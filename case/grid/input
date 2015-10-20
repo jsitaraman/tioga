@@ -1,0 +1,15 @@
+$inputs
+nlayers=40,
+wallSpacing=1e-5,
+outerSpacing=0.1,
+outerB=1.0
+xlo(1)=-5.,
+xlo(2)=-5.,
+xlo(3)=-5.,
+xhi(1)=5.,
+xhi(2)=5., 
+xhi(3)=5.,
+dx(1)=0.1,
+dx(2)=0.1,
+dx(3)=0.1
+$end

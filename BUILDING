@@ -1,0 +1,33 @@
+To build the library "libtioga.a"
+---------------------------------
+[user@machine tioga]$ cd src;make;cd ..
+
+To build the tools for standalone testing
+----------------------------
+[user@machine tioga]$ cd driver;make;cd ..
+[user@machine tioga]$ cd gridGen;make;cd ..
+
+To run the test the case
+---------------------------
+[user@machine tioga]$ cd case;./run.sh 16
+
+run.sh does two things:
+
+1. builds a sample grid system that is composed of
+   a prizmatic sphere grid and a background hex grid 
+   The argument "16" above says how many cores you want
+   to test this problem.
+
+2. performs connectivity using tioga and verifies that
+   the interpolation accuracy for a linear field
+
+To visualize
+---------------------
+[user@machine tioga/case]$ tec360 iblank.lay
+
+NOTE:
+I use intel fortran for f90 and gcc/g++ for C/C++
+the build system is setup for that. If you use another
+compiler change the FFLAGS in various Makefiles to match
+the flags you need to use. I have tested with gfortran and
+it seems to work OK

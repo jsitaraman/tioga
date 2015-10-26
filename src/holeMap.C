@@ -51,7 +51,7 @@ void tioga::getHoleMap(void)
  // get the local bounding box
  //
  mb->getWallBounds(&meshtag,&existWall,wbox);
- MPI_Allreduce(&meshtag,&maxtag,1,MPI_INT,MPI_MAX,MPI_COMM_WORLD);
+ MPI_Allreduce(&meshtag,&maxtag,1,MPI_INT,MPI_MAX,scomm);
  //
  if (holeMap) 
    {
@@ -68,7 +68,7 @@ void tioga::getHoleMap(void)
  //
  existHoleLocal[meshtag-1]=existWall;
  //
- MPI_Allreduce(existHoleLocal,existHole,maxtag,MPI_INT,MPI_MAX,MPI_COMM_WORLD);
+ MPI_Allreduce(existHoleLocal,existHole,maxtag,MPI_INT,MPI_MAX,scomm);
  //
  for(i=0;i<maxtag;i++) holeMap[i].existWall=existHole[i];
  //
@@ -90,8 +90,8 @@ void tioga::getHoleMap(void)
  // get the global bounding box info across all the
  // partitions for all meshes
  //
- MPI_Allreduce(bboxLocal,bboxGlobal,3*maxtag,MPI_DOUBLE,MPI_MIN,MPI_COMM_WORLD);
- MPI_Allreduce(&(bboxLocal[3*maxtag]),&(bboxGlobal[3*maxtag]),3*maxtag,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+ MPI_Allreduce(bboxLocal,bboxGlobal,3*maxtag,MPI_DOUBLE,MPI_MIN,scomm);
+ MPI_Allreduce(&(bboxLocal[3*maxtag]),&(bboxGlobal[3*maxtag]),3*maxtag,MPI_DOUBLE,MPI_MAX,scomm);
  //
  // find the bounding box for each mesh
  // from the globally reduced data
@@ -136,7 +136,7 @@ void tioga::getHoleMap(void)
     if (holeMap[i].existWall) 
      {
       bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
-      MPI_Allreduce(holeMap[i].samLocal,holeMap[i].sam,bufferSize,MPI_INT,MPI_MAX,MPI_COMM_WORLD);
+      MPI_Allreduce(holeMap[i].samLocal,holeMap[i].sam,bufferSize,MPI_INT,MPI_MAX,scomm);
      }
    }
  //

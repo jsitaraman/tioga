@@ -38,7 +38,7 @@ extern "C" {
     int id_proc,nprocs;
     MPI_Comm tcomm;
     //tcomm=(MPI_Comm) (*scomm);
-    tcomm=MPI_COMM_WORLD;
+    tcomm=MPI_Comm_f2c(*scomm);
     //
     tg=new tioga[1];
     //

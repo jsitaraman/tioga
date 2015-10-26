@@ -74,7 +74,7 @@ void tioga::performConnectivity(void)
   mb->ihigh=0;
   mb->search();
   exchangeDonors();
-  MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   if (ihighGlobal) {
    mb->getCellIblanks();
 //  mb->writeCellFile(myid);

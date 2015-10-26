@@ -33,7 +33,7 @@ void tioga::exchangeBoxes(void)
   PACKET *sndPack,*rcvPack;
   //
   alltags=(int *)malloc(sizeof(int)*numprocs);
-  MPI_Allgather(&mytag, 1, MPI_INT, alltags,1,MPI_INT,MPI_COMM_WORLD);
+  MPI_Allgather(&mytag, 1, MPI_INT, alltags,1,MPI_INT,scomm);
   //
   // count number of other processors to communicate to
   // in overset grid scenario, usually you do not communicate

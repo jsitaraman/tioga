@@ -160,7 +160,7 @@ void tioga::exchangePointSearchData(void)
     mb->getExtraQueryPoints(&obblist[k],
 			    &sndPack[k].nints,&sndPack[k].intData,
 			    &sndPack[k].nreals,&sndPack[k].realData);
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(scomm);
   //if (myid==0) printf("AAAAA\n");
   //
   // exchange the data

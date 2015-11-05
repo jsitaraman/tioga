@@ -96,11 +96,11 @@ extern "C" {
   void tioga_dataupdate_(double *q,int *nvar,char *itype)
   {
     int interptype;
-    if (strcmp(itype,"row")==0) 
+    if (strstr(itype,"row")) 
       {
 	interptype=0;
       }
-    else if (strcmp(itype,"column")==0) 
+    else if (strstr(itype,"column")) 
       {
 	interptype=1;
       }
@@ -121,11 +121,11 @@ extern "C" {
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)
   {
     int interptype;
-    if (strcmp(itype,"row")==0) 
+    if (strstr(itype,"row")) 
       {
 	interptype=0;
       }
-    else if (strcmp(itype,"column")==0) 
+    else if (strstr(itype,"column")) 
       {
 	interptype=1;
       }

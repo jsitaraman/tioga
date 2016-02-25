@@ -25,13 +25,18 @@
  *  Jay Sitaraman 02/24/2014 
  */
 #include "MeshBlock.h"
+#include "CartGrid.h"
+#include "CartBlock.h"
 #include "parallelComm.h"
 
 class tioga
 {
  private :
   int nblocks;
+  int ncart;
   MeshBlock *mb;
+  CartGrid *cg;
+  CartBlock *cb;
   int nmesh;
   HOLEMAP *holeMap;
   MPI_Comm scomm;
@@ -50,7 +55,7 @@ class tioga
   int ihighGlobal;
   /** basic constuctor */
   tioga() { mb = NULL; holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
-    obblist=NULL; isym=2;ihigh=0;};
+    obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;};
  
   /** basic destructor */
   ~tioga(); 
@@ -77,6 +82,7 @@ class tioga
 
   void performConnectivity(void);
   void performConnectivityHighOrder(void);
+  void performConnectivityAMR(void);
 
   /** update data */
 

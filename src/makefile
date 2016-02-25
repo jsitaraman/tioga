@@ -11,7 +11,8 @@ OBJECTS = buildADTrecursion.o searchADTrecursion.o ADT.o\
 	MeshBlock.o search.o checkContainment.o bookKeeping.o \
 	dataUpdate.o math.o utils.o linklist.o\
 	tioga.o holeMap.o exchangeBoxes.o exchangeSearchData.o exchangeDonors.o\
-	parallelComm.o highOrder.o\
+	parallelComm.o highOrder.o \
+	cartOps.o CartGrid.o CartBlock.o getCartReceptors.o get_amr_index_xyz.o\
 	tiogaInterface.o
 
 LDFLAGS= -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl

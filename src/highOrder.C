@@ -242,13 +242,18 @@ void MeshBlock::processPointDonors(void)
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
-	free(interpList2[i].inode);
-	free(interpList2[i].weights);
+	if (interpList2[i].inode) free(interpList2[i].inode);
+	if (interpList2[i].weights) free(interpList2[i].weights);
       }
     free(interpList2);
   } 
   interp2ListSize = ninterp2;
   interpList2=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
+  for(i=0;i<interp2ListSize;i++)
+    {
+      interpList2[i].inode=NULL;
+      interpList2[i].weights=NULL;
+   }
   //  
   //printf("nsearch=%d %d\n",nsearch,myid);
   m=0;

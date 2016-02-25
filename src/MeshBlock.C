@@ -749,20 +749,29 @@ MeshBlock::~MeshBlock()
     free(donorList);
   }
   if (interpList) {
-    for(i=0;i<ninterp;i++)
+    for(i=0;i<interpListSize;i++)
       {
-	free(interpList[i].inode);
-	free(interpList[i].weights);
+	if (interpList[i].inode) free(interpList[i].inode);
+	if (interpList[i].weights) free(interpList[i].weights);
       }
     free(interpList);
   }
+  return;
   if (interpList2) {
-    for(i=0;i<ninterp2;i++)
+    for(i=0;i<interp2ListSize;i++)
       {
-	free(interpList2[i].inode);
-	free(interpList2[i].weights);
+	if (interpList2[i].inode) free(interpList2[i].inode);
+	if (interpList2[i].weights) free(interpList2[i].weights);
       }
     free(interpList2);
+  }
+  if (interpListCart) {
+    for(i=0;i<interpListCartSize;i++)
+      {
+        if (interpListCart[i].inode) free(interpListCart[i].inode);
+ 	if (interpListCart[i].weights) free(interpListCart[i].weights);
+      }
+    free(interpListCart);
   }
   if (!ihigh) {
    if (iblank_cell) free(iblank_cell);
@@ -777,6 +786,10 @@ MeshBlock::~MeshBlock()
   if (pointsPerCell) free(pointsPerCell);
   if (rxyz) free(rxyz);
   if (picked) free(picked);
+  if (rxyzCart) free(rxyzCart);
+  if (donorIdCart) free(donorIdCart);
+  if (pickedCart) free(pickedCart);
+  if (ctag_cart) free(ctag_cart);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

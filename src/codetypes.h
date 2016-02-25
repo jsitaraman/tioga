@@ -113,7 +113,7 @@ typedef struct INTERPLIST
 {
   int cancel;
   int nweights;
-  int receptorInfo[2];
+  int receptorInfo[3];
   int *inode;
   double *weights;
 } INTERPLIST;
@@ -123,3 +123,11 @@ typedef struct INTEGERLIST
   int inode;
   struct INTEGERLIST *next;
 } INTEGERLIST;
+
+typedef struct INTEGERLIST2
+{
+  int intDataSize,realDataSize;
+  int *intData;
+  double *realData;
+  struct INTEGERLIST2 *next;
+}INTEGERLIST2; 

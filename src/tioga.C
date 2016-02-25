@@ -93,6 +93,18 @@ void tioga::performConnectivityHighOrder(void)
   iorphanPrint=1;
 }  
 
+void tioga::performConnectivityAMR(void)
+{
+  if (nblocks > 0) 
+    {
+      mb->getCartReceptors(cg);
+      mb->ihigh=ihigh;
+      mb->search();
+      mb->getUnresolvedMandatoryReceptors();
+      cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
+    }    
+}
+
 void tioga::dataUpdate(int nvar,double *q,int interptype)
 {
   int i,j,k,m;

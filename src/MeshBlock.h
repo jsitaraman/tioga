@@ -25,7 +25,8 @@
  */
 #include "codetypes.h"
 #include "ADT.h"
-
+// forward declare to instantiate one of the methods
+class CartGrid;
 class MeshBlock
 {
  private:
@@ -79,8 +80,14 @@ class MeshBlock
   int ipoint; 
   int *picked;             /** < flag specifying if a node has been selected for high-order interpolation */
 
-
+  int nreceptorCellsCart;
+  int *ctag_cart;
+  int *pickedCart;
+ 	
  public :
+  int ntotalPointsCart;
+  double *rxyzCart;
+  int *donorIdCart;
   int donorListLength;
 
   int nfringe;
@@ -103,15 +110,19 @@ class MeshBlock
   int ninterp2;            /** < number of interpolants for high-order points */
   int interp2ListSize;
   INTERPLIST *interpList2; /** < list for high-interpolation points */
-  
+  int ninterpCart;
+  int interpListCartSize;
+  INTERPLIST *interpListCart; 
   /** basic constructor */
   MeshBlock() { nv=NULL; nc=NULL; x=NULL;iblank=NULL;iblank_cell=NULL;vconn=NULL;wbcnode=NULL;
     obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
     interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; xsearch=NULL; donorId=NULL;
     adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=2;
     // new vars
+    ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
-    interpList2=NULL;picked=NULL;
+    interpList2=NULL;picked=NULL;ctag_cart=NULL;rxyzCart=NULL;donorIdCart=NULL;pickedCart=NULL;ntotalPointsCart=0;
+    nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;
   };
 
   /** basic destructor */
@@ -217,4 +228,6 @@ class MeshBlock
     fprintf(fp,"%f %f %f\n",rxyz[3*i],rxyz[3*i+1],rxyz[3*i+2]);
   }
   void clearOrphans(int *itmp);
+  void getUnresolvedMandatoryReceptors();
+  void getCartReceptors(CartGrid *cg);
 };

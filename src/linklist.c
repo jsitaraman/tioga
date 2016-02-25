@@ -37,6 +37,16 @@ void deallocateLinkList2(INTEGERLIST *temp)
     }
 }
 
+void deallocateLinkList3(INTEGERLIST2 *temp)
+{
+  if (temp!=NULL)
+    {
+      free(temp->intData);
+      free(temp->realData);
+      deallocateLinkList3(temp->next);
+      free(temp);
+    }
+}
 
 void insertInList(DONORLIST **donorList,DONORLIST *temp1)
 {

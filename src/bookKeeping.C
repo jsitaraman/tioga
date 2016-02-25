@@ -250,17 +250,21 @@ void MeshBlock::initializeInterpList(int ninterp_input)
 {
   int i;
   if (interpList) {
-    for(i=0;i<ninterp;i++)
-    //for(i=0;i<interpListSize;i++)
+    //for(i=0;i<ninterp;i++)
+    for(i=0;i<interpListSize;i++)
       {
-	free(interpList[i].inode);
-	free(interpList[i].weights);
+	if (interpList[i].inode) free(interpList[i].inode);
+	if (interpList[i].weights) free(interpList[i].weights);
       }
     free(interpList);
   }
   ninterp=ninterp_input;   
   interpListSize=ninterp_input;
   interpList=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListSize);
+  for(i=0;i<interpListSize;i++) {
+   interpList[i].inode=NULL;
+   interpList[i].weights=NULL;
+  }
   if (cancelList) deallocateLinkList2(cancelList);
   cancelList=NULL;
   ncancel=0;

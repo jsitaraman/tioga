@@ -54,7 +54,8 @@ class tioga
   int ihigh;
   int ihighGlobal;
   /** basic constuctor */
-  tioga() { mb = NULL; holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
+  tioga() { mb = NULL; cg=NULL; cb=NULL; 
+    holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
     obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;};
  
   /** basic destructor */
@@ -123,6 +124,11 @@ class tioga
     mb->setcallback(f1,f2,f3,f4,f5);
     ihigh=1;
   }
+  
+  void register_amr_global_data(int, double *, int *,double *, int, int);
+  void set_amr_patch_count(int);
+  void register_amr_local_data(int, int *, int *, double *, double *, int);
+
 };
       
   

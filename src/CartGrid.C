@@ -20,7 +20,8 @@
 # include "codetypes.h"
 # include "CartGrid.h"
 
-void CartGrid::registerData(int nfin,double *qnodein,int *idata,int *rdata,int ngridsin,int qnodesize)
+void CartGrid::registerData(int nfin,double *qnodein,int *idata,
+			    double *rdata,int ngridsin,int qnodesize)
 {
   int i,i3,i6,iloc,n;
   

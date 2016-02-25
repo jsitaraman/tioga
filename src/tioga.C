@@ -359,3 +359,24 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   if (dcount) free(dcount);
 }
 
+void tioga::register_amr_global_data(int nf,double *qnodein,int *idata,
+				     double *rdata,int ngridsin,
+				     int qnodesize)
+{
+  if (cg) delete [] cg;
+  cg=new CartGrid[1];
+  cg->registerData(nf,qnodein,idata,rdata,ngridsin,qnodesize);
+}
+
+void tioga::set_amr_patch_count(int npatchesin)
+{
+  ncart=npatchesin;
+  if (cb) delete [] cb;
+  cb=new CartBlock[ncart];
+}
+
+void tioga::register_amr_local_data(int ipatch,int *idata,int *iblank,
+				    double *q,double *xlo, int nf)
+{
+  cb[ipatch].registerData(idata,iblank,q,xlo,nf);
+}

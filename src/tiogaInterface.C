@@ -78,6 +78,25 @@ extern "C" {
     tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,nv,nc,vconn);
   }
 
+  void tioga_register_amr_global_data_(int *nf, double *qnodein,
+				      int *idata,double *rdata,
+				      int *ngridsin,int *qnodesize)
+  {
+    tg->register_amr_global_data(*nf,qnodein,idata,rdata,*ngridsin,*qnodesize);
+  }
+
+
+  void tioga_register_amr_patch_count_(int *npatches)
+  {
+    tg->set_amr_patch_count(*npatches);
+  }
+
+  void tioga_register_amr_local_data_(int *ipatch,int *idata,int *iblank,
+				     double *q,double *xlo,int *nf)
+  {
+    tg->register_amr_local_data(*ipatch,idata,iblank,q,xlo,*nf);
+  }
+
   void tioga_preprocess_grids_(void)
   {
     tg->profile();

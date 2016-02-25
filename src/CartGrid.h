@@ -58,7 +58,9 @@ class CartGrid
     if (dxlvl) free(dxlvl);
     if (qnode) free(qnode);
   };
-  void registerData(int nf,double *qnodein,int *idata,int *rdata,int ngridsin,int qnodesize);
+  void registerData(int nf,double *qnodein,
+		    int *idata,double *rdata,
+		    int ngridsin,int qnodesize);
   void preprocess(void);     
   void search(double *x,int *donorid,int nsearch);
 };

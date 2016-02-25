@@ -78,11 +78,11 @@ extern "C" {
     tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,nv,nc,vconn);
   }
 
-  void tioga_register_amr_global_data_(int *nf, double *qnodein,
+  void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
 				      int *idata,double *rdata,
 				      int *ngridsin,int *qnodesize)
   {
-    tg->register_amr_global_data(*nf,qnodein,idata,rdata,*ngridsin,*qnodesize);
+    tg->register_amr_global_data(*nf,*qstride,qnodein,idata,rdata,*ngridsin,*qnodesize);
   }
 
 
@@ -91,10 +91,9 @@ extern "C" {
     tg->set_amr_patch_count(*npatches);
   }
 
-  void tioga_register_amr_local_data_(int *ipatch,int *idata,int *iblank,
-				     double *q,double *xlo,int *nf)
+  void tioga_register_amr_local_data_(int *ipatch,int *global_id,int *iblank,double *q)
   {
-    tg->register_amr_local_data(*ipatch,idata,iblank,q,xlo,*nf);
+    tg->register_amr_local_data(*ipatch,*global_id,iblank,q);
   }
 
   void tioga_preprocess_grids_(void)
@@ -192,8 +191,11 @@ extern "C" {
     //donor_frac=f4;
     //convert_to_modal=f5;
   }
-
-
+  void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *))
+  {
+    tg->set_amr_callback(f1);
+  }
+  
   void tioga_delete_(void)
    {
     delete [] tg;

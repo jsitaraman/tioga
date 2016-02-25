@@ -34,11 +34,12 @@ class CartGrid
   int *ilo;
   int *ihi;
   int *dims;
-  int nf;
+  int nf,qstride;
   double *xlo;
   double *dx;
   double *qnode;
   int ngrids;
+  void (*donor_frac) (int *,double *,int *,double *);
    
   CartGrid() { ngrids=0;global_id=NULL;level_num=NULL;local_id=NULL;porder=NULL;
     proc_id=NULL;local_id=NULL;ilo=NULL;ihi=NULL;dims=NULL;
@@ -58,9 +59,10 @@ class CartGrid
     if (dxlvl) free(dxlvl);
     if (qnode) free(qnode);
   };
-  void registerData(int nf,double *qnodein,
+  void registerData(int nf,int qstride,double *qnodein,
 		    int *idata,double *rdata,
 		    int ngridsin,int qnodesize);
   void preprocess(void);     
   void search(double *x,int *donorid,int nsearch);
+  void setcallback(void (*f1)(int *,double *,int *,double *)) {donor_frac=f1;}
 };

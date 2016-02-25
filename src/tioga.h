@@ -125,10 +125,14 @@ class tioga
     ihigh=1;
   }
   
-  void register_amr_global_data(int, double *, int *,double *, int, int);
-  void set_amr_patch_count(int);
-  void register_amr_local_data(int, int *, int *, double *, double *, int);
+  void set_amr_callback(void (*f1)(int *,double *,int *,double *))
+  {
+    cg->setcallback(f1);
+  }
 
+  void register_amr_global_data(int, int, double *, int *,double *, int, int);
+  void set_amr_patch_count(int);
+  void register_amr_local_data(int, int ,int *, double *);  
 };
       
   

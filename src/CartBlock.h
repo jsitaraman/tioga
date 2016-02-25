@@ -18,6 +18,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 //#include "codetypes.h"
+class CartGrid;
 class CartBlock
 {
  private:
@@ -27,26 +28,20 @@ class CartBlock
   int *ibl;
   double *q;
   double xlo[3]; 
+  double dx[3];
   int ndonors;
   int interpListSize;
   INTERPLIST *interpList;
 
  public:
   CartBlock() { global_id=0;jd=kd=ld=0;ibl=NULL;q=NULL;interpListSize=0;interpList=NULL;};
-  void registerData(int *idata,int *iblankin,double *qin,double *xloin,int nf)
+  void registerData(int global_id_in,int *iblankin,double *qin)
   {
-    global_id=idata[0];
-    jd=idata[1];
-    kd=idata[2];
-    ld=idata[3];
+    global_id=global_id_in;
     ibl=iblankin;
     q=qin;
-    for(int n=0;n<3;n++) xlo[n]=xloin[n];
-    gsize1=(jd+2*nf);
-    gsize2=gsize1*(kd+2*nf);
-    gsize3=gsize2*(ld+2*nf);
   };
-
+  void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData,
 			   double *q,

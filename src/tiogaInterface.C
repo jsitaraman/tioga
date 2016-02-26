@@ -111,6 +111,11 @@ extern "C" {
     tg->performConnectivityHighOrder();
   }
 
+  void tioga_performconnectivity_amr_(void)
+  {
+   tg->performConnectivityAMR();
+  }
+
   void tioga_dataupdate_(double *q,int *nvar,char *itype)
   {
     int interptype;

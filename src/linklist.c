@@ -41,9 +41,20 @@ void deallocateLinkList3(INTEGERLIST2 *temp)
 {
   if (temp!=NULL)
     {
-      free(temp->intData);
-      free(temp->realData);
+      if (temp->intData) free(temp->intData);
+      if (temp->realData) free(temp->realData);
       deallocateLinkList3(temp->next);
+      free(temp);
+    }
+}
+
+void deallocateLinkList4(INTERPLIST2 *temp)
+{
+  if (temp!=NULL)
+    {
+      if (temp->inode) free(temp->inode);
+      if (temp->weights) free(temp->weights);
+      deallocateLinkList4(temp->next);
       free(temp);
     }
 }

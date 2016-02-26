@@ -23,18 +23,20 @@ class CartBlock
 {
  private:
   int global_id;
-  int jd,kd,ld,nf;
-  int gsize1,gsize2,gsize3;
+  int dims[3],nf,qstride,ndof,pdegree,p3;
+  int d1,d2,d3;
   int *ibl;
   double *q;
+  double *qnode;
   double xlo[3]; 
   double dx[3];
   int ndonors;
   int interpListSize;
-  INTERPLIST *interpList;
-
+  INTERPLIST2 *interpList,*listptr;
+  DONORLIST **donorList;
+  void (*donor_frac) (int *,double *,int *,double *);
  public:
-  CartBlock() { global_id=0;jd=kd=ld=0;ibl=NULL;q=NULL;interpListSize=0;interpList=NULL;};
+  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;interpListSize=0;interpList=NULL;};
   void registerData(int global_id_in,int *iblankin,double *qin)
   {
     global_id=global_id_in;
@@ -47,4 +49,9 @@ class CartBlock
 			   double *q,
 			   int nvar, int interptype);
   void update(double *qval,int index,int nq);
+  void getCancellationData(int *cancelledData, int *ncancel);
+  void processDonors(HOLEMAP *holemap, int nmesh);
+  void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes);
+  void insertInInterpList(int procid,int remoteid,double *xtmp);
+  void initializeLists(void);
 };

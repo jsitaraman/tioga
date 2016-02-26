@@ -98,6 +98,7 @@ typedef struct DONORLIST
 {
   int donorData[3];
   double donorRes;
+  int cancel;
   struct DONORLIST *next;
 } DONORLIST;
 
@@ -114,9 +115,20 @@ typedef struct INTERPLIST
   int cancel;
   int nweights;
   int receptorInfo[3];
+  double xtmp[3];
   int *inode;
   double *weights;
 } INTERPLIST;
+
+typedef struct INTERPLIST2
+{
+  int cancel;
+  int nweights;
+  int receptorInfo[3];
+  int *inode;
+  double *weights;
+  struct INTERPLIST2 *next;
+} INTERPLIST2;
 
 typedef struct INTEGERLIST
 {

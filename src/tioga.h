@@ -41,6 +41,7 @@ class tioga
   HOLEMAP *holeMap;
   MPI_Comm scomm;
   parallelComm *pc;
+  parallelComm *pc_cart;
   int isym;
   int ierr;
   int mytag;
@@ -133,6 +134,7 @@ class tioga
   void register_amr_global_data(int, int, double *, int *,double *, int, int);
   void set_amr_patch_count(int);
   void register_amr_local_data(int, int ,int *, double *);  
+  void exchangeAMRDonors(void);
 };
       
   

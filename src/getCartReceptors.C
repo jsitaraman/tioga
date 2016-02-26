@@ -23,12 +23,13 @@
 // FIX later ...
 //
 #include "MeshBlock.h"
+#include "parallelComm.h"
 #include "CartGrid.h"
 extern "C"{
   int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
                         double vB[3][3],double xB[3],double dxB[3]);
 
-  void get_amr_index_xyz(int i,int j,int k,
+  void get_amr_index_xyz(int nq,int i,int j,int k,
 			 int pBasis,
 			 int nX,int nY,int nZ,
 			 int nf,
@@ -38,20 +39,27 @@ extern "C"{
   void deallocateLinkList3(INTEGERLIST2 *);
 }
 
-void MeshBlock::getCartReceptors(CartGrid *cg)
+void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 {
   int i,j,k,l,m,ploc,c,n,ntm;
   int i3;
   int iflag;
   int icount,dcount;
   int nsend,nrecv;
+  int *pmap;
+  int *sndMap,*rcvMap;
   OBB *obcart;
   INTEGERLIST2 *head;
   INTEGERLIST2 *dataPtr;
   int *itm;
   double *xtm;
   double xd[3];
-
+  //
+  // limit case we communicate to everybody
+  //
+  pmap=(int *)malloc(sizeof(int)*pc->numprocs);
+  for(i=0;i<pc->numprocs;i++) pmap[i]=0;
+  //
   obcart=(OBB *)malloc(sizeof(OBB));
   for(j=0;j<3;j++)
     for(k=0;k<3;k++)
@@ -83,7 +91,7 @@ void MeshBlock::getCartReceptors(CartGrid *cg)
 	    for(k=0;k<cg->dims[3*c+1];k++)
 	      for(l=0;l<cg->dims[3*c+2];l++)
 		{
-		  get_amr_index_xyz(j,k,l,
+		  get_amr_index_xyz(cg->qstride,j,k,l,
 				    cg->porder[c],cg->dims[3*c],cg->dims[3*c+1],cg->dims[3*c+2],
 				    cg->nf,
 				    &cg->xlo[3*c+n],
@@ -110,6 +118,7 @@ void MeshBlock::getCartReceptors(CartGrid *cg)
 		  
 		  if (iflag==ntm) 
 		    {
+		      pmap[cg->proc_id[c]]=1;
 		      dataPtr->next=(INTEGERLIST2 *) malloc(sizeof(INTEGERLIST2));
 		      dataPtr=dataPtr->next;
 		      dataPtr->realData=(double *) malloc(sizeof(double)*3*ntm);
@@ -132,6 +141,24 @@ void MeshBlock::getCartReceptors(CartGrid *cg)
 	  free(itm);
 	}
     }
+  //
+  // create the communication map
+  //
+  nsend=0;
+  for(i=0;i<pc->numprocs;i++) if (pmap[i]==1) nsend++;
+  nrecv=nsend;
+  sndMap=(int *)malloc(sizeof(int)*nsend);
+  rcvMap=(int *)malloc(sizeof(int)*nrecv);
+  m=0;
+  for(i=0;i<pc->numprocs;i++)
+    {
+      if (pmap[i]==1) 
+	{
+	  sndMap[m]=rcvMap[m]=i;
+	  m++;
+	}
+    }
+  pc->setMap(nsend,nrecv,sndMap,rcvMap);
   //
   // if these were already allocated
   // get rid of them
@@ -161,6 +188,9 @@ void MeshBlock::getCartReceptors(CartGrid *cg)
     }
   deallocateLinkList3(head);
   free(obcart);
+  free(pmap);
+  free(sndMap);
+  free(rcvMap);
 }
 
   

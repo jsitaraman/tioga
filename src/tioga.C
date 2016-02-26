@@ -44,6 +44,14 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   pc->myid=myid;
   pc->scomm=scomm;
   pc->numprocs=numprocs;  
+ 
+  // instantiate the parallel communication class
+  //   
+  pc_cart=new parallelComm[1];
+  pc_cart->myid=myid;
+  pc_cart->scomm=scomm;
+  pc_cart->numprocs=numprocs;
+  //
 }
 /**
  * register grid data for each mesh block
@@ -101,12 +109,13 @@ void tioga::performConnectivityAMR(void)
   
   if (nblocks > 0) 
     {
-      mb->getCartReceptors(cg);
+      mb->getCartReceptors(cg,pc_cart);
       mb->ihigh=ihigh;
       mb->search();
       mb->getUnresolvedMandatoryReceptors();
       cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
     }    
+  exchangeAMRDonors();
 }
 
 void tioga::dataUpdate(int nvar,double *q,int interptype)

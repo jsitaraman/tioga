@@ -26,6 +26,7 @@
 #include "codetypes.h"
 #include "ADT.h"
 // forward declare to instantiate one of the methods
+class parallelComm;
 class CartGrid;
 class MeshBlock
 {
@@ -229,5 +230,5 @@ class MeshBlock
   }
   void clearOrphans(int *itmp);
   void getUnresolvedMandatoryReceptors();
-  void getCartReceptors(CartGrid *cg);
+  void getCartReceptors(CartGrid *cg, parallelComm *pc);
 };

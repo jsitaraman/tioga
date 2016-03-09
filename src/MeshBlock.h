@@ -147,12 +147,17 @@ class MeshBlock
 
   void writeOBB(int bid);
 
+  void writeOBB2(OBB *obc,int bid);
+
   void updateSolnData(int inode,double *qvar,double *q,int nvar,int interptype);
 
   int getNinterp(void) {return ninterp;};
 
   void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,double *q,
 			       int nvar, int interptype);
+
+  void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,
+				  int nvar, int interptype);
   
   void checkContainment(int *cellIndex,int adtElement,double *xsearch);
 
@@ -178,6 +183,8 @@ class MeshBlock
   void initializeInterpList(int ninterp_input);
   
   void findInterpData(int* recid,int irecord, double receptorRes);
+
+  void findInterpListCart();
 
   void set_ninterp(int);
 
@@ -231,4 +238,5 @@ class MeshBlock
   void clearOrphans(int *itmp);
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
+  void setCartIblanks(void);
 };

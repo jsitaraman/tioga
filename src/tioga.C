@@ -18,11 +18,14 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h"
+#include <assert.h>
 /**
  * set communicator
  * and initialize a few variables
  */
-
+extern "C"{
+//void writeqnode_(int *myid,double *qnodein,int *qnodesize);
+};
 void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
 {
   scomm=communicator;
@@ -35,7 +38,7 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   // this can be changed at a later date
   // but will be a fairly invasive change
   //
-  nblocks=1;
+  nblocks=0;
   mb=new MeshBlock[1];
   //
   // instantiate the parallel communication class
@@ -59,6 +62,7 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			     int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn)
 {
+  if (nnodes > 0) nblocks=1;
   mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
   mb->myid=myid;
   mytag=btag;
@@ -83,10 +87,10 @@ void tioga::performConnectivity(void)
   mb->search();
   exchangeDonors();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
-  if (ihighGlobal) {
-   mb->getCellIblanks();
+  //if (ihighGlobal) {
+  mb->getCellIblanks();
 //  mb->writeCellFile(myid);
-  }
+  //}
   //mb->writeOutput(myid);
   //tracei(myid);
 }
@@ -103,7 +107,11 @@ void tioga::performConnectivityHighOrder(void)
 
 void tioga::performConnectivityAMR(void)
 {
-  int i;
+  int i,ierr;
+  int iamr;
+
+  iamr=(ncart >0)?1:0;
+  MPI_Allreduce(&iamr,&iamrGlobal,1,MPI_INT,MPI_MAX,scomm);
   cg->preprocess();
   for(i=0;i<ncart;i++) cb[i].preprocess(cg);
   
@@ -115,8 +123,123 @@ void tioga::performConnectivityAMR(void)
       mb->getUnresolvedMandatoryReceptors();
       cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
     }    
+  //checkComm();
   exchangeAMRDonors();
+  mb->getCellIblanks();
+  mb->writeCellFile(myid);
+  for(i=0;i<ncart;i++)
+	cb[i].writeCellFile(i);
+  //MPI_Barrier(scomm);
+  //printf("Finished performConnectivityAMR in %d\n",myid);
+  //ierr=0;
+  //MPI_Abort(scomm,ierr);
 }
+
+void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
+{
+  int i,j,k,m;
+  int nints;
+  int nreals;
+  int *integerRecords;
+  double *realRecords;
+  int nsend,nrecv;
+  int *sndMap,*rcvMap;
+  PACKET *sndPack,*rcvPack;
+  int *icount,*dcount;
+  int bid;
+  //
+  // initialize send and recv packets
+  //
+  icount=dcount=NULL;
+  integerRecords=NULL;
+  realRecords=NULL;
+  //
+  pc_cart->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  if (nsend==0) return;
+  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
+  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
+  icount=(int *)malloc(sizeof(int)*nsend);
+  dcount=(int *)malloc(sizeof(int)*nrecv);
+  //
+  pc_cart->initPackets(sndPack,rcvPack);  
+  //
+  // get the interpolated solution now
+  //
+  integerRecords=NULL;
+  realRecords=NULL;
+  mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+  for(i=0;i<ncart;i++)
+    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
+  //
+  // populate the packets
+  //
+  for(i=0;i<nints;i++)
+    {
+      k=integerRecords[3*i];
+      if (k <0 || k > nsend) {
+	tracei(nsend);
+	tracei(i);
+	tracei(nints);
+	tracei(k);
+      }
+      assert(k < nsend);      
+      sndPack[k].nints+=2;
+      sndPack[k].nreals+=nvar;
+    }
+
+  for(k=0;k<nsend;k++)
+    {
+     sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
+     sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
+     icount[k]=dcount[k]=0;
+    }  
+
+  m=0;
+  for(i=0;i<nints;i++)
+    {
+      k=integerRecords[3*i];
+      sndPack[k].intData[icount[k]++]=integerRecords[3*i+1];
+      sndPack[k].intData[icount[k]++]=integerRecords[3*i+2];
+      for(j=0;j<nvar;j++)
+	sndPack[k].realData[dcount[k]++]=realRecords[m++];
+    }
+  //
+  // communicate the data across
+  //
+  pc_cart->sendRecvPackets(sndPack,rcvPack);
+  //
+  // decode the packets and update the data
+  //
+  for(k=0;k<nrecv;k++)
+    {
+      m=0;
+      for(i=0;i<rcvPack[k].nints/2;i++)
+	{
+	  bid=rcvPack[k].intData[2*i];
+	  if (bid< 0) 
+	    {
+	      mb->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],q,nvar,interptype);
+	    }
+	  else
+	    {
+
+	      cb[bid].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
+	      m+=nvar;
+	    }
+	}
+    }
+  //
+  // release all memory
+  //
+  pc_cart->clearPackets2(sndPack,rcvPack);
+  free(sndPack);
+  free(rcvPack);
+  if (integerRecords) free(integerRecords);
+  if (realRecords) free(realRecords);
+  if (icount) free(icount);
+  if (dcount) free(dcount);
+}
+
 
 void tioga::dataUpdate(int nvar,double *q,int interptype)
 {
@@ -378,7 +501,9 @@ void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *ida
 {
   if (cg) delete [] cg;
   cg=new CartGrid[1];
+  cg->myid=myid;
   cg->registerData(nf,qstride,qnodein,idata,rdata,ngridsin,qnodesize);
+  //writeqnode_(&myid,qnodein,&qnodesize);
 }
 
 void tioga::set_amr_patch_count(int npatchesin)
@@ -390,5 +515,5 @@ void tioga::set_amr_patch_count(int npatchesin)
 
 void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,double *q)
 {
-  cb[ipatch].registerData(global_id,iblank,q);
+  cb[ipatch].registerData(ipatch,global_id,iblank,q);
 }

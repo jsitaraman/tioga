@@ -46,7 +46,7 @@ program testTioga
   !
   ! initialize tioga
   !
-  call tioga_init(mpi_comm_world)
+  call tioga_init_f90(mpi_comm_world)
   call mpi_barrier(mpi_comm_world,ierr)
   !
   ntypes=1

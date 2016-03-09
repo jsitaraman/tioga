@@ -54,10 +54,11 @@ class tioga
  public:
   int ihigh;
   int ihighGlobal;
+  int iamrGlobal;
   /** basic constuctor */
   tioga() { mb = NULL; cg=NULL; cb=NULL; 
     holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
-    obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;};
+    obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;};
  
   /** basic destructor */
   ~tioga(); 
@@ -90,6 +91,8 @@ class tioga
 
   void dataUpdate(int nvar,double *q,int interptype) ;
 
+  void dataUpdate_AMR(int nvar,double *q,int interptype) ;
+  
   void dataUpdate_highorder(int nvar,double *q,int interptype) ;
 
   /** get hole map for each mesh */
@@ -135,6 +138,7 @@ class tioga
   void set_amr_patch_count(int);
   void register_amr_local_data(int, int ,int *, double *);  
   void exchangeAMRDonors(void);
+  void checkComm(void);
 };
       
   

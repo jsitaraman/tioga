@@ -33,12 +33,33 @@
 // 02/24/2014
 //
 extern "C" {
-  void tioga_init_(int *scomm)
+
+  void tioga_init_f90_(int *scomm)
   {
     int id_proc,nprocs;
     MPI_Comm tcomm;
     //tcomm=(MPI_Comm) (*scomm);
     tcomm=MPI_Comm_f2c(*scomm);
+    //
+    tg=new tioga[1];
+    //
+    //MPI_Comm_rank(MPI_COMM_WORLD,&id_proc);
+    //MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
+    MPI_Comm_rank(tcomm,&id_proc);
+    MPI_Comm_size(tcomm,&nprocs);
+    //
+    tg->setCommunicator(tcomm,id_proc,nprocs);
+    nc=NULL;
+    nv=NULL;
+    vconn=NULL;
+  }
+
+  void tioga_init_(MPI_Comm tcomm)
+  {
+    int id_proc,nprocs;
+    //MPI_Comm tcomm;
+    //tcomm=(MPI_Comm) (*scomm);
+    //tcomm=MPI_Comm_f2c(*scomm);
     //
     tg=new tioga[1];
     //
@@ -134,11 +155,25 @@ extern "C" {
       }
     if (tg->ihighGlobal==0) 
       {
-	tg->dataUpdate(*nvar,q,interptype);
+	if (tg->iamrGlobal==0) 
+	  {
+	    tg->dataUpdate(*nvar,q,interptype);
+	  }
+	else
+	  {
+	    tg->dataUpdate_AMR(*nvar,q,interptype);
+	  }
       }
     else
       {
-	tg->dataUpdate_highorder(*nvar,q,interptype);
+	if (tg->iamrGlobal==0) 
+	  {
+	    tg->dataUpdate_highorder(*nvar,q,interptype);
+	  }
+	else
+	  {
+	    printf("Data udpate between high-order near-body and AMR cartesian Not implemented yet\n");
+	  }
       }
   }
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)

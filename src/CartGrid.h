@@ -34,6 +34,7 @@ class CartGrid
   int *ilo;
   int *ihi;
   int *dims;
+  int myid;
   int nf,qstride;
   double *xlo;
   double *dx;
@@ -64,5 +65,6 @@ class CartGrid
 		    int ngridsin,int qnodesize);
   void preprocess(void);     
   void search(double *x,int *donorid,int nsearch);
-  void setcallback(void (*f1)(int *,double *,int *,double *)) {donor_frac=f1;}
+  void setcallback(void (*f1)(int *,double *,int *,double *)) 
+  {   donor_frac=f1;  }
 };

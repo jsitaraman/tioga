@@ -22,9 +22,11 @@ class CartGrid;
 class CartBlock
 {
  private:
+  int local_id;
   int global_id;
   int dims[3],nf,qstride,ndof,pdegree,p3;
-  int d1,d2,d3;
+  int d1,d2,d3,d3nf;
+  int myid;
   int *ibl;
   double *q;
   double *qnode;
@@ -36,9 +38,11 @@ class CartBlock
   DONORLIST **donorList;
   void (*donor_frac) (int *,double *,int *,double *);
  public:
-  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;interpListSize=0;interpList=NULL;};
-  void registerData(int global_id_in,int *iblankin,double *qin)
+  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;interpListSize=0;donorList=NULL;interpList=NULL;};
+  ~CartBlock() { clearLists();};
+  void registerData(int local_id_in,int global_id_in,int *iblankin,double *qin)
   {
+    local_id=local_id_in;
     global_id=global_id_in;
     ibl=iblankin;
     q=qin;
@@ -46,12 +50,13 @@ class CartBlock
   void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData,
-			   double *q,
-			   int nvar, int interptype);
+			   int nvar);
   void update(double *qval,int index,int nq);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
   void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes);
   void insertInInterpList(int procid,int remoteid,double *xtmp);
+  void writeCellFile(int bid);
+  void clearLists(void);
   void initializeLists(void);
 };

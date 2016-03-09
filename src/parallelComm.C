@@ -328,7 +328,7 @@ void parallelComm::clearPackets2(PACKET *sndPack, PACKET *rcvPack)
       if (rcvPack[i].realData) free(rcvPack[i].realData);
       rcvPack[i].intData=NULL;
       rcvPack[i].realData=NULL;
-      sndPack[i].nints=sndPack[i].nreals=0;
+      rcvPack[i].nints=rcvPack[i].nreals=0;
     }
   //
 }

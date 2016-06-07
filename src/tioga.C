@@ -352,6 +352,16 @@ void tioga::getDonorInfo(int *receptors,int *indices,double *frac,int *dcount)
       
 }
 
+int tioga::findPointDonor(double *x_pt)
+{
+  return mb->findPointDonor(x_pt);
+}
+
+std::unordered_set<int> tioga::findCellDonors(double *bbox)
+{
+  return mb->findCellDonors(bbox);
+}
+
 tioga::~tioga()
 {      
   int i;

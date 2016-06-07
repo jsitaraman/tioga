@@ -52,13 +52,19 @@ class tioga
   int iorphanPrint;
 
  public:
-  int ihigh;
-  int ihighGlobal;
-  int iamrGlobal;
+  int ihigh;        /// High-Order flag for current rank
+  int ihighGlobal;  /// Flag for whether high-order grids exist on any rank
+  int iamrGlobal;   /// Flag for whether AMR cartesian grids exist on any rank
+
   /** basic constuctor */
-  tioga() { mb = NULL; cg=NULL; cb=NULL; 
-    holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
-    obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;};
+  tioga()
+  {
+    mb = NULL; cg = NULL; cb = NULL;
+    pc = NULL; sendCount = NULL; recvCount = NULL;
+    holeMap = NULL; obblist = NULL;
+    nblocks = 0; ncart = 0;
+    isym = 2; ihigh = 0; ihighGlobal = 0; iamrGlobal = 0;
+  }
  
   /** basic destructor */
   ~tioga(); 
@@ -80,7 +86,13 @@ class tioga
   void exchangePointSearchData(void);
 
   void exchangeDonors(void);
-    
+
+  /** Find donor element ID for given point */
+  int findPointDonor(double* x_pt);
+
+  /** Find all elements overlapping given bounding box */
+  std::unordered_set<int> findCellDonors(double* bbox);
+
   /** perform overset grid connectivity */
 
   void performConnectivity(void);

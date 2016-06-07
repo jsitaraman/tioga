@@ -34,26 +34,35 @@ class ADT
   double *coord;          /** < bounding box of each element */
 
  public :
-  ADT() {ndim=6;nelem=0;adtIntegers=NULL;adtReals=NULL;adtExtents=NULL;coord=NULL;};
-  ~ADT() 
-    {
-      if (adtIntegers) free(adtIntegers);
-      if (adtReals) free(adtReals);
-      if (adtExtents) free(adtExtents);
-      adtIntegers=NULL;
-      adtReals=NULL;
-      adtExtents=NULL;
-    };
+
+  ADT() {ndim=6;nelem=0;adtIntegers=NULL;adtReals=NULL;adtExtents=NULL;coord=NULL;}
+
+  ~ADT()
+  {
+    if (adtIntegers) free(adtIntegers);
+    if (adtReals) free(adtReals);
+    if (adtExtents) free(adtExtents);
+    adtIntegers=NULL;
+    adtReals=NULL;
+    adtExtents=NULL;
+  }
+
   void clearData(void)
-    {
-      if (adtIntegers) free(adtIntegers);
-      if (adtReals) free(adtReals);
-      if (adtExtents) free(adtExtents);
-      adtIntegers=NULL;
-      adtReals=NULL;
-      adtExtents=NULL;
-    };      
+  {
+    if (adtIntegers) free(adtIntegers);
+    if (adtReals) free(adtReals);
+    if (adtExtents) free(adtExtents);
+    adtIntegers=NULL;
+    adtReals=NULL;
+    adtExtents=NULL;
+  }
+
   void buildADT(int d,int nelements,double *elementBbox);  
-  void searchADT(MeshBlock *mb,int *cellindx,double *xsearch);
+
+  //! Search the ADT for the element containint the point xsearch
+  void searchADT(MeshBlock *mb,int *cellIndex,double *xsearch);
+
+  //! Search the ADT for all elements overlapping with bounding-box bbox
+  void searchADT_box(int *elementList, std::unordered_set<int>& icells, double *bbox);
 };
 

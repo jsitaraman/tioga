@@ -23,11 +23,16 @@
  * Jay Sitaraman
  * 02/20/2014
  */
+#include <unordered_set>
+
 #include "codetypes.h"
+#include "funcs.hpp"
 #include "ADT.h"
+
 // forward declare to instantiate one of the methods
 class parallelComm;
 class CartGrid;
+
 class MeshBlock
 {
  private:
@@ -67,10 +72,51 @@ class MeshBlock
 
   INTEGERLIST *cancelList;  /** receptors that need to be cancelled because of */
   int ncancel;              /** conflicts with the state of their donors */
-  void (*get_nodes_per_cell)(int*, int*);
-  void (*get_receptor_nodes)(int *,int *,double *);
-  void (*donor_inclusion_test)(int *,double *,int *,double *);
-  void (*donor_frac)(int *,double *,int *,int *,double *,double *,int *);
+
+   /* ---- Callback functions for high-order overset connectivity ---- */
+
+  /*!
+   * \brief Get the number of solution points in given cell
+   */
+  void (*get_nodes_per_cell)(int* cellID, int* nNodes);
+
+  /*!
+   * \brief Get the physical position of solution points in given cell
+   *
+   * input: cellID, nNodes
+   * output: xyz [size: nNodes x 3, row-major]
+   */
+  void (*get_receptor_nodes)(int* cellID, int* nNodes, double* xyz);
+
+  /*!
+   * \brief Determine whether a point (x,y,z) lies within a cell
+   *
+   * Given a point's physical position, determine if it is contained in the
+   * given cell; if so, return the reference coordinates of the point
+   *
+   * @param[in]  cellID    ID of cell within current mesh
+   * @param[in]  xyz       Physical position of point to test
+   * @param[out] passFlag  Is the point inside the cell? (no:0, yes:1)
+   * @param[out] rst       Position of point within cell in reference coordinates
+   */
+  void (*donor_inclusion_test)(int* cellID, double* xyz, int* passFlag, double* rst);
+
+  /*!
+   * \brief Get interpolation weights for a point
+   *
+   * Get interpolation points & weights for current cell,
+   * given a point in reference coordinates
+   *
+   * @param[in]  cellID    ID of cell within current mesh
+   * @param[in]  xyz       Physical position of receptor point
+   * @param[out] nweights  Number of interpolation points/weights to be used
+   * @param[out] inode     Indices of donor points within global solution array
+   * @param[out] weights   Interpolation weights for each donor point
+   * @param[in]  rst       Reference coordinates of receptor point within cell
+   * @param[in]  ndim      Amount of memory allocated to 'frac' (# of doubles)
+   */
+  void (*donor_frac)(int* cellID, double* xyz, int* nweights, int* inode, double* weights, double* rst, int* ndim);
+
   void (*convert_to_modal)(int *,int *,double *,int *,int *,double *);
 
   int nreceptorCells;      /** number of receptor cells */
@@ -115,16 +161,41 @@ class MeshBlock
   int interpListCartSize;
   INTERPLIST *interpListCart; 
   /** basic constructor */
-  MeshBlock() { nv=NULL; nc=NULL; x=NULL;iblank=NULL;iblank_cell=NULL;vconn=NULL;wbcnode=NULL;
-    obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
-    interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; xsearch=NULL; donorId=NULL;
-    adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=2;
+  MeshBlock()
+  {
+    nv=NULL; nc=NULL; x=NULL;
+    iblank=NULL; iblank_cell=NULL; vconn=NULL;
+    wbcnode=NULL; obcnode=NULL;
+    cellRes=NULL; nodeRes=NULL;
+    elementBbox=NULL; elementList=NULL;
+    adt=NULL; obb=NULL;
+    donorList=NULL; interpList=NULL; interp2donor=NULL;
+    nsearch=0; isearch=NULL; xsearch=NULL;
+    donorId=NULL; cancelList=NULL;
+    userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
+    nfringe=2;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
-    ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
-    interpList2=NULL;picked=NULL;ctag_cart=NULL;rxyzCart=NULL;donorIdCart=NULL;pickedCart=NULL;ntotalPointsCart=0;
-    nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;
-  };
+    ctag=NULL;
+    pointsPerCell=NULL;
+    maxPointsPerCell=0;
+    rxyz=NULL;
+    ntotalPoints=0;
+    rst=NULL;
+    ihigh=0;
+    ipoint=0;
+    interpList2=NULL;
+    picked=NULL;
+    ctag_cart=NULL;
+    rxyzCart=NULL;
+    donorIdCart=NULL;
+    pickedCart=NULL;
+    ntotalPointsCart=0;
+    nreceptorCellsCart=0;
+    ninterpCart=0;
+    interpListCartSize=0;
+    interpListCart=NULL;
+  }
 
   /** basic destructor */
   ~MeshBlock();
@@ -144,6 +215,12 @@ class MeshBlock
   void setResolutions(double *nres,double *cres);    
 	       
   void search();
+
+  /*! Given a 3D position, find the cell it lies within (-1 if not found) */
+  int findPointDonor(double *x_pt);
+
+  /*! Given a bounding box, find all elements which overlap with it */
+  std::unordered_set<int> findCellDonors(double *bbox);
 
   void writeOBB(int bid);
 

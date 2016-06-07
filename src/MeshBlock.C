@@ -728,6 +728,21 @@ void MeshBlock::writeOBB(int bid)
   fprintf(fp,"%e %e %e\n",obb->dxc[0],obb->dxc[1],obb->dxc[2]);
   fclose(fp);
 }
+
+int MeshBlock::findPointDonor(double *x_pt)
+{
+  int foundCell;
+  adt->searchADT(this,&foundCell,x_pt);
+  return foundCell;
+}
+
+std::unordered_set<int> MeshBlock::findCellDonors(double *bbox)
+{
+  std::unordered_set<int> foundCells;
+  adt->searchADT_box(elementList,foundCells,bbox);
+  return foundCells;
+}
+
 //
 // destructor that deallocates all the
 // the dynamic objects inside

@@ -1,0 +1,93 @@
+/*!
+ * \file funcs.hpp
+ * \brief Miscellaneous helper functions (header)
+ *
+ * \author - Jacob Crabill
+ *           Aerospace Computing Laboratory (ACL)
+ *           Aero/Astro Department. Stanford University
+ *
+ * This file is part of the Tioga software library
+ *
+ * Tioga  is a tool for overset grid assembly on parallel distributed systems
+ * Copyright (C) 2015-2016 Jay Sitaraman
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ */
+#ifndef FUNCS_HPP
+#define FUNCS_HPP
+
+#include <cstdlib>
+#include <stdio.h>
+#include <iostream>
+#include <vector>
+
+#include "error.hpp"
+#include "points.hpp"
+
+/* ---------------------------- Helpful Objects ---------------------------- */
+
+point operator/(point a, double b);
+point operator*(point a, double b);
+
+bool operator<(const point &a, const point &b); // Just a sort of 'dummy' function for sorting purposes
+
+std::ostream& operator<<(std::ostream &os, const point &pt);
+
+std::ostream& operator<<(std::ostream &os, const std::vector<int> &vec);
+std::ostream& operator<<(std::ostream &os, const std::vector<double> &vec);
+
+double getDist(point a, point b);
+
+/* ---------------------------- Functions ---------------------------- */
+
+/*! Evaluate the 1D Lagrange polynomial mode based on points x_lag at point y */
+double Lagrange(std::vector<double> &x_lag, double y, uint mode);
+
+/*! Evaluate the first derivative of the 1D Lagrange polynomial mode based on points x_lag at point y */
+double dLagrange(std::vector<double> &x_lag, double y, uint mode);
+
+std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size);
+
+double determinant(const vector<double> &mat);
+
+void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
+
+//! Get reference location out_rst of point in_xyz within an element defined by the points in xv
+bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, int nDims);
+
+//! Compute the volume of a high-order quad or hex
+double computeVolume(double *xv, int nNodes, int nDims);
+
+/* ---------------------------- Shape Functions ---------------------------- */
+
+//! Shape function for linear or quadratic quad (TODO: Generalize to N-noded quad)
+void shape_quad(const point &in_rs, std::vector<double> &out_shape, int nNodes);
+void shape_quad(const point &in_rs, double* out_shape, int nNodes);
+
+//! Derivative of shape functions for linear or quadratic quad
+void dshape_quad(const std::vector<point> loc_pts, double* out_dshape, int nNodes);
+void dshape_quad(const point &in_rs, double* out_dshape, int nNodes);
+
+//! Shape function for linear or quadratic hexahedron
+void shape_hex(const point &in_rst, std::vector<double> &out_shape, int nNodes);
+void shape_hex(const point &in_rst, double* out_shape, int nNodes);
+
+//! Derivative of shape functions for linear or quadratic hexahedron
+void dshape_hex(const std::vector<point>& loc_pts, double* out_dshape, int nNodes);
+void dshape_hex(const point &in_rst, double* out_dshape, int nNodes);
+
+#endif // FUNCS_HPP
+

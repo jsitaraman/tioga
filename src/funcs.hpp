@@ -51,24 +51,26 @@ std::ostream& operator<<(std::ostream &os, const std::vector<double> &vec);
 
 double getDist(point a, point b);
 
-/* ---------------------------- Functions ---------------------------- */
-
 /*! Evaluate the 1D Lagrange polynomial mode based on points x_lag at point y */
 double Lagrange(std::vector<double> &x_lag, double y, uint mode);
 
 /*! Evaluate the first derivative of the 1D Lagrange polynomial mode based on points x_lag at point y */
 double dLagrange(std::vector<double> &x_lag, double y, uint mode);
 
+/* ---------------------------- Misc. Functions ---------------------------- */
+
+/*! Calculate the adjoint of a 'size x size' matrix stored row-major in 'mat' */
 std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size);
 
-double determinant(const vector<double> &mat);
+/*! Calculate the determinant of a 'size x size' matrix stored row-major in 'mat' */
+double determinant(const std::vector<double> &mat, unsigned int size);
 
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
 
-//! Get reference location out_rst of point in_xyz within an element defined by the points in xv
+/*! Get reference location out_rst of point in_xyz within an element defined by the points in xv */
 bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, int nDims);
 
-//! Compute the volume of a high-order quad or hex
+/*! Compute the volume of a high-order quad or hex */
 double computeVolume(double *xv, int nNodes, int nDims);
 
 /* ---------------------------- Shape Functions ---------------------------- */

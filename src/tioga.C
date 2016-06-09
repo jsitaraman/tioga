@@ -103,7 +103,19 @@ void tioga::performConnectivityHighOrder(void)
   mb->search();
   mb->processPointDonors();
   iorphanPrint=1;
-}  
+}
+
+// !! PLACEHOLDERS - TO BE COMPLETED !!
+void tioga::performConnectivityArtificialBoundary(void)
+{
+  mb->iartbnd=iartbnd;
+  mb->ihigh=ihigh;
+  mb->getBoundaryNodes();  //! Get all AB face point locations
+  exchangePointSearchData();
+  mb->search();
+  mb->processPointDonors();
+  iorphanPrint=1;
+}
 
 void tioga::performConnectivityAMR(void)
 {
@@ -503,6 +515,11 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   if (realRecords) free(realRecords);
   if (icount) free(icount);
   if (dcount) free(dcount);
+}
+
+void dataUpdate_artbnd(int nvar, double *q_spts, double* q_fpts, int leading_dim)
+{
+  /// TODO
 }
 
 void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *idata,

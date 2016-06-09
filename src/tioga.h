@@ -53,6 +53,7 @@ class tioga
 
  public:
   int ihigh;        /// High-Order flag for current rank
+  int iartbnd;      /// Artificial-boundary flag for current rank
   int ihighGlobal;  /// Flag for whether high-order grids exist on any rank
   int iamrGlobal;   /// Flag for whether AMR cartesian grids exist on any rank
 
@@ -63,7 +64,7 @@ class tioga
     pc = NULL; sendCount = NULL; recvCount = NULL;
     holeMap = NULL; obblist = NULL;
     nblocks = 0; ncart = 0;
-    isym = 2; ihigh = 0; ihighGlobal = 0; iamrGlobal = 0;
+    isym = 2; ihigh = 0; iartbnd = 0; ihighGlobal = 0; iamrGlobal = 0;
   }
  
   /** basic destructor */
@@ -81,8 +82,10 @@ class tioga
 
   void exchangeBoxes(void);
 
+
   void exchangeSearchData(void);
 
+  /** Send/Recv receptor points for each rank */
   void exchangePointSearchData(void);
 
   void exchangeDonors(void);
@@ -98,6 +101,7 @@ class tioga
   void performConnectivity(void);
   void performConnectivityHighOrder(void);
   void performConnectivityAMR(void);
+  void performConnectivityArtificialBoundary(void);
 
   /** update data */
 
@@ -105,7 +109,10 @@ class tioga
 
   void dataUpdate_AMR(int nvar,double *q,int interptype) ;
   
-  void dataUpdate_highorder(int nvar,double *q,int interptype) ;
+  void dataUpdate_highorder(int nvar,double *q, int interptype) ;
+
+  /** Perform data interpolation for artificial boundary method */
+  void dataUpdate_artbnd(int nvar, double *q_spts, double* q_fpts, int leading_dim) ;
 
   /** get hole map for each mesh */
  

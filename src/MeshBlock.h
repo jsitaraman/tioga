@@ -38,6 +38,7 @@ class MeshBlock
  private:
   int nnodes;  /** < number of grid nodes */
   int ncells;  /** < total number of cells */
+  int nfaces;  /** < total number of faces (Art. Bnd.) */
   int ntypes;  /** < number of different types of cells */
   int *nv;     /** < number of vertices for each types of cell */
   int *nc;     /**  < number of each of different kinds of cells (tets, prism, pyramids, hex etc) */
@@ -47,8 +48,12 @@ class MeshBlock
   double *x;        /** < grid nodes x[3*nnodes] */
   int *iblank;      /** < iblank value for each grid node */
   int *iblank_cell; /** < iblank value at each grid cell */
+  int *iblank_face; /** < iblank value at each grid face (Art. Bnd.) */
   //
-  int **vconn;        /** < connectivity of each kind of cell */
+  int **vconn;      /** < connectivity (cell to nodes) for each cell type */
+  int **fconn;      /** < Connectivity (face to nodes) for each face type */
+  int *f2c;         /** < Face to cell connectivity */
+  int *c2f;         /** < Cell to face connectivity */
   int *wbcnode;     /** < wall boundary node indices */
   int *obcnode;     /** < overset boundary node indices */
   //
@@ -81,12 +86,28 @@ class MeshBlock
   void (*get_nodes_per_cell)(int* cellID, int* nNodes);
 
   /*!
+   * \brief Get the number of flux points on given face
+   *        For the artificial boundary method
+   */
+  void (*get_nodes_per_face)(int* faceID, int* nNodes);
+
+  /*!
    * \brief Get the physical position of solution points in given cell
    *
    * input: cellID, nNodes
    * output: xyz [size: nNodes x 3, row-major]
    */
   void (*get_receptor_nodes)(int* cellID, int* nNodes, double* xyz);
+
+  /*!
+   * \brief Get the physical position of flux points on given face
+   *        For the artificial boundary method
+   *
+   * @param[in]  faceID  Face ID within current rank
+   * @param[in]  nNodes  Number of nodes expected on face
+   * @param[out] xyz     Coordinates of each point on face [nNodes x 3, row-major]
+   */
+  void (*get_face_nodes)(int* faceID, int* nNodes, double* xyz);
 
   /*!
    * \brief Determine whether a point (x,y,z) lies within a cell
@@ -122,7 +143,13 @@ class MeshBlock
   int nreceptorCells;      /** number of receptor cells */
   int *ctag;               /** index of receptor cells */
   int *pointsPerCell;      /** number of receptor points per cell */
-  int maxPointsPerCell;     /** max of pointsPerCell vector */
+  int maxPointsPerCell;    /** max of pointsPerCell vector */
+
+  int nreceptorFaces;      /** Number of artificial boundary faces */
+  int *ftag;               /** Indices of artificial boundary faces */
+  int *pointsPerFace;      /** number of receptor points per face */
+  int maxPointsPerFace;    /** max of pointsPerFace vector */
+
   double *rxyz;            /**  point coordinates */
   int ipoint; 
   int *picked;             /** < flag specifying if a node has been selected for high-order interpolation */
@@ -153,7 +180,8 @@ class MeshBlock
   int myid;
   double *cellRes;  /** < resolution for each cell */
   int ntotalPoints;        /**  total number of extra points to interpolate */
-  int ihigh;
+  int ihigh;               /** High-order flag for current rank */
+  int iartbnd;             /** High-order artificial boundary flag for current rank */
   int ninterp2;            /** < number of interpolants for high-order points */
   int interp2ListSize;
   INTERPLIST *interpList2; /** < list for high-interpolation points */
@@ -164,7 +192,7 @@ class MeshBlock
   MeshBlock()
   {
     nv=NULL; nc=NULL; x=NULL;
-    iblank=NULL; iblank_cell=NULL; vconn=NULL;
+    iblank=NULL; iblank_cell=NULL; iblank_face=NULL; vconn=NULL;
     wbcnode=NULL; obcnode=NULL;
     cellRes=NULL; nodeRes=NULL;
     elementBbox=NULL; elementList=NULL;
@@ -299,7 +327,13 @@ class MeshBlock
     convert_to_modal=f5;
   }
   void writeCellFile(int);
+
+  /*! Gather a list of all receptor point locations (including for high-order) */
   void getInternalNodes(void);
+
+  /*! Gather a list of all artificial boundary point locations (for high-order) */
+  void getBoundaryNodes(void);
+
   void getExtraQueryPoints(OBB *obb,int *nints,int **intData,int *nreals,
 		      double **realData);
   void processPointDonors(void);

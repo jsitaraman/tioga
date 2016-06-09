@@ -127,7 +127,7 @@ std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size)
   return adj;
 }
 
-double determinant(const std::vector<double> &data, int size)
+double determinant(const std::vector<double> &data, unsigned int size)
 {
   if (size == 1) {
     return data[0];

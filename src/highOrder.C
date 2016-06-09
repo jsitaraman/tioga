@@ -23,6 +23,10 @@
 #define COLUMN 1
 #define NFRAC 1331
 
+#define FRINGE -1
+#define HOLE 0
+#define NORMAL 1
+
 extern "C" 
 {
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
@@ -30,41 +34,39 @@ extern "C"
 
 void MeshBlock::getCellIblanks(void)
 {
-  int i;
-  int n,nvert,m;
-  int icell;
-  int inode[8];
-  int ncount,flag;
+  std::vector<int> inode;
 
-  icell=0;
+  int icell = 0;
   if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
-  for(n=0;n<ntypes;n++)
+
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    inode.resize(nvert);
+    for (int i = 0; i < nc[n]; i++)
     {
-      nvert=nv[n];
-      for(i=0;i<nc[n];i++)
-	{
-	  flag=1;
-	  iblank_cell[icell]=1;
-	  ncount=0;
-	  for(m=0;m<nvert && flag;m++)
-	    {
-	      inode[m]=vconn[n][nvert*i+m]-BASE;
-	      if (iblank[inode[m]]==0) 
-		{
-		  iblank_cell[icell]=0;
-		  flag=0;
-		}
-	      ncount=ncount+(iblank[inode[m]]==-1);
-	    }
-	  
-	  if (flag) 
-	    {
-	      if (ncount ==nvert) iblank_cell[icell]=-1;
-//	      if (ncount >= nvert/2) iblank_cell[icell]=-1;
-	    }
-	  icell++;
-	}
+      int flag=1;
+      iblank_cell[icell]=1;
+      int ncount=0;
+      for (int m = 0; m < nvert && flag; m++)
+      {
+        inode[m] = vconn[n][nvert*i+m]-BASE;
+        if (iblank[inode[m]] == 0)
+        {
+          iblank_cell[icell] = 0;
+          flag = 0;
+        }
+        ncount = ncount + (iblank[inode[m]]==-1);
+      }
+
+      if (flag)
+      {
+        if (ncount ==nvert) iblank_cell[icell] = -1;
+        // if (ncount >= nvert/2) iblank_cell[icell]=-1;
+      }
+      icell++;
     }
+  }
 }
 
 void MeshBlock::clearOrphans(int *itmp)
@@ -109,66 +111,123 @@ void MeshBlock::clearOrphans(int *itmp)
 
 void MeshBlock::getInternalNodes(void)
 {
-  int i,m,j,icell,indx,isum,i3,n,nvert;
-  //
   nreceptorCells=0;
-  //
+
   if (ctag!=NULL) free(ctag);
-  ctag=(int *)malloc(sizeof(int)*ncells);
-  //
-  for(i=0;i<ncells;i++)
-      if (iblank_cell[i]==-1) ctag[nreceptorCells++]=i+1;
-  //
-  if (ihigh) 
+  ctag = (int *)malloc(sizeof(int)*ncells);
+
+  /* Gather a list of cell IDs for all receptor (fringe) cells */
+  for (int i = 0; i < ncells; i++)
+    if (iblank_cell[i] == -1)
+      ctag[nreceptorCells++] = i+1;
+
+  if (ihigh)
+  {
+    /* Get a list of positions of all internal DOFs (solution points)
+     * for all fringe cells */
+
+    if (pointsPerCell != NULL) free(pointsPerCell);
+    pointsPerCell = (int *)malloc(sizeof(int)*nreceptorCells);
+
+    /* Get total number of internal nodes (solution points) for our fringe cells */
+    maxPointsPerCell=0;
+    ntotalPoints=0;
+
+    for (int i = 0; i < nreceptorCells; i++)
     {
-      if (pointsPerCell!=NULL) free(pointsPerCell);
-      pointsPerCell=(int *)malloc(sizeof(int)*nreceptorCells);
-      //
-      maxPointsPerCell=0;
-      ntotalPoints=0;
-      //
-      for(i=0;i<nreceptorCells;i++)
-	{
-	  get_nodes_per_cell(&(ctag[i]),&(pointsPerCell[i]));
-	  ntotalPoints+=pointsPerCell[i];
-	  maxPointsPerCell=max(maxPointsPerCell,pointsPerCell[i]);
-      }
-      //
-      if (rxyz !=NULL) free(rxyz);
-      //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
-      rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
-      //
-      m=0;
-      for(i=0;i<nreceptorCells;i++)
-	{
-	  get_receptor_nodes(&(ctag[i]),&(pointsPerCell[i]),&(rxyz[m]));
-	  m+=(3*pointsPerCell[i]);
-	}
+      get_nodes_per_cell(&(ctag[i]),&(pointsPerCell[i]));
+      ntotalPoints += pointsPerCell[i];
+      maxPointsPerCell = max(maxPointsPerCell,pointsPerCell[i]);
     }
+
+    if (rxyz != NULL) free(rxyz);
+    //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
+    rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
+
+    int m = 0;
+    for (int i = 0; i < nreceptorCells; i++)
+    {
+      get_receptor_nodes(&(ctag[i]),&(pointsPerCell[i]),&(rxyz[m]));
+      m += (3*pointsPerCell[i]);
+    }
+  }
   else
-    {
-      ntotalPoints=0;      
-      if (picked !=NULL) free(picked);
-      picked=(int *) malloc(sizeof(int)*nnodes);
-      for(i=0;i<nnodes;i++) {
-        picked[i]=0;
-        if (iblank[i]==-1) {
-          picked[i]=1;
-          ntotalPoints++;
-         }
+  {
+    /* Gather a list of positions of all mesh points tagged as 'fringe'
+     * Will this ever be executed? */
+
+    ntotalPoints=0;
+    if (picked !=NULL) free(picked);
+    picked = (int *) malloc(sizeof(int)*nnodes);
+
+    for (int i = 0; i < nnodes; i++) {
+      picked[i] = 0;
+      if (iblank[i] == -1) {
+        picked[i] = 1;
+        ntotalPoints++;
       }
-  
-      if (rxyz !=NULL) free(rxyz);
-      rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
-      m=0;
-      for(i=0;i<nnodes;i++)
-	if (picked[i]) 
-	  {
-	    i3=3*i;
-	    for(j=0;j<3;j++)
-	      rxyz[m++]=x[i3+j];
-	  }
     }
+
+    if (rxyz !=NULL) free(rxyz);
+    rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
+
+    int m = 0;
+    for (int i = 0; i < nnodes; i++)
+    {
+      if (picked[i])
+      {
+        int i3 = 3*i;
+        for (int j = 0; j < 3; j++)
+          rxyz[m++] = x[i3+j];
+      }
+    }
+  }
+}
+
+void MeshBlock::getBoundaryNodes(void)
+{
+  /// TODO
+  /** Use cell/face connectivity + callback funcs
+   *  to get locations of AB flux points */
+
+  nreceptorFaces=0;
+
+  if (ftag!=NULL) free(ctag);
+  ftag = (int *)malloc(sizeof(int)*nfaces);
+
+  /* Gather a list of cell IDs for all receptor (fringe) cells */
+  for (int i = 0; i < nfaces; i++)
+    if (iblank_face[i] == -1)
+      ftag[nreceptorFaces++] = i+1;
+
+  /* Get a list of positions of all internal DOFs (solution points)
+   * for all fringe cells */
+
+  if (pointsPerFace != NULL) free(pointsPerFace);
+  pointsPerFace = (int *)malloc(sizeof(int)*nreceptorCells);
+
+  /* Get total number of internal nodes (solution points) for our fringe cells */
+  maxPointsPerFace=0;
+  ntotalPoints=0;
+
+  for (int i = 0; i < nreceptorCells; i++)
+  {
+    get_nodes_per_face(&(ftag[i]),&(pointsPerFace[i])); /// Access by face? or by cell+local face ID?
+    ntotalPoints += pointsPerFace[i];
+    maxPointsPerFace = max(maxPointsPerFace,pointsPerFace[i]);
+  }
+
+  if (rxyz != NULL) free(rxyz);
+  //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
+  rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
+
+  int m = 0;
+  for (int i = 0; i < nreceptorCells; i++)
+  {
+    /// Access by face ID, or cell ID + local-face ID?
+    get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyz[m]));
+    m += (3*pointsPerFace[i]);
+  }
 }
 
 void MeshBlock::getExtraQueryPoints(OBB *obc,
@@ -266,12 +325,15 @@ void MeshBlock::processPointDonors(void)
 	      icell=donorId[i]+BASE;
 	      interpList2[m].inode=(int *) malloc(sizeof(int));		  
 	      interpList2[m].nweights=0;
+
+	      /* Use High-Order callback function to get interpolation weights */
 	      donor_frac(&(icell),
 			 &(xsearch[3*i]),
 			 &(interpList2[m].nweights),
 			 &(interpList2[m].inode[0]),
 			 frac,
 			 &(rst[3*i]),&ndim);
+
 	      interpList2[m].weights=(double *)malloc(sizeof(double)*interpList2[m].nweights);
 	      for(j=0;j<interpList2[m].nweights;j++)
 		interpList2[m].weights[j]=frac[j];

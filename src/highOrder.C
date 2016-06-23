@@ -69,6 +69,78 @@ void MeshBlock::getCellIblanks(void)
   }
 }
 
+void MeshBlock::setArtificialBoundaries(void)
+{
+  std::vector<int> iblankCell(ncells);
+
+  if (iblank_cell == NULL) iblank_cell = new int(ncells);
+
+  /* Initialized iblank_cell to all normal cells and
+   * blank all cells containing a hole node */
+  unsigned int ic = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    for (int i = 0; i < nc[n]; i++)
+    {
+      unsigned int nFringe = 0;
+      iblank_cell[ic] = NORMAL;
+      iblankCell[ic] = NORMAL;
+      for (int j = 0; j < nv[n] && flag; j++)
+      {
+        int iv = vconn[n][nvert*i+j]-BASE;
+        if (iblank[iv] == HOLE)
+        {
+          iblank_cell[ic] = HOLE;
+          iblankCell[ic] = HOLE;
+          break;
+        }
+        else if (iblank[iv] == FRINGE)
+        {
+          nFringe++;
+        }
+      }
+
+      if (nFringe == nv[n])
+      {
+        //iblank_cell[ic] = FRINGE;
+        iblank_cell[ic] = HOLE; /// TODO
+        iblankCell[ic] = FRINGE;
+      }
+
+      ic++;
+    }
+  }
+
+  /// TODO: implement more sophisticated algorithm (i.e. Galbraith's method)
+//  /* ---- If nDims == 3 ---- */
+//  ic = 0;
+//  for (int n = 0; n < ntypes; n++)
+//  {
+//    for (int i = 0; i < nc[n]; i++)
+//    {
+//      if (iblank_cell[ic] != NORMAL)
+//      {
+//        for (int j = 0; j < nf[n]; j++) {
+//          int ff = c2f(ic,j);
+//          int ic2 = (f2c(ff,0) != ic) ? f2c(ff,0) : f2c(ff,1);
+//          if (ic2 > -1) {
+//            if (iblankCell[ic2] == NORMAL) {
+//              iblankCell[ic2] = FRINGE;
+//            }
+//          } else {
+//            // MPI Boundary
+//            int F = findFirst(mpiFaces,c2f(ic,j));
+//            if (F > -1) {
+//              mpiFringeFaces.push_back(mpiFaces[F]);
+//            }
+//          }
+//        }
+//      }
+//    }
+//  }
+//  /* ---- End if nDims == 3 ---- */
+}
+
 void MeshBlock::clearOrphans(int *itmp)
 {
   int i,j,m;

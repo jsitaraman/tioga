@@ -78,6 +78,9 @@ class tioga
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
 
+  /** Register additional face-connectivity arrays for Artificial Boundadry method */
+  void registerFaceConnectivity(int* nf, int *f2v, int *f2c, int *c2f);
+
   void profile(void);
 
   void exchangeBoxes(void);
@@ -88,6 +91,8 @@ class tioga
   /** Send/Recv receptor points for each rank */
   void exchangePointSearchData(void);
 
+  /** Perform overset connectivity: Determine receptor points & donor cells,
+   *  and calculate interpolation weights for each receptor point */
   void exchangeDonors(void);
 
   /** Find donor element ID for given point */
@@ -96,14 +101,14 @@ class tioga
   /** Find all elements overlapping given bounding box */
   std::unordered_set<int> findCellDonors(double* bbox);
 
-  /** perform overset grid connectivity */
+  /** perform overset grid connectivity (match receptor points to donor cells) */
 
   void performConnectivity(void);
   void performConnectivityHighOrder(void);
   void performConnectivityAMR(void);
   void performConnectivityArtificialBoundary(void);
 
-  /** update data */
+  /** Perform overset interpolation and data communication */
 
   void dataUpdate(int nvar,double *q,int interptype) ;
 

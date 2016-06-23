@@ -41,7 +41,8 @@ class MeshBlock
   int nfaces;  /** < total number of faces (Art. Bnd.) */
   int ntypes;  /** < number of different types of cells */
   int *nv;     /** < number of vertices for each types of cell */
-  int *nc;     /**  < number of each of different kinds of cells (tets, prism, pyramids, hex etc) */
+  int *nc;     /** < number of each of different kinds of cells (tets, prism, pyramids, hex etc) */
+  int *nf;     /** < number of faces for each cell type */
   int nobc;    /** < number of overset boundary nodes */
   int nwbc;    /** < number of wall boundary nodes */
   //
@@ -145,6 +146,7 @@ class MeshBlock
   int *pointsPerCell;      /** number of receptor points per cell */
   int maxPointsPerCell;    /** max of pointsPerCell vector */
 
+  /* ---- Artificial Boundary Variables ---- */
   int nreceptorFaces;      /** Number of artificial boundary faces */
   int *ftag;               /** Indices of artificial boundary faces */
   int *pointsPerFace;      /** number of receptor points per face */
@@ -239,6 +241,8 @@ class MeshBlock
   void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 	       int *wbcnodei,int *obcnodei,
 	       int ntypesi, int *nvi, int *nci, int **vconni);
+
+  void setFaceData(int* _nf, int *_f2v, int *_f2c, int *_c2f);
 
   void setResolutions(double *nres,double *cres);    
 	       
@@ -350,4 +354,7 @@ class MeshBlock
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);
+
+  /*! Apply blanking algorithm (to nodal iblank?) to get cell & face iblanks */
+  void setArtificialBoundaries(void);
 };

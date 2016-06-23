@@ -117,7 +117,7 @@ class tioga
   void dataUpdate_highorder(int nvar,double *q, int interptype) ;
 
   /** Perform data interpolation for artificial boundary method */
-  void dataUpdate_artbnd(int nvar, double *q_spts, double* q_fpts, int leading_dim) ;
+  void dataUpdate_artifBound(int nvar, double *q_spts, double* q_fpts, int leading_dim) ;
 
   /** get hole map for each mesh */
  

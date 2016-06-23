@@ -191,7 +191,7 @@ void MeshBlock::getInternalNodes(void)
   /* Gather a list of cell IDs for all receptor (fringe) cells */
   for (int i = 0; i < ncells; i++)
     if (iblank_cell[i] == -1)
-      ctag[nreceptorCells++] = i+1;
+      ctag[nreceptorCells++] = i+BASE;
 
   if (ihigh)
   {
@@ -258,45 +258,42 @@ void MeshBlock::getInternalNodes(void)
 
 void MeshBlock::getBoundaryNodes(void)
 {
-  /// TODO
-  /** Use cell/face connectivity + callback funcs
+  /* Use cell/face connectivity + callback funcs
    *  to get locations of AB flux points */
 
   nreceptorFaces=0;
 
-  if (ftag!=NULL) free(ctag);
-  ftag = (int *)malloc(sizeof(int)*nfaces);
+  if (ftag!=NULL) delete[] ftag;
+  ftag = new int(nfaces);
 
   /* Gather a list of cell IDs for all receptor (fringe) cells */
   for (int i = 0; i < nfaces; i++)
     if (iblank_face[i] == -1)
-      ftag[nreceptorFaces++] = i+1;
+      ftag[nreceptorFaces++] = i+BASE;
 
   /* Get a list of positions of all internal DOFs (solution points)
    * for all fringe cells */
 
   if (pointsPerFace != NULL) free(pointsPerFace);
-  pointsPerFace = (int *)malloc(sizeof(int)*nreceptorCells);
+  pointsPerFace = (int *)malloc(sizeof(int)*nreceptorFaces);
 
   /* Get total number of internal nodes (solution points) for our fringe cells */
-  maxPointsPerFace=0;
-  ntotalPoints=0;
+  maxPointsPerFace = 0;
+  ntotalPoints = 0;
 
-  for (int i = 0; i < nreceptorCells; i++)
+  for (int i = 0; i < nreceptorFaces; i++)
   {
-    get_nodes_per_face(&(ftag[i]),&(pointsPerFace[i])); /// Access by face? or by cell+local face ID?
+    get_nodes_per_face(&(ftag[i]),&(pointsPerFace[i]));
     ntotalPoints += pointsPerFace[i];
     maxPointsPerFace = max(maxPointsPerFace,pointsPerFace[i]);
   }
 
   if (rxyz != NULL) free(rxyz);
-  //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
-  rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
+  rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
 
   int m = 0;
-  for (int i = 0; i < nreceptorCells; i++)
+  for (int i = 0; i < nreceptorFaces; i++)
   {
-    /// Access by face ID, or cell ID + local-face ID?
     get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyz[m]));
     m += (3*pointsPerFace[i]);
   }
@@ -593,4 +590,32 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
 	    }
 	}
     }
+}
+
+void MeshBlock::updateFluxPointData(double *q, double *qtmp, int nvar)
+{
+  if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
+
+  int m = 0;
+  for(int i = 0; i < nreceptorFace; i++)
+  {
+    if (iblank_face[ftag[i]-1] == -1)
+    {
+      // Get starting index of face's q data
+      int index_out, n_fpts;
+      get_q_index_face(&(ftag[i]), &index_out);
+      index_out -= BASE;
+      k = 0;
+      for (int j = 0; j < pointsPerFace[i]; j++)
+      {
+        for (int n = 0; n < nvar; n++)
+        {
+          /// TODO: Implement 'rowColMajor' option (take in 'dataType' & 'stride' vars)
+          q[index_out+j*nvar+n] = qtmp[m+k];
+          k++;
+        }
+      }
+    }
+    m += (pointsPerFace[i]*nvar);
+  }
 }

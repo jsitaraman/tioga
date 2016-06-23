@@ -331,7 +331,8 @@ class MeshBlock
   /*! Gather a list of all receptor point locations (including for high-order) */
   void getInternalNodes(void);
 
-  /*! Gather a list of all artificial boundary point locations (for high-order) */
+  /*! Gather a list of all artificial boundary point locations (for high-order)
+   * [Requires use of callback functions] */
   void getBoundaryNodes(void);
 
   void getExtraQueryPoints(OBB *obb,int *nints,int **intData,int *nreals,
@@ -341,7 +342,13 @@ class MeshBlock
 				       double **realData,
 				       double *q,
 				       int nvar, int interptype);
+
+  /*! Update high-order element data at internal degrees of freedom */
   void updatePointData(double *q,double *qtmp,int nvar,int interptype);
+
+  /*! Update high-order element data at artificial boundary flux points */
+  void updateFluxPointData(double *q, double *qtmp, int nvar, int interptype);
+
   void outputOrphan(FILE *fp,int i) 
   {
     fprintf(fp,"%f %f %f\n",rxyz[3*i],rxyz[3*i+1],rxyz[3*i+2]);

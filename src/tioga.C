@@ -19,6 +19,10 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h"
 #include <assert.h>
+#include <fstream>
+#include <string>
+#include <sstream>
+
 /**
  * set communicator
  * and initialize a few variables
@@ -517,9 +521,119 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   if (dcount) free(dcount);
 }
 
-void dataUpdate_artbnd(int nvar, double *q_spts, double* q_fpts, int leading_dim)
+void tioga::dataUpdate_artifBound(int nvar, double *q_spts, double* q_fpts, int leading_dim)
 {
   /// TODO
+  // initialize send and recv packets
+
+  int nsend,nrecv;
+  int *sndMap,*rcvMap;
+
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+
+  if (nsend == 0) return;
+
+  PACKET *sndPack = new PACKET(nsend);
+  PACKET *rcvPack = new PACKET(nrecv);
+
+  int *icount = new int(nsend);
+  int *dcount = new int(nrecv);
+
+  pc->initPackets(sndPack,rcvPack);
+
+  // get the interpolated solution now
+  int *integerRecords = NULL;
+  double *realRecords = NULL;
+
+  mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
+              &realRecords,q_spts,nvar,interptype);
+
+  // populate the packets
+  for (int i = 0; i < nints; i++)
+  {
+    int k = integerRecords[2*i];
+    sndPack[k].nints++;
+    sndPack[k].nreals += nvar;
+  }
+
+  for (int k = 0; k < nsend; k++)
+  {
+    sndPack[k].intData = new int(sndPack[k].nints);
+    sndPack[k].realData = new double(sndPack[k].nreals);
+    icount[k] = dcount[k] = 0;
+  }
+
+  int m = 0;
+  for (int i = 0; i < nints; i++)
+  {
+    int k = integerRecords[2*i];
+    sndPack[k].intData[icount[k]++] = integerRecords[2*i+1];
+    for (int j = 0; j < nvar; j++)
+      sndPack[k].realData[dcount[k]++] = realRecords[m++];
+  }
+
+  // communicate the data across
+  pc->sendRecvPackets(sndPack,rcvPack);
+
+  // decode the packets and update the data
+  double* qtmp = new double(nvar*mb->ntotalPoints);
+  int* itmp = new int(mb->ntotalPoints);
+
+  for (int i = 0; i < mb->ntotalPoints; i++)
+    itmp[i] = 0;
+
+  for (int k = 0; k < nrecv;k++)
+  {
+    int m = 0;
+    for (int i = 0; i < rcvPack[k].nints; i++)
+    {
+      for (int j = 0; j < nvar; j++)
+      {
+        itmp[rcvPack[k].intData[i]] = 1;
+        qtmp[rcvPack[k].intData[i]*nvar+j] = rcvPack[k].realData[m];
+        m++;
+      }
+    }
+  }
+
+  std::fstream fp;
+  int norphanPoint = 0;
+  for (int i = 0; i < mb->ntotalPoints; i++)
+  {
+    if (itmp[i] == 0) {
+      if (!fp.is_open())
+      {
+        std::stringstream ss;
+        ss << "orphan" << myid << ".dat";
+        fp.open(ss.str().c_str(),std::fstream::out);
+      }
+      mb->outputOrphan(fp,i);
+      norphanPoint++;
+    }
+  }
+  fp.close();
+
+  if (norphanPoint > 0 && iorphanPrint) {
+    printf("Warning::number of orphans in %d = %d of %d\n",myid,norphanPoint,mb->ntotalPoints);
+    iorphanPrint = 0;
+  }
+
+  // change the state of cells/nodes who are orphans
+  mb->clearOrphans(itmp);
+
+  /// TODO: Probably need to rewrite this one to use fpt indices (separate from spt indices)
+  mb->updateFluxPointData(q_fpts,qtmp,nvar,interptype);
+
+  // release all memory
+  pc->clearPackets2(sndPack,rcvPack);
+  delete[] sndPack;
+  delete[] rcvPack;
+  delete[] qtmp;
+  delete[] itmp;
+  if (integerRecords) delete[] integerRecords;
+  if (realRecords) delete[] realRecords;
+  if (icount) delete[] icount;
+  if (dcount) delete[] dcount;
 }
 
 void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *idata,

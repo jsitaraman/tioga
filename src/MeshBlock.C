@@ -788,7 +788,7 @@ MeshBlock::~MeshBlock()
       }
     free(interpListCart);
   }
-  if (!ihigh) {
+  if (ihigh) {
    if (iblank_cell) free(iblank_cell);
   }
   if (obb) free(obb);
@@ -798,7 +798,9 @@ MeshBlock::~MeshBlock()
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);
   if (ctag) free(ctag);
+  if (ftag) delete[] ftag;
   if (pointsPerCell) free(pointsPerCell);
+  if (pointsPerFace) free(pointsPerFace);
   if (rxyz) free(rxyz);
   if (picked) free(picked);
   if (rxyzCart) free(rxyzCart);
@@ -807,7 +809,7 @@ MeshBlock::~MeshBlock()
   if (ctag_cart) free(ctag_cart);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
-};
+}
 //
 // set user specified node and cell resolutions
 //

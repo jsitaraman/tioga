@@ -19,6 +19,8 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "MeshBlock.h"
 
+#include <algorithm>
+
 #define ROW 0
 #define COLUMN 1
 #define NFRAC 1331
@@ -37,7 +39,7 @@ void MeshBlock::getCellIblanks(void)
   std::vector<int> inode;
 
   int icell = 0;
-  if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
+  if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
 
   for (int n = 0; n < ntypes; n++)
   {
@@ -45,101 +47,221 @@ void MeshBlock::getCellIblanks(void)
     inode.resize(nvert);
     for (int i = 0; i < nc[n]; i++)
     {
-      int flag=1;
-      iblank_cell[icell]=1;
-      int ncount=0;
+      int flag = 1;
+      iblank_cell[icell] = NORMAL;
+      int ncount = 0;
       for (int m = 0; m < nvert && flag; m++)
       {
         inode[m] = vconn[n][nvert*i+m]-BASE;
-        if (iblank[inode[m]] == 0)
+        if (iblank[inode[m]] == HOLE)
         {
-          iblank_cell[icell] = 0;
+          iblank_cell[icell] = HOLE;
           flag = 0;
         }
-        ncount = ncount + (iblank[inode[m]]==-1);
+        ncount = ncount + (iblank[inode[m]] == FRINGE);
       }
 
       if (flag)
-      {
-        if (ncount ==nvert) iblank_cell[icell] = -1;
-        // if (ncount >= nvert/2) iblank_cell[icell]=-1;
-      }
+        if (ncount == nvert) iblank_cell[icell] = FRINGE;
+
       icell++;
     }
   }
 }
 
-void MeshBlock::setArtificialBoundaries(void)
+void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 {
-  std::vector<int> iblankCell(ncells);
+  nreceptorFaces = 0;
 
-  if (iblank_cell == NULL) iblank_cell = new int(ncells);
-
-  /* Initialized iblank_cell to all normal cells and
-   * blank all cells containing a hole node */
-  unsigned int ic = 0;
-  for (int n = 0; n < ntypes; n++)
+  // First, correct iblank_cell to contain only normal or hole cells (no fringe)
+  for (int ic = 0; ic < ncells; ic++)
   {
-    for (int i = 0; i < nc[n]; i++)
+    if (iblank_cell[ic] == FRINGE)
+      iblank_cell[ic] = HOLE;
+  }
+
+  std::set<int> overFaces, blankMpi;
+
+  // Allocate face iblank storage
+  if (!iblank_face) iblank_face = new int[nfaces];
+
+  for (int ff = 0; ff < nfaces; ff++)
+  {
+    iblank_face[ff] = NORMAL;
+
+    int ic1 = f2c[2*ff];   // By convention, always >= 0
+    int ic2 = f2c[2*ff+1]; // By convention, == -1 if a boundary/MPI face
+
+    if (ic2 < 0)
     {
-      unsigned int nFringe = 0;
-      iblank_cell[ic] = NORMAL;
-      iblankCell[ic] = NORMAL;
-      for (int j = 0; j < nv[n] && flag; j++)
+      // Boundary or MPI face
+      iblank_face[ff] = iblank_cell[ic1];
+    }
+    else
+    {
+      // Internal face
+      int isum = iblank_cell[ic1] + iblank_cell[ic2];
+      if (isum == HOLE+NORMAL)  // Artificial Boundary
       {
-        int iv = vconn[n][nvert*i+j]-BASE;
-        if (iblank[iv] == HOLE)
-        {
-          iblank_cell[ic] = HOLE;
-          iblankCell[ic] = HOLE;
-          break;
-        }
-        else if (iblank[iv] == FRINGE)
-        {
-          nFringe++;
-        }
+        iblank_face[ff] = FRINGE;
+        overFaces.insert(ff);
       }
-
-      if (nFringe == nv[n])
+      else if (isum == HOLE+HOLE)  // Blanked face
       {
-        //iblank_cell[ic] = FRINGE;
-        iblank_cell[ic] = HOLE; /// TODO
-        iblankCell[ic] = FRINGE;
+        iblank_face[ff] = HOLE;
       }
-
-      ic++;
     }
   }
 
-  /// TODO: implement more sophisticated algorithm (i.e. Galbraith's method)
-//  /* ---- If nDims == 3 ---- */
-//  ic = 0;
+  // Now, ensure consistency of MPI face blanking across processes
+
+  int meshRank, nProcMesh;
+  MPI_Comm_rank(meshComm, &meshRank);
+  MPI_Comm_size(meshComm, &nProcMesh);
+
+  // Get the number of mpiFaces on each processor (for later communication)
+  int nMpiFaces = mpiFaces.size();
+  std::vector<int> nMpiFaces_proc(nProcMesh);
+  MPI_Allgather(&nMpiFaces,1,MPI_INT,nMpiFaces_proc.data(),1,MPI_INT,meshComm);
+  int maxNMpi = *std::max_element(nMpiFaces_proc.begin(), nMpiFaces_proc.end());
+
+  std::vector<int> mpiIblank(nMpiFaces);
+  std::vector<int> mpiIblank_proc(nProcMesh*maxNMpi);
+  std::vector<int> mpiFid_proc(nProcMesh*maxNMpi);
+
+  std::vector<int> recvCnts(nProcMesh);
+  std::vector<int> recvDisp(nProcMesh);
+  for (int i=0; i<nProcMesh; i++) {
+    recvCnts[i] = nMpiFaces_proc[i];
+    recvDisp[i] = i*maxNMpi;
+  }
+
+  for (int i = 0; i < nMpiFaces; i++)
+    mpiIblank[i] = iblank_face[mpiFaces[i]];
+
+  // Get iblank data for all mpi faces
+  MPI_Allgatherv(mpiFaces.data(), nMpiFaces, MPI_INT, mpiFid_proc.data(), recvCnts.data(), recvDisp.data(), MPI_INT, meshComm);
+  MPI_Allgatherv(mpiIblank.data(), nMpiFaces, MPI_INT, mpiIblank_proc.data(), recvCnts.data(), recvDisp.data(), MPI_INT, meshComm);
+
+  for (int F = 0; F < nMpiFaces; F++) {
+    int ff = mpiFaces[F];
+    int p = mpiProcR[F];
+    for (int i = 0; i < nMpiFaces_proc[p]; i++) {
+      if (mpiFid_proc[p*maxNMpi+i] == mpiFidR[F]) {
+        int isum = mpiIblank[F] + mpiIblank_proc[p*maxNMpi+i];
+        if (isum != NORMAL+NORMAL) {
+          // Not a normal face; figure out if hole or fringe
+          if (isum == HOLE+HOLE)
+            iblank_face[ff] = HOLE;
+          else {
+            iblank_face[ff] = FRINGE;
+            overFaces.insert(ff);
+          }
+        }
+      }
+    }
+  }
+
+  nreceptorFaces = overFaces.size();
+
+  // Setup final Artificial Boundary face list
+  delete[] ftag;
+  ftag = new int[nreceptorFaces];
+
+  int ind = 0;
+  for (auto &ff: overFaces) ftag[ind++] = ff;
+}
+
+void MeshBlock::setArtificialBoundaries(void)
+{
+  std:set<int> overFaces;
+
+  for (int ff = 0; ff < nfaces; ff++)
+  {
+    if (iblank_face[ff] == FRINGE)
+      overFaces.insert(ff);
+  }
+  nreceptorFaces = overFaces.size();
+
+  // Setup final storage of A.B. face indices
+  delete[] ftag;
+  ftag = new int[nreceptorFaces];
+
+  int ind = 0;
+  for (auto &ff: overFaces) ftag[ind++] = ff;
+}
+
+//void MeshBlock::setArtificialBoundaries(void)
+//{
+//  std::vector<int> iblankCell(ncells);
+
+//  if (iblank_cell == NULL) iblank_cell = new int(ncells);
+
+//  /* Initialized iblank_cell to all normal cells and
+//   * blank all cells containing a hole node */
+//  unsigned int ic = 0;
 //  for (int n = 0; n < ntypes; n++)
 //  {
 //    for (int i = 0; i < nc[n]; i++)
 //    {
-//      if (iblank_cell[ic] != NORMAL)
+//      unsigned int nFringe = 0;
+//      iblank_cell[ic] = NORMAL;
+//      iblankCell[ic] = NORMAL;
+//      for (int j = 0; j < nv[n] && flag; j++)
 //      {
-//        for (int j = 0; j < nf[n]; j++) {
-//          int ff = c2f(ic,j);
-//          int ic2 = (f2c(ff,0) != ic) ? f2c(ff,0) : f2c(ff,1);
-//          if (ic2 > -1) {
-//            if (iblankCell[ic2] == NORMAL) {
-//              iblankCell[ic2] = FRINGE;
-//            }
-//          } else {
-//            // MPI Boundary
-//            int F = findFirst(mpiFaces,c2f(ic,j));
-//            if (F > -1) {
-//              mpiFringeFaces.push_back(mpiFaces[F]);
-//            }
-//          }
+//        int iv = vconn[n][nvert*i+j]-BASE;
+//        if (iblank[iv] == HOLE)
+//        {
+//          iblank_cell[ic] = HOLE;
+//          iblankCell[ic] = HOLE;
+//          break;
+//        }
+//        else if (iblank[iv] == FRINGE)
+//        {
+//          nFringe++;
 //        }
 //      }
+
+//      if (nFringe == nv[n])
+//      {
+//        //iblank_cell[ic] = FRINGE;
+//        iblank_cell[ic] = HOLE; /// TODO
+//        iblankCell[ic] = FRINGE;
+//      }
+
+//      ic++;
 //    }
 //  }
-//  /* ---- End if nDims == 3 ---- */
-}
+
+//  /// TODO: implement more sophisticated algorithm (i.e. Galbraith's method)
+////  /* ---- If nDims == 3 ---- */
+////  ic = 0;
+////  for (int n = 0; n < ntypes; n++)
+////  {
+////    for (int i = 0; i < nc[n]; i++)
+////    {
+////      if (iblank_cell[ic] != NORMAL)
+////      {
+////        for (int j = 0; j < nf[n]; j++) {
+////          int ff = c2f(ic,j);
+////          int ic2 = (f2c(ff,0) != ic) ? f2c(ff,0) : f2c(ff,1);
+////          if (ic2 > -1) {
+////            if (iblankCell[ic2] == NORMAL) {
+////              iblankCell[ic2] = FRINGE;
+////            }
+////          } else {
+////            // MPI Boundary
+////            int F = findFirst(mpiFaces,c2f(ic,j));
+////            if (F > -1) {
+////              mpiFringeFaces.push_back(mpiFaces[F]);
+////            }
+////          }
+////        }
+////      }
+////    }
+////  }
+////  /* ---- End if nDims == 3 ---- */
+//}
 
 void MeshBlock::clearOrphans(int *itmp)
 {
@@ -349,102 +471,100 @@ void MeshBlock::getExtraQueryPoints(OBB *obc,
 
 void MeshBlock::processPointDonors(void)
 {
-  int i,j,m,n;
-  int isum,nvert,i3,ivert;
-  double *frac;
-  int icell;
-  int ndim;
-  int ierr;
-  double xv[8][3];
-  double xp[3];
-  double frac2[8];
-  //
-  ndim=NFRAC;
-  frac=(double *) malloc(sizeof(double)*ndim);
+  int ndim = NFRAC;
+  double* frac = (double *)malloc(sizeof(double)*ndim);
   interp2ListSize = ninterp2;
   ninterp2=0;
-  //
-  for(i=0;i<nsearch;i++)
-    if (donorId[i] > -1 && iblank_cell[donorId[i]]==1) ninterp2++;
-  //
-  if (interpList2) {
-    for(i=0;i<interp2ListSize;i++)
-      {
-	if (interpList2[i].inode) free(interpList2[i].inode);
-	if (interpList2[i].weights) free(interpList2[i].weights);
-      }
-    free(interpList2);
-  } 
-  interp2ListSize = ninterp2;
-  interpList2=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
-  for(i=0;i<interp2ListSize;i++)
-    {
-      interpList2[i].inode=NULL;
-      interpList2[i].weights=NULL;
-   }
-  //  
-  //printf("nsearch=%d %d\n",nsearch,myid);
-  m=0;
-  for(i=0;i<nsearch;i++)
-    {
-      if (donorId[i] > -1 && iblank_cell[donorId[i]]==1) 
-	{
-	  if (ihigh) 
-	    {
-	      icell=donorId[i]+BASE;
-	      interpList2[m].inode=(int *) malloc(sizeof(int));		  
-	      interpList2[m].nweights=0;
 
-	      /* Use High-Order callback function to get interpolation weights */
-	      donor_frac(&(icell),
-			 &(xsearch[3*i]),
-			 &(interpList2[m].nweights),
-			 &(interpList2[m].inode[0]),
-			 frac,
-			 &(rst[3*i]),&ndim);
+  for (int i = 0; i < nsearch; i++)
+    if (donorId[i] > -1 && iblank_cell[donorId[i]] == 1)
+      ninterp2++;
 
-	      interpList2[m].weights=(double *)malloc(sizeof(double)*interpList2[m].nweights);
-	      for(j=0;j<interpList2[m].nweights;j++)
-		interpList2[m].weights[j]=frac[j];
-	      interpList2[m].receptorInfo[0]=isearch[2*i];
-	      interpList2[m].receptorInfo[1]=isearch[2*i+1];
-	      m++;
-	    }
-	  else
-	    {
-	      icell=donorId[i];
-	      isum=0;
-	      for(n=0;n<ntypes;n++)
-		{
-		  isum+=nc[n];
-		  if (icell < isum) 
-		    {
-		      icell=icell-(isum-nc[n]);
-		      break;
-		    }
-		}
-	      nvert=nv[n];
-	      interpList2[m].inode=(int *) malloc(sizeof(int)*nvert);
-	      interpList2[m].nweights=nvert;
-	      interpList2[m].weights=(double *)malloc(sizeof(double)*interpList2[m].nweights);
-	      for(ivert=0;ivert<nvert;ivert++)
-		{
-		  interpList2[m].inode[ivert]=vconn[n][nvert*icell+ivert]-BASE;
-		  i3=3*interpList2[m].inode[ivert];
-		  for(j=0;j<3;j++) xv[ivert][j]=x[i3+j];
-		}
-	      xp[0]=xsearch[3*i];
-	      xp[1]=xsearch[3*i+1];
-	      xp[2]=xsearch[3*i+2];
-	      computeNodalWeights(xv,xp,frac2,nvert);
-	      for(j=0;j<nvert;j++)
-		interpList2[m].weights[j]=frac2[j];
-	      interpList2[m].receptorInfo[0]=isearch[2*i];
-	      interpList2[m].receptorInfo[1]=isearch[2*i+1];
-	      m++;
-	    }
-	}
+  if (interpList2)
+  {
+    for (int i = 0; i < interp2ListSize; i++)
+    {
+      free(interpList2[i].inode);
+      free(interpList2[i].weights);
     }
+    free(interpList2);
+  }
+
+  interp2ListSize = ninterp2;
+  interpList2 = (INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
+
+  for (int i = 0; i < interp2ListSize; i++)
+  {
+    interpList2[i].inode=NULL;
+    interpList2[i].weights=NULL;
+  }
+
+  int m = 0;
+  for (int i = 0; i < nsearch; i++)
+  {
+    if (donorId[i] > -1 && iblank_cell[donorId[i]] == 1)
+    {
+      if (ihigh)
+      {
+        int icell = donorId[i]+BASE;
+        interpList2[m].inode = (int *) malloc(sizeof(int));
+        interpList2[m].nweights = 0;
+
+        /* Use High-Order callback function to get interpolation weights */
+        donor_frac(&(icell), &(xsearch[3*i]), &(interpList2[m].nweights), &(interpList2[m].inode[0]), frac, &(rst[3*i]),&ndim);
+
+        interpList2[m].weights = (double *)malloc(sizeof(double)*interpList2[m].nweights);
+        for(int j = 0; j < interpList2[m].nweights; j++)
+          interpList2[m].weights[j] = frac[j];
+
+        interpList2[m].receptorInfo[0] = isearch[2*i];
+        interpList2[m].receptorInfo[1] = isearch[2*i+1];
+        m++;
+      }
+      else
+      {
+        int icell = donorId[i];
+        int isum = 0;
+        for (int n = 0; n < ntypes; n++)
+        {
+          isum += nc[n];
+          if (icell < isum)
+          {
+            icell = icell - (isum-nc[n]);
+            break;
+          }
+        }
+
+        int nvert = nv[n];
+        interpList2[m].inode = (int *) malloc(sizeof(int)*nvert);
+        interpList2[m].nweights = nvert;
+        interpList2[m].weights = (double *)malloc(sizeof(double)*interpList2[m].nweights);
+
+        double xv[8][3];
+        for (int ivert = 0; ivert < nvert; ivert++)
+        {
+          interpList2[m].inode[ivert] = vconn[n][nvert*icell+ivert]-BASE;
+          int i3 = 3*interpList2[m].inode[ivert];
+          for (int j = 0; j < 3; j++) xv[ivert][j] = x[i3+j];
+        }
+
+        double xp[3];
+        double frac2[8];
+
+        xp[0]=xsearch[3*i];
+        xp[1]=xsearch[3*i+1];
+        xp[2]=xsearch[3*i+2];
+        computeNodalWeights(xv,xp,frac2,nvert);
+
+        for (int j = 0; j < nvert; j++)
+          interpList2[m].weights[j]=frac2[j];
+
+        interpList2[m].receptorInfo[0]=isearch[2*i];
+        interpList2[m].receptorInfo[1]=isearch[2*i+1];
+        m++;
+      }
+    }
+  }
   free(frac);
 }
 
@@ -592,7 +712,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
     }
 }
 
-void MeshBlock::updateFluxPointData(double *q, double *qtmp, int nvar)
+void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
@@ -602,16 +722,15 @@ void MeshBlock::updateFluxPointData(double *q, double *qtmp, int nvar)
     if (iblank_face[ftag[i]-1] == -1)
     {
       // Get starting index of face's q data
-      int index_out, n_fpts;
-      get_q_index_face(&(ftag[i]), &index_out);
-      index_out -= BASE;
       k = 0;
       for (int j = 0; j < pointsPerFace[i]; j++)
       {
+        int ind, stride;
+        get_q_index_face(&(ftag[i]), &j, &ind, &stride);
+        ind -= BASE;
         for (int n = 0; n < nvar; n++)
         {
-          /// TODO: Implement 'rowColMajor' option (take in 'dataType' & 'stride' vars)
-          q[index_out+j*nvar+n] = qtmp[m+k];
+          q_fpts[ind+stride*n] = qtmp[m+k];
           k++;
         }
       }

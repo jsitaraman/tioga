@@ -102,144 +102,152 @@ void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int rem
 void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,double **receptorResolution,
 			      int *nrecords)
 {
-  int i,j,k,m,n,mm,ii;
-  int nvert;
-  DONORLIST *temp;
-  int *iflag; 
-  int meshtagdonor;
-  int *mtag,*mtag1;
-  int iter;
   //
   // first mark hole points
   //
-  iflag=(int *)malloc(sizeof(int)*nmesh);
-  //
-  for(i=0;i<nnodes;i++)
+  int *iflag = (int *)malloc(sizeof(int)*nmesh);
+
+  for (int i = 0; i < nnodes; i++)
+  {
+    iblank[i] = NORMAL;
+    if (donorList[i]==NULL)
     {
-      iblank[i]=1;
-      if (donorList[i]==NULL)
-	{
-	  for(j=0;j<nmesh;j++)
-           if (j!=(meshtag-BASE) && holemap[j].existWall) 
-            {
-	     if (checkHoleMap(&x[3*i],holemap[j].nx,holemap[j].sam,holemap[j].extents)) 
-	      {
-		iblank[i]=0;
-		break;
-	      }
-           }
-	}
-      else
-	{
-	  temp=donorList[i];
-	  for(j=0;j<nmesh;j++) iflag[j]=0;
-	  while(temp!=NULL) 
-	    {
-	      meshtagdonor=temp->donorData[1]-BASE;
-	      iflag[meshtagdonor]=1;
-	      temp=temp->next;
-	    }
-	  for(j=0;j<nmesh;j++)
-	    {
-             if (j!=(meshtag-BASE) && holemap[j].existWall)
-              {
-	       if (!iflag[j])
-		if (checkHoleMap(&x[3*i],holemap[j].nx,holemap[j].sam,holemap[j].extents))
-		  {
-		    iblank[i]=0;
-		    break;
-		  }
-              }
-	    }
-	}
+      for (int j = 0; j < nmesh; j++)
+        if (j != (meshtag-BASE) && holemap[j].existWall)
+        {
+          if (checkHoleMap(&x[3*i],holemap[j].nx,holemap[j].sam,holemap[j].extents))
+          {
+            iblank[i] = HOLE;
+            break;
+          }
+        }
     }
-  for(i=0;i<nwbc;i++)
-   if (iblank[wbcnode[i]-BASE]==0) {
+    else
+    {
+      DONORLIST *temp = donorList[i];
+
+      for (int j = 0; j < nmesh; j++) iflag[j] = 0;
+
+      while (temp != NULL)
+      {
+        int meshtagdonor = temp->donorData[1]-BASE;
+        iflag[meshtagdonor] = 1;
+        temp = temp->next;
+      }
+      for (int j = 0; j < nmesh; j++)
+      {
+        if (j != (meshtag-BASE) && holemap[j].existWall)
+        {
+          if (!iflag[j])
+            if (checkHoleMap(&x[3*i],holemap[j].nx,holemap[j].sam,holemap[j].extents))
+            {
+              iblank[i] = HOLE;
+              break;
+            }
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < nwbc; i++)
+  {
+   if (iblank[wbcnode[i]-BASE] == HOLE) {
      printf("--------------------------------------------------------------------\n");
      printf("Alarm from process %d : wall node is being tagged as a hole %d %p\n",myid,wbcnode[i]-BASE,
         donorList[wbcnode[i]-BASE]);
-     ii=wbcnode[i]-BASE;
+     int ii=wbcnode[i]-BASE;
      printf("xloc=%e %e %e\n",x[3*ii],x[3*ii+1],x[3*ii+2]);
      printf("Computations will continue, but may suffer from accuracy problems\n");
      printf("Please recheck positions of your grids\n");
      printf("--------------------------------------------------------------------\n");
     }
+  }
+
   //
   // mark mandatory fringes as neighbors (up to nfringe depth)
   // of hole points 
   //
-  mtag=(int *)malloc(sizeof(int)*nnodes);
-  mtag1=(int *)malloc(sizeof(int)*nnodes);
+  int *mtag = (int *)malloc(sizeof(int)*nnodes);
+  int *mtag1 = (int *)malloc(sizeof(int)*nnodes);
  
-  for(i=0;i<nnodes;i++)
+  for (int i = 0; i < nnodes; i++)
+  {
+    mtag[i] = mtag1[i] = HOLE;
+    if (iblank[i] == HOLE)
+      mtag[i] = mtag1[i] = NORMAL;
+  }
+
+  for (int iter = 0; iter < nfringe; iter++)
+  {
+    for (int n = 0; n < ntypes; n++)
     {
-     mtag[i]=mtag1[i]=0;
-     if (iblank[i]==0) mtag[i]=mtag1[i]=1;
+      int nvert = nv[n];
+      for (int i = 0; i < nc[n]; i++)
+      {
+        for (int m = 0; m < nvert; m++)
+        {
+          if (mtag[(vconn[n][nvert*i+m]-BASE)] == NORMAL)
+          {
+            for (int mm = 0; mm < nvert; mm++)
+              if (m != mm && mtag[vconn[n][nvert*i+mm]-BASE] != NORMAL)
+                mtag1[vconn[n][nvert*i+mm]-BASE] = NORMAL;
+          }
+        }
+      }
     }
 
- for(iter=0;iter<nfringe;iter++)
- {
-  for(n=0;n<ntypes;n++)
-    {
-      nvert=nv[n];
-      for(i=0;i<nc[n];i++)
-	{
-	  for(m=0;m<nvert;m++)
-	    {
-	      if (mtag[(vconn[n][nvert*i+m]-BASE)]==1)
-		{
-		  for(mm=0;mm<nvert;mm++)
-		    if (m!=mm && mtag[vconn[n][nvert*i+mm]-BASE] !=1) 
-	                 mtag1[vconn[n][nvert*i+mm]-BASE] = 1;
-		}
-	    }
-	}
-    }
-   for(i=0;i<nnodes;i++) mtag[i]=mtag1[i];
+    for (int i = 0; i < nnodes; i++) mtag[i] = mtag1[i];
   }
-  for(i=0;i<nnodes;i++)
-     if (mtag1[i] && iblank[i]) nodeRes[i]=BIGVALUE;
+
+  for (int i = 0; i < nnodes; i++)
+    if (mtag1[i] && iblank[i])
+      nodeRes[i]=BIGVALUE;
+
   free(mtag);
   free(mtag1);
+
   //
   // now find fringes
   //
   *nrecords=0;
-  for(i=0;i<nnodes;i++)
+  for (int i = 0; i < nnodes; i++)
+  {
+    if (donorList[i] != NULL && iblank[i] != HOLE)
     {
-      if (donorList[i]!=NULL && iblank[i]!=0)
-	{ 
-	  temp=donorList[i];
-	  while(temp!=NULL)
-	    {
-	      if (temp->donorRes < nodeRes[i])
-		{
-		  iblank[i]=-1;
-		  (*nrecords)++;
-		  break;
-		}
-	      temp=temp->next;
-	    }
-	}
+      DONORLIST *temp = donorList[i];
+      while (temp != NULL)
+      {
+        if (temp->donorRes < nodeRes[i])
+        {
+          iblank[i] = FRINGE;
+          (*nrecords)++;
+          break;
+        }
+        temp = temp->next;
+      }
     }
+  }
+
   //
   // set the records to send back to the donor
   // process
   //
   (*donorRecords)=(int *)malloc(sizeof(int)*2*(*nrecords));
   (*receptorResolution)=(double *)malloc(sizeof(double)*(*nrecords));
-  m=0;
-  k=0;
-  for(i=0;i<nnodes;i++)
+
+  int m = 0;
+  int k = 0;
+  for (int i = 0; i < nnodes; i++)
+  {
+    if (iblank[i] == FRINGE)
     {
-      if (iblank[i]==-1) 
-	{
-	  temp=donorList[i];
-	  (*receptorResolution)[k++]=nodeRes[i];
-	  (*donorRecords)[m++]=temp->donorData[0];
-	  (*donorRecords)[m++]=temp->donorData[2];
-	}
-    }  	      
+      temp = donorList[i];
+      (*receptorResolution)[k++] = nodeRes[i];
+      (*donorRecords)[m++] = temp->donorData[0];
+      (*donorRecords)[m++] = temp->donorData[2];
+    }
+  }
+
   //
   // release local memory
   //

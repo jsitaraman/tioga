@@ -40,6 +40,7 @@ class tioga
   int nmesh;
   HOLEMAP *holeMap;
   MPI_Comm scomm;
+  MPI_Comm meshcomm;
   parallelComm *pc;
   parallelComm *pc_cart;
   int isym;
@@ -51,11 +52,14 @@ class tioga
   OBB *obblist;
   int iorphanPrint;
 
+  int nprocMesh, meshRank;
+
  public:
   int ihigh;        /// High-Order flag for current rank
   int iartbnd;      /// Artificial-boundary flag for current rank
   int ihighGlobal;  /// Flag for whether high-order grids exist on any rank
   int iamrGlobal;   /// Flag for whether AMR cartesian grids exist on any rank
+  int iabGlobal;    /// Flaag for whether high-order A.B.'s being used on any rank
 
   /** basic constuctor */
   tioga()
@@ -73,8 +77,20 @@ class tioga
   /** set communicator */
   void setCommunicator(MPI_Comm communicator,int id_proc,int nprocs);
 
-  /** registerGrid data */
-
+  /** \brief Assign solver / grid / mesh data to TIOGA object
+   *
+   * @param[in] btag : body tag for rank
+   * @param[in] nnodes : number of mesh nodes on rank
+   * @param[in] xyz : x,y,z coordinates of each node
+   * @param[inout] ibl : pointer to store nodal iblank data in (size: nnodes)
+   * @param[in] nwbc : number of solid wall boundary nodes on rank
+   * @param[in] nobc : number of overset boundary nodes on rank
+   * @param[in] wbcnode : list of node IDs for wall boundary nodes
+   * @param[in] obcnode : list of node IDs for overset boundary nodes
+   * @param[in] ntypes : number of (volume) element types present on rank
+   * @param[in] nv : number of vertices for each (volume) element type (size ntypes)
+   * @param[in] nc : number of elements for each (volume) element type (size ntypes)
+   * @param[in] vconn : element-to-vertex connectivity array */
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
 

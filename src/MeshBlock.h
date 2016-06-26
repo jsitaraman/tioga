@@ -24,6 +24,7 @@
  * 02/20/2014
  */
 #include <unordered_set>
+#include <set>
 
 #include "codetypes.h"
 #include "funcs.hpp"
@@ -40,7 +41,7 @@ class MeshBlock
   int ncells;  /** < total number of cells */
   int nfaces;  /** < total number of faces (Art. Bnd.) */
   int ntypes;  /** < number of different types of cells */
-  int *nv;     /** < number of vertices for each types of cell */
+  int *nv;     /** < number of vertices for each type of cell */
   int *nc;     /** < number of each of different kinds of cells (tets, prism, pyramids, hex etc) */
   int *nf;     /** < number of faces for each cell type */
   int nobc;    /** < number of overset boundary nodes */
@@ -63,6 +64,11 @@ class MeshBlock
   double *userSpecifiedCellRes;
   double *elementBbox; /** < bounding box of the elements */
   int *elementList;    /** < list of elements in */
+
+  std::vector<int> mpiFaces;  /** < List of MPI face IDs on rank */
+  std::vector<int> mpiFidR;   /** < Matching MPI face IDs on opposite rank */
+  std::vector<int> mpiProcR;  /** < Opposite rank for MPI face */
+
   //
   // Alternating digital tree library
   //
@@ -111,6 +117,22 @@ class MeshBlock
   void (*get_face_nodes)(int* faceID, int* nNodes, double* xyz);
 
   /*!
+   * \brief Get the location of 'q' (solution) data for the given face fpt
+   *
+   * 'ind' will be equivalent to calling std::distance between 'q_fpts(0,0,0)'
+   * and 'q_fpts(faceID,fpt,0)'
+   * 'stride' is equivalent to std::distance between 'q_fpts(faceID,fpt,var_0)'
+   * and 'q_fpts(faceID,fpt,var_1)'
+   *
+   * @param[in] faceID   Rank-specific face ID
+   * @param[in] fpt      Index of flux point on face [0 to nPointsFace-1]
+   * @param[out] ind     Total starting index of solution data for point
+   * @param[out] stride  Stride length to get from starting index to each
+   *                     additional variable
+   */
+  void (*get_q_index_face)(int* faceID, int *fpt, int* ind, int* stride);
+
+  /*!
    * \brief Determine whether a point (x,y,z) lies within a cell
    *
    * Given a point's physical position, determine if it is contained in the
@@ -151,6 +173,8 @@ class MeshBlock
   int *ftag;               /** Indices of artificial boundary faces */
   int *pointsPerFace;      /** number of receptor points per face */
   int maxPointsPerFace;    /** max of pointsPerFace vector */
+
+  //std::unordered_set<int> overFaces; /** < List of Artificial Boundary face indices */
 
   double *rxyz;            /**  point coordinates */
   int ipoint; 
@@ -314,6 +338,10 @@ class MeshBlock
   // routines for high order connectivity and interpolation
   //
   void getCellIblanks(void);
+
+  //! Find all artificial boundary faces using previously-set cell iblank values
+  void calcFaceIblanks(const MPI_Comm &meshComm);
+
   void set_cell_iblank(int *iblank_cell_input)
   {
     iblank_cell=iblank_cell_input;
@@ -330,6 +358,18 @@ class MeshBlock
     donor_frac=f4;
     convert_to_modal=f5;
   }
+
+  //! Set callback functions specific to Artificial Boundary method
+  void setCallbackArtBnd(void (*gnf)(int* id,int* npf),
+                         void (*gfn)(int* id, int* npf, double* xyz),
+                         void (*gqi)(int* id, int* fpt, int* ind, int* stride))
+  {
+    // See declaration of functions above for more details
+    get_nodes_per_face = gnf;
+    get_face_nodes = gfn;
+    get_q_index_face = gqi;
+  }
+
   void writeCellFile(int);
 
   /*! Gather a list of all receptor point locations (including for high-order) */
@@ -351,12 +391,18 @@ class MeshBlock
   void updatePointData(double *q,double *qtmp,int nvar,int interptype);
 
   /*! Update high-order element data at artificial boundary flux points */
-  void updateFluxPointData(double *q, double *qtmp, int nvar, int interptype);
+  void updateFluxPointData(double *q_fpts, double *qtmp, int nvar);
 
   void outputOrphan(FILE *fp,int i) 
   {
     fprintf(fp,"%f %f %f\n",rxyz[3*i],rxyz[3*i+1],rxyz[3*i+2]);
   }
+
+  void outputOrphan(const std::fstream &fp, int i)
+  {
+    fp << rxyz[3*i] << " " << rxyz[3*i+1] << " " << rxyz[3*i+2] << std::endl;
+  }
+
   void clearOrphans(int *itmp);
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);

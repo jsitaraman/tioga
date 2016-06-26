@@ -65,20 +65,22 @@ void MeshBlock::setFaceData(int *_nf, int *_f2v, int *_f2c, int *_c2f)
 
 void MeshBlock::preprocess(void)
 {
-  int i;
-  //
   // set all iblanks = 1
-  //
-  for(i=0;i<nnodes;i++) iblank[i]=1;
-  //
+  for (int i = 0; i < nnodes; i++) iblank[i] = 1;
+
   // find oriented bounding boxes
-  //
-  if (obb) free(obb);
-  obb=(OBB *) malloc(sizeof(OBB));
+  free(obb);
+
+  obb = (OBB *) malloc(sizeof(OBB));
+
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
+
   tagBoundary();
 }
 
+/** Calculate 'cellRes' / 'nodeRes' (cell volume) for each cell / node
+ *  and tag overset-boundary nodes by setting their nodeRes to a big value
+ */
 void MeshBlock::tagBoundary(void)
 {
   int i,j,k,n,m,ii;
@@ -99,8 +101,8 @@ void MeshBlock::tagBoundary(void)
   // initialized, cellRes would be NULL in this case
   //
 
-      if(cellRes) free(cellRes);
-      if(nodeRes) free(nodeRes);
+      free(cellRes);
+      free(nodeRes);
     
       //
       cellRes=(double *) malloc(sizeof(double)*ncells);
@@ -515,7 +517,7 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   int i,j,i3;
   int inode;
 
-  *mtag=meshtag+(1-BASE); 
+  *mtag = meshtag - BASE;
   if (nwbc <=0) {
     *existWall=0;
     for(i=0;i<6;i++) wbox[i]=0;
@@ -541,110 +543,88 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   
 void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
 {
-  int i,j,k,m,n;
-  int nvert;
-  int ii,jj,kk,mm;
-  int i3,iv;
-  int *iflag;
-  int *inode;
-  char intstring[7];
-  char fname[80];
+  std::vector<int> iflag(ncells);
+  std::vector<int> inode(nnodes);
+
+  // Mark all wall boundary nodes
+  for (int i = 0; i < nwbc; i++)
+  {
+    int ii = wbcnode[i]-BASE;
+    inode[ii] = 1;
+  }
+
+  // Mark all wall boundary cells (Any cell with wall-boundary node)
+  int m = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    for (int i = 0; i < nc[n]; i++)
+    {
+      for (int j = 0; j < nvert; j++)
+      {
+        int ii = vconn[n][nvert*i+j]-BASE;
+        if (inode[ii] == 1)
+        {
+          iflag[m] = 1;
+          break;
+        }
+      }
+      m++;
+    }
+  }
+
+  // find delta's in each directions
   double ds[3];
-  double xv;
+  for (int k = 0; k < 3; k++) ds[k] = (extents[k+3]-extents[k])/nx[k];
+
+  // mark sam cells with wall boundary cells now
   int imin[3];
   int imax[3];
-  FILE *fp;
-  //
-  iflag=(int *)malloc(sizeof(int)*ncells);
-  inode=(int *) malloc(sizeof(int)*nnodes);
-  ///
-  //sprintf(intstring,"%d",100000+myid);
-  //sprintf(fname,"wbc%s.dat",&(intstring[1]));
-  //fp=fopen(fname,"w");
-  for(i=0;i<ncells;i++) iflag[i]=0;
-  for(i=0;i<nnodes;i++) inode[i]=0;
-  //
-  for(i=0;i<nwbc;i++)
-   {
-    ii=wbcnode[i]-BASE;
-    //fprintf(fp,"%e %e %e\n",x[3*ii],x[3*ii+1],x[3*ii+2]);
-    inode[ii]=1;
-   }
-  //fclose(fp);
-  //
-  // mark wall boundary cells
-  //
-  m=0;
-  for(n=0;n<ntypes;n++)
+  m = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    for (int i = 0; i < nc[n]; i++)
     {
-      nvert=nv[n];
-      for(i=0;i<nc[n];i++)
-	{
-	  for(j=0;j<nvert;j++)
-	    {
-	      ii=vconn[n][nvert*i+j]-BASE;
-	      if (inode[ii]==1)
-		{
-		  iflag[m]=1;
-		  break;
-		}
-	    }
-	  m++;
-	}
+      if (iflag[m] == 1)
+      {
+        // find the index bounds of each wall boundary cell bounding box
+        imin[0] = imin[1] = imin[2] =  BIGINT;
+        imax[0] = imax[1] = imax[2] = -BIGINT;
+        for (int j = 0; j < nvert; j++)
+        {
+          int i3 = 3*(vconn[n][nvert*i+j]-BASE);
+          for (int k = 0; k < 3; k++)
+          {
+            double xv = x[i3+k];
+            int iv = floor((xv-extents[k])/ds[k]);
+            imin[k] = min(imin[k],iv);
+            imax[k] = max(imax[k],iv);
+          }
+        }
+
+        for (int j = 0; j < 3; j++)
+        {
+          imin[j] = max(imin[j],0);
+          imax[j] = min(imax[j],nx[j]-1);
+        }
+
+        // mark sam to 2
+        for (int kk = imin[2]; kk < imax[2]+1; kk++)
+        {
+          for (int jj = imin[1]; jj < imax[1]+1; jj++)
+          {
+            for (int ii = imin[0]; ii < imax[0]+1; ii++)
+            {
+              int mm = (kk*nx[1] + jj)*nx[0] + ii;
+              sam[mm] = 2;
+            }
+          }
+        }
+      }
+      m++;
     }
-  //
-  // find delta's in each directions
-  //
-  for(k=0;k<3;k++) ds[k]=(extents[k+3]-extents[k])/nx[k];
-  //
-  // mark sam cells with wall boundary cells now
-  //
-   m=0;
-   for(n=0;n<ntypes;n++)
-     {
-       nvert=nv[n];
-       for(i=0;i<nc[n];i++)
- 	{
-	  if (iflag[m]==1) 
-	    {
-	      //
-	      // find the index bounds of each wall boundary cell
-	      // bounding box
-	      //
-	      imin[0]=imin[1]=imin[2]=BIGINT;
-	      imax[0]=imax[1]=imax[2]=-BIGINT;
-	      for(j=0;j<nvert;j++)
-		{
-		  i3=3*(vconn[n][nvert*i+j]-BASE);
-		  for(k=0;k<3;k++)
-		    {
-		      xv=x[i3+k];
-		      iv=floor((xv-extents[k])/ds[k]);
-		      imin[k]=min(imin[k],iv);
-		      imax[k]=max(imax[k],iv);
-		    }
-		}
-	     for(j=0;j<3;j++)
-              {
-	       imin[j]=max(imin[j],0);
-               imax[j]=min(imax[j],nx[j]-1);
-              }
-	      //
-	      // mark sam to 1
-	      //
-	      for(kk=imin[2];kk<imax[2]+1;kk++)
-	        for(jj=imin[1];jj<imax[1]+1;jj++)
-		  for (ii=imin[0];ii<imax[0]+1;ii++)
-		   {
-		    mm=kk*nx[1]*nx[0]+jj*nx[0]+ii;
-		     sam[mm]=2;
-		   }
-	    }
-	  m++;
-	}
-     }
-   free(iflag);
-   free(inode);
+  }
 }
 	
 void MeshBlock::getQueryPoints(OBB *obc,

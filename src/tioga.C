@@ -87,23 +87,64 @@ void tioga::profile(void)
   //mb->writeOBB(myid);
   //if (myid==4) mb->writeOutput(myid);
   //if (myid==4) mb->writeOBB(myid);
+
+  MPI_Allreduce(&iartbnd, &iabGlobal, 1, MPI_INT, MPI_MAX, scomm);
+
+  if (iabGlobal)
+  {
+    /// TODO: find a better location for this?
+    // Split the global communicator into a mesh-local communicator
+    MPI_Comm_split(scomm, mytag, myid, &meshcomm);
+    MPI_Comm_rank(meshcomm, &meshRank);
+    MPI_Comm_size(meshcomm, &nprocMesh);
+  }
 }
 
 void tioga::performConnectivity(void)
 {
+  // Generate coordinate-aligned 'vision space bins' (Sitaraman et al, JCP 2010)
   getHoleMap();
+
+  // Send/Recv the hole maps to/from all necessary ranks
   exchangeBoxes();
+
+  // Find a list of all potential receptor points and send to all possible
+  // donor ranks
   exchangeSearchData();
-  mb->ihigh=0;
+
+  mb->ihigh=ihigh;
+
+  // Find donors for all search points (other grids' possible receptor points)
   mb->search();
+
+  // Send donor information back to each grid and do final iblank setting
   exchangeDonors();
+
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
+
   //if (ihighGlobal) {
+  // Calculate cell iblank values from nodal iblank values
   mb->getCellIblanks();
 //  mb->writeCellFile(myid);
   //}
   //mb->writeOutput(myid);
   //tracei(myid);
+
+  if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
+  {
+    // Find artificial boundary faces
+    mb->calcFaceIblanks(meshcomm);
+
+    // Get all AB face point locations
+    mb->getBoundaryNodes();
+  }
+
+  if (iabGlobal)
+  {
+    exchangePointSearchData();
+    mb->search();
+    mb->processPointDonors();
+  }
 }
 
 void tioga::performConnectivityHighOrder(void)
@@ -565,8 +606,8 @@ void tioga::dataUpdate_artifBound(int nvar, double *q_spts, double* q_fpts, int 
 
   for (int k = 0; k < nsend; k++)
   {
-    sndPack[k].intData = new int(sndPack[k].nints);
-    sndPack[k].realData = new double(sndPack[k].nreals);
+    sndPack[k].intData = malloc(sizeof(int)*sndPack[k].nints);
+    sndPack[k].realData = malloc(sizeof(double)*sndPack[k].nreals);
     icount[k] = dcount[k] = 0;
   }
 
@@ -637,10 +678,10 @@ void tioga::dataUpdate_artifBound(int nvar, double *q_spts, double* q_fpts, int 
   delete[] rcvPack;
   delete[] qtmp;
   delete[] itmp;
-  if (integerRecords) delete[] integerRecords;
-  if (realRecords) delete[] realRecords;
-  if (icount) delete[] icount;
-  if (dcount) delete[] dcount;
+  delete[] integerRecords;
+  delete[] realRecords;
+  delete[] icount;
+  delete[] dcount;
 }
 
 void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *idata,

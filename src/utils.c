@@ -164,24 +164,23 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
   free(aa);
   free(eigenv);
 }
-/**
- check if a point is inside the
- provided hole map
-*/
+
+/** Check if a point is inside the provided hole map (return hole status) */
 int checkHoleMap(double *x,int *nx,int *sam,double *extents)
 {
-  int i;
-  int mm;
   double dx[3];
   int ix[3];
 
-  for(i=0;i<3;i++) dx[i]=(extents[i+3]-extents[i])/nx[i];
-  for(i=0;i<3;i++) 
-    {
-      ix[i]=(x[i]-extents[i])/dx[i];
-      if (ix[i] < 0 || ix[i] > nx[i]-1) return 0;
-    }
-  mm=ix[2]*nx[1]*nx[0]+ix[1]*nx[0]+ix[0];
+  for (int i = 0; i < 3; i++)
+    dx[i] = (extents[i+3]-extents[i]) / nx[i];
+
+  for (int i = 0; i < 3; i++)
+  {
+    ix[i] = (x[i]-extents[i])/dx[i];
+    if (ix[i] < 0 || ix[i] > nx[i]-1) return 0;
+  }
+
+  int mm = (ix[2]*nx[1] + ix[1])*nx[0] + ix[0];
   return sam[mm];
 }
 

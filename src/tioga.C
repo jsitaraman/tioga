@@ -19,6 +19,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h"
 #include <assert.h>
+#include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -35,7 +36,7 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   scomm=communicator;
   myid=id_proc;
   numprocs=nprocs;
-  sendCount=(int *) malloc(sizeof(int)*numprocs);
+  sendCount=(int *) malloc(sizeof(int)*numprocs); /// Never used?
   recvCount=(int *) malloc(sizeof(int)*numprocs);
   //
   // only one mesh block per process for now
@@ -72,23 +73,17 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   mytag=btag;
 }
 
-void tioga::registerFaceConnectivity(int *nf, int *f2v, int *f2c, int *c2f)
+void tioga::registerFaceConnectivity(int nftype, int *nf, int *nfv, int **fconn, int *f2c, int *c2f)
 {
-  iartbnd = 1;
-  ihigh = 1;
-  mb->setFaceData(nf, f2v, f2c, c2f);
+  mb->setFaceData(nftype, nf, nfv, fconn, f2c, c2f);
 }
 
 void tioga::profile(void)
 {
-
   mb->preprocess();
-  //mb->writeGridFile(myid);
-  //mb->writeOBB(myid);
-  //if (myid==4) mb->writeOutput(myid);
-  //if (myid==4) mb->writeOBB(myid);
 
   MPI_Allreduce(&iartbnd, &iabGlobal, 1, MPI_INT, MPI_MAX, scomm);
+  MPI_Allreduce(&ihigh, &ihighGlobal, 1, MPI_INT, MPI_MAX, scomm);
 
   if (iabGlobal)
   {
@@ -102,7 +97,7 @@ void tioga::profile(void)
 
 void tioga::performConnectivity(void)
 {
-  // Generate coordinate-aligned 'vision space bins' (Sitaraman et al, JCP 2010)
+  // Generate structured map of solid boundary (hole) locations
   getHoleMap();
 
   // Send/Recv the hole maps to/from all necessary ranks
@@ -112,44 +107,44 @@ void tioga::performConnectivity(void)
   // donor ranks
   exchangeSearchData();
 
-  mb->ihigh=ihigh;
-
   // Find donors for all search points (other grids' possible receptor points)
   mb->search();
 
-  // Send donor information back to each grid and do final iblank setting
+  // Exchange found donor data and do final iblank setting
   exchangeDonors();
 
-  MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
-
-  //if (ihighGlobal) {
-  // Calculate cell iblank values from nodal iblank values
-  mb->getCellIblanks();
-//  mb->writeCellFile(myid);
-  //}
-  //mb->writeOutput(myid);
-  //tracei(myid);
-
-  if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
+  if (ihighGlobal)
   {
-    // Find artificial boundary faces
-    mb->calcFaceIblanks(meshcomm);
+    // Calculate cell iblank values from nodal iblank values
+    mb->getCellIblanks();
 
-    // Get all AB face point locations
-    mb->getBoundaryNodes();
-  }
+    if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
+    {
+      // Find artificial boundary faces
+      mb->calcFaceIblanks(meshcomm);
 
-  if (iabGlobal)
-  {
+      // Get all AB face point locations
+      mb->getBoundaryNodes();
+    }
+    else
+    {
+      // If this rank isn't high order, this will still load up fringe nodes
+      mb->getInternalNodes();
+    }
+
+    // Exchange new list of points, including high-order Artificial Boundary
+    // face points or internal points (or fringe nodes for non-high order)
     exchangePointSearchData();
+
     mb->search();
+
+    // Setup interpolation weights and such for final interp-point list
     mb->processPointDonors();
   }
 }
 
 void tioga::performConnectivityHighOrder(void)
 {
-  mb->ihigh=ihigh;
   mb->getInternalNodes();
   exchangePointSearchData();
   mb->search();
@@ -160,8 +155,6 @@ void tioga::performConnectivityHighOrder(void)
 // !! PLACEHOLDERS - TO BE COMPLETED !!
 void tioga::performConnectivityArtificialBoundary(void)
 {
-  mb->iartbnd=iartbnd;
-  mb->ihigh=ihigh;
   mb->getBoundaryNodes();  //! Get all AB face point locations
   exchangePointSearchData();
   mb->search();
@@ -569,45 +562,66 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   if (dcount) free(dcount);
 }
 
-void tioga::dataUpdate_artifBound(int nvar, double *q_spts, double* q_fpts, int leading_dim)
+void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int interpType)
 {
-  /// TODO
   // initialize send and recv packets
-
   int nsend,nrecv;
   int *sndMap,*rcvMap;
 
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
 
-  if (nsend == 0) return;
+  if (nsend+nrecv == 0) return;
 
-  PACKET *sndPack = new PACKET(nsend);
-  PACKET *rcvPack = new PACKET(nrecv);
+  PACKET *sndPack = new PACKET[nsend];
+  PACKET *rcvPack = new PACKET[nrecv];
 
-  int *icount = new int(nsend);
-  int *dcount = new int(nrecv);
+  std::vector<int> icount(nsend), dcount(nsend);
 
   pc->initPackets(sndPack,rcvPack);
 
   // get the interpolated solution now
-  int *integerRecords = NULL;
-  double *realRecords = NULL;
+  int *integerRecords = NULL;  // procID & pointID
+  double *realRecords = NULL;  // Interpolated solution
 
-  mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
-              &realRecords,q_spts,nvar,interptype);
+  /// TODO: Replace 'interptype' with array of strides (simpler & more general)
+  int nints, nreals;
+  if (iartbnd)
+  {
+    interpType = 0;
+    mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
+                                        &realRecords,q_spts,nvar,interpType);
+  }
+  else if (ihigh && (ncart == 0))
+  {
+    mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
+                                        &realRecords,q_spts,nvar,interpType);
+  }
+  else if (ncart > 0)
+  {
+    mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,
+                                   q_spts,nvar,interpType);
+    for (int i = 0; i < ncart; i++)
+      cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
+  }
+  else
+  {
+    // Note: same as original func, but using interpList2 instead
+    mb->getInterpolatedSolution2(nints,nreals,integerRecords,realRecords,q_spts,
+                                 nvar,interpType);
+  }
 
-  // populate the packets
+  // Populate the packets [organize interp data by rank to send to]
   for (int i = 0; i < nints; i++)
   {
-    int k = integerRecords[2*i];
+    int k = integerRecords[2*i]; // rank that interp point belongs to
     sndPack[k].nints++;
     sndPack[k].nreals += nvar;
   }
 
   for (int k = 0; k < nsend; k++)
   {
-    sndPack[k].intData = malloc(sizeof(int)*sndPack[k].nints);
-    sndPack[k].realData = malloc(sizeof(double)*sndPack[k].nreals);
+    sndPack[k].intData = (int *)malloc(sizeof(int)*sndPack[k].nints);
+    sndPack[k].realData = (double *)malloc(sizeof(double)*sndPack[k].nreals);
     icount[k] = dcount[k] = 0;
   }
 
@@ -620,68 +634,77 @@ void tioga::dataUpdate_artifBound(int nvar, double *q_spts, double* q_fpts, int 
       sndPack[k].realData[dcount[k]++] = realRecords[m++];
   }
 
-  // communicate the data across
+  // communicate the data across all partitions
   pc->sendRecvPackets(sndPack,rcvPack);
 
-  // decode the packets and update the data
-  double* qtmp = new double(nvar*mb->ntotalPoints);
-  int* itmp = new int(mb->ntotalPoints);
-
-  for (int i = 0; i < mb->ntotalPoints; i++)
-    itmp[i] = 0;
-
-  for (int k = 0; k < nrecv;k++)
+  // Decode the packets and update the values in the solver's data array
+  if (ihigh)
   {
-    int m = 0;
-    for (int i = 0; i < rcvPack[k].nints; i++)
+    std::vector<double> qtmp(nvar*mb->ntotalPoints);
+    std::vector<int> itmp(mb->ntotalPoints);
+
+    for (int k = 0; k < nrecv;k++)
     {
-      for (int j = 0; j < nvar; j++)
+      int m = 0;
+      for (int i = 0; i < rcvPack[k].nints; i++)
       {
-        itmp[rcvPack[k].intData[i]] = 1;
-        qtmp[rcvPack[k].intData[i]*nvar+j] = rcvPack[k].realData[m];
-        m++;
+        for (int j = 0; j < nvar; j++)
+        {
+          itmp[rcvPack[k].intData[i]] = 1;
+          qtmp[rcvPack[k].intData[i]*nvar+j] = rcvPack[k].realData[m];
+          m++;
+        }
       }
     }
-  }
 
-  std::fstream fp;
-  int norphanPoint = 0;
-  for (int i = 0; i < mb->ntotalPoints; i++)
+    // Print any 'orphan' points which may exist
+    std::ofstream fp;
+    int norphanPoint = 0;
+    for (int i = 0; i < mb->ntotalPoints; i++)
+    {
+      if (itmp[i] == 0) {
+        if (!fp.is_open())
+        {
+          std::stringstream ss;
+          ss << "orphan" << myid << ".dat";
+          fp.open(ss.str().c_str(),std::ofstream::out);
+        }
+        mb->outputOrphan(fp,i);
+        norphanPoint++;
+      }
+    }
+    fp.close();
+
+    if (norphanPoint > 0 && iorphanPrint) {
+      printf("Warning::number of orphans in %d = %d of %d\n",myid,norphanPoint,mb->ntotalPoints);
+      iorphanPrint = 0;
+    }
+
+    // change the state of cells/nodes who are orphans
+    mb->clearOrphans(itmp.data());
+
+    if (iartbnd)
+      mb->updateFluxPointData(q_fpts,qtmp.data(),nvar);
+    else
+      mb->updatePointData(q_spts,qtmp.data(),nvar,interpType);
+  }
+  else
   {
-    if (itmp[i] == 0) {
-      if (!fp.is_open())
+    for (int k = 0; k < nrecv; k++)
+    {
+      for (int i = 0; i < rcvPack[k].nints; i++)
       {
-        std::stringstream ss;
-        ss << "orphan" << myid << ".dat";
-        fp.open(ss.str().c_str(),std::fstream::out);
+        mb->updateSolnData(rcvPack[k].intData[i],&rcvPack[k].realData[nvar*i],q_spts,nvar,interpType);
       }
-      mb->outputOrphan(fp,i);
-      norphanPoint++;
     }
   }
-  fp.close();
-
-  if (norphanPoint > 0 && iorphanPrint) {
-    printf("Warning::number of orphans in %d = %d of %d\n",myid,norphanPoint,mb->ntotalPoints);
-    iorphanPrint = 0;
-  }
-
-  // change the state of cells/nodes who are orphans
-  mb->clearOrphans(itmp);
-
-  /// TODO: Probably need to rewrite this one to use fpt indices (separate from spt indices)
-  mb->updateFluxPointData(q_fpts,qtmp,nvar,interptype);
 
   // release all memory
   pc->clearPackets2(sndPack,rcvPack);
   delete[] sndPack;
   delete[] rcvPack;
-  delete[] qtmp;
-  delete[] itmp;
   delete[] integerRecords;
   delete[] realRecords;
-  delete[] icount;
-  delete[] dcount;
 }
 
 void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *idata,

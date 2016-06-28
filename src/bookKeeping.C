@@ -241,7 +241,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   {
     if (iblank[i] == FRINGE)
     {
-      temp = donorList[i];
+      DONORLIST *temp = donorList[i];
       (*receptorResolution)[k++] = nodeRes[i];
       (*donorRecords)[m++] = temp->donorData[0];
       (*donorRecords)[m++] = temp->donorData[2];
@@ -359,9 +359,11 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
 	    }
 	}
     }
-  //  
+
+  //  Find shape-function interpolation weights for query point
+  // if (!ihighGlobal) // Unnecessary - will be done later if high-order grids present
   computeNodalWeights(xv,xp,frac,nvert);
-  //
+
   interp2donor[irecord]=*recid;
   interpList[*recid].cancel=0;
   interpList[*recid].nweights=nvert;
@@ -433,43 +435,5 @@ void MeshBlock::clearIblanks(void)
 
 void MeshBlock::setIblanks(int inode)
 {
-/*  if (fabs(nodeRes[inode]-BIGVALUE) < TOL)
-    {
-      iblank[inode]=-2;
-    }
-  else*/
-//    {
-   iblank[inode]=-1;
-//    }
+  iblank[inode] = FRINGE;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

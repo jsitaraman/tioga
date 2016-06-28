@@ -55,9 +55,11 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   for(i=0;i<ntypes;i++) ncells+=nc[i];
 }
 
-void MeshBlock::setFaceData(int *_nf, int *_f2v, int *_f2c, int *_c2f)
+void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v, int *_f2c, int *_c2f)
 {
+  nftype = _nftype;
   nf = _nf;
+  nfv = _nfv;
   fconn = _f2v;
   f2c = _f2c;
   c2f = _c2f;
@@ -66,7 +68,7 @@ void MeshBlock::setFaceData(int *_nf, int *_f2v, int *_f2c, int *_c2f)
 void MeshBlock::preprocess(void)
 {
   // set all iblanks = 1
-  for (int i = 0; i < nnodes; i++) iblank[i] = 1;
+  for (int i = 0; i < nnodes; i++) iblank[i] = NORMAL;
 
   // find oriented bounding boxes
   free(obb);

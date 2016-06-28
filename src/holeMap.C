@@ -26,6 +26,7 @@ extern "C"
 
 /**
  * Create hole maps (structured cartesian maps of solid surfaces) for all grids
+ * Using simplified 'vision space bins' concept from Sitaraman et al, JCP 2010
  * This routine is not efficient since it does mutiple global reduce ops
  * have to change it at a later date when there is more time to develop code
  */
@@ -102,7 +103,7 @@ void tioga::getHoleMap(void)
         holeMap[i].extents[j]   -= (2*dsbox);
         holeMap[i].extents[j+3] += (2*dsbox);
         // nx should end up equal to 68 for maximum dimension
-        holeMap[i].nx[j] = floor(max((ds[j]+4*dsbox)/dsbox, 1));
+        holeMap[i].nx[j] = floor(max((ds[j]+4*dsbox)/dsbox, 1.));
       }
 
       int bufferSize = holeMap[i].nx[0] * holeMap[i].nx[1] * holeMap[i].nx[2];

@@ -1,0 +1,26 @@
+# Compiled Object Files
+*.o
+*.lo
+*.slo
+
+# Compiled Static/Dynamic Libraries
+*.a
+*.la
+*.lai
+*.so
+*.dylib
+
+# Temporary Files
+*~
+*.swp
+
+# TeX-Generated Files
+*.aux
+*.syctex.gz
+*.log
+*.toc
+
+# Other
+*.dat
+*.csv
+*.out

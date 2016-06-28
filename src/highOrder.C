@@ -20,6 +20,7 @@
 #include "MeshBlock.h"
 
 #include <algorithm>
+#include <set>
 
 #define ROW 0
 #define COLUMN 1
@@ -80,7 +81,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
       iblank_cell[ic] = HOLE;
   }
 
-  std::set<int> overFaces, blankMpi;
+  std::set<int> overFaces;
 
   // Allocate face iblank storage
   if (!iblank_face) iblank_face = new int[nfaces];
@@ -174,7 +175,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 
 void MeshBlock::setArtificialBoundaries(void)
 {
-  std:set<int> overFaces;
+  std::set<int> overFaces;
 
   for (int ff = 0; ff < nfaces; ff++)
   {
@@ -266,17 +267,37 @@ void MeshBlock::setArtificialBoundaries(void)
 void MeshBlock::clearOrphans(int *itmp)
 {
   int i,j,m;
-  int reject;
 
-  if (ihigh) 
+  if (iartbnd)
+  {
+    int fpt = 0;
+    for (int i = 0; i < nreceptorFaces; i++)
+    {
+      bool reject = false;
+      for (int j = 0; j < pointsPerFace[i]; j++)
+      {
+        if (itmp[fpt] == 0) reject = true;
+        fpt++;
+      }
+      if (reject)
+      {
+        // Change both connected cells to hole cells, if not already
+        int ic1 = f2c[2*ftag[i]];
+        int ic2 = f2c[2*ftag[i]+1];
+        iblank_cell[ic1] = HOLE;
+        iblank_cell[ic2] = HOLE;
+      }
+    }
+  }
+  else if (ihigh)
     {
       m=0;
       for(i=0;i<nreceptorCells;i++)
 	{
-	  reject=0;
+	  bool reject = false;
 	  for(j=0;j<pointsPerCell[i];j++)
 	    {
-	      if (itmp[m]==0) reject=1;
+	      if (itmp[m]==0) reject = true;
 	      m++;
 	    }
 	  if (reject) 
@@ -292,8 +313,8 @@ void MeshBlock::clearOrphans(int *itmp)
 	{
 	  if (picked[i]) 
 	    {
-	      reject=0;
-	      if (itmp[m]==0) reject=1;
+	      bool reject = false;
+	      if (itmp[m]==0) reject = true;
 	      if (reject) iblank[i]=1; // changed to field for near-body
                                        // perhaps not the right thing to do
               m++;
@@ -305,25 +326,24 @@ void MeshBlock::clearOrphans(int *itmp)
 
 void MeshBlock::getInternalNodes(void)
 {
-  nreceptorCells=0;
-
-  if (ctag!=NULL) free(ctag);
-  ctag = (int *)malloc(sizeof(int)*ncells);
-
-  /* Gather a list of cell IDs for all receptor (fringe) cells */
-  for (int i = 0; i < ncells; i++)
-    if (iblank_cell[i] == -1)
-      ctag[nreceptorCells++] = i+BASE;
+  nreceptorCells = 0;
 
   if (ihigh)
   {
-    /* Get a list of positions of all internal DOFs (solution points)
-     * for all fringe cells */
+    // Get a list of positions of all internal DOFs (solution points)
+    // for all fringe cells
+    free(ctag);
+    ctag = (int *)malloc(sizeof(int)*ncells);
 
-    if (pointsPerCell != NULL) free(pointsPerCell);
+    // Gather a list of cell IDs for all receptor (fringe) cells
+    for (int i = 0; i < ncells; i++)
+      if (iblank_cell[i] == FRINGE)
+        ctag[nreceptorCells++] = i+BASE;
+
+    free(pointsPerCell);
     pointsPerCell = (int *)malloc(sizeof(int)*nreceptorCells);
 
-    /* Get total number of internal nodes (solution points) for our fringe cells */
+    // Get total number of internal nodes (solution points) for our fringe cells
     maxPointsPerCell=0;
     ntotalPoints=0;
 
@@ -334,7 +354,7 @@ void MeshBlock::getInternalNodes(void)
       maxPointsPerCell = max(maxPointsPerCell,pointsPerCell[i]);
     }
 
-    if (rxyz != NULL) free(rxyz);
+    free(rxyz);
     //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
     rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
 
@@ -347,22 +367,19 @@ void MeshBlock::getInternalNodes(void)
   }
   else
   {
-    /* Gather a list of positions of all mesh points tagged as 'fringe'
-     * Will this ever be executed? */
-
     ntotalPoints=0;
-    if (picked !=NULL) free(picked);
+    free(picked);
     picked = (int *) malloc(sizeof(int)*nnodes);
 
     for (int i = 0; i < nnodes; i++) {
       picked[i] = 0;
-      if (iblank[i] == -1) {
+      if (iblank[i] == FRINGE) {
         picked[i] = 1;
         ntotalPoints++;
       }
     }
 
-    if (rxyz !=NULL) free(rxyz);
+    free(rxyz);
     rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
 
     int m = 0;
@@ -380,104 +397,125 @@ void MeshBlock::getInternalNodes(void)
 
 void MeshBlock::getBoundaryNodes(void)
 {
-  /* Use cell/face connectivity + callback funcs
-   *  to get locations of AB flux points */
+  nreceptorFaces = 0;
 
-  nreceptorFaces=0;
-
-  if (ftag!=NULL) delete[] ftag;
-  ftag = new int(nfaces);
-
-  /* Gather a list of cell IDs for all receptor (fringe) cells */
-  for (int i = 0; i < nfaces; i++)
-    if (iblank_face[i] == -1)
-      ftag[nreceptorFaces++] = i+BASE;
-
-  /* Get a list of positions of all internal DOFs (solution points)
-   * for all fringe cells */
-
-  if (pointsPerFace != NULL) free(pointsPerFace);
-  pointsPerFace = (int *)malloc(sizeof(int)*nreceptorFaces);
-
-  /* Get total number of internal nodes (solution points) for our fringe cells */
-  maxPointsPerFace = 0;
-  ntotalPoints = 0;
-
-  for (int i = 0; i < nreceptorFaces; i++)
+  if (iartbnd)
   {
-    get_nodes_per_face(&(ftag[i]),&(pointsPerFace[i]));
-    ntotalPoints += pointsPerFace[i];
-    maxPointsPerFace = max(maxPointsPerFace,pointsPerFace[i]);
+    // Gather all Artificial Boundary face flux points into fringe-point list
+    delete[] ftag;
+    ftag = new int[nfaces];
+
+    // Gather a list of cell IDs for all receptor (fringe) cells
+    for (int i = 0; i < nfaces; i++)
+      if (iblank_face[i] == FRINGE)
+        ftag[nreceptorFaces++] = i+BASE;
+
+    free(pointsPerFace);
+    pointsPerFace = (int *)malloc(sizeof(int)*nreceptorFaces);
+
+    // Get total number of face nodes (flux points) for our AB faces
+    maxPointsPerFace = 0;
+    ntotalPoints = 0;
+
+    for (int i = 0; i < nreceptorFaces; i++)
+    {
+      get_nodes_per_face(&(ftag[i]),&(pointsPerFace[i]));
+      ntotalPoints += pointsPerFace[i];
+      maxPointsPerFace = max(maxPointsPerFace,pointsPerFace[i]);
+    }
+
+    free(rxyz);
+    rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
+
+    // Find the position of each flux point using callback function
+    int m = 0;
+    for (int i = 0; i < nreceptorFaces; i++)
+    {
+      get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyz[m]));
+      m += (3*pointsPerFace[i]);
+    }
   }
-
-  if (rxyz != NULL) free(rxyz);
-  rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
-
-  int m = 0;
-  for (int i = 0; i < nreceptorFaces; i++)
+  else
   {
-    get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyz[m]));
-    m += (3*pointsPerFace[i]);
+    // Gather all fringe nodes into fringe-point list
+    ntotalPoints = 0;
+
+    free(picked);
+    picked = (int *) malloc(sizeof(int)*nnodes);
+
+    for (int i = 0; i < nnodes; i++) {
+      picked[i] = 0;
+      if (iblank[i] == FRINGE) {
+        picked[i] = 1;
+        ntotalPoints++;
+      }
+    }
+
+    free(rxyz);
+    rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
+
+    int m = 0;
+    for (int i = 0; i < nnodes; i++)
+      if (picked[i])
+        for (int j = 0; j < 3; j++)
+          rxyz[m++] = x[3*i+j];
   }
 }
 
-void MeshBlock::getExtraQueryPoints(OBB *obc,
-			       int *nints,int **intData,
-			       int *nreals, double **realData)
+void MeshBlock::getExtraQueryPoints(OBB *obc, int &nints, int *&intData,
+                                    int &nreals, double *&realData)
 {
-  int i,j,k;
-  int i3;
-  double xd[3];
-  int *inode;
-  int iptr;
-  int m;
+  nints = 0;
+  nreals = 0;
 
-  inode=(int *)malloc(sizeof(int)*ntotalPoints);
-  *nints=*nreals=0; 
-  for(i=0;i<ntotalPoints;i++)
+  // When high-order solvers being used, receptor points stored in 'rxyz'
+  // [Recall: points loaded using the AB face list 'ftag' + callback funcs,
+  // or using the list of fringe cells 'ctag' + callback funcs]
+  std::vector<int> inode(ntotalPoints, -1);
+
+  // Determine which of our receptor points overlap with given grid's OBB
+  for (int i = 0; i < ntotalPoints; i++)
+  {
+    double xd[3] = {0,0,0};
+    int i3 = 3*i;
+    // Dot product of distance to OBB center with OBB axes
+    for (int j = 0; j < 3; j++)
+      for (int k = 0; k < 3; k++)
+        xd[j] += (rxyz[i3+k]-obc->xc[k])*obc->vec[j][k];
+
+    if (fabs(xd[0]) <= obc->dxc[0] &&
+        fabs(xd[1]) <= obc->dxc[1] &&
+        fabs(xd[2]) <= obc->dxc[2])
     {
-      i3=3*i;
-      for(j=0;j<3;j++) xd[j]=0;
-      for(j=0;j<3;j++)
-	for(k=0;k<3;k++)
-	  xd[j]+=(rxyz[i3+k]-obc->xc[k])*obc->vec[j][k];
-
-      if (fabs(xd[0]) <= obc->dxc[0] &&
-	  fabs(xd[1]) <= obc->dxc[1] &&
-	  fabs(xd[2]) <= obc->dxc[2])
-	{
-	  inode[*nints]=i;
-	  (*nints)++;
-	  (*nreals)+=3;
-
-	}
+      inode[nints] = i;
+      nints++;
+      nreals += 3;
     }
-  //
-  (*intData)=(int *)malloc(sizeof(int)*(*nints));
-  (*realData)=(double *)malloc(sizeof(double)*(*nreals));
-  //
-  m=0;
-  for(i=0;i<*nints;i++)
-    {
-      i3=3*inode[i];
-      (*intData)[i]=inode[i];
-      (*realData)[m++]=rxyz[i3];
-      (*realData)[m++]=rxyz[i3+1];
-      (*realData)[m++]=rxyz[i3+2];
-    }
-  //
-  free(inode);
-}  
+  }
+
+  intData = (int *)malloc(sizeof(int)*nints);
+  realData = (double *)malloc(sizeof(double)*nreals);
+
+  int m = 0;
+  for (int i = 0; i < nints; i++)
+  {
+    int i3 = 3*inode[i];
+    intData[i] = inode[i];
+    realData[m++] = rxyz[i3];
+    realData[m++] = rxyz[i3+1];
+    realData[m++] = rxyz[i3+2];
+  }
+}
 
 void MeshBlock::processPointDonors(void)
 {
-  int ndim = NFRAC;
-  double* frac = (double *)malloc(sizeof(double)*ndim);
+  int buffsize = NFRAC;
+  double* frac = (double *)malloc(sizeof(double)*buffsize);
   interp2ListSize = ninterp2;
-  ninterp2=0;
+  ninterp2 = 0;
 
   for (int i = 0; i < nsearch; i++)
-    if (donorId[i] > -1 && iblank_cell[donorId[i]] == 1)
+    if (donorId[i] > -1 && iblank_cell[donorId[i]] == NORMAL)
       ninterp2++;
 
   if (interpList2)
@@ -502,7 +540,7 @@ void MeshBlock::processPointDonors(void)
   int m = 0;
   for (int i = 0; i < nsearch; i++)
   {
-    if (donorId[i] > -1 && iblank_cell[donorId[i]] == 1)
+    if (donorId[i] > -1 && iblank_cell[donorId[i]] == NORMAL)
     {
       if (ihigh)
       {
@@ -510,22 +548,24 @@ void MeshBlock::processPointDonors(void)
         interpList2[m].inode = (int *) malloc(sizeof(int));
         interpList2[m].nweights = 0;
 
-        /* Use High-Order callback function to get interpolation weights */
-        donor_frac(&(icell), &(xsearch[3*i]), &(interpList2[m].nweights), &(interpList2[m].inode[0]), frac, &(rst[3*i]),&ndim);
+        // Use High-Order callback function to get interpolation weights
+        donor_frac(&(icell), &(xsearch[3*i]), &(interpList2[m].nweights),
+                   &(interpList2[m].inode[0]), frac, &(rst[3*i]), &buffsize);
 
         interpList2[m].weights = (double *)malloc(sizeof(double)*interpList2[m].nweights);
         for(int j = 0; j < interpList2[m].nweights; j++)
           interpList2[m].weights[j] = frac[j];
 
-        interpList2[m].receptorInfo[0] = isearch[2*i];
-        interpList2[m].receptorInfo[1] = isearch[2*i+1];
+        interpList2[m].receptorInfo[0] = isearch[2*i];   // procID
+        interpList2[m].receptorInfo[1] = isearch[2*i+1]; // pointID
         m++;
       }
       else
       {
         int icell = donorId[i];
         int isum = 0;
-        for (int n = 0; n < ntypes; n++)
+        int n = -1;
+        for (n = 0; n < ntypes; n++)
         {
           isum += nc[n];
           if (icell < isum)
@@ -545,22 +585,23 @@ void MeshBlock::processPointDonors(void)
         {
           interpList2[m].inode[ivert] = vconn[n][nvert*icell+ivert]-BASE;
           int i3 = 3*interpList2[m].inode[ivert];
-          for (int j = 0; j < 3; j++) xv[ivert][j] = x[i3+j];
+          for (int j = 0; j < 3; j++)
+            xv[ivert][j] = x[i3+j];
         }
 
         double xp[3];
         double frac2[8];
 
-        xp[0]=xsearch[3*i];
-        xp[1]=xsearch[3*i+1];
-        xp[2]=xsearch[3*i+2];
+        xp[0] = xsearch[3*i];
+        xp[1] = xsearch[3*i+1];
+        xp[2] = xsearch[3*i+2];
         computeNodalWeights(xv,xp,frac2,nvert);
 
         for (int j = 0; j < nvert; j++)
-          interpList2[m].weights[j]=frac2[j];
+          interpList2[m].weights[j] = frac2[j];         // interpolation weights
 
-        interpList2[m].receptorInfo[0]=isearch[2*i];
-        interpList2[m].receptorInfo[1]=isearch[2*i+1];
+        interpList2[m].receptorInfo[0] = isearch[2*i];   // procID
+        interpList2[m].receptorInfo[1] = isearch[2*i+1]; // pointID
         m++;
       }
     }
@@ -716,13 +757,13 @@ void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
-  int m = 0;
-  for(int i = 0; i < nreceptorFace; i++)
+  int fpt = 0;
+  for(int i = 0; i < nreceptorFaces; i++)
   {
     if (iblank_face[ftag[i]-1] == -1)
     {
       // Get starting index of face's q data
-      k = 0;
+      int k = 0;
       for (int j = 0; j < pointsPerFace[i]; j++)
       {
         int ind, stride;
@@ -730,11 +771,11 @@ void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
         ind -= BASE;
         for (int n = 0; n < nvar; n++)
         {
-          q_fpts[ind+stride*n] = qtmp[m+k];
+          q_fpts[ind+stride*n] = qtmp[fpt+k];
           k++;
         }
       }
     }
-    m += (pointsPerFace[i]*nvar);
+    fpt += (pointsPerFace[i]*nvar);
   }
 }

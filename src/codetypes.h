@@ -20,7 +20,7 @@
 #define MPICH_SKIP_MPICXX
 #include<stdio.h>
 #include<stdlib.h>
-#include<math.h>
+#include<cmath>
 #include "mpi.h"
 /*====================================================================*/
 /*  Floating point definition                                         */
@@ -55,8 +55,10 @@
 /*==================================================================*/
 # define tracei(x)  printf("#tioga:\t"#x" =%d\n",x);
 # define traced(x)  printf("#tioga:\t"#x" =%.16e\n",x);
-# define min(x,y)  (x) < (y) ? (x) : (y)
-# define max(x,y)  (x) > (y) ? (x) : (y)
+//#define min(x,y)  (x < y) ? x : y;
+//#define max(x,y)  (x > y) ? x : y;
+using std::min;
+using std::max;
 # define debug(x,y)  printf("#tioga:\t"#x"=%d,"#y"=%d\n",x,y);
 # define stdwrite(x) if (myid==0) printf("#tioga:\t"#x"\n");
 # define dstr(x) printf("#tioga:\t"#x"\n");
@@ -74,7 +76,7 @@
         (((aa) >= 0)? (aa): -(aa))
 #define Round(aa)\
         (int) ((fabs((aa) - floor(aa)) >= HALF)? ceil(aa): floor(aa))
-#define swap(a,b) { a=a+b;b=a-b;a=a-b;}
+//#define swap(a,b) { a=a+b;b=a-b;a=a-b;}
 
 /*====================================================================*/
 /* IBLANK value definitions                                           */

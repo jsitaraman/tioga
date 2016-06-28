@@ -37,11 +37,9 @@ extern "C" {
   void tioga_init_f90_(int *scomm)
   {
     int id_proc,nprocs;
-    MPI_Comm tcomm;
-    //tcomm=(MPI_Comm) (*scomm);
-    tcomm=MPI_Comm_f2c(*scomm);
+    MPI_Comm tcomm = MPI_Comm_f2c(*scomm);
     //
-    tg=new tioga[1];
+    tg=new tioga();
     //
     //MPI_Comm_rank(MPI_COMM_WORLD,&id_proc);
     //MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
@@ -57,17 +55,12 @@ extern "C" {
   void tioga_init_(MPI_Comm tcomm)
   {
     int id_proc,nprocs;
-    //MPI_Comm tcomm;
-    //tcomm=(MPI_Comm) (*scomm);
-    //tcomm=MPI_Comm_f2c(*scomm);
-    //
-    tg=new tioga[1];
-    //
-    //MPI_Comm_rank(MPI_COMM_WORLD,&id_proc);
-    //MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
+
+    tg = new tioga();
+
     MPI_Comm_rank(tcomm,&id_proc);
     MPI_Comm_size(tcomm,&nprocs);
-    //
+
     tg->setCommunicator(tcomm,id_proc,nprocs);
     nc=NULL;
     nv=NULL;
@@ -83,9 +76,9 @@ extern "C" {
 
     va_start(arguments, ntypes);
 
-    if(nv) free(nv);
-    if(nc) free(nc);
-    if(vconn) free(vconn);
+    free(nv);
+    free(nc);
+    free(vconn);
 
     nv=(int *) malloc(sizeof(int)*(*ntypes));    
     nc=(int *) malloc(sizeof(int)*(*ntypes));
@@ -176,6 +169,12 @@ extern "C" {
 	  }
       }
   }
+
+  void tioga_dataupdate_ab(int nvar, double *q_spts, double *q_fpts)
+  {
+    tg->dataUpdate_artBnd(nvar, q_spts, q_fpts, 0);
+  }
+
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)
   {
     int interptype;
@@ -231,6 +230,14 @@ extern "C" {
     //donor_frac=f4;
     //convert_to_modal=f5;
   }
+
+  void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
+                                  void (*gfn)(int* id, int* npf, double* xyz),
+                                  void (*gqi)(int* id, int* fpt, int* ind, int* stride))
+  {
+    tg->set_ab_callback(gnf, gfn, gqi);
+  }
+
   void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *))
   {
     tg->set_amr_callback(f1);

@@ -3,9 +3,9 @@ F90= mpif90
 CC = mpicc
 CXX= mpicxx
 AR = ar -rvs
-CFLAGS = -fPIC -O0 -g -rdynamic #-Wall -Wextra#-fpe0
-FFLAGS = -fPIC  -CB -traceback #-fbacktrace -fbounds-check
-INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h
+CFLAGS = -std=c++11 -fPIC -O0 -g -rdynamic #-Wall -Wextra#-fpe0
+FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
+INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h error.hpp points.hpp funcs.hpp
 OBJF90 = kaiser.o median.o cellVolume.o
 OBJECTS = buildADTrecursion.o searchADTrecursion.o ADT.o\
 	MeshBlock.o search.o checkContainment.o bookKeeping.o \
@@ -13,7 +13,7 @@ OBJECTS = buildADTrecursion.o searchADTrecursion.o ADT.o\
 	tioga.o holeMap.o exchangeBoxes.o exchangeSearchData.o exchangeDonors.o\
 	parallelComm.o highOrder.o \
 	cartOps.o CartGrid.o CartBlock.o getCartReceptors.o get_amr_index_xyz.o\
-	exchangeAMRDonors.o\
+	exchangeAMRDonors.o funcs.o points.o \
 	tiogaInterface.o
 
 LDFLAGS= -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
@@ -32,6 +32,8 @@ clean :
 
 %.o:%.cu
 	$(CUC)  $(CFLAGS) -c $< -o $*.o
+%.o:%.cpp
+	$(CXX) $(CFLAGS) -c $< -o $*.o
 %.o:%.C
 	$(CXX) $(CFLAGS) -c $< -o $*.o
 %.o:%.F90

@@ -30,8 +30,6 @@ void MeshBlock::search(void)
   int i,j,k,l,m,n,p,i3;
   int ndim;
   int iptr,isum,nvert;
-  OBB *obq;
-  int *icell;
   int cell_count; 
   int cellindex;
   double xd[3];
@@ -48,10 +46,9 @@ void MeshBlock::search(void)
     return;
   }
 
-  obq=(OBB *) malloc(sizeof(OBB));
+  OBB obq;
   
-findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
-
+  findOBB(xsearch,obq.xc,obq.dxc,obq.vec,nsearch);
 
   //writebbox(obq,4);
   //writePoints(xsearch,nsearch,4);
@@ -59,8 +56,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   // find all the cells that may have intersections with
   // the OBB
   //
-  icell=(int *)malloc(sizeof(int)*ncells);
-  for(i=0;i<ncells;i++) icell[i]=-1;
+  std::vector<int> icell(ncells, -1);
+
   iptr=-1;
   cell_count=0;
   p=0;
@@ -82,7 +79,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 		{
 		  xd[j]=0;
 		  for(k=0;k<3;k++)
-		    xd[j]+=(x[i3+k]-obq->xc[k])*obq->vec[j][k];
+		    xd[j]+=(x[i3+k]-obq.xc[k])*obq.vec[j][k];
 		  xmin[j]=min(xmin[j],xd[j]);
 		  xmax[j]=max(xmax[j],xd[j]);
 		}
@@ -92,9 +89,9 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 		  dxc[j]=(xmax[j]-xmin[j])*0.5;
 		}
 	    }
-	  if (fabs(xd[0]) <= (dxc[0]+obq->dxc[0]) &&
-	      fabs(xd[1]) <= (dxc[1]+obq->dxc[1]) &&
-	      fabs(xd[2]) <= (dxc[2]+obq->dxc[2])) 
+	  if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
+	      fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
+	      fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
 	    {
 	      //
 	      // create a LIFO stack
@@ -189,7 +186,4 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       }
       ipoint+=3;
     }
-  //
-  free(icell);
-  free(obq);
 }

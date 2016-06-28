@@ -22,6 +22,8 @@
 void tioga::exchangeSearchData(void)
 {
   // Get the processor map for sending and receiving
+  int nsend, nrecv;
+  int *sndMap, *rcvMap;
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
 
   // Create packets to send and receive points, and initialize them to zero
@@ -65,7 +67,7 @@ void tioga::exchangeSearchData(void)
   free(mb->donorId);
 
   mb->xsearch = (double *)malloc(sizeof(double)*3*mb->nsearch);
-  mb->isearch = (int *)malloc(2*sizeof(int)*mb->nsearch);
+  mb->isearch = (int *)malloc(sizeof(int)*2*mb->nsearch);
   mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
 
   // now fill the query point arrays
@@ -142,10 +144,9 @@ void tioga::exchangePointSearchData(void)
   // now get data for each packet
   //
   for(k=0;k<nsend;k++)
-    mb->getExtraQueryPoints(&obblist[k],
-			    &sndPack[k].nints,&sndPack[k].intData,
-			    &sndPack[k].nreals,&sndPack[k].realData);
-  MPI_Barrier(scomm);
+    mb->getExtraQueryPoints(&obblist[k], sndPack[k].nints, sndPack[k].intData,
+                            sndPack[k].nreals, sndPack[k].realData);
+  //MPI_Barrier(scomm);
   //if (myid==0) printf("AAAAA\n");
   //
   // exchange the data
@@ -162,10 +163,10 @@ void tioga::exchangePointSearchData(void)
   // if these were already allocated
   // get rid of them
   //
-  if (mb->xsearch) free(mb->xsearch);
-  if (mb->isearch) free(mb->isearch);
-  if (mb->donorId) free(mb->donorId);
-  if (mb->rst) free(mb->rst);
+  free(mb->xsearch);
+  free(mb->isearch);
+  free(mb->donorId);
+  free(mb->rst);
   //
   // allocate query point storage
   //
@@ -180,14 +181,13 @@ void tioga::exchangePointSearchData(void)
   dcount=0;
   for(k=0;k<nrecv;k++)
     {
-      l=0;
       for(j=0;j<rcvPack[k].nints;j++)
 	{
 	  mb->isearch[icount++]=k;
 	  mb->isearch[icount++]=rcvPack[k].intData[j];	  
-	  mb->xsearch[dcount++]=rcvPack[k].realData[l++];
-	  mb->xsearch[dcount++]=rcvPack[k].realData[l++];
-	  mb->xsearch[dcount++]=rcvPack[k].realData[l++];
+	  mb->xsearch[dcount++]=rcvPack[k].realData[3*j];
+	  mb->xsearch[dcount++]=rcvPack[k].realData[3*j+1];
+	  mb->xsearch[dcount++]=rcvPack[k].realData[3*j+2];
 	}
     }
   for(i=0;i<nsend;i++)

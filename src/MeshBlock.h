@@ -41,9 +41,11 @@ class MeshBlock
   int ncells;  /** < total number of cells */
   int nfaces;  /** < total number of faces (Art. Bnd.) */
   int ntypes;  /** < number of different types of cells */
+  int nftype;  /** < number of different face types (triangle or quad) */
   int *nv;     /** < number of vertices for each type of cell */
   int *nc;     /** < number of each of different kinds of cells (tets, prism, pyramids, hex etc) */
   int *nf;     /** < number of faces for each cell type */
+  int *nfv;    /** < number of vertices per face for each face type (3 or 4) */
   int nobc;    /** < number of overset boundary nodes */
   int nwbc;    /** < number of wall boundary nodes */
   //
@@ -157,9 +159,9 @@ class MeshBlock
    * @param[out] inode     Indices of donor points within global solution array
    * @param[out] weights   Interpolation weights for each donor point
    * @param[in]  rst       Reference coordinates of receptor point within cell
-   * @param[in]  ndim      Amount of memory allocated to 'frac' (# of doubles)
+   * @param[in]  buffsize  Amount of memory allocated to 'weights' (# of doubles)
    */
-  void (*donor_frac)(int* cellID, double* xyz, int* nweights, int* inode, double* weights, double* rst, int* ndim);
+  void (*donor_frac)(int* cellID, double* xyz, int* nweights, int* inode, double* weights, double* rst, int* buffsize);
 
   void (*convert_to_modal)(int *,int *,double *,int *,int *,double *);
 
@@ -266,7 +268,7 @@ class MeshBlock
 	       int *wbcnodei,int *obcnodei,
 	       int ntypesi, int *nvi, int *nci, int **vconni);
 
-  void setFaceData(int* _nf, int *_f2v, int *_f2c, int *_c2f);
+  void setFaceData(int _nftype, int* _nf, int* _nfv, int** _f2v, int *_f2c, int *_c2f);
 
   void setResolutions(double *nres,double *cres);    
 	       
@@ -288,6 +290,9 @@ class MeshBlock
 
   void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,double *q,
 			       int nvar, int interptype);
+
+  void getInterpolatedSolution2(int &nints,int &nreals,int *&intData, double *&realData,
+                                double *q,int nvar, int interptype);
 
   void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,
 				  int nvar, int interptype);
@@ -357,10 +362,12 @@ class MeshBlock
     donor_inclusion_test=f3;
     donor_frac=f4;
     convert_to_modal=f5;
+
+    ihigh = 1;
   }
 
   //! Set callback functions specific to Artificial Boundary method
-  void setCallbackArtBnd(void (*gnf)(int* id,int* npf),
+  void setCallbackArtBnd(void (*gnf)(int* id, int* npf),
                          void (*gfn)(int* id, int* npf, double* xyz),
                          void (*gqi)(int* id, int* fpt, int* ind, int* stride))
   {
@@ -368,6 +375,8 @@ class MeshBlock
     get_nodes_per_face = gnf;
     get_face_nodes = gfn;
     get_q_index_face = gqi;
+
+    iartbnd = 1;
   }
 
   void writeCellFile(int);
@@ -379,8 +388,8 @@ class MeshBlock
    * [Requires use of callback functions] */
   void getBoundaryNodes(void);
 
-  void getExtraQueryPoints(OBB *obb,int *nints,int **intData,int *nreals,
-		      double **realData);
+  void getExtraQueryPoints(OBB *obb, int &nints, int*& intData, int &nreals,
+                           double*& realData);
   void processPointDonors(void);
   void getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **intData,
 				       double **realData,
@@ -398,7 +407,7 @@ class MeshBlock
     fprintf(fp,"%f %f %f\n",rxyz[3*i],rxyz[3*i+1],rxyz[3*i+2]);
   }
 
-  void outputOrphan(const std::fstream &fp, int i)
+  void outputOrphan(std::ofstream &fp, int i)
   {
     fp << rxyz[3*i] << " " << rxyz[3*i+1] << " " << rxyz[3*i+2] << std::endl;
   }

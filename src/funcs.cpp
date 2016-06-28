@@ -44,13 +44,13 @@ std::ostream& operator<<(std::ostream &os, const point &pt)
 
 std::ostream& operator<<(std::ostream &os, const std::vector<int> &vec)
 {
-  for (auto &val:vec) cout << val << ", ";
+  for (auto &val:vec) std::cout << val << ", ";
   return os;
 }
 
 std::ostream& operator<<(std::ostream &os, const std::vector<double> &vec)
 {
-  for (auto &val:vec) cout << val << ", ";
+  for (auto &val:vec) std::cout << val << ", ";
   return os;
 }
 
@@ -114,13 +114,13 @@ std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size)
         int j0 = 0;
         for (int j=0; j<size; j++) {
           if (j==col) continue;
-          Minor(i0*(size-1)+j0) = mat(i*size+j);
+          Minor[i0*(size-1)+j0] = mat[i*size+j];
           j0++;
         }
         i0++;
       }
       // Recall: adjoint is TRANSPOSE of cofactor matrix
-      adj(col*size+row) = sign*determinant(Minor,size-1);
+      adj[col*size+row] = sign*determinant(Minor,size-1);
     }
   }
 
@@ -141,14 +141,14 @@ double determinant(const std::vector<double> &data, unsigned int size)
     double Det = 0;
     int sign = -1;
     std::vector<double> Minor((size-1)*(size-1));
-    for (int row=0; row<this->dims[0]; row++) {
+    for (int row=0; row<size; row++) {
       sign *= -1;
       // Setup the minor matrix (expanding along first column)
       int i0 = 0;
       for (int i=0; i<size; i++) {
         if (i==row) continue;
         for (int j=1; j<size; j++) {
-          Minor(i0,j-1) = data[i*size+j];
+          Minor[i0,j-1] = data[i*size+j];
         }
         i0++;
       }
@@ -170,8 +170,8 @@ void getBoundingBox(double *pts, int nPts, int nDims, double *bbox)
 
   for (int i=0; i<nPts; i++) {
     for (int dim=0; dim<nDims; dim++) {
-      bbox[dim]       = min(bbox[dim],      pts[i*nDims+dim]);
-      bbox[nDims+dim] = max(bbox[nDims+dim],pts[i*nDims+dim]);
+      bbox[dim]       = std::min(bbox[dim],      pts[i*nDims+dim]);
+      bbox[nDims+dim] = std::max(bbox[nDims+dim],pts[i*nDims+dim]);
     }
   }
 }
@@ -199,8 +199,8 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
   }
 
   // Use a relative tolerance to handle extreme grids
-  double h = min(xmax-xmin,ymax-ymin);
-  if (nDims==3) h = min(h,zmax-zmin);
+  double h = std::min(xmax-xmin,ymax-ymin);
+  if (nDims==3) h = std::min(h,zmax-zmin);
 
   double tol = 1e-12*h;
 
@@ -237,9 +237,9 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
       }
     }
 
-    double detJ = grad.det();
+    double detJ = determinant(grad,nDims);
 
-    auto ginv = grad.adjoint();
+    auto ginv = adjoint(grad,nDims);
 
     point delta = {0,0,0};
     for (int i=0; i<nDims; i++)
@@ -250,7 +250,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
     for (int i=0; i<nDims; i++) {
       norm += dx[i]*dx[i];
       loc[i] += delta[i];
-      loc[i] = max(min(loc[i],1.01),-1.01);
+      loc[i] = std::max(std::min(loc[i],1.01),-1.01);
     }
 
     iter++;
@@ -308,7 +308,7 @@ double computeVolume(double *xv, int nNodes, int nDims)
 
   for (uint spt = 0; spt < nSpts; spt++)
   {
-    jaco.initializeToZero();
+    jaco.assign(jaco.size(), 0);
     for (uint n = 0; n < nNodes; n++)
       for (uint d1 = 0; d1 < nDims; d1++)
         for (uint d2 = 0; d2 < nDims; d2++)
@@ -727,7 +727,8 @@ void dshape_quad(const point &in_rs, double* out_dshape, int nNodes)
 void dshape_hex(const std::vector<point> &loc_pts, double* out_dshape, int nNodes)
 {
   for (int i = 0; i < loc_pts.size(); i++) {
-    dshape_hex(loc_pts[i], dshape_tmp[i*nNodes*3], nNodes);
+    point pt = loc_pts[i];
+    dshape_hex(pt, &out_dshape[i*nNodes*3], nNodes);
   }
 }
 

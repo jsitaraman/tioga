@@ -17,6 +17,9 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include <stdlib.h>
+#include <unordered_set>
+
 /** 
  * Generic Alternating Digital Tree For Search Operations
  */
@@ -39,9 +42,9 @@ class ADT
 
   ~ADT()
   {
-    if (adtIntegers) free(adtIntegers);
-    if (adtReals) free(adtReals);
-    if (adtExtents) free(adtExtents);
+    free(adtIntegers);
+    free(adtReals);
+    free(adtExtents);
     adtIntegers=NULL;
     adtReals=NULL;
     adtExtents=NULL;
@@ -49,9 +52,9 @@ class ADT
 
   void clearData(void)
   {
-    if (adtIntegers) free(adtIntegers);
-    if (adtReals) free(adtReals);
-    if (adtExtents) free(adtExtents);
+    free(adtIntegers);
+    free(adtReals);
+    free(adtExtents);
     adtIntegers=NULL;
     adtReals=NULL;
     adtExtents=NULL;

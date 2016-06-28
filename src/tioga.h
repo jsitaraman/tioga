@@ -95,7 +95,7 @@ class tioga
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
 
   /** Register additional face-connectivity arrays for Artificial Boundadry method */
-  void registerFaceConnectivity(int* nf, int *f2v, int *f2c, int *c2f);
+  void registerFaceConnectivity(int nftype, int* nf, int *nfv, int** fconn, int *f2c, int *c2f);
 
   void profile(void);
 
@@ -133,7 +133,7 @@ class tioga
   void dataUpdate_highorder(int nvar,double *q, int interptype) ;
 
   /** Perform data interpolation for artificial boundary method */
-  void dataUpdate_artifBound(int nvar, double *q_spts, double* q_fpts, int leading_dim) ;
+  void dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int interpType);
 
   /** get hole map for each mesh */
  
@@ -148,17 +148,20 @@ class tioga
   void getDonorCount(int *dcount, int *fcount);
   
   void getDonorInfo(int *receptors,int *indices,double *frac,int *dcount);
+
   /** set symmetry bc */
-  void setSymmetry(int syminput) { isym=syminput;};
+  void setSymmetry(int syminput) { isym=syminput;}
+
   /** set resolutions for nodes and cells */
   void setResolutions(double *nres,double *cres)
-  { mb->setResolutions(nres,cres);}    
+  { mb->setResolutions(nres,cres);}
 
   void set_cell_iblank(int *iblank_cell)
   {
    mb->set_cell_iblank(iblank_cell);
   }
 
+  //! Set callback functions for general high-order methods
   void setcallback(void (*f1)(int*, int*),
 		    void (*f2)(int *,int *,double *),
 		    void (*f3)(int *,double *,int *,double *),
@@ -167,6 +170,15 @@ class tioga
   {
     mb->setcallback(f1,f2,f3,f4,f5);
     ihigh=1;
+  }
+
+  //! Set callback functions specific to Artificial Boundary method
+  void set_ab_callback(void (*gnf)(int* id, int* npf),
+                       void (*gfn)(int* id, int* npf, double* xyz),
+                       void (*gqi)(int* id, int* fpt, int* ind, int* stride))
+  {
+    mb->setCallbackArtBnd(gnf, gfn, gqi);
+    iartbnd = 1;
   }
   
   void set_amr_callback(void (*f1)(int *,double *,int *,double *))

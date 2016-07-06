@@ -21,8 +21,7 @@
 extern "C" 
 { 
   void fillHoleMap(int *holeMap, int ix[3],int isym);
-
-};
+}
 
 /**
  * Create hole maps (structured cartesian maps of solid surfaces) for all grids

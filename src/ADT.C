@@ -24,12 +24,13 @@
 #include <stdlib.h>
 #include "codetypes.h"
 #include "ADT.h"
-extern "C"{
+
+extern "C" {
 void buildADTrecursion(double *coord,double *adtReals,double *adtWork,int *adtIntegers,
 		       int *elementsAvailable,int *adtCount,int side,int parent,
-		       int level,int ndim,int nelem, int nav);}
-
+		       int level,int ndim,int nelem, int nav);
 extern void median_(int *,double *,int *,double *);
+}
 
 void ADT::buildADT(int d, int nelements, double *elementBbox)
 {

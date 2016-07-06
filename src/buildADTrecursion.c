@@ -19,6 +19,9 @@
 /* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA */
 #include "codetypes.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern void median_(int *,double *,int *,double *);
 
 void buildADTrecursion(double *coord,double *adtReals,double *adtWork,int *adtIntegers,
@@ -115,3 +118,6 @@ void buildADTrecursion(double *coord,double *adtReals,double *adtWork,int *adtIn
   }
 }
 
+#ifdef __cplusplus
+}
+#endif

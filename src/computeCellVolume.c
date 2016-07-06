@@ -18,6 +18,12 @@
 /* License along with this library; if not, write to the Free Software */
 /* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern double cellVolume_(double xc[8][3],int *numverts,int* fconn, int *nfaces,int *nvert);
+
 double computeCellVolume(double xv[8][3],int nvert)
 {
  double vol;
@@ -52,3 +58,7 @@ double computeCellVolume(double xv[8][3],int nvert)
  vol=cellVolume_(xv,&numverts[itype],&faceInfo[itype],&nfaces,&nvert);
  return vol;
 }
+
+#ifdef __cplusplus
+}
+#endif

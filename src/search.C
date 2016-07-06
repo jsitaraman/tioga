@@ -24,7 +24,6 @@ extern "C" {
   void writePoints(double *x,int nsearch,int bid);
 }
 
-
 void MeshBlock::search(void)
 {
   int i,j,k,l,m,n,p,i3;

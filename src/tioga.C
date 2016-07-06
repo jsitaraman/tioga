@@ -24,13 +24,13 @@
 #include <string>
 #include <sstream>
 
-/**
- * set communicator
- * and initialize a few variables
- */
 extern "C"{
 //void writeqnode_(int *myid,double *qnodein,int *qnodesize);
-};
+}
+
+/**
+ * Set MPI communicator and initialize a few variables
+ */
 void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
 {
   scomm=communicator;

@@ -18,10 +18,12 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h"
+
 extern "C"{
   int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
 			double vB[3][3],double xB[3],double dxB[3]);			   
 }
+
 void tioga::exchangeBoxes(void)
 {
   int i,j,k,m;

@@ -19,7 +19,12 @@
 /* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA */
 #include "codetypes.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void kaiser_wrap_(double *,int *,int *,double *,double *,double *,int *);
+
 /***
  ** find oriented bounding box for a given set of points
 */
@@ -442,3 +447,6 @@ void writePoints(double *x,int nsearch,int bid)
   fclose(fp);
 }
 
+#ifdef __cplusplus
+}
+#endif

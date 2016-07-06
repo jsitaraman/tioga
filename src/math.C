@@ -21,6 +21,62 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** box product of vectors, a,b,c */
+double scalarProduct(double a[3], double b[3], double c[3])
+{
+  return a[0]*b[1]*c[2] - a[0]*b[2]*c[1] +
+         a[1]*b[2]*c[0] - a[1]*b[0]*c[2] +
+         a[2]*b[0]*c[1] - a[2]*b[1]*c[0];
+}
+
+/**
+ * Subroutine to find volumes of arbitrary polyhedra with triangles and quads
+ * as faces
+ * Uses vertex coordinates and provided face connectivity
+ *
+ * Uses Gausss divergence theorem with quad faces treated as bilinear
+ * Reference Appendix B of https://drum.umd.edu/dspace/handle/1903/310
+ * Sitaraman, UMD, PhD thesis 2003
+ *
+ * Arguments:
+ * xc - coordinates of vertices of the polyhedra
+ * fconn - face connectivity
+ * numverts-number of vertices in each face
+ * nfaces - number of faces
+ * nvert - number of vertices of the polyhedra
+ */
+double cellVolume(double xv[8][3], int numverts[6], int fconn[24],
+                int nfaces, int nvert)
+{
+  // -ve sign below because the vertex ordering of faces are such that the
+  // normals are inward facing
+  double vol = 0.;
+  for (int i = 0; i < nfaces; i++)
+  {
+    if (numverts[i] == 3)
+    {
+      vol -= .5 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+1]],
+                                xv[fconn[i*6+2]]);
+    }
+    else
+    {
+      vol -= .25 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+1]],
+                                 xv[fconn[i*6+2]]);
+      vol -= .25 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+2]],
+                                 xv[fconn[i*6+3]]);
+      vol -= .25 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+1]],
+                                 xv[fconn[i*6+3]]);
+      vol -= .25 * scalarProduct(xv[fconn[i*6+1]], xv[fconn[i*6+2]],
+                                 xv[fconn[i*6+3]]);
+    }
+  }
+
+  vol /= 3.;
+}
 
 void solvec(double **a,double *b,int *iflag,int n)
 {
@@ -323,6 +379,9 @@ double computeCellVolume(double xv[8][3],int nvert)
      break;
    }
      
- cellvolume_(&vol,xv,&numverts[itype],&faceInfo[itype],&nfaces,&nvert);
- return vol;
+ return cellVolume(xv,numverts[itype],faceInfo[itype],nfaces,nvert);
 }
+
+#ifdef __cplusplus
+}
+#endif

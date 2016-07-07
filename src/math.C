@@ -59,19 +59,19 @@ double cellVolume(double xv[8][3], int numverts[6], int fconn[24],
   {
     if (numverts[i] == 3)
     {
-      vol -= .5 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+1]],
-                                xv[fconn[i*6+2]]);
+      vol -= .5 * scalarProduct(xv[fconn[i*4+0]], xv[fconn[i*4+1]],
+                                xv[fconn[i*4+2]]);
     }
     else
     {
-      vol -= .25 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+1]],
-                                 xv[fconn[i*6+2]]);
-      vol -= .25 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+2]],
-                                 xv[fconn[i*6+3]]);
-      vol -= .25 * scalarProduct(xv[fconn[i*6+0]], xv[fconn[i*6+1]],
-                                 xv[fconn[i*6+3]]);
-      vol -= .25 * scalarProduct(xv[fconn[i*6+1]], xv[fconn[i*6+2]],
-                                 xv[fconn[i*6+3]]);
+      vol -= .25 * scalarProduct(xv[fconn[i*4+0]], xv[fconn[i*4+1]],
+                                 xv[fconn[i*4+2]]);
+      vol -= .25 * scalarProduct(xv[fconn[i*4+0]], xv[fconn[i*4+2]],
+                                 xv[fconn[i*4+3]]);
+      vol -= .25 * scalarProduct(xv[fconn[i*4+0]], xv[fconn[i*4+1]],
+                                 xv[fconn[i*4+3]]);
+      vol -= .25 * scalarProduct(xv[fconn[i*4+1]], xv[fconn[i*4+2]],
+                                 xv[fconn[i*4+3]]);
     }
   }
 
@@ -377,6 +377,10 @@ double computeCellVolume(double xv[8][3],int nvert)
      itype=3;
      nfaces=6;
      break;
+   default:
+     printf("Error in computeCellVolume: unknown nvert!\n");
+     printf("Unknown nvert = %d!\n",nvert);
+     exit(1);
    }
      
  return cellVolume(xv,numverts[itype],faceInfo[itype],nfaces,nvert);

@@ -95,7 +95,7 @@ class tioga
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
 
   /** Register additional face-connectivity arrays for Artificial Boundadry method */
-  void registerFaceConnectivity(int nftype, int* nf, int *nfv, int** fconn, int *f2c, int *c2f);
+  void registerFaceConnectivity(int nftype, int* nf, int *nfv, int** fconn, int *f2c, int *c2f, int* iblank_face);
 
   void profile(void);
 

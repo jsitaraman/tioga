@@ -67,29 +67,40 @@ extern "C" {
     vconn=NULL;
   }
   
-
-  void tioga_registergrid_data_(int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
-			       int *obcnode,int *ntypes,...)
+  void tioga_registergrid_data_(int btag, int nnodes, double *xyz, int *ibl,
+                                int nwbc, int nobc, int *wbcnode, int *obcnode,
+                                int ntypes, int _nv, int _nc, int *_vconn)
   {
-    va_list arguments;
-    int i;
-
-    va_start(arguments, ntypes);
-
     free(nv);
     free(nc);
     free(vconn);
 
-    nv=(int *) malloc(sizeof(int)*(*ntypes));    
-    nc=(int *) malloc(sizeof(int)*(*ntypes));
-    vconn=(int **)malloc(sizeof(int *)*(*ntypes));
-    for(i=0;i<*ntypes;i++)
-     {
-      nv[i]=*(va_arg(arguments, int *));
-      nc[i]=*(va_arg(arguments, int *));
-      vconn[i]=va_arg(arguments, int *);
-     }
-    tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,nv,nc,vconn);
+    // NOTE: due to SWIG/Python wrapping, removing va_args stuff for now
+    nv    = (int *) malloc(sizeof(int)*ntypes);
+    nc    = (int *) malloc(sizeof(int)*ntypes);
+    vconn = (int **)malloc(sizeof(int *)*ntypes);
+    nv[0] = _nv;
+    nc[0] = _nc;
+    vconn[0] = _vconn;
+
+    tg->registerGridData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
+  }
+
+  void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nftype,
+                                 int _nfv, int _nf, int *_fconn)
+  {
+    free(nfv);
+    free(nf);
+    free(fconn);
+
+    nfv   = (int *) malloc(sizeof(int)*nftype);
+    nf    = (int *) malloc(sizeof(int)*nftype);
+    fconn = (int **)malloc(sizeof(int *)*nftype);
+    nfv[0] = _nfv;
+    nf[0] = _nf;
+    fconn[0] = _fconn;
+
+    tg->registerFaceConnectivity(nftype, nf, nfv, fconn, f2c, c2f, fibl);
   }
 
   void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,

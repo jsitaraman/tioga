@@ -268,7 +268,7 @@ class MeshBlock
 	       int *wbcnodei,int *obcnodei,
 	       int ntypesi, int *nvi, int *nci, int **vconni);
 
-  void setFaceData(int _nftype, int* _nf, int* _nfv, int** _f2v, int *_f2c, int *_c2f);
+  void setFaceData(int _nftype, int* _nf, int* _nfv, int** _f2v, int *_f2c, int *_c2f, int* _ib_face);
 
   void setResolutions(double *nres,double *cres);    
 	       

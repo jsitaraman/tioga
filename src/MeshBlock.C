@@ -55,7 +55,8 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   for(i=0;i<ntypes;i++) ncells+=nc[i];
 }
 
-void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v, int *_f2c, int *_c2f)
+void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v,
+                            int *_f2c, int *_c2f, int *_ib_face)
 {
   nftype = _nftype;
   nf = _nf;
@@ -63,6 +64,7 @@ void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v, int *_
   fconn = _f2v;
   f2c = _f2c;
   c2f = _c2f;
+  iblank_face = _ib_face;
 }
 
 void MeshBlock::preprocess(void)

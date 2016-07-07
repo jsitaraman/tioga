@@ -73,9 +73,10 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   mytag=btag;
 }
 
-void tioga::registerFaceConnectivity(int nftype, int *nf, int *nfv, int **fconn, int *f2c, int *c2f)
+void tioga::registerFaceConnectivity(int nftype, int *nf, int *nfv, int **fconn,
+                                     int *f2c, int *c2f, int *iblank_face)
 {
-  mb->setFaceData(nftype, nf, nfv, fconn, f2c, c2f);
+  mb->setFaceData(nftype, nf, nfv, fconn, f2c, c2f, iblank_face);
 }
 
 void tioga::profile(void)

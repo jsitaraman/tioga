@@ -33,8 +33,12 @@ extern "C" {
 void tioga_init_f90_(int *scomm);
 void tioga_init_(MPI_Comm tcomm);
 
-void tioga_registergrid_data_(int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode,
-			      int *obcnode,int *ntypes,...);
+void tioga_registergrid_data_(int btag, int nnodes, double *xyz, int *ibl,
+                              int nwbc, int nobc, int *wbcnode, int *obcnode,
+                              int ntypes, int _nv, int _nc, int *_vconn);
+
+void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nftype,
+                               int _nfv, int _nf, int *_fconn);
 
 void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
 				     int *idata,double *rdata,

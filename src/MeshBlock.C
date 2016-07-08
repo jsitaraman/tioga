@@ -50,9 +50,9 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   vconn=vconni;
   //
   //tracei(nnodes);
-  //for(i=0;i<ntypes;i++) tracei(nc[i]);
+  //for (int i = 0; i < ntypes; i++) tracei(nc[i]);
   ncells=0;
-  for(i=0;i<ntypes;i++) ncells+=nc[i];
+  for (int i = 0; i < ntypes; i++) ncells+=nc[i];
 }
 
 void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v,
@@ -65,6 +65,10 @@ void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v,
   f2c = _f2c;
   c2f = _c2f;
   iblank_face = _ib_face;
+
+  nfaces = 0;
+  for (int i = 0; i < nftype; i++)
+    nfaces += nf[i];
 }
 
 void MeshBlock::preprocess(void)
@@ -87,156 +91,125 @@ void MeshBlock::preprocess(void)
  */
 void MeshBlock::tagBoundary(void)
 {
-  int i,j,k,n,m,ii;
-  int itag;
   int inode[8];
   double xv[8][3];
-  double vol;
-  int *iflag;
-  int nvert,i3;
-  FILE *fp;
-  char intstring[7];
-  char fname[80];  
-  
 
-  //
-  // do this only once
-  // i.e. when the meshblock is first 
-  // initialized, cellRes would be NULL in this case
-  //
+  // Do this only once
+  // i.e. when the meshblock is first initialized, cellRes would be NULL in
+  // this case
+  free(cellRes);
+  free(nodeRes);
 
-      free(cellRes);
-      free(nodeRes);
-    
-      //
-      cellRes=(double *) malloc(sizeof(double)*ncells);
-      nodeRes=(double *) malloc(sizeof(double)*nnodes);
-      //
-      // this is a local array
-      //
-      iflag=(int *)malloc(sizeof(int)*nnodes);
+  cellRes=(double *) malloc(sizeof(double)*ncells);
+  nodeRes=(double *) malloc(sizeof(double)*nnodes);
 
-      if (userSpecifiedNodeRes ==NULL && userSpecifiedCellRes ==NULL)
-	{
-	  for(i=0;i<nnodes;i++) iflag[i]=0;
-	  for(i=0;i<nnodes;i++) nodeRes[i]=0.0;
-	  //
-	  k=0;
-	  for(n=0;n<ntypes;n++)
-	    {
-	      nvert=nv[n];
-	      for(i=0;i<nc[n];i++)
-		{
-		  for(m=0;m<nvert;m++)
-		    {
-		      inode[m]=vconn[n][nvert*i+m]-BASE;
-		      i3=3*inode[m];
-		      for(j=0;j<3;j++)
-			xv[m][j]=x[i3+j];
-		    }
-		  vol=computeCellVolume(xv,nvert);
-		  cellRes[k++]=vol;
-		  for(m=0;m<nvert;m++)
-		    {
-		      iflag[inode[m]]++;
-		      nodeRes[inode[m]]+=vol;
-		    }	      
-		}
-	    }
-	}
-      else
-	{
-	  k=0;
-	  for(n=0;n<ntypes;n++)
-	    {
-	      for(i=0;i<nc[n];i++)		
-		{
-		  cellRes[k]=userSpecifiedCellRes[k];
-		  k++;
-		}
-	    }
-	  for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
-	}	  
-      //
-      // compute nodal resolution as the average of 
-      // all the cells associated with it. This takes care
-      // of partition boundaries as well.
-      //
-      for(i=0;i<nnodes;i++)
-	{
-          if (iflag[i]!=0)  nodeRes[i]/=iflag[i];
-	  iflag[i]=0;
-	}
-      //
-      // now tag the boundary nodes
-      // reuse the iflag array
-      //
-      //tracei(nobc);
-      for(i=0;i<nobc;i++)
-        { 
-          ii=(obcnode[i]-BASE);
-	  iflag[(obcnode[i]-BASE)]=1;
+  int *iflag=(int *)malloc(sizeof(int)*nnodes);
+
+  if (userSpecifiedNodeRes == NULL && userSpecifiedCellRes == NULL)
+  {
+    for (int i = 0; i < nnodes; i++) iflag[i] = 0;
+    for (int i = 0; i < nnodes; i++) nodeRes[i] = 0.0;
+
+    int k = 0;
+    for (int n = 0; n < ntypes; n++)
+    {
+      int nvert = nv[n];
+      for (int i = 0; i < nc[n]; i++)
+      {
+        for (int m = 0; m < nvert; m++)
+        {
+          inode[m] = vconn[n][nvert*i+m]-BASE;
+          int i3 = 3*inode[m];
+          for (int j = 0; j < 3; j++)
+            xv[m][j] = x[i3+j];
         }
-      //
-      // now tag all the nodes of boundary cells
-      // to be mandatory receptors
-      //
-      for(n=0;n<ntypes;n++)
-	{
-	  nvert=nv[n];
-	  for(i=0;i<nc[n];i++)
-	    {
-	      itag=0;
-	      for(m=0;m<nvert;m++)
-		{
-		  inode[m]=vconn[n][nvert*i+m]-BASE;
-		  if (iflag[inode[m]]) itag=1;
-		}
-	      if (itag)
-		{
-		  for(m=0;m<nvert;m++)
-		    {
-		      //iflag[inode[m]]=1;
-		      nodeRes[inode[m]]=BIGVALUE;
-		    }
-		}
-	    }
-	}
-      /*
-      sprintf(intstring,"%d",100000+myid);
-      sprintf(fname,"nodeRes%s.dat",&(intstring[1]));
-      fp=fopen(fname,"w");
-      for(i=0;i<nnodes;i++)
-       {
-        if (nodeRes[i]==BIGVALUE) {
-         fprintf(fp,"%e %e %e\n",x[3*i],x[3*i+1],x[3*i+2]);
-         }
-       }
-      fclose(fp);
-      */
-      //
-      // now tag all the cells which have 
-      // mandatory receptors as nodes as not acceptable
-      // donors
-      k=0;
-      for(n=0;n<ntypes;n++)
-	{
-	  nvert=nv[n];
-	  for(i=0;i<nc[n];i++)
-	    {
-	      for(m=0;m<nvert;m++)
-		{
-		  inode[m]=vconn[n][nvert*i+m]-BASE;
-		  if (iflag[inode[m]]) 
-		    {
-		      cellRes[k]=BIGVALUE;
-		      break;
-		    }
-		}
-	      k++;
-	    }
-	}
-      free(iflag);
+        double vol = computeCellVolume(xv,nvert);
+        cellRes[k++] = vol;
+        for (int m = 0; m < nvert; m++)
+        {
+          iflag[inode[m]]++;
+          nodeRes[inode[m]] += vol;
+        }
+      }
+    }
+  }
+  else
+  {
+    int k = 0;
+    for (int n = 0; n < ntypes; n++)
+    {
+      for (int i = 0; i < nc[n]; i++)
+      {
+        cellRes[k] = userSpecifiedCellRes[k];
+        k++;
+      }
+    }
+    for (int k = 0; k < nnodes; k++) nodeRes[k] = userSpecifiedNodeRes[k];
+  }
+
+  // compute nodal resolution as the average of
+  // all the cells associated with it. This takes care
+  // of partition boundaries as well.
+  for (int i = 0; i < nnodes; i++)
+  {
+    if (iflag[i] != 0)  nodeRes[i] /= iflag[i];
+    iflag[i] = 0;
+  }
+
+  // now tag the boundary nodes
+  // reuse the iflag array
+  //tracei(nobc);
+  for (int i = 0; i < nobc; i++)
+  {
+    iflag[(obcnode[i]-BASE)] = 1;
+  }
+
+  // now tag all the nodes of boundary cells
+  // to be mandatory receptors
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    for (int i = 0; i < nc[n]; i++)
+    {
+      int itag = 0;
+      for (int m = 0; m < nvert; m++)
+      {
+        inode[m] = vconn[n][nvert*i+m]-BASE;
+        if (iflag[inode[m]]) itag = 1;
+      }
+      if (itag)
+      {
+        for (int m = 0; m < nvert; m++)
+        {
+          //iflag[inode[m]]=1;
+          nodeRes[inode[m]]=BIGVALUE;
+        }
+      }
+    }
+  }
+
+  // now tag all the cells which have
+  // mandatory receptors as nodes as not acceptable
+  // donors
+  int k = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    for (int i = 0; i < nc[n]; i++)
+    {
+      for (int m = 0; m < nvert; m++)
+      {
+        inode[m] = vconn[n][nvert*i+m]-BASE;
+        if (iflag[inode[m]])
+        {
+          cellRes[k]=BIGVALUE;
+          break;
+        }
+      }
+      k++;
+    }
+  }
+  free(iflag);
 }
 
 void MeshBlock::writeGridFile(int bid)
@@ -257,16 +230,16 @@ void MeshBlock::writeGridFile(int bid)
   fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK\"\n");
   fprintf(fp,"ZONE T=\"VOL_MIXED\",N=%d E=%d ET=BRICK, F=FEPOINT\n",nnodes,
 	  ncells);
-  for(i=0;i<nnodes;i++)
+  for (int i = 0; i < nnodes; i++)
     {
       fprintf(fp,"%.14e %.14e %.14e %d\n",x[3*i],x[3*i+1],x[3*i+2],iblank[i]);
     }
 
   ba=1-BASE;
-  for(n=0;n<ntypes;n++)
+  for (int n = 0; n < ntypes; n++)
     {
       nvert=nv[n];
-      for(i=0;i<nc[n];i++)
+      for (int i = 0; i < nc[n]; i++)
 	{
 	  if (nvert==4)
 	    {
@@ -343,16 +316,16 @@ void MeshBlock::writeCellFile(int bid)
   fprintf(fp,"ZONE T=\"VOL_MIXED\",N=%d E=%d ET=BRICK, F=FEBLOCK\n",nnodes,
 	  ncells);
   fprintf(fp,"VARLOCATION =  (1=NODAL, 2=NODAL, 3=NODAL, 4=NODAL,5=CELLCENTERED)\n");
-  for(i=0;i<nnodes;i++) fprintf(fp,"%lf\n",x[3*i]);
-  for(i=0;i<nnodes;i++) fprintf(fp,"%lf\n",x[3*i+1]);
-  for(i=0;i<nnodes;i++) fprintf(fp,"%lf\n",x[3*i+2]);
-  for(i=0;i<nnodes;i++) fprintf(fp,"%d\n",iblank[i]);
-  for(i=0;i<ncells;i++) fprintf(fp,"%d\n",iblank_cell[i]);
+  for (int i = 0; i < nnodes; i++) fprintf(fp,"%lf\n",x[3*i]);
+  for (int i = 0; i < nnodes; i++) fprintf(fp,"%lf\n",x[3*i+1]);
+  for (int i = 0; i < nnodes; i++) fprintf(fp,"%lf\n",x[3*i+2]);
+  for (int i = 0; i < nnodes; i++) fprintf(fp,"%d\n",iblank[i]);
+  for (int i = 0; i < ncells; i++) fprintf(fp,"%d\n",iblank_cell[i]);
   ba=1-BASE;
-  for(n=0;n<ntypes;n++)
+  for (int n = 0; n < ntypes; n++)
     {
       nvert=nv[n];
-      for(i=0;i<nc[n];i++)
+      for (int i = 0; i < nc[n]; i++)
 	{
 	  if (nvert==4)
 	    {
@@ -425,7 +398,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
   fp=fopen(fname,"w");
   fprintf(fp,"TITLE =\"Tioga output\"\n");
   fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK\" ");
-  for(i=0;i<nvar;i++)
+  for (int i = 0; i < nvar; i++)
     {
       sprintf(qstr,"Q%d",i);
       fprintf(fp,"\"%s\",",qstr);
@@ -436,31 +409,31 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
 
   if (type==0)
     {
-      for(i=0;i<nnodes;i++)
+      for (int i = 0; i < nnodes; i++)
 	{
 	  fprintf(fp,"%lf %lf %lf %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i]);
-	  for(j=0;j<nvar;j++)
+	  for (int j = 0; j < nvar; j++)
 	    fprintf(fp,"%lf ",q[i*nvar+j]);      
-	  //for(j=0;j<nvar;j++)
+	  //for (int j = 0; j < nvar; j++)
 	  //  fprintf(fp,"%lf ", x[3*i]+x[3*i+1]+x[3*i+2]);
           fprintf(fp,"\n");
 	}
     }
   else
     {
-      for(i=0;i<nnodes;i++)
+      for (int i = 0; i < nnodes; i++)
         {
           fprintf(fp,"%lf %lf %lf %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i]);
-          for(j=0;j<nvar;j++)
+          for (int j = 0; j < nvar; j++)
             fprintf(fp,"%lf ",q[j*nnodes+i]);
           fprintf(fp,"\n");
         }
     }
   ba=1-BASE;
-  for(n=0;n<ntypes;n++)
+  for (int n = 0; n < ntypes; n++)
     {
       nvert=nv[n];
-      for(i=0;i<nc[n];i++)
+      for (int i = 0; i < nc[n]; i++)
 	{
 	  if (nvert==4)
 	    {
@@ -524,7 +497,11 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   *mtag = meshtag - BASE;
   if (nwbc <=0) {
     *existWall=0;
-    for(i=0;i<6;i++) wbox[i]=0;
+    for (int i = 0; i < 3; i++)
+    {
+      wbox[i]   = BIGVALUE;
+      wbox[3+i] = -BIGVALUE;
+    }
     return;
   }
 
@@ -532,11 +509,11 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   wbox[0]=wbox[1]=wbox[2]=BIGVALUE;
   wbox[3]=wbox[4]=wbox[5]=-BIGVALUE;
 
-  for(i=0;i<nwbc;i++)
+  for (int i = 0; i < nwbc; i++)
     {
       inode=wbcnode[i]-BASE;
       i3=3*inode;
-      for(j=0;j<3;j++)
+      for (int j = 0; j < 3; j++)
 	{
 	  wbox[j]=min(wbox[j],x[i3+j]);
 	  wbox[j+3]=max(wbox[j+3],x[i3+j]);
@@ -644,12 +621,12 @@ void MeshBlock::getQueryPoints(OBB *obc,
 
   inode=(int *)malloc(sizeof(int)*nnodes);
   *nints=*nreals=0; 
-  for(i=0;i<nnodes;i++)
+  for (int i = 0; i < nnodes; i++)
     {
       i3=3*i;
-      for(j=0;j<3;j++) xd[j]=0;
-      for(j=0;j<3;j++)
-	for(k=0;k<3;k++)
+      for (int j = 0; j < 3; j++) xd[j]=0;
+      for (int j = 0; j < 3; j++)
+        for (int k = 0; k < 3; k++)
 	  xd[j]+=(x[i3+k]-obc->xc[k])*obc->vec[j][k];
 
       if (fabs(xd[0]) <= obc->dxc[0] &&
@@ -667,7 +644,7 @@ void MeshBlock::getQueryPoints(OBB *obc,
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
   //
   m=0;
-  for(i=0;i<*nints;i++)
+  for (int i = 0; i < *nints; i++)
     {
       i3=3*inode[i];
       (*intData)[i]=inode[i];
@@ -698,14 +675,14 @@ void MeshBlock::writeOBB(int bid)
   for(l=0;l<2;l++)
     {
       il=2*(l%2)-1;
-      for(k=0;k<2;k++)
+      for (int k = 0; k < 2; k++)
 	{
 	  ik=2*(k%2)-1;
-	  for(j=0;j<2;j++)
+	  for (int j = 0; j < 2; j++)
 	    {
 	      ij=2*(j%2)-1;
 	      xx[0]=xx[1]=xx[2]=0;
-	      for(m=0;m<3;m++)
+	      for (int m = 0; m < 3; m++)
 		xx[m]=obb->xc[m]+ij*obb->vec[0][m]*obb->dxc[0]
 		  +ik*obb->vec[1][m]*obb->dxc[1]
 		  +il*obb->vec[2][m]*obb->dxc[2];	      
@@ -715,7 +692,7 @@ void MeshBlock::writeOBB(int bid)
     }
   fprintf(fp,"1 2 4 3 5 6 8 7\n");
   fprintf(fp,"%e %e %e\n",obb->xc[0],obb->xc[1],obb->xc[2]);
-  for(k=0;k<3;k++)
+  for (int k = 0; k < 3; k++)
    fprintf(fp,"%e %e %e\n",obb->vec[0][k],obb->vec[1][k],obb->vec[2][k]);
   fprintf(fp,"%e %e %e\n",obb->dxc[0],obb->dxc[1],obb->dxc[2]);
   fclose(fp);
@@ -752,11 +729,11 @@ MeshBlock::~MeshBlock()
   if (elementList) free(elementList);
   if (adt) delete[] adt;
   if (donorList) {
-    for(i=0;i<nnodes;i++) deallocateLinkList(donorList[i]);
+    for (int i = 0; i < nnodes; i++) deallocateLinkList(donorList[i]);
     free(donorList);
   }
   if (interpList) {
-    for(i=0;i<interpListSize;i++)
+    for (int i = 0; i < interpListSize; i++)
       {
 	if (interpList[i].inode) free(interpList[i].inode);
 	if (interpList[i].weights) free(interpList[i].weights);
@@ -765,7 +742,7 @@ MeshBlock::~MeshBlock()
   }
   return;
   if (interpList2) {
-    for(i=0;i<interp2ListSize;i++)
+    for (int i = 0; i < interp2ListSize; i++)
       {
 	if (interpList2[i].inode) free(interpList2[i].inode);
 	if (interpList2[i].weights) free(interpList2[i].weights);
@@ -773,15 +750,12 @@ MeshBlock::~MeshBlock()
     free(interpList2);
   }
   if (interpListCart) {
-    for(i=0;i<interpListCartSize;i++)
+    for (int i = 0; i < interpListCartSize; i++)
       {
         if (interpListCart[i].inode) free(interpListCart[i].inode);
  	if (interpListCart[i].weights) free(interpListCart[i].weights);
       }
     free(interpListCart);
-  }
-  if (ihigh) {
-   if (iblank_cell) free(iblank_cell);
   }
   if (obb) free(obb);
   if (isearch) free(isearch);
@@ -790,7 +764,7 @@ MeshBlock::~MeshBlock()
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);
   if (ctag) free(ctag);
-  if (ftag) delete[] ftag;
+  if (ftag) free(ftag);
   if (pointsPerCell) free(pointsPerCell);
   if (pointsPerFace) free(pointsPerFace);
   if (rxyz) free(rxyz);

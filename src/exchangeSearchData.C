@@ -69,6 +69,8 @@ void tioga::exchangeSearchData(void)
   mb->xsearch = (double *)malloc(sizeof(double)*3*mb->nsearch);
   mb->isearch = (int *)malloc(sizeof(int)*2*mb->nsearch);
   mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
+  if (ihigh)
+    mb->rst = (double *)malloc(sizeof(double)*3*mb->nsearch);
 
   // now fill the query point arrays
   int icount = 0;

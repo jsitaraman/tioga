@@ -162,7 +162,6 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
      printf("--------------------------------------------------------------------\n");
     }
   }
-
   //
   // mark mandatory fringes as neighbors (up to nfringe depth)
   // of hole points 

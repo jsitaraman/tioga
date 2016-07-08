@@ -38,7 +38,6 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
   double xd[3];
   double xmin[3],xmax[3];
   int nrows,ncols;
-  printf("nnodes = %d, xend: %f\n",nnodes,x[nnodes*3-1]);
   //
   xc[0]=xc[1]=xc[2]=0;
   //

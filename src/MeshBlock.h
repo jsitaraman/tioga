@@ -233,10 +233,13 @@ class MeshBlock
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;
+    ftag=NULL;
     pointsPerCell=NULL;
+    pointsPerFace=NULL;
     maxPointsPerCell=0;
     rxyz=NULL;
     ntotalPoints=0;
+    nreceptorFaces=0;
     rst=NULL;
     ihigh=0;
     ipoint=0;

@@ -40,7 +40,7 @@ void MeshBlock::getCellIblanks(void)
   std::vector<int> inode;
 
   int icell = 0;
-  if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
+//  if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
 
   for (int n = 0; n < ntypes; n++)
   {
@@ -84,7 +84,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   std::set<int> overFaces;
 
   // Allocate face iblank storage
-  if (!iblank_face) iblank_face = new int[nfaces];
+//  if (!iblank_face) iblank_face = new int[nfaces];
 
   for (int ff = 0; ff < nfaces; ff++)
   {
@@ -166,8 +166,8 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   nreceptorFaces = overFaces.size();
 
   // Setup final Artificial Boundary face list
-  delete[] ftag;
-  ftag = new int[nreceptorFaces];
+  free(ftag);
+  ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
 
   int ind = 0;
   for (auto &ff: overFaces) ftag[ind++] = ff;
@@ -185,8 +185,8 @@ void MeshBlock::setArtificialBoundaries(void)
   nreceptorFaces = overFaces.size();
 
   // Setup final storage of A.B. face indices
-  delete[] ftag;
-  ftag = new int[nreceptorFaces];
+  free(ftag);
+  ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
 
   int ind = 0;
   for (auto &ff: overFaces) ftag[ind++] = ff;
@@ -402,8 +402,8 @@ void MeshBlock::getBoundaryNodes(void)
   if (iartbnd)
   {
     // Gather all Artificial Boundary face flux points into fringe-point list
-    delete[] ftag;
-    ftag = new int[nfaces];
+    free(ftag);
+    ftag = (int*)malloc(sizeof(int)*nfaces);
 
     // Gather a list of cell IDs for all receptor (fringe) cells
     for (int i = 0; i < nfaces; i++)

@@ -235,7 +235,7 @@ extern "C" {
 				     void (*f5)(int *,int *,double *,int *,int *,double *))
   {
     tg->setcallback(f1,f2,f3,f4,f5);
-    //    get_nodes_per_cell=f1;
+    //get_nodes_per_cell=f1;
     //get_receptor_nodes=f2;
     //donor_inclusion_test=f3;
     //donor_frac=f4;
@@ -256,9 +256,12 @@ extern "C" {
   
   void tioga_delete_(void)
    {
-    delete [] tg;
-    if (nc) free(nc);
-    if (nv) free(nv);
-    if (vconn) free(vconn);
+    delete tg;
+    free(nc);
+    free(nv);
+    free(vconn);
+    free(nf);
+    free(nfv);
+    free(fconn);
    }
 }

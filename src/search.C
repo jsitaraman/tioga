@@ -46,7 +46,6 @@ void MeshBlock::search(void)
   }
 
   OBB obq;
-  
   findOBB(xsearch,obq.xc,obq.dxc,obq.vec,nsearch);
 
   //writebbox(obq,4);
@@ -110,9 +109,8 @@ void MeshBlock::search(void)
   // of each cell in the LIFO stack to build the
   // ADT
   //
-
-  if (elementBbox) free(elementBbox);
-  if (elementList) free(elementList);
+  free(elementBbox);
+  free(elementList);
   elementBbox=(double *)malloc(sizeof(double)*cell_count*6);
   elementList=(int *)malloc(sizeof(int)*cell_count);
   //
@@ -169,10 +167,9 @@ void MeshBlock::search(void)
     adt=new ADT[1];
    }
   ndim=6;
-  //
   adt->buildADT(ndim,cell_count,elementBbox);
-  //
-  if (donorId) free(donorId);
+
+  free(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
   //
   donorCount=0;

@@ -4,7 +4,7 @@ F90= mpif90
 CXX= mpicxx
 AR = ar -rvs
 SWIG = swig -c++ -python
-CFLAGS = -std=c++11 -fPIC -O0 -g -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
+CFLAGS = -std=c++11 -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
 SFLAGS = -I/usr/include/python2.7 -I/usr/local/lib/python2.7/dist-packages/mpi4py/include
 INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h error.hpp points.hpp funcs.hpp

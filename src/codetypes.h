@@ -125,6 +125,7 @@ typedef struct INTERPLIST
   int cancel;
   int nweights;
   int receptorInfo[3];
+  int donorID; // donor-cell ID
   double xtmp[3];
   int *inode;
   double *weights;

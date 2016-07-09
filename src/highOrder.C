@@ -40,7 +40,10 @@ void MeshBlock::getCellIblanks(void)
   std::vector<int> inode;
 
   int icell = 0;
-//  if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
+  if (!iartbnd)
+  {
+    if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
+  }
 
   for (int n = 0; n < ntypes; n++)
   {
@@ -62,8 +65,8 @@ void MeshBlock::getCellIblanks(void)
         ncount = ncount + (iblank[inode[m]] == FRINGE);
       }
 
-      if (flag)
-        if (ncount == nvert) iblank_cell[icell] = FRINGE;
+      if (flag && ncount == nvert)
+        iblank_cell[icell] = FRINGE;
 
       icell++;
     }
@@ -81,10 +84,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
       iblank_cell[ic] = HOLE;
   }
 
-  std::set<int> overFaces;
-
-  // Allocate face iblank storage
-//  if (!iblank_face) iblank_face = new int[nfaces];
+  std::set<int> artBndFaces;
 
   for (int ff = 0; ff < nfaces; ff++)
   {
@@ -105,7 +105,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
       if (isum == HOLE+NORMAL)  // Artificial Boundary
       {
         iblank_face[ff] = FRINGE;
-        overFaces.insert(ff);
+        artBndFaces.insert(ff);
       }
       else if (isum == HOLE+HOLE)  // Blanked face
       {
@@ -121,7 +121,6 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   MPI_Comm_size(meshComm, &nProcMesh);
 
   // Get the number of mpiFaces on each processor (for later communication)
-  int nMpiFaces = mpiFaces.size();
   std::vector<int> nMpiFaces_proc(nProcMesh);
   MPI_Allgather(&nMpiFaces,1,MPI_INT,nMpiFaces_proc.data(),1,MPI_INT,meshComm);
   int maxNMpi = *std::max_element(nMpiFaces_proc.begin(), nMpiFaces_proc.end());
@@ -141,7 +140,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
     mpiIblank[i] = iblank_face[mpiFaces[i]];
 
   // Get iblank data for all mpi faces
-  MPI_Allgatherv(mpiFaces.data(), nMpiFaces, MPI_INT, mpiFid_proc.data(), recvCnts.data(), recvDisp.data(), MPI_INT, meshComm);
+  MPI_Allgatherv(mpiFaces, nMpiFaces, MPI_INT, mpiFid_proc.data(), recvCnts.data(), recvDisp.data(), MPI_INT, meshComm);
   MPI_Allgatherv(mpiIblank.data(), nMpiFaces, MPI_INT, mpiIblank_proc.data(), recvCnts.data(), recvDisp.data(), MPI_INT, meshComm);
 
   for (int F = 0; F < nMpiFaces; F++) {
@@ -152,25 +151,38 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
         int isum = mpiIblank[F] + mpiIblank_proc[p*maxNMpi+i];
         if (isum != NORMAL+NORMAL) {
           // Not a normal face; figure out if hole or fringe
-          if (isum == HOLE+HOLE)
+          if (isum == HOLE+HOLE || iblank_cell[f2c[2*ff]] == HOLE)
             iblank_face[ff] = HOLE;
-          else {
+          else
+          {
             iblank_face[ff] = FRINGE;
-            overFaces.insert(ff);
+            artBndFaces.insert(ff);
           }
+
         }
       }
     }
   }
 
-  nreceptorFaces = overFaces.size();
+  // Lastly, set any explicit [solver-defined] overset faces (if not blanked)
+  for (int i = 0; i < nOverFaces; i++)
+  {
+    int ff = overFaces[i];
+    if (iblank_face[ff] != HOLE)
+    {
+      iblank_face[ff] = FRINGE;
+      artBndFaces.insert(ff);
+    }
+  }
 
+  nreceptorFaces = artBndFaces.size();
+printf("Rank %d: nOverFaces = %d / %d\n",myid,nreceptorFaces,nfaces); /// DEBUGGING
   // Setup final Artificial Boundary face list
   free(ftag);
   ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
 
   int ind = 0;
-  for (auto &ff: overFaces) ftag[ind++] = ff;
+  for (auto &ff: artBndFaces) ftag[ind++] = ff;
 }
 
 void MeshBlock::setArtificialBoundaries(void)
@@ -292,10 +304,10 @@ void MeshBlock::clearOrphans(int *itmp)
   else if (ihigh)
     {
       m=0;
-      for(i=0;i<nreceptorCells;i++)
+      for (int i = 0; i < nreceptorCells;i++)
 	{
 	  bool reject = false;
-	  for(j=0;j<pointsPerCell[i];j++)
+	  for (int j = 0; j < pointsPerCell[i];j++)
 	    {
 	      if (itmp[m]==0) reject = true;
 	      m++;
@@ -309,7 +321,7 @@ void MeshBlock::clearOrphans(int *itmp)
   else
     {
       m=0;
-      for(i=0;i<nnodes;i++)
+      for (int i = 0; i < nnodes;i++)
 	{
 	  if (picked[i]) 
 	    {
@@ -529,6 +541,7 @@ void MeshBlock::processPointDonors(void)
   }
 
   interp2ListSize = ninterp2;
+  free(interpList2);
   interpList2 = (INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
 
   for (int i = 0; i < interp2ListSize; i++)
@@ -547,10 +560,11 @@ void MeshBlock::processPointDonors(void)
         int icell = donorId[i]+BASE;
         interpList2[m].inode = (int *) malloc(sizeof(int));
         interpList2[m].nweights = 0;
+        interpList2[m].donorID = icell;
 
         // Use High-Order callback function to get interpolation weights
         donor_frac(&(icell), &(xsearch[3*i]), &(interpList2[m].nweights),
-                   &(interpList2[m].inode[0]), frac, &(rst[3*i]), &buffsize);
+                   interpList2[m].inode, frac, &(rst[3*i]), &buffsize);
 
         interpList2[m].weights = (double *)malloc(sizeof(double)*interpList2[m].nweights);
         for(int j = 0; j < interpList2[m].nweights; j++)
@@ -609,102 +623,111 @@ void MeshBlock::processPointDonors(void)
   free(frac);
 }
 
-void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **intData,
-						double **realData,
-						double *q,
-						int nvar, int interptype)
+void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
+                int **intData, double **realData, double *q, int nvar,
+                int interptype)
 {
-  int i;
-  int k,m,inode;
-  double weight;
-  double *qq;
-  int icount,dcount;
-  //
-  qq=(double *)malloc(sizeof(double)*nvar);
-  //
-  (*nints)=ninterp2;
-  (*nreals)=ninterp2*nvar;
-  if ((*nints)==0) {
-	free(qq);
-	return;
-  }
-  //
+  (*nints) = ninterp2;
+  (*nreals) = ninterp2*nvar;
+  if ((*nints) == 0) return;
+
   (*intData)=(int *)malloc(sizeof(int)*2*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
-  icount=dcount=0;
-  //
-  if (ihigh) 
+
+  std::vector<double> qq(nvar,0);
+  int icount = 0;
+  int dcount = 0;
+
+//std::string fields[5] = {"rho","xmom","ymom","zmom","ene"}; /// DEBUGGING
+//for (int k=0; k<nvar; k++)
+//  printf("Rank %d: pt %d: %s: qi = %f\n",myid,i,fields[k].c_str(),qq[k]);
+  if (iartbnd)
+  {
+    for (int i = 0; i < ninterp2; i++)
     {
-      if (interptype==ROW)
-	{    
-	  for(i=0;i<ninterp2;i++)
-	    {
-	      for(k=0;k<nvar;k++) qq[k]=0;
-	      inode=interpList2[i].inode[0]-BASE;
-	      for(m=0;m<interpList2[i].nweights;m++)
-		{
-		  weight=interpList2[i].weights[m];
-		  //if (weight < 0 || weight > 1.0) {
-		  //	traced(weight);
-		  //	printf("warning: weights are not convex\n");
-		  //    }
-		  for(k=0;k<nvar;k++)
-		    qq[k]+=q[inode+m*nvar+k]*weight;
-		}
-	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
-	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
-	      for(k=0;k<nvar;k++)
-		(*realData)[dcount++]=qq[k];
-	    }
-	}
+      qq.assign(nvar,0);
+      int ic = interpList2[i].donorID;
+      for (int spt = 0; spt < interpList2[i].nweights; spt++)
+      {
+        double weight = interpList2[i].weights[spt];
+        for (int k = 0; k < nvar; k++) {
+          double val =get_q_spt(ic,spt,k);
+          qq[k] += val*weight;
+        }
+      }
+      (*intData)[icount++] = interpList2[i].receptorInfo[0];
+      (*intData)[icount++] = interpList2[i].receptorInfo[1];
+      for (int k = 0; k < nvar; k++)
+        (*realData)[dcount++] = qq[k];
     }
+  }
+  else if (ihigh)
+  {
+    if (interptype==ROW)
+    {
+      for (int i = 0; i < ninterp2; i++)
+      {
+        qq.assign(nvar,0);
+        int inode = interpList2[i].inode[0]-BASE;
+        for (int m = 0; m < interpList2[i].nweights; m++)
+        {
+          double weight = interpList2[i].weights[m];
+          for (int k = 0; k < nvar; k++)
+            qq[k] += q[inode+m*nvar+k]*weight;
+        }
+        (*intData)[icount++] = interpList2[i].receptorInfo[0];
+        (*intData)[icount++] = interpList2[i].receptorInfo[1];
+        for (int k = 0; k < nvar; k++)
+          (*realData)[dcount++] = qq[k];
+      }
+    }
+  }
   else
+  {
+    if (interptype==ROW)
     {
-      if (interptype==ROW)
-	{    
-	  for(i=0;i<ninterp2;i++)
-	    {
-	      for(k=0;k<nvar;k++) qq[k]=0;
-	      for(m=0;m<interpList2[i].nweights;m++)
-		{
-		  inode=interpList2[i].inode[m];
-		  weight=interpList2[i].weights[m];
-		  if (weight < 0 || weight > 1.0) {
-                    traced(weight);
-                    printf("warning: weights are not convex\n");
-                   }
-		  for(k=0;k<nvar;k++)
-		    qq[k]+=q[inode*nvar+k]*weight;
-		}
-	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
-	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
-	      for(k=0;k<nvar;k++)
-		(*realData)[dcount++]=qq[k];
-	    }
-	}
-      else if (interptype==COLUMN)
-	{
-	  for(i=0;i<ninterp2;i++)
-	    {
-	      for(k=0;k<nvar;k++) qq[k]=0;
-	      for(m=0;m<interpList2[i].nweights;m++)
-		{
-		  inode=interpList2[i].inode[m];
-		  weight=interpList2[i].weights[m];
-		  for(k=0;k<nvar;k++)
-		    qq[k]+=q[k*nnodes+inode]*weight;
-		}
-	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
-	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
-	      for(k=0;k<nvar;k++)
-		(*realData)[dcount++]=qq[k];
-	    }
-	}
+      for (int i = 0; i < ninterp2;i++)
+      {
+        for (int k = 0; k < nvar;k++) qq[k]=0;
+        for (int m = 0; m < interpList2[i].nweights;m++)
+        {
+          int inode = interpList2[i].inode[m];
+          double weight = interpList2[i].weights[m];
+          if (weight < 0 || weight > 1.0) {
+            traced(weight);
+            printf("warning: weights are not convex\n");
+          }
+          for (int k = 0; k < nvar;k++)
+            qq[k] += q[inode*nvar+k]*weight;
+        }
+        (*intData)[icount++] = interpList2[i].receptorInfo[0];
+        (*intData)[icount++] = interpList2[i].receptorInfo[1];
+        for (int k = 0; k < nvar;k++)
+          (*realData)[dcount++] = qq[k];
+      }
     }
+    else if (interptype==COLUMN)
+    {
+      for (int i = 0; i < ninterp2; i++)
+      {
+        for (int k = 0; k < nvar;k++) qq[k]=0;
+        for (int m = 0; m < interpList2[i].nweights; m++)
+        {
+          int inode = interpList2[i].inode[m];
+          double weight = interpList2[i].weights[m];
+          for (int k = 0; k < nvar; k++)
+            qq[k] += q[k*nnodes+inode]*weight;
+        }
+        (*intData)[icount++] = interpList2[i].receptorInfo[0];
+        (*intData)[icount++] = interpList2[i].receptorInfo[1];
+        for (int k = 0; k < nvar; k++)
+          (*realData)[dcount++] = qq[k];
+      }
+    }
+  }
   //
   // no column-wise storage for high-order data
   //
-  free(qq);
 }
 	
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
@@ -720,7 +743,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
       qout=(double *)malloc(sizeof(double)*nvar*npts);	
       //
       m=0;
-      for(i=0;i<nreceptorCells;i++)
+      for (int i = 0; i < nreceptorCells;i++)
 	{
 	  if (iblank_cell[ctag[i]-1]==-1) 
 	    {
@@ -728,7 +751,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
 			       &index_out,qout);
 	      index_out-=BASE;
 	      k=0;
-	      for(j=0;j<npts;j++)
+	      for (int j = 0; j < npts;j++)
 		for(n=0;n<nvar;n++)
 		  {
 		    q[index_out+j*nvar+n]=qout[k];
@@ -742,7 +765,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
   else
     {
       m=0;
-      for(i=0;i<nnodes;i++)
+      for (int i = 0; i < nnodes;i++)
 	{
 	  if (picked[i]) 
 	    {
@@ -757,10 +780,10 @@ void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
-  int fpt = 0;
+  int fpt_start = 0;
   for(int i = 0; i < nreceptorFaces; i++)
   {
-    if (iblank_face[ftag[i]-1] == -1)
+    if (iblank_face[ftag[i]-BASE] == -1)
     {
       // Get starting index of face's q data
       int k = 0;
@@ -771,11 +794,12 @@ void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
         ind -= BASE;
         for (int n = 0; n < nvar; n++)
         {
-          q_fpts[ind+stride*n] = qtmp[fpt+k];
+          q_fpts[ind+stride*n] = qtmp[fpt_start+k];
+//          printf("Rank %d: Face %d: q_interp = %f\n",myid,i,qtmp[fpt_start+k]);
           k++;
         }
       }
     }
-    fpt += (pointsPerFace[i]*nvar);
+    fpt_start += (pointsPerFace[i]*nvar);
   }
 }

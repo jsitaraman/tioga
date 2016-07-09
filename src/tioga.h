@@ -95,7 +95,10 @@ class tioga
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
 
   /** Register additional face-connectivity arrays for Artificial Boundadry method */
-  void registerFaceConnectivity(int nftype, int* nf, int *nfv, int** fconn, int *f2c, int *c2f, int* iblank_face);
+  void registerFaceConnectivity(int nftype, int* nf, int *nfv, int** fconn,
+                                int *f2c, int *c2f, int* iblank_face,
+                                int nOverFaces, int nMpi, int* overFaces,
+                                int* mpiFaces, int *procR, int *idR);
 
   void profile(void);
 
@@ -175,9 +178,10 @@ class tioga
   //! Set callback functions specific to Artificial Boundary method
   void set_ab_callback(void (*gnf)(int* id, int* npf),
                        void (*gfn)(int* id, int* npf, double* xyz),
-                       void (*gqi)(int* id, int* fpt, int* ind, int* stride))
+                       void (*gqi)(int* id, int* fpt, int* ind, int* stride),
+                       double (*gqs)(int ic, int spt, int var))
   {
-    mb->setCallbackArtBnd(gnf, gfn, gqi);
+    mb->setCallbackArtBnd(gnf, gfn, gqi, gqs);
     iartbnd = 1;
   }
   

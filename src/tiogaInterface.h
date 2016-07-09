@@ -37,7 +37,9 @@ void tioga_registergrid_data_(int btag, int nnodes, double *xyz, int *ibl,
                               int nwbc, int nobc, int *wbcnode, int *obcnode,
                               int ntypes, int _nv, int _nc, int *_vconn);
 
-void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nftype,
+void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nOverFaces,
+                               int nMpiFaces, int *overFaces, int *mpiFaces,
+                               int* mpiProcR, int* mpiFidR, int nftype,
                                int _nfv, int _nf, int *_fconn);
 
 void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
@@ -80,7 +82,8 @@ void tioga_set_highorder_callback_(void (*f1)(int*, int*),
 
 void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                             void (*gfn)(int* id, int* npf, double* xyz),
-                            void (*gqi)(int* id, int* fpt, int* ind, int* stride));
+                            void (*gqi)(int* id, int* fpt, int* ind, int* stride),
+                            double (*gqs)(int ic, int spt, int var));
 
 void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 

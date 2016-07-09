@@ -74,9 +74,13 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
 }
 
 void tioga::registerFaceConnectivity(int nftype, int *nf, int *nfv, int **fconn,
-                                     int *f2c, int *c2f, int *iblank_face)
+                                     int *f2c, int *c2f, int *iblank_face,
+                                     int nOverFaces, int nMpiFaces,
+                                     int *overFaces, int *mpiFaces,
+                                     int *mpiProcR, int *mpiFidR)
 {
-  mb->setFaceData(nftype, nf, nfv, fconn, f2c, c2f, iblank_face);
+  mb->setFaceData(nftype, nf, nfv, fconn, f2c, c2f, iblank_face, nOverFaces,
+                  nMpiFaces, overFaces, mpiFaces, mpiProcR, mpiFidR);
 }
 
 void tioga::profile(void)
@@ -541,7 +545,7 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
     }
   if (fp!=NULL) fclose(fp);
   if (norphanPoint > 0 && iorphanPrint) {
-   printf("Warning::number of orphans in %d = %d of %d\n",myid,norphanPoint,
+   printf("Warning::number of orphans in rank %d = %d of %d\n",myid,norphanPoint,
 	mb->ntotalPoints);
     iorphanPrint=0;
    }
@@ -586,8 +590,10 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int inte
 
   /// TODO: Replace 'interptype' with array of strides (simpler & more general)
   int nints, nreals;
+  printf("before data interp: iartbnd = %d\n",iartbnd);
   if (iartbnd)
   {
+    printf("Immediately before data interp\n");
     interpType = 0;
     mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
                                         &realRecords,q_spts,nvar,interpType);
@@ -626,13 +632,12 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int inte
     icount[k] = dcount[k] = 0;
   }
 
-  int m = 0;
   for (int i = 0; i < nints; i++)
   {
     int k = integerRecords[2*i];
     sndPack[k].intData[icount[k]++] = integerRecords[2*i+1];
     for (int j = 0; j < nvar; j++)
-      sndPack[k].realData[dcount[k]++] = realRecords[m++];
+      sndPack[k].realData[dcount[k]++] = realRecords[nvar*i+j];
   }
 
   // communicate the data across all partitions
@@ -677,7 +682,7 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int inte
     fp.close();
 
     if (norphanPoint > 0 && iorphanPrint) {
-      printf("Warning::number of orphans in %d = %d of %d\n",myid,norphanPoint,mb->ntotalPoints);
+      printf("Warning::number of orphans in rank %d = %d of %d\n",myid,norphanPoint,mb->ntotalPoints);
       iorphanPrint = 0;
     }
 
@@ -704,8 +709,8 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int inte
   pc->clearPackets2(sndPack,rcvPack);
   delete[] sndPack;
   delete[] rcvPack;
-  delete[] integerRecords;
-  delete[] realRecords;
+  free(integerRecords);
+  free(realRecords);
 }
 
 void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *idata,

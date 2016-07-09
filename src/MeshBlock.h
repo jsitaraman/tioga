@@ -67,9 +67,12 @@ class MeshBlock
   double *elementBbox; /** < bounding box of the elements */
   int *elementList;    /** < list of elements in */
 
-  std::vector<int> mpiFaces;  /** < List of MPI face IDs on rank */
-  std::vector<int> mpiFidR;   /** < Matching MPI face IDs on opposite rank */
-  std::vector<int> mpiProcR;  /** < Opposite rank for MPI face */
+  int nOverFaces;
+  int nMpiFaces;
+  int *overFaces; /** < List of explicitly-defined (by solver) overset faces */
+  int *mpiFaces;  /** < List of MPI face IDs on rank */
+  int *mpiFidR;   /** < Matching MPI face IDs on opposite rank */
+  int *mpiProcR;  /** < Opposite rank for MPI face */
 
   //
   // Alternating digital tree library
@@ -134,6 +137,8 @@ class MeshBlock
    */
   void (*get_q_index_face)(int* faceID, int *fpt, int* ind, int* stride);
 
+  double (*get_q_spt)(int cellID, int spt, int var);
+
   /*!
    * \brief Determine whether a point (x,y,z) lies within a cell
    *
@@ -161,7 +166,8 @@ class MeshBlock
    * @param[in]  rst       Reference coordinates of receptor point within cell
    * @param[in]  buffsize  Amount of memory allocated to 'weights' (# of doubles)
    */
-  void (*donor_frac)(int* cellID, double* xyz, int* nweights, int* inode, double* weights, double* rst, int* buffsize);
+  void (*donor_frac)(int* cellID, double* xyz, int* nweights, int* inode,
+                     double* weights, double* rst, int* buffsize);
 
   void (*convert_to_modal)(int *,int *,double *,int *,int *,double *);
 
@@ -229,7 +235,7 @@ class MeshBlock
     nsearch=0; isearch=NULL; xsearch=NULL;
     donorId=NULL; cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
-    nfringe=2;
+    nfringe=0;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;
@@ -271,7 +277,9 @@ class MeshBlock
 	       int *wbcnodei,int *obcnodei,
 	       int ntypesi, int *nvi, int *nci, int **vconni);
 
-  void setFaceData(int _nftype, int* _nf, int* _nfv, int** _f2v, int *_f2c, int *_c2f, int* _ib_face);
+  void setFaceData(int _nftype, int* _nf, int* _nfv, int** _f2v, int *_f2c,
+                   int *_c2f, int* _ib_face, int nOver, int nMpi, int* oFaces,
+                   int* mFaces, int* procR, int* idR);
 
   void setResolutions(double *nres,double *cres);    
 	       
@@ -372,12 +380,14 @@ class MeshBlock
   //! Set callback functions specific to Artificial Boundary method
   void setCallbackArtBnd(void (*gnf)(int* id, int* npf),
                          void (*gfn)(int* id, int* npf, double* xyz),
-                         void (*gqi)(int* id, int* fpt, int* ind, int* stride))
+                         void (*gqi)(int* id, int* fpt, int* ind, int* stride),
+                         double (*gqs)(int ic, int spt, int var))
   {
     // See declaration of functions above for more details
     get_nodes_per_face = gnf;
     get_face_nodes = gfn;
     get_q_index_face = gqi;
+    get_q_spt = gqs;
 
     iartbnd = 1;
   }

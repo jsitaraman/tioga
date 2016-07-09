@@ -56,7 +56,9 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
 }
 
 void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v,
-                            int *_f2c, int *_c2f, int *_ib_face)
+                            int *_f2c, int *_c2f, int *_ib_face, int nOver,
+                            int nMpi, int *oFaces, int *mFaces, int *procR,
+                            int *idR)
 {
   nftype = _nftype;
   nf = _nf;
@@ -65,6 +67,12 @@ void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v,
   f2c = _f2c;
   c2f = _c2f;
   iblank_face = _ib_face;
+  nOverFaces = nOver;
+  nMpiFaces = nMpi;
+  overFaces = oFaces;
+  mpiFaces = mFaces;
+  mpiProcR = procR;
+  mpiFidR = idR;
 
   nfaces = 0;
   for (int i = 0; i < nftype; i++)
@@ -765,6 +773,7 @@ MeshBlock::~MeshBlock()
   if (cancelList) deallocateLinkList2(cancelList);
   if (ctag) free(ctag);
   if (ftag) free(ftag);
+  if (!iartbnd) free(iblank_cell);
   if (pointsPerCell) free(pointsPerCell);
   if (pointsPerFace) free(pointsPerFace);
   if (rxyz) free(rxyz);

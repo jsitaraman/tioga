@@ -86,7 +86,9 @@ extern "C" {
     tg->registerGridData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
   }
 
-  void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nftype,
+  void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nOverFaces,
+                                 int nMpiFaces, int *overFaces, int *mpiFaces,
+                                 int* mpiProcR, int* mpiFidR, int nftype,
                                  int _nfv, int _nf, int *_fconn)
   {
     free(nfv);
@@ -100,7 +102,9 @@ extern "C" {
     nf[0] = _nf;
     fconn[0] = _fconn;
 
-    tg->registerFaceConnectivity(nftype, nf, nfv, fconn, f2c, c2f, fibl);
+    tg->registerFaceConnectivity(nftype, nf, nfv, fconn, f2c, c2f, fibl,
+                                 nOverFaces, nMpiFaces, overFaces, mpiFaces,
+                                 mpiProcR, mpiFidR);
   }
 
   void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
@@ -243,10 +247,11 @@ extern "C" {
   }
 
   void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
-                                  void (*gfn)(int* id, int* npf, double* xyz),
-                                  void (*gqi)(int* id, int* fpt, int* ind, int* stride))
+                              void (*gfn)(int* id, int* npf, double* xyz),
+                              void (*gqi)(int* id, int* fpt, int* ind, int* stride),
+                              double (*gqs)(int ic, int spt, int var))
   {
-    tg->set_ab_callback(gnf, gfn, gqi);
+    tg->set_ab_callback(gnf, gfn, gqi, gqs);
   }
 
   void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *))

@@ -590,10 +590,8 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int inte
 
   /// TODO: Replace 'interptype' with array of strides (simpler & more general)
   int nints, nreals;
-  printf("before data interp: iartbnd = %d\n",iartbnd);
   if (iartbnd)
   {
-    printf("Immediately before data interp\n");
     interpType = 0;
     mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
                                         &realRecords,q_spts,nvar,interpType);
@@ -687,7 +685,8 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int inte
     }
 
     // change the state of cells/nodes who are orphans
-    mb->clearOrphans(itmp.data());
+    if (!iartbnd)
+      mb->clearOrphans(itmp.data());
 
     if (iartbnd)
       mb->updateFluxPointData(q_fpts,qtmp.data(),nvar);

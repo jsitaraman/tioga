@@ -158,7 +158,6 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
             iblank_face[ff] = FRINGE;
             artBndFaces.insert(ff);
           }
-
         }
       }
     }
@@ -176,7 +175,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   }
 
   nreceptorFaces = artBndFaces.size();
-printf("Rank %d: nOverFaces = %d / %d\n",myid,nreceptorFaces,nfaces); /// DEBUGGING
+
   // Setup final Artificial Boundary face list
   free(ftag);
   ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
@@ -204,82 +203,8 @@ void MeshBlock::setArtificialBoundaries(void)
   for (auto &ff: overFaces) ftag[ind++] = ff;
 }
 
-//void MeshBlock::setArtificialBoundaries(void)
-//{
-//  std::vector<int> iblankCell(ncells);
-
-//  if (iblank_cell == NULL) iblank_cell = new int(ncells);
-
-//  /* Initialized iblank_cell to all normal cells and
-//   * blank all cells containing a hole node */
-//  unsigned int ic = 0;
-//  for (int n = 0; n < ntypes; n++)
-//  {
-//    for (int i = 0; i < nc[n]; i++)
-//    {
-//      unsigned int nFringe = 0;
-//      iblank_cell[ic] = NORMAL;
-//      iblankCell[ic] = NORMAL;
-//      for (int j = 0; j < nv[n] && flag; j++)
-//      {
-//        int iv = vconn[n][nvert*i+j]-BASE;
-//        if (iblank[iv] == HOLE)
-//        {
-//          iblank_cell[ic] = HOLE;
-//          iblankCell[ic] = HOLE;
-//          break;
-//        }
-//        else if (iblank[iv] == FRINGE)
-//        {
-//          nFringe++;
-//        }
-//      }
-
-//      if (nFringe == nv[n])
-//      {
-//        //iblank_cell[ic] = FRINGE;
-//        iblank_cell[ic] = HOLE; /// TODO
-//        iblankCell[ic] = FRINGE;
-//      }
-
-//      ic++;
-//    }
-//  }
-
-//  /// TODO: implement more sophisticated algorithm (i.e. Galbraith's method)
-////  /* ---- If nDims == 3 ---- */
-////  ic = 0;
-////  for (int n = 0; n < ntypes; n++)
-////  {
-////    for (int i = 0; i < nc[n]; i++)
-////    {
-////      if (iblank_cell[ic] != NORMAL)
-////      {
-////        for (int j = 0; j < nf[n]; j++) {
-////          int ff = c2f(ic,j);
-////          int ic2 = (f2c(ff,0) != ic) ? f2c(ff,0) : f2c(ff,1);
-////          if (ic2 > -1) {
-////            if (iblankCell[ic2] == NORMAL) {
-////              iblankCell[ic2] = FRINGE;
-////            }
-////          } else {
-////            // MPI Boundary
-////            int F = findFirst(mpiFaces,c2f(ic,j));
-////            if (F > -1) {
-////              mpiFringeFaces.push_back(mpiFaces[F]);
-////            }
-////          }
-////        }
-////      }
-////    }
-////  }
-////  /* ---- End if nDims == 3 ---- */
-//}
-
 void MeshBlock::clearOrphans(int *itmp)
 {
-  int i,j,m;
-
   if (iartbnd)
   {
     int fpt = 0;
@@ -294,16 +219,21 @@ void MeshBlock::clearOrphans(int *itmp)
       if (reject)
       {
         // Change both connected cells to hole cells, if not already
+        /// TODO: this requires creation of new AB faces and additional flux
+        /// point matching afterwards
         int ic1 = f2c[2*ftag[i]];
         int ic2 = f2c[2*ftag[i]+1];
-        iblank_cell[ic1] = HOLE;
-        iblank_cell[ic2] = HOLE;
+        iblank_face[ftag[i]] = HOLE;
+        if (ic1 >= 0)
+          iblank_cell[ic1] = HOLE;
+        if (ic2 >= 0)
+          iblank_cell[ic2] = HOLE;
       }
     }
   }
   else if (ihigh)
     {
-      m=0;
+      int m=0;
       for (int i = 0; i < nreceptorCells;i++)
 	{
 	  bool reject = false;
@@ -320,7 +250,7 @@ void MeshBlock::clearOrphans(int *itmp)
     }
   else
     {
-      m=0;
+      int m=0;
       for (int i = 0; i < nnodes;i++)
 	{
 	  if (picked[i]) 
@@ -638,9 +568,6 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
   int icount = 0;
   int dcount = 0;
 
-//std::string fields[5] = {"rho","xmom","ymom","zmom","ene"}; /// DEBUGGING
-//for (int k=0; k<nvar; k++)
-//  printf("Rank %d: pt %d: %s: qi = %f\n",myid,i,fields[k].c_str(),qq[k]);
   if (iartbnd)
   {
     for (int i = 0; i < ninterp2; i++)
@@ -786,7 +713,6 @@ void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
     if (iblank_face[ftag[i]-BASE] == -1)
     {
       // Get starting index of face's q data
-      int k = 0;
       for (int j = 0; j < pointsPerFace[i]; j++)
       {
         int ind, stride;
@@ -794,9 +720,7 @@ void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
         ind -= BASE;
         for (int n = 0; n < nvar; n++)
         {
-          q_fpts[ind+stride*n] = qtmp[fpt_start+k];
-//          printf("Rank %d: Face %d: q_interp = %f\n",myid,i,qtmp[fpt_start+k]);
-          k++;
+          q_fpts[ind+stride*n] = qtmp[fpt_start+j*nvar+n];
         }
       }
     }

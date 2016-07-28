@@ -283,85 +283,106 @@ void MeshBlock::initializeInterpList(int ninterp_input)
 		
 void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
 {
-  int i,j,i3,m,n;
-  int nvert;
-  int isum;
-  int procid,pointid;
   double xv[8][3];
-  double xp[3];
   double frac[8];
-  int inode[8];
-  int acceptFlag;
+  std::vector<double> xv2;
+  std::vector<double> frac2;
+  std::vector<int> inode;
   INTEGERLIST *clist;
-  //
-  procid=isearch[2*irecord];
-  pointid=isearch[2*irecord+1];
-  i3=3*irecord;
-  xp[0]=xsearch[i3];
-  xp[1]=xsearch[i3+1];
-  xp[2]=xsearch[i3+2]; 
-  //
-  isum=0;
-  for(n=0;n<ntypes;n++)
+
+  int procid = isearch[2*irecord];
+  int pointid = isearch[2*irecord+1];
+  int i3 = 3*irecord;
+
+  double xp[3];
+  xp[0] = xsearch[i3];
+  xp[1] = xsearch[i3+1];
+  xp[2] = xsearch[i3+2];
+
+  int isum = 0;
+  int n = 0;
+  int idonor = 0;
+  for (n = 0; n < ntypes; n++)
+  {
+    isum += nc[n];
+    if (donorId[irecord] < isum)
     {
-      isum+=nc[n];
-      if (donorId[irecord] < isum) 
-	{
-	  i=donorId[irecord]-(isum-nc[n]);
-          break;
-	}
+      idonor = donorId[irecord]-(isum-nc[n]);
+      break;
     }
-  nvert=nv[n];
-  acceptFlag=1;
-  for(m=0;m<nvert;m++)
+  }
+
+  // Get the physical node positions of the donor cell
+  int acceptFlag = 1;
+  int nvert = nv[n];
+
+  inode.resize(nvert);
+  if (nvert > 8)
+    xv2.resize(nvert*3);
+
+  for (int m = 0; m < nvert; m++)
+  {
+    inode[m]=vconn[n][nvert*idonor+m]-BASE;
+    i3 = 3*inode[m];
+    if (iblank[inode[m]] <=0)
     {
-      inode[m]=vconn[n][nvert*i+m]-BASE;
-      i3=3*inode[m];
-      if (iblank[inode[m]] <=0)
-        {
-         acceptFlag=0;
-        }
-      for(j=0;j<3;j++)
-        xv[m][j]=x[i3+j];
-    }
-  //
-  if (acceptFlag==0 && receptorRes!=BIGVALUE) return;
-  if (receptorRes==BIGVALUE)
-    {
-      clist=cancelList;
-      //
-      // go to the end of the list 
-      //
-      if (clist !=NULL) while(clist->next !=NULL) clist=clist->next;
-      //
-      for(m=0;m<nvert;m++)
-	{
-          inode[m]=vconn[n][nvert*i+m]-BASE;
-	  if (iblank[inode[m]]==-1 && nodeRes[inode[m]]!=BIGVALUE) 
-	    {
-	      iblank[inode[m]]=1;
-	      if (clist == NULL) 
-		{
-		  clist=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
-		  clist->inode=inode[m];
-		  clist->next=NULL;
-                  cancelList=clist;
-		}
-	      else
-		{
-		  clist->next=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
-		  clist->next->inode=inode[m];
-		  clist->next->next=NULL;
-		  clist=clist->next;
-		}
-	      ncancel++;
-	    }
-	}
+      acceptFlag = 0;
     }
 
-  //  Find shape-function interpolation weights for query point
-  // if (!ihighGlobal) // Unnecessary - will be done later if high-order grids present
-  computeNodalWeights(xv,xp,frac,nvert);
+    if (nvert > 8)
+      for (int j = 0; j < 3; j++)
+        xv2[m*3+j] = x[i3+j];
+    else
+      for (int j = 0; j < 3; j++)
+        xv[m][j] = x[i3+j];
+  }
+
+  if (acceptFlag==0 && receptorRes!=BIGVALUE) return;
+
+  if (receptorRes==BIGVALUE)
+  {
+    clist=cancelList;
+
+    // go to the end of the list
+    if (clist !=NULL) while(clist->next !=NULL) clist=clist->next;
+    //
+    for (int m = 0; m < nvert; m++)
+    {
+      inode[m]=vconn[n][nvert*idonor+m]-BASE;
+      if (iblank[inode[m]]==-1 && nodeRes[inode[m]]!=BIGVALUE)
+      {
+        iblank[inode[m]]=1;
+        if (clist == NULL)
+        {
+          clist=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
+          clist->inode=inode[m];
+          clist->next=NULL;
+          cancelList=clist;
+        }
+        else
+        {
+          clist->next=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
+          clist->next->inode=inode[m];
+          clist->next->next=NULL;
+          clist=clist->next;
+        }
+        ncancel++;
+      }
+    }
+  }
+
+  /* Compute the (linear) shape-function interpolation weights of the receptor
+   * node within the donor cell */
+  if (nvert <= 8)
+  {
+    computeNodalWeights(xv,xp,frac,nvert); /// TODO: support nvert > 8
+  } else
+  {
+    double xref[3];
+    getRefLocNewton(xv2.data(), &xp[0], &xref[0], nvert, 3);
+    frac2.resize(nvert);
+    shape_hex(point(&xref[0]),frac2,nvert);
+  }
 
   interp2donor[irecord]=*recid;
   interpList[*recid].cancel=0;
@@ -370,11 +391,14 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
   interpList[*recid].receptorInfo[1]=pointid;
   interpList[*recid].inode=(int *)malloc(sizeof(int)*nvert);
   interpList[*recid].weights=(double *)malloc(sizeof(double)*nvert);
-  for(m=0;m<nvert;m++)
-    {
-      interpList[*recid].inode[m]=inode[m];
+  for (int m = 0; m < nvert; m++)
+  {
+    interpList[*recid].inode[m]=inode[m];
+    if (nvert > 8)
+      interpList[*recid].weights[m]=frac2[m];
+    else
       interpList[*recid].weights[m]=frac[m];
-    }
+  }
   (*recid)++;
 }
 

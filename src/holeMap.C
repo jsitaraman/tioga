@@ -52,19 +52,17 @@ void tioga::getHoleMap(void)
 
   holeMap = new HOLEMAP[nmesh];
 
-  int *existHoleLocal = new int[nmesh];
-  int *existHole = new int[nmesh];
-
-  for (int i = 0; i < nmesh; i++) existHole[i] = existHoleLocal[i] = 0;
+  std::vector<int> existHoleLocal(nmesh);
+  std::vector<int> existHole(nmesh);
 
   existHoleLocal[meshtag] = existWall;
 
-  MPI_Allreduce(existHoleLocal,existHole,nmesh,MPI_INT,MPI_MAX,scomm);
+  MPI_Allreduce(existHoleLocal.data(),existHole.data(),nmesh,MPI_INT,MPI_MAX,scomm);
 
   for (int i = 0; i < nmesh; i++) holeMap[i].existWall = existHole[i];
 
-  double *bboxLocal = new double[6*nmesh];
-  double *bboxGlobal = new double[6*nmesh];
+  std::vector<double> bboxLocal(6*nmesh);
+  std::vector<double> bboxGlobal(6*nmesh);
 
   for (int i = 0; i < 3*nmesh; i++) bboxLocal[i]          =  BIGVALUE;
   for (int i = 0; i < 3*nmesh; i++) bboxLocal[i+3*nmesh]  = -BIGVALUE;
@@ -78,7 +76,7 @@ void tioga::getHoleMap(void)
   }
 
   // Get the global bounding box info across all the partitions for all meshes
-  MPI_Allreduce(bboxLocal,bboxGlobal,3*nmesh,MPI_DOUBLE,MPI_MIN,scomm);
+  MPI_Allreduce(&bboxLocal[0],        &bboxGlobal[0],        3*nmesh,MPI_DOUBLE,MPI_MIN,scomm);
   MPI_Allreduce(&(bboxLocal[3*nmesh]),&(bboxGlobal[3*nmesh]),3*nmesh,MPI_DOUBLE,MPI_MAX,scomm);
 
   // Find the bounding box for each mesh from the globally reduced data
@@ -136,12 +134,6 @@ void tioga::getHoleMap(void)
 
   // output the hole map
   //this->outputHoleMap();
-
-  // free local memory
-  delete[] existHoleLocal;
-  delete[] existHole;
-  delete[] bboxLocal;
-  delete[] bboxGlobal;
 }
 
 /**

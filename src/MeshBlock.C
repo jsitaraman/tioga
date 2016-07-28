@@ -99,8 +99,10 @@ void MeshBlock::preprocess(void)
  */
 void MeshBlock::tagBoundary(void)
 {
-  int inode[8];
+  std::vector<int> inode;
   double xv[8][3];
+  std::vector<double> xv2;
+  std::vector<int> iflag(nnodes, 0);
 
   // Do this only once
   // i.e. when the meshblock is first initialized, cellRes would be NULL in
@@ -108,30 +110,47 @@ void MeshBlock::tagBoundary(void)
   free(cellRes);
   free(nodeRes);
 
-  cellRes=(double *) malloc(sizeof(double)*ncells);
-  nodeRes=(double *) malloc(sizeof(double)*nnodes);
-
-  int *iflag=(int *)malloc(sizeof(int)*nnodes);
+  cellRes = (double *) malloc(sizeof(double)*ncells);
+  nodeRes = (double *) malloc(sizeof(double)*nnodes);
 
   if (userSpecifiedNodeRes == NULL && userSpecifiedCellRes == NULL)
   {
-    for (int i = 0; i < nnodes; i++) iflag[i] = 0;
     for (int i = 0; i < nnodes; i++) nodeRes[i] = 0.0;
 
     int k = 0;
     for (int n = 0; n < ntypes; n++)
     {
       int nvert = nv[n];
+      inode.resize(nvert);
+      if (nvert > 8) xv2.resize(nvert*3);
+
       for (int i = 0; i < nc[n]; i++)
       {
-        for (int m = 0; m < nvert; m++)
+        double vol = 0.;
+
+        if (nvert > 8)
         {
-          inode[m] = vconn[n][nvert*i+m]-BASE;
-          int i3 = 3*inode[m];
-          for (int j = 0; j < 3; j++)
-            xv[m][j] = x[i3+j];
+          for (int m = 0; m < nvert; m++)
+          {
+            inode[m] = vconn[n][nvert*i+m]-BASE;
+            int i3 = 3*inode[m];
+            for (int j = 0; j < 3; j++)
+              xv2[m*3+j] = x[i3+j];
+          }
+          vol = computeVolume(xv2.data(), nvert, 3);
         }
-        double vol = computeCellVolume(xv,nvert);
+        else
+        {
+          for (int m = 0; m < nvert; m++)
+          {
+            inode[m] = vconn[n][nvert*i+m]-BASE;
+            int i3 = 3*inode[m];
+            for (int j = 0; j < 3; j++)
+              xv[m][j] = x[i3+j];
+          }
+          vol = computeCellVolume(xv, nvert);
+        }
+
         cellRes[k++] = vol;
         for (int m = 0; m < nvert; m++)
         {
@@ -177,6 +196,7 @@ void MeshBlock::tagBoundary(void)
   for (int n = 0; n < ntypes; n++)
   {
     int nvert = nv[n];
+    inode.resize(nvert);
     for (int i = 0; i < nc[n]; i++)
     {
       int itag = 0;
@@ -189,7 +209,6 @@ void MeshBlock::tagBoundary(void)
       {
         for (int m = 0; m < nvert; m++)
         {
-          //iflag[inode[m]]=1;
           nodeRes[inode[m]]=BIGVALUE;
         }
       }
@@ -203,6 +222,7 @@ void MeshBlock::tagBoundary(void)
   for (int n = 0; n < ntypes; n++)
   {
     int nvert = nv[n];
+    inode.resize(nvert);
     for (int i = 0; i < nc[n]; i++)
     {
       for (int m = 0; m < nvert; m++)
@@ -217,7 +237,6 @@ void MeshBlock::tagBoundary(void)
       k++;
     }
   }
-  free(iflag);
 }
 
 void MeshBlock::writeGridFile(int bid)

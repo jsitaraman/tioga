@@ -37,8 +37,6 @@ extern "C"
 
 void MeshBlock::getCellIblanks(void)
 {
-  std::vector<int> inode;
-
   int icell = 0;
   if (!iartbnd)
   {
@@ -48,7 +46,6 @@ void MeshBlock::getCellIblanks(void)
   for (int n = 0; n < ntypes; n++)
   {
     int nvert = nv[n];
-    inode.resize(nvert);
     for (int i = 0; i < nc[n]; i++)
     {
       int flag = 1;
@@ -56,13 +53,13 @@ void MeshBlock::getCellIblanks(void)
       int ncount = 0;
       for (int m = 0; m < nvert && flag; m++)
       {
-        inode[m] = vconn[n][nvert*i+m]-BASE;
-        if (iblank[inode[m]] == HOLE)
+        int inode = vconn[n][nvert*i+m]-BASE;
+        if (iblank[inode] == HOLE)
         {
           iblank_cell[icell] = HOLE;
           flag = 0;
         }
-        ncount = ncount + (iblank[inode[m]] == FRINGE);
+        ncount = ncount + (iblank[inode] == FRINGE);
       }
 
       if (flag && ncount == nvert)
@@ -175,7 +172,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   }
 
   nreceptorFaces = artBndFaces.size();
-
+printf("Rank %d: Grid %d: # Overset Faces = %d\n",myid,meshtag,nreceptorFaces);
   // Setup final Artificial Boundary face list
   free(ftag);
   ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
@@ -578,7 +575,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
       {
         double weight = interpList2[i].weights[spt];
         for (int k = 0; k < nvar; k++) {
-          double val =get_q_spt(ic,spt,k);
+          double val = get_q_spt(ic,spt,k);
           qq[k] += val*weight;
         }
       }
@@ -656,6 +653,37 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
   // no column-wise storage for high-order data
   //
 }
+
+void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
+                std::vector<int> &intData, std::vector<double> &realData, int nvar)
+{
+  nints = ninterp2;
+  nreals = ninterp2*nvar;
+  if (nints == 0) return;
+
+  intData.resize(2*nints);
+  realData.resize(nreals);
+
+  std::vector<double> qq(nvar,0);
+  int icount = 0;
+  int dcount = 0;
+
+  for (int i = 0; i < ninterp2; i++)
+  {
+    qq.assign(nvar,0);
+    int ic = interpList2[i].donorID;
+    for (int spt = 0; spt < interpList2[i].nweights; spt++)
+    {
+      double weight = interpList2[i].weights[spt];
+      for (int k = 0; k < nvar; k++)
+        qq[k] += weight * get_q_spt(ic,spt,k);
+    }
+    intData[icount++] = interpList2[i].receptorInfo[0];
+    intData[icount++] = interpList2[i].receptorInfo[1];
+    for (int k = 0; k < nvar; k++)
+      realData[dcount++] = qq[k];
+  }
+}
 	
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
 {
@@ -706,7 +734,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
 void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
-
+  //std::vector<std::string> fields = {"rho","xmom","ymom","zmom","ene"};
   int fpt_start = 0;
   for(int i = 0; i < nreceptorFaces; i++)
   {
@@ -716,14 +744,35 @@ void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
       for (int j = 0; j < pointsPerFace[i]; j++)
       {
         int ind, stride;
-        get_q_index_face(&(ftag[i]), &j, &ind, &stride);
-        ind -= BASE;
+        //get_q_index_face(&(ftag[i]), &j, &ind, &stride);
+        //ind -= BASE;
         for (int n = 0; n < nvar; n++)
         {
-          q_fpts[ind+stride*n] = qtmp[fpt_start+j*nvar+n];
+          //q_fpts[ind+stride*n] = qtmp[fpt_start+j*nvar+n];
+          get_q_fpt(ftag[i], j, n) = qtmp[fpt_start+j*nvar+n];
         }
       }
     }
     fpt_start += (pointsPerFace[i]*nvar);
   }
+}
+
+
+void MeshBlock::getDonorDataGPU(void)
+{
+  // Get a sorted list of all donor cells on this rank
+  std::set<int> donors;
+  for (int i = 0; i < ninterp2; i++)
+    donors.insert(interpList2[i].donorID);
+
+  std::vector<int> donorIDs;
+  donorIDs.reserve(donors.size());
+  for (auto &ic:donors) donorIDs.push_back(ic);
+
+  data_from_device(donorIDs.data(), donorIDs.size());
+}
+
+void MeshBlock::sendFringeDataGPU(void)
+{
+  data_to_device(ftag, nreceptorFaces);
 }

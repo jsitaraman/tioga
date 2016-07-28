@@ -139,6 +139,14 @@ class MeshBlock
 
   double (*get_q_spt)(int cellID, int spt, int var);
 
+  double& (*get_q_fpt)(int ff, int spt, int var);
+
+  /*! Copy solution data for the donor elements from device to host */
+  void (*data_from_device)(int* donorIDs, int nDonors);
+
+  /*! Copy updated solution data for the fringe faces from host to the device */
+  void (*data_to_device)(int* fringeIDs, int nFringe);
+
   /*!
    * \brief Determine whether a point (x,y,z) lies within a cell
    *
@@ -216,6 +224,8 @@ class MeshBlock
   int ntotalPoints;        /**  total number of extra points to interpolate */
   int ihigh;               /** High-order flag for current rank */
   int iartbnd;             /** High-order artificial boundary flag for current rank */
+  bool gpu = false;        /** Flag for GPUs being used on high-order solver */
+
   int ninterp2;            /** < number of interpolants for high-order points */
   int interp2ListSize;
   INTERPLIST *interpList2; /** < list for high-interpolation points */
@@ -235,7 +245,7 @@ class MeshBlock
     nsearch=0; isearch=NULL; xsearch=NULL;
     donorId=NULL; cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
-    nfringe=0;
+    nfringe=2;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;
@@ -297,7 +307,7 @@ class MeshBlock
 
   void updateSolnData(int inode,double *qvar,double *q,int nvar,int interptype);
 
-  int getNinterp(void) {return ninterp;};
+  int getNinterp(void) {return ninterp;}
 
   void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,double *q,
 			       int nvar, int interptype);
@@ -308,6 +318,9 @@ class MeshBlock
   void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,
 				  int nvar, int interptype);
   
+  void getInterpolatedSolutionArtBnd(int &nints, int &nreals,
+           std::vector<int> &intData, std::vector<double> &realData, int nvar);
+
   void checkContainment(int *cellIndex,int adtElement,double *xsearch);
 
   void getWallBounds(int *mtag,int *existWall, double wbox[6]);
@@ -381,16 +394,27 @@ class MeshBlock
   void setCallbackArtBnd(void (*gnf)(int* id, int* npf),
                          void (*gfn)(int* id, int* npf, double* xyz),
                          void (*gqi)(int* id, int* fpt, int* ind, int* stride),
-                         double (*gqs)(int ic, int spt, int var))
+                         double (*gqs)(int ic, int spt, int var),
+                         double& (*gqf)(int ff, int fpt, int var))
   {
     // See declaration of functions above for more details
     get_nodes_per_face = gnf;
     get_face_nodes = gfn;
     get_q_index_face = gqi;
     get_q_spt = gqs;
+    get_q_fpt = gqf;
 
     iartbnd = 1;
   }
+
+  void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd),
+                            void (*h2d)(int* ids, int nf))
+  {
+    data_from_device = d2h;
+    data_to_device = h2d;
+    gpu = true;
+  }
+
 
   void writeCellFile(int);
 
@@ -414,6 +438,12 @@ class MeshBlock
 
   /*! Update high-order element data at artificial boundary flux points */
   void updateFluxPointData(double *q_fpts, double *qtmp, int nvar);
+
+  /*! Copy donor-cell data from device to host for use in interpolation */
+  void getDonorDataGPU(void);
+
+  /*! Copy fringe-face data back to device for computation in solver */
+  void sendFringeDataGPU(void);
 
   void outputOrphan(FILE *fp,int i) 
   {

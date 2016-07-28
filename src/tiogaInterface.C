@@ -23,6 +23,7 @@
 #include "tioga.h"
 #include "globals.h"
 #include <string.h>
+
 //
 // All the interfaces that are 
 // accessible to third party f90 and C
@@ -249,9 +250,16 @@ extern "C" {
   void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                               void (*gfn)(int* id, int* npf, double* xyz),
                               void (*gqi)(int* id, int* fpt, int* ind, int* stride),
-                              double (*gqs)(int ic, int spt, int var))
+                              double (*gqs)(int ic, int spt, int var),
+                              double& (*gqf)(int ff, int fpt, int var))
   {
-    tg->set_ab_callback(gnf, gfn, gqi, gqs);
+    tg->set_ab_callback(gnf, gfn, gqi, gqs, gqf);
+  }
+
+  void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd),
+                                  void (*h2d)(int* ids, int nf))
+  {
+    tg->set_ab_callback_gpu(d2h,h2d);
   }
 
   void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *))

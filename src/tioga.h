@@ -29,6 +29,69 @@
 #include "CartBlock.h"
 #include "parallelComm.h"
 
+
+#include <chrono>
+#include <iostream>
+#include <iomanip>
+#include <string>
+class Timer
+{
+private:
+  std::chrono::high_resolution_clock::time_point tStart;
+  std::chrono::high_resolution_clock::time_point tStop;
+  double duration = 0;
+  std::string prefix = "Execution Time = ";
+
+public:
+  Timer(void) {}
+
+  Timer(std::string prefix) { this->prefix = prefix; }
+
+  void setPrefix(std::string prefix) { this->prefix = prefix; }
+
+  void startTimer(void)
+  {
+    tStart = std::chrono::high_resolution_clock::now();
+  }
+
+  void stopTimer(void)
+  {
+    tStop = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>( tStop - tStart ).count();
+    duration += (double)elapsed/1000.;
+  }
+
+  void resetTimer(void)
+  {
+    duration = 0;
+    tStart = std::chrono::high_resolution_clock::now();
+  }
+
+  double getTime(void)
+  {
+    return duration;
+  }
+
+  void showTime(int precision = 2)
+  {
+    int rank = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+
+    std::cout.setf(std::ios::fixed, std::ios::floatfield);
+    if (duration > 60) {
+      int minutes = floor(duration/60);
+      double seconds = duration-(minutes*60);
+      std::cout << "Rank " << rank << ": " << prefix << minutes << "min ";
+      std::cout << std::setprecision(precision) << seconds << "s" << std::endl;
+    }
+    else
+    {
+      std::cout << "Rank " << rank << ": " << prefix;
+      std::cout << std::setprecision(precision) << duration << "s" << std::endl;
+    }
+  }
+};
+
 class tioga
 {
  private :
@@ -54,12 +117,22 @@ class tioga
 
   int nprocMesh, meshRank;
 
+  //! NEW - attempting to speed up code...
+  std::vector<VPACKET> sndVPack, rcvVPack;
+  std::vector<int> intData;
+  std::vector<double> dblData;
+
  public:
   int ihigh;        /// High-Order flag for current rank
   int iartbnd;      /// Artificial-boundary flag for current rank
   int ihighGlobal;  /// Flag for whether high-order grids exist on any rank
   int iamrGlobal;   /// Flag for whether AMR cartesian grids exist on any rank
   int iabGlobal;    /// Flaag for whether high-order A.B.'s being used on any rank
+
+  bool gpu = false; /// Flag for whether GPUs are being used on the high-order code
+
+  Timer waitTime;
+  Timer interpTime;
 
   /** basic constuctor */
   tioga()
@@ -69,6 +142,9 @@ class tioga
     holeMap = NULL; obblist = NULL;
     nblocks = 0; ncart = 0;
     isym = 2; ihigh = 0; iartbnd = 0; ihighGlobal = 0; iamrGlobal = 0;
+
+    waitTime.setPrefix("TIOGA: MPI Time: ");
+    interpTime.setPrefix("TIOGA: Total Interp Time: ");
   }
  
   /** basic destructor */
@@ -179,10 +255,18 @@ class tioga
   void set_ab_callback(void (*gnf)(int* id, int* npf),
                        void (*gfn)(int* id, int* npf, double* xyz),
                        void (*gqi)(int* id, int* fpt, int* ind, int* stride),
-                       double (*gqs)(int ic, int spt, int var))
+                       double (*gqs)(int ic, int spt, int var),
+                       double& (*gqf)(int ff, int fpt, int var))
   {
-    mb->setCallbackArtBnd(gnf, gfn, gqi, gqs);
+    mb->setCallbackArtBnd(gnf, gfn, gqi, gqs, gqf);
     iartbnd = 1;
+  }
+
+  void set_ab_callback_gpu(void (*d2h)(int* ids, int nd),
+                            void (*h2d)(int* ids, int nf))
+  {
+    mb->setCallbackArtBndGpu(d2h,h2d);
+    gpu = true;
   }
   
   void set_amr_callback(void (*f1)(int *,double *,int *,double *))

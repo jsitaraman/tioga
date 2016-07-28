@@ -26,52 +26,82 @@ extern "C"{
 void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch)
 {
   int icell = elementList[adtElement];
+
   if (ihigh == 0)
   {
     //
     // locate the type of the cell
     //
     int isum = 0;
-    int i = -1;
+    int ic = -1;
     int n = 0;
     for (n = 0; n < ntypes; n++)
     {
       isum += nc[n];
       if (icell < isum)
       {
-        i = icell-(isum-nc[n]);
+        ic = icell-(isum-nc[n]);
         break;
       }
     }
 
-    // now collect all the vertices in the
-    // array xv
-    double xv[8][3];
-    double frac[8];
-    int nvert = nv[n];
-    for (int m = 0; m < nvert; m++)
+    if (ic < 0)
     {
-      int i3 = 3*(vconn[n][nvert*i+m]-BASE);
-      for (int j = 0; j < 3; j++)
-        xv[m][j] = x[i3+j];
+      printf("TIOGA: invalid icell (adtElement) in checkContainment\n");
+      exit(1);
     }
 
-    computeNodalWeights(xv,xsearch,frac,nvert);
-
-    *cellIndex = icell;
-
-    // if any of the nodal weights are
-    // not in between [-TOL 1+TOL] discard
-    // cell
-    for (int m = 0; m < nvert; m++)
+    int nvert = nv[n];
+    if (nvert > 8)
     {
-      if ((frac[m]+TOL)*(frac[m]-1.0-TOL) > 0)
+      /* --- Quadratic or higher-order shape functions - use general func --- */
+
+      std::vector<double> xv2(nvert*3);
+      for (int m = 0; m < nvert; m++)
       {
-        *cellIndex = -1;
+        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+        for (int j = 0; j < 3; j++)
+          xv2[m*3+j] = x[i3+j];
+      }
+
+      double refloc[3];
+      bool isInEle = getRefLocNewton(xv2.data(), xsearch, &refloc[0], nvert, 3);
+
+      // if any of the nodal weights are not in between [-TOL 1+TOL] discard cell
+      if (!isInEle)
+      {
+        *cellIndex=-1;
         return;
       }
+      return;
     }
-    return;
+    else
+    {
+      /* --- Linear shape functions --- */
+
+      double xv[8][3];
+      double frac[8];
+
+      for (int m = 0; m < nvert; m++)
+      {
+        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+        for (int j = 0; j < 3; j++)
+          xv[m][j] = x[i3+j];
+      }
+
+      computeNodalWeights(xv,xsearch,frac,nvert);
+
+      // if any of the nodal weights are not in between [-TOL 1+TOL] discard cell
+      for (int m = 0; m < nvert; m++)
+      {
+        if ((frac[m]+TOL)*(frac[m]-1.0-TOL) > 0)
+        {
+          *cellIndex=-1;
+          return;
+        }
+      }
+      return;
+    }
   }
   else
   {

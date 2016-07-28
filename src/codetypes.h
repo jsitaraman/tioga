@@ -21,6 +21,8 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<cmath>
+#include <vector>
+
 #include "mpi.h"
 /*====================================================================*/
 /*  Floating point definition                                         */
@@ -119,6 +121,14 @@ typedef struct PACKET
   int *intData;
   REAL *realData;
 } PACKET;
+
+typedef struct VPACKET
+{
+  int nints;
+  int nreals;
+  std::vector<int> intData;
+  std::vector<double> realData;
+} VPACKET;
 
 typedef struct INTERPLIST
 {

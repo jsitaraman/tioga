@@ -18,6 +18,8 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "mpi.h"
+#include <vector>
+
 /**
 * Parallel communication methods
 * the MPI calls are abstracted into
@@ -46,6 +48,8 @@ class parallelComm
   
   void sendRecvPackets(PACKET *sndPack,PACKET *rcvPack);
 
+  void sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+
   void sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack);
 
   void setMap(int ns, int nr, int *snd,int *rcv);
@@ -53,9 +57,11 @@ class parallelComm
   void getMap(int *ns,int *nr, int **snd, int **rcv);
 
   void initPackets(PACKET *sndPack, PACKET *rcvPack);
+  void initPacketsV(std::vector<VPACKET>& sndPack, std::vector<VPACKET>& rcvPack);
 
   void clearPackets(PACKET *sndPack, PACKET *rcvPack);
   void clearPackets2(PACKET *sndPack, PACKET *rcvPack);
+  void clearPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
   
 };
   

@@ -550,9 +550,9 @@ void MeshBlock::processPointDonors(void)
   free(frac);
 }
 
-void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
+void MeshBlock::getInterpolatedSolutionAtPoints(int *nints, int *nreals,
                 int **intData, double **realData, double *q, int nvar,
-                int interptype)
+                int interpType)
 {
   (*nints) = ninterp2;
   (*nreals) = ninterp2*nvar;
@@ -587,7 +587,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
   }
   else if (ihigh)
   {
-    if (interptype==ROW)
+    if (interpType==ROW)
     {
       for (int i = 0; i < ninterp2; i++)
       {
@@ -608,7 +608,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
   }
   else
   {
-    if (interptype==ROW)
+    if (interpType==ROW)
     {
       for (int i = 0; i < ninterp2;i++)
       {
@@ -630,7 +630,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
           (*realData)[dcount++] = qq[k];
       }
     }
-    else if (interptype==COLUMN)
+    else if (interpType==COLUMN)
     {
       for (int i = 0; i < ninterp2; i++)
       {
@@ -652,6 +652,44 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,
   //
   // no column-wise storage for high-order data
   //
+}
+
+void MeshBlock::getInterpolatedGradientAtPoints(int &nints, int &nreals,
+                int *&intData, double *&realData, double *q, int nvar)
+{
+  nints = ninterp2;
+  nreals = ninterp2*3*nvar;
+  if (nints == 0) return;
+
+  intData = (int *)malloc(sizeof(int)*2*nints);
+  realData = (double *)malloc(sizeof(double)*nreals);
+
+  std::vector<double> qq(3*nvar,0);
+  int icount = 0;
+  int dcount = 0;
+
+  for (int i = 0; i < ninterp2; i++)
+  {
+    qq.assign(3*nvar,0);
+    int ic = interpList2[i].donorID;
+    for (int spt = 0; spt < interpList2[i].nweights; spt++)
+    {
+      double weight = interpList2[i].weights[spt];
+      for (int dim = 0; dim < 3; dim++)
+      {
+        for (int k = 0; k < nvar; k++)
+        {
+          double val = get_grad_spt(ic,spt,dim,k);
+          qq[dim*nvar+k] += val*weight;
+        }
+      }
+    }
+    intData[icount++] = interpList2[i].receptorInfo[0];
+    intData[icount++] = interpList2[i].receptorInfo[1];
+    for (int dim = 0; dim < 3; dim++)
+      for (int k = 0; k < nvar; k++)
+        realData[dcount++] = qq[dim*nvar+k];
+  }
 }
 
 void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
@@ -731,34 +769,42 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
     }
 }
 
-void MeshBlock::updateFluxPointData(double *q_fpts, double *qtmp, int nvar)
+void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
-  //std::vector<std::string> fields = {"rho","xmom","ymom","zmom","ene"};
+
   int fpt_start = 0;
   for(int i = 0; i < nreceptorFaces; i++)
   {
     if (iblank_face[ftag[i]-BASE] == -1)
     {
-      // Get starting index of face's q data
       for (int j = 0; j < pointsPerFace[i]; j++)
-      {
-        int ind, stride;
-        //get_q_index_face(&(ftag[i]), &j, &ind, &stride);
-        //ind -= BASE;
         for (int n = 0; n < nvar; n++)
-        {
-          //q_fpts[ind+stride*n] = qtmp[fpt_start+j*nvar+n];
           get_q_fpt(ftag[i], j, n) = qtmp[fpt_start+j*nvar+n];
-        }
-      }
     }
     fpt_start += (pointsPerFace[i]*nvar);
   }
 }
 
+void MeshBlock::updateFluxPointGradient(double *dqtmp, int nvar)
+{
+  if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
-void MeshBlock::getDonorDataGPU(void)
+  int fpt_start = 0;
+  for(int i = 0; i < nreceptorFaces; i++)
+  {
+    if (iblank_face[ftag[i]-BASE] == -1)
+    {
+      for (int j = 0; j < pointsPerFace[i]; j++)
+        for (int dim = 0; dim < 3; dim++)
+          for (int n = 0; n < nvar; n++)
+            get_grad_fpt(ftag[i], j, dim, n) = dqtmp[fpt_start+nvar*(j*3+dim)+n];
+    }
+    fpt_start += (pointsPerFace[i]*nvar*3);
+  }
+}
+
+void MeshBlock::getDonorDataGPU(int dataFlag)
 {
   // Get a sorted list of all donor cells on this rank
   std::set<int> donors;
@@ -769,10 +815,10 @@ void MeshBlock::getDonorDataGPU(void)
   donorIDs.reserve(donors.size());
   for (auto &ic:donors) donorIDs.push_back(ic);
 
-  data_from_device(donorIDs.data(), donorIDs.size());
+  data_from_device(donorIDs.data(), donorIDs.size(), dataFlag);
 }
 
-void MeshBlock::sendFringeDataGPU(void)
+void MeshBlock::sendFringeDataGPU(int gradFlag)
 {
-  data_to_device(ftag, nreceptorFaces);
+  data_to_device(ftag, nreceptorFaces, gradFlag);
 }

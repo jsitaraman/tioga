@@ -186,9 +186,9 @@ extern "C" {
       }
   }
 
-  void tioga_dataupdate_ab(int nvar, double *q_spts, double *q_fpts)
+  void tioga_dataupdate_ab(int nvar, double *q_spts, double *q_fpts, int gradFlag)
   {
-    tg->dataUpdate_artBnd(nvar, q_spts, q_fpts, 0);
+    tg->dataUpdate_artBnd(nvar, q_spts, q_fpts, gradFlag);
   }
 
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)
@@ -249,15 +249,16 @@ extern "C" {
 
   void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                               void (*gfn)(int* id, int* npf, double* xyz),
-                              void (*gqi)(int* id, int* fpt, int* ind, int* stride),
                               double (*gqs)(int ic, int spt, int var),
-                              double& (*gqf)(int ff, int fpt, int var))
+                              double& (*gqf)(int ff, int fpt, int var),
+                              double (*ggs)(int ic, int spt, int dim, int var),
+                              double& (*ggf)(int, int, int, int))
   {
-    tg->set_ab_callback(gnf, gfn, gqi, gqs, gqf);
+    tg->set_ab_callback(gnf, gfn, gqs, gqf, ggs, ggf);
   }
 
-  void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd),
-                                  void (*h2d)(int* ids, int nf))
+  void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
+                                  void (*h2d)(int* ids, int nf, int grad))
   {
     tg->set_ab_callback_gpu(d2h,h2d);
   }

@@ -212,7 +212,7 @@ class tioga
   void dataUpdate_highorder(int nvar,double *q, int interptype) ;
 
   /** Perform data interpolation for artificial boundary method */
-  void dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int interpType);
+  void dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int dataFlag);
 
   /** get hole map for each mesh */
  
@@ -254,16 +254,17 @@ class tioga
   //! Set callback functions specific to Artificial Boundary method
   void set_ab_callback(void (*gnf)(int* id, int* npf),
                        void (*gfn)(int* id, int* npf, double* xyz),
-                       void (*gqi)(int* id, int* fpt, int* ind, int* stride),
                        double (*gqs)(int ic, int spt, int var),
-                       double& (*gqf)(int ff, int fpt, int var))
+                       double& (*gqf)(int ff, int fpt, int var),
+                       double (*ggs)(int ic, int spt, int dim, int var),
+                       double& (*ggf)(int ff, int fpt, int dim, int var))
   {
-    mb->setCallbackArtBnd(gnf, gfn, gqi, gqs, gqf);
+    mb->setCallbackArtBnd(gnf, gfn, gqs, gqf, ggs, ggf);
     iartbnd = 1;
   }
 
-  void set_ab_callback_gpu(void (*d2h)(int* ids, int nd),
-                            void (*h2d)(int* ids, int nf))
+  void set_ab_callback_gpu(void (*d2h)(int* ids, int nd, int grad),
+                            void (*h2d)(int* ids, int nf, int grad))
   {
     mb->setCallbackArtBndGpu(d2h,h2d);
     gpu = true;

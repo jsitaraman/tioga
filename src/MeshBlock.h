@@ -121,31 +121,18 @@ class MeshBlock
    */
   void (*get_face_nodes)(int* faceID, int* nNodes, double* xyz);
 
-  /*!
-   * \brief Get the location of 'q' (solution) data for the given face fpt
-   *
-   * 'ind' will be equivalent to calling std::distance between 'q_fpts(0,0,0)'
-   * and 'q_fpts(faceID,fpt,0)'
-   * 'stride' is equivalent to std::distance between 'q_fpts(faceID,fpt,var_0)'
-   * and 'q_fpts(faceID,fpt,var_1)'
-   *
-   * @param[in] faceID   Rank-specific face ID
-   * @param[in] fpt      Index of flux point on face [0 to nPointsFace-1]
-   * @param[out] ind     Total starting index of solution data for point
-   * @param[out] stride  Stride length to get from starting index to each
-   *                     additional variable
-   */
-  void (*get_q_index_face)(int* faceID, int *fpt, int* ind, int* stride);
-
   double (*get_q_spt)(int cellID, int spt, int var);
+
+  double (*get_grad_spt)(int cellID, int spt, int dim, int var);
+  double& (*get_grad_fpt)(int faceID, int fpt, int dim, int var);
 
   double& (*get_q_fpt)(int ff, int spt, int var);
 
-  /*! Copy solution data for the donor elements from device to host */
-  void (*data_from_device)(int* donorIDs, int nDonors);
+  /*! Copy solution/gradient data for the donor elements from device to host */
+  void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
 
-  /*! Copy updated solution data for the fringe faces from host to the device */
-  void (*data_to_device)(int* fringeIDs, int nFringe);
+  /*! Copy updated solution/gradient for fringe faces from host to device */
+  void (*data_to_device)(int* fringeIDs, int nFringe, int gradFlag);
 
   /*!
    * \brief Determine whether a point (x,y,z) lies within a cell
@@ -393,22 +380,24 @@ class MeshBlock
   //! Set callback functions specific to Artificial Boundary method
   void setCallbackArtBnd(void (*gnf)(int* id, int* npf),
                          void (*gfn)(int* id, int* npf, double* xyz),
-                         void (*gqi)(int* id, int* fpt, int* ind, int* stride),
                          double (*gqs)(int ic, int spt, int var),
-                         double& (*gqf)(int ff, int fpt, int var))
+                         double& (*gqf)(int ff, int fpt, int var),
+                         double (*ggs)(int ic, int spt, int dim, int var),
+                         double& (*ggf)(int ff, int fpt, int dim, int var))
   {
     // See declaration of functions above for more details
     get_nodes_per_face = gnf;
     get_face_nodes = gfn;
-    get_q_index_face = gqi;
     get_q_spt = gqs;
     get_q_fpt = gqf;
+    get_grad_spt = ggs;
+    get_grad_fpt = ggf;
 
     iartbnd = 1;
   }
 
-  void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd),
-                            void (*h2d)(int* ids, int nf))
+  void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd, int grad),
+                            void (*h2d)(int* ids, int nf, int grad))
   {
     data_from_device = d2h;
     data_to_device = h2d;
@@ -428,22 +417,26 @@ class MeshBlock
   void getExtraQueryPoints(OBB *obb, int &nints, int*& intData, int &nreals,
                            double*& realData);
   void processPointDonors(void);
-  void getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **intData,
-				       double **realData,
-				       double *q,
-				       int nvar, int interptype);
+  void getInterpolatedSolutionAtPoints(int *nints, int *nreals, int **intData,
+      double **realData, double *q, int nvar, int interpType);
+
+  void getInterpolatedGradientAtPoints(int &nints, int &nreals, int *&intData,
+      double *&realData, double *q, int nvar);
 
   /*! Update high-order element data at internal degrees of freedom */
   void updatePointData(double *q,double *qtmp,int nvar,int interptype);
 
   /*! Update high-order element data at artificial boundary flux points */
-  void updateFluxPointData(double *q_fpts, double *qtmp, int nvar);
+  void updateFluxPointData(double *qtmp, int nvar);
+
+  /*! Update solution gradient at artificial boundary flux points */
+  void updateFluxPointGradient(double *dqtmp, int nvar);
 
   /*! Copy donor-cell data from device to host for use in interpolation */
-  void getDonorDataGPU(void);
+  void getDonorDataGPU(int dataFlag = 0);
 
   /*! Copy fringe-face data back to device for computation in solver */
-  void sendFringeDataGPU(void);
+  void sendFringeDataGPU(int gradFlag);
 
   void outputOrphan(FILE *fp,int i) 
   {

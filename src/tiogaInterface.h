@@ -60,7 +60,7 @@ void tioga_performconnectivity_amr_(void);
 
 void tioga_dataupdate_(double *q,int *nvar,char *itype);
 
-void tioga_dataupdate_ab(int nvar, double *q_spts, double *q_fpts);
+void tioga_dataupdate_ab(int nvar, double *q_spts, double *q_fpts, int gradFlag = 0);
 
 void tioga_writeoutputfiles_(double *q,int *nvar,char *itype);
 
@@ -82,12 +82,13 @@ void tioga_set_highorder_callback_(void (*f1)(int*, int*),
 
 void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                             void (*gfn)(int* id, int* npf, double* xyz),
-                            void (*gqi)(int* id, int* fpt, int* ind, int* stride),
                             double (*gqs)(int ic, int spt, int var),
-                            double& (*gqf)(int ff, int fpt, int var));
+                            double& (*gqf)(int ff, int fpt, int var),
+                            double (*ggs)(int ic, int spt, int dim, int var),
+                            double& (*ggf)(int ff, int fpt, int dim, int var));
 
-void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd),
-                                void (*h2d)(int* ids, int nf));
+void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
+                                void (*h2d)(int* ids, int nf, int grad));
 
 void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 

@@ -30,9 +30,141 @@
 #define HOLE 0
 #define NORMAL 1
 
+#define HOLE_CUT 0
+#define FIELD_CUT 1
+
 extern "C" 
 {
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
+}
+
+void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
+    int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
+{
+  /*
+   * Variables to add (incl. callbacks for):
+   * int nGroups     (# of cutting groups present on THIS RANK)
+   * int* groupIDs   (Cutting-group IDs on this rank [default to grid ID])
+   * int* cutType    (group type - hole or field cutting)
+   * int* nGf        (# of faces per group)
+   * int** cutFaces  (list of faces for each cut group)
+   * int* f2v        (if not already)
+   *
+   * std::vector<std::vector<double>> cutBbox  (bounding box of each group)
+   */
+  int nDims = 3; /// TODO: add to MB.h ...
+
+  /// TODO: pre-process groups on this rank vs. groups on ALL ranks/grids
+  /// TODO: Move up to Tioga class
+  int maxID = 0;
+  for (int g = 0; g < nGroups; g++)
+    maxID = max(maxID, groupIDs[g]);
+
+  int nGroups_glob = maxID;
+  MPI_Allreduce(&maxId, &nGroups_glob, 1, MPI_INT, MPI_MAX, scomm);
+
+  // Full list of group types, and list of group IDs for each grid
+  std::vector<int> cutType_glob(nGroups_glob, -1);
+  std::vector<int> gridGroups(nGrids*nGroups_glob);
+  std::unordered_set<int> myGroups;
+
+  for (int g = 0; g < nGroups; g++)
+  {
+    int G = groupIDs[g];
+    cutType_glob[G] = cutType[g];
+    gridGroups[gridID*nGroups_glob+G] = 1;
+    myGroups.insert(G);
+  }
+
+  MPI_Allreduce(&cutType_glob[0], MPI_IN_PLACE, nGroups_glob, MPI_INT, MPI_MAX, scomm);
+  MPI_Allreduce(&gridGroups[0], MPI_IN_PLACE, nGrids*nGroups_glob, MPI_INT, MPI_MAX, scomm);
+
+  std::vector<double> cutBox(6*nGroups_glob);
+  std::vector<std::vector<double>> faceBox(nGroups);
+
+
+  // Generate bounding boxes for each cutting group and face
+  for (int g = 0; g < nGroups; g++)
+  {
+    int G = groupIDs[g];
+
+    // Initialize this group's bounding box
+    for (int d = 0; d < nDims; d++)
+    {
+      cutBox[6*G+d]   = BIGVALUE;
+      cutBox[6*G+d+3] = -BIGVALUE;
+    }
+
+    // Loop over all faces of this cutting group
+    for (int i = 0; i < nGf[g]; i++)
+    {
+      // Initialize this face's bounding box
+      for (int d = 0; d < nDims; d++)
+      {
+        faceBox[g][6*i+d]   = BIGVALUE;
+        faceBox[g][6*i+d+3] = -BIGVALUE;
+      }
+
+      // Loop over vertices of this face
+      int ff = cutFaces[g][i];
+      for (int n = 0; n < nfv[0]; n++)
+      {
+        int iv = f2v[ff*nfv[0] + n];
+        for (int d = 0; d < nDims; d++)
+        {
+          cutBox[6*G+d]   = std::min(cutBox[6*G+d], x[3*iv+d]);
+          cutBox[6*G+d+3] = std::max(cutBox[6*G+d+3], x[3*iv+d]);
+          faceBox[g][6*i+d]   = std::min(faceBox[g][6*i+d], x[3*iv+d]);
+          faceBox[g][6*i+d+3] = std::max(faceBox[g][6*i+d+3], x[3*iv+d]);
+        }
+      }
+    }
+  }
+
+  /// TODO: re-locate up to Tioga class?
+  // Get the global bounding box info across all the partitions for all meshes
+  std::vector<double> cutBox_global(6*nGroups_glob);
+  for (int G = 0; G < nGroups_glob; G++)
+  {
+    MPI_Allreduce(&cutBox[6*G],  &cutBox_global[6*G],  3,MPI_DOUBLE,MPI_MIN,scomm);
+    MPI_Allreduce(&cutBox[6*G+3],&cutBox_global[6*G+3],3,MPI_DOUBLE,MPI_MAX,scomm);
+  }
+
+  /* Use ADT Search to find all cells [on this rank] which intersect with each
+   * cutting group [which is not on this rank]
+   * NOTE: Only 'background' grids (defined as grids with no cutting groups)
+   * will be cut by 'field'-type groups */
+  std::vector<std::unordered_set<int>> cellList(nGroups_glob);
+  for (int G = 0; G < nGroups_glob; G++)
+  {
+    if (myGroups.count(G)) continue;
+    if (nGroups > 0 && cutType_glob[G] == FIELD_CUT) continue;
+    adt->searchADT_box(elementList,cellList[G],&cutBox_global[6*G]);
+  }
+
+  // use 'PC' object to send/recv faceBox data to correct ranks
+  // Ranks for which cellList[G] != 0 must send data
+  int nsend = 0;
+  int nrecv = 0;
+  std::vector<int> sendMap, sendInts, recvMap, recvGroups;
+  for (int p = 0; p < numprocs; p++)
+  {
+    int grid = gridIds[p];
+    for (int G = 0; G < nGroups_glob; G++)
+    {
+      if (gridGroups[grid*nGroups_glob+G]) // && cellList[G].size() > 0)
+      {
+        nrecv++;
+        nsend++;
+        recvMap.push_back(p);
+        recvGroups.push_back(G);
+        sendMap.push_back(p);
+        sendInts.push_back(cellList[G].size());
+      }
+    }
+  }
+
+
 }
 
 void MeshBlock::getCellIblanks(void)
@@ -172,7 +304,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   }
 
   nreceptorFaces = artBndFaces.size();
-printf("Rank %d: Grid %d: # Overset Faces = %d\n",myid,meshtag,nreceptorFaces);
+//printf("Rank %d: Grid %d: # Overset Faces = %d\n",myid,meshtag,nreceptorFaces);
   // Setup final Artificial Boundary face list
   free(ftag);
   ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
@@ -468,7 +600,6 @@ void MeshBlock::processPointDonors(void)
   }
 
   interp2ListSize = ninterp2;
-  free(interpList2);
   interpList2 = (INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
 
   for (int i = 0; i < interp2ListSize; i++)

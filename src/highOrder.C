@@ -38,6 +38,7 @@ extern "C"
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
 }
 
+/*
 void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
     int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
 {
@@ -51,7 +52,7 @@ void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
    * int* f2v        (if not already)
    *
    * std::vector<std::vector<double>> cutBbox  (bounding box of each group)
-   */
+   *
   int nDims = 3; /// TODO: add to MB.h ...
 
   /// TODO: pre-process groups on this rank vs. groups on ALL ranks/grids
@@ -133,7 +134,7 @@ void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
   /* Use ADT Search to find all cells [on this rank] which intersect with each
    * cutting group [which is not on this rank]
    * NOTE: Only 'background' grids (defined as grids with no cutting groups)
-   * will be cut by 'field'-type groups */
+   * will be cut by 'field'-type groups *
   std::vector<std::unordered_set<int>> cellList(nGroups_glob);
   for (int G = 0; G < nGroups_glob; G++)
   {
@@ -163,9 +164,8 @@ void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
       }
     }
   }
-
-
 }
+*/
 
 void MeshBlock::getCellIblanks(void)
 {
@@ -194,8 +194,8 @@ void MeshBlock::getCellIblanks(void)
         ncount = ncount + (iblank[inode] == FRINGE);
       }
 
-      if (flag && ncount == nvert)
-        iblank_cell[icell] = FRINGE;
+//      if (flag && ncount == nvert)
+//        iblank_cell[icell] = FRINGE;
 
       icell++;
     }

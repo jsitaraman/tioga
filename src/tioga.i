@@ -20,9 +20,13 @@
 %pythoncallback;
 // Functions declared here will be able to act like (C-style) function pointers
 void tioga_dataupdate_ab(int nvar, double* q_spts, double* q_fpts, int gradFlag);
+void tioga_preprocess_grids_(void);
+void tioga_performconnectivity_(void);
 %nopythoncallback;
 
 %ignore tioga_dataupdate_ab;
+%ignore tioga_preprocess_grids_;
+%ignore tioga_performconnectivity_;
 %include "tiogaInterface.h"
 
 // <-- Additional C++ declations [anything that would normally go in a header]

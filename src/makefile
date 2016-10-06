@@ -36,7 +36,7 @@ default: $(OBJECTS) $(OBJF90) $(INCLUDES)
 clean : 
 	rm -rf *.o lib$(MODULENAME).a lib$(MODULENAME).so
 
-tioga_wrap.o: tioga.i
+tioga_wrap.o: tioga.i tiogaInterface.h
 	$(SWIG) $(SFLAGS) -o tioga_wrap.cpp tioga.i
 	$(CXX) -fPIC $(SFLAGS) tioga_wrap.cpp -c -o tioga_wrap.o
 

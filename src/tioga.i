@@ -17,6 +17,12 @@
 %include mpi4py/mpi4py.i
 %mpi4py_typemap(Comm,MPI_Comm);
 
+%pythoncallback;
+// Functions declared here will be able to act like (C-style) function pointers
+void tioga_dataupdate_ab(int nvar, double* q_spts, double* q_fpts, int gradFlag);
+%nopythoncallback;
+
+%ignore tioga_dataupdate_ab;
 %include "tiogaInterface.h"
 
 // <-- Additional C++ declations [anything that would normally go in a header]

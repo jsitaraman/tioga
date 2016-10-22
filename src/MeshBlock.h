@@ -232,7 +232,7 @@ class MeshBlock
     nsearch=0; isearch=NULL; xsearch=NULL;
     donorId=NULL; cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
-    nfringe=2;
+    nfringe=4;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;
@@ -353,10 +353,14 @@ class MeshBlock
   //
   // routines for high order connectivity and interpolation
   //
-  void getCellIblanks(void);
+  void getCellIblanks(const MPI_Comm meshComm);
 
   //! Find all artificial boundary faces using previously-set cell iblank values
   void calcFaceIblanks(const MPI_Comm &meshComm);
+
+  void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::vector<double>> &faceBox, int nGroups_glob);
+
+  void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob)
 
   void set_cell_iblank(int *iblank_cell_input)
   {

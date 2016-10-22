@@ -92,7 +92,8 @@ void tioga::getHoleMap(void)
         ds[j] = holeMap[i].extents[j+3]-holeMap[i].extents[j];
       }
       double dsmax = max(max(ds[0], ds[1]), ds[2]);
-      double dsbox = dsmax/64;
+      int NX_HOLEMAP = 100; // Originally 64
+      double dsbox = dsmax/NX_HOLEMAP;
 
       for (int j = 0; j < 3; j++)
       {

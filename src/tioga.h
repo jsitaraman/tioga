@@ -106,6 +106,7 @@ class tioga
   MPI_Comm meshcomm;
   parallelComm *pc;
   parallelComm *pc_cart;
+  parallelComm *pc_ab;
   int isym;
   int ierr;
   int mytag;

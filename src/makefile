@@ -3,10 +3,12 @@ F90= mpif90
 #CC = mpicc
 CXX= mpicxx
 AR = ar -rvs
-SWIG = swig -c++ -python
+SWIG = /home/jcrabill/local/bin/swig -c++ -python
 CFLAGS = -std=c++11 -Ofast -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
+#CFLAGS = -std=c++11 -g -O0 -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
-SFLAGS = -I/usr/include/python2.7 -I/usr/local/lib/python2.7/dist-packages/mpi4py/include
+SFLAGS = -I/home/jcrabill/Workspace/pyfr-venv/lib/python3.5/site-packages/mpi4py/include -I/home/jcrabill/local/include/python3.5m
+#SFLAGS = -I/usr/include/python2.7 -I/usr/local/lib/python2.7/dist-packages/mpi4py/include
 INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h error.hpp points.hpp funcs.hpp
 OBJF90 = kaiser.o median.o 
 OBJECTS = buildADTrecursion.o searchADTrecursion.o ADT.o\
@@ -37,6 +39,7 @@ clean :
 	rm -rf *.o lib$(MODULENAME).a lib$(MODULENAME).so
 
 tioga_wrap.o: tioga.i tiogaInterface.h
+	@echo `which swig`
 	$(SWIG) $(SFLAGS) -o tioga_wrap.cpp tioga.i
 	$(CXX) -fPIC $(SFLAGS) tioga_wrap.cpp -c -o tioga_wrap.o
 

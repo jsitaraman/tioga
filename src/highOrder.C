@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <set>
+#include <vector>
 
 #define ROW 0
 #define COLUMN 1
@@ -38,10 +39,10 @@ extern "C"
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
 }
 
-/*
-void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
-    int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
-{
+*
+// void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
+//     int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
+// {
   /*
    * Variables to add (incl. callbacks for):
    * int nGroups     (# of cutting groups present on THIS RANK)
@@ -52,37 +53,12 @@ void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
    * int* f2v        (if not already)
    *
    * std::vector<std::vector<double>> cutBbox  (bounding box of each group)
-   *
-  int nDims = 3; /// TODO: add to MB.h ...
-
-  /// TODO: pre-process groups on this rank vs. groups on ALL ranks/grids
-  /// TODO: Move up to Tioga class
-  int maxID = 0;
-  for (int g = 0; g < nGroups; g++)
-    maxID = max(maxID, groupIDs[g]);
-
-  int nGroups_glob = maxID;
-  MPI_Allreduce(&maxId, &nGroups_glob, 1, MPI_INT, MPI_MAX, scomm);
-
-  // Full list of group types, and list of group IDs for each grid
-  std::vector<int> cutType_glob(nGroups_glob, -1);
-  std::vector<int> gridGroups(nGrids*nGroups_glob);
-  std::unordered_set<int> myGroups;
-
-  for (int g = 0; g < nGroups; g++)
-  {
-    int G = groupIDs[g];
-    cutType_glob[G] = cutType[g];
-    gridGroups[gridID*nGroups_glob+G] = 1;
-    myGroups.insert(G);
-  }
-
-  MPI_Allreduce(&cutType_glob[0], MPI_IN_PLACE, nGroups_glob, MPI_INT, MPI_MAX, scomm);
-  MPI_Allreduce(&gridGroups[0], MPI_IN_PLACE, nGrids*nGroups_glob, MPI_INT, MPI_MAX, scomm);
-
-  std::vector<double> cutBox(6*nGroups_glob);
-  std::vector<std::vector<double>> faceBox(nGroups);
-
+   */
+void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::vector<double>> &faceBox, int nGroups_glob)
+{
+  cutBox.resize(6*nGroups_glob);
+  //faceBox.resize(nGroups);
+  faceBox.resize(nGroups_glob);
 
   // Generate bounding boxes for each cutting group and face
   for (int g = 0; g < nGroups; g++)
@@ -97,13 +73,14 @@ void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
     }
 
     // Loop over all faces of this cutting group
+    facebox[G].resize(nGf[g]);
     for (int i = 0; i < nGf[g]; i++)
     {
       // Initialize this face's bounding box
       for (int d = 0; d < nDims; d++)
       {
-        faceBox[g][6*i+d]   = BIGVALUE;
-        faceBox[g][6*i+d+3] = -BIGVALUE;
+        faceBox[G][6*i+d]   = BIGVALUE;
+        faceBox[G][6*i+d+3] = -BIGVALUE;
       }
 
       // Loop over vertices of this face
@@ -121,84 +98,199 @@ void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
       }
     }
   }
+}
 
-  /// TODO: re-locate up to Tioga class?
-  // Get the global bounding box info across all the partitions for all meshes
-  std::vector<double> cutBox_global(6*nGroups_glob);
-  for (int G = 0; G < nGroups_glob; G++)
-  {
-    MPI_Allreduce(&cutBox[6*G],  &cutBox_global[6*G],  3,MPI_DOUBLE,MPI_MIN,scomm);
-    MPI_Allreduce(&cutBox[6*G+3],&cutBox_global[6*G+3],3,MPI_DOUBLE,MPI_MAX,scomm);
-  }
-
+void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob)
+{
   /* Use ADT Search to find all cells [on this rank] which intersect with each
    * cutting group [which is not on this rank]
    * NOTE: Only 'background' grids (defined as grids with no cutting groups)
-   * will be cut by 'field'-type groups *
-  std::vector<std::unordered_set<int>> cellList(nGroups_glob);
+   * will be cut by 'field'-type groups */
   for (int G = 0; G < nGroups_glob; G++)
   {
     if (myGroups.count(G)) continue;
     if (nGroups > 0 && cutType_glob[G] == FIELD_CUT) continue;
     adt->searchADT_box(elementList,cellList[G],&cutBox_global[6*G]);
   }
-
-  // use 'PC' object to send/recv faceBox data to correct ranks
-  // Ranks for which cellList[G] != 0 must send data
-  int nsend = 0;
-  int nrecv = 0;
-  std::vector<int> sendMap, sendInts, recvMap, recvGroups;
-  for (int p = 0; p < numprocs; p++)
-  {
-    int grid = gridIds[p];
-    for (int G = 0; G < nGroups_glob; G++)
-    {
-      if (gridGroups[grid*nGroups_glob+G]) // && cellList[G].size() > 0)
-      {
-        nrecv++;
-        nsend++;
-        recvMap.push_back(p);
-        recvGroups.push_back(G);
-        sendMap.push_back(p);
-        sendInts.push_back(cellList[G].size());
-      }
-    }
-  }
 }
-*/
 
-void MeshBlock::getCellIblanks(void)
+int get_cell_type(int* nc, int ntypes, int ic_in)
 {
-  int icell = 0;
-  if (!iartbnd)
-  {
-    if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
-  }
-
+  // Return the cell type index and cell index within that type
+  int count = 0;
   for (int n = 0; n < ntypes; n++)
   {
-    int nvert = nv[n];
-    for (int i = 0; i < nc[n]; i++)
+    if (count + nc[n] > ic_in)
+      return n;
+
+    count += nc[n];
+  }
+}
+
+int get_cell_index(int* nc, int ntypes, int ic_in, int &ic_out)
+{
+  // Return the cell type index and cell index within that type
+  int count = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    if (count + nc[n] > ic_in)
     {
-      int flag = 1;
-      iblank_cell[icell] = NORMAL;
-      int ncount = 0;
-      for (int m = 0; m < nvert && flag; m++)
-      {
-        int inode = vconn[n][nvert*i+m]-BASE;
-        if (iblank[inode] == HOLE)
-        {
-          iblank_cell[icell] = HOLE;
-          flag = 0;
-        }
-        ncount = ncount + (iblank[inode] == FRINGE);
-      }
+      ic_out = ic_in - count;
+      return n;
+    }
+    count += nc[n];
+  }
+}
+
+void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
+{
+//  int icell = 0;
+//  if (!iartbnd)
+//  {
+//    if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
+//  }
+
+//  for (int n = 0; n < ntypes; n++)
+//  {
+//    int nvert = nv[n];
+//    for (int i = 0; i < nc[n]; i++)
+//    {
+//      int flag = 1;
+//      iblank_cell[icell] = NORMAL;
+//      int ncount = 0;
+//      for (int m = 0; m < nvert && flag; m++)
+//      {
+//        int inode = vconn[n][nvert*i+m]-BASE;
+//        if (iblank[inode] == HOLE)
+//        {
+//          iblank_cell[icell] = HOLE;
+//          flag = 0;
+//        }
+//        ncount = ncount + (iblank[inode] == FRINGE);
+//      }
 
 //      if (flag && ncount == nvert)
 //        iblank_cell[icell] = FRINGE;
 
-      icell++;
+//      icell++;
+//    }
+//  }
+
+
+//  /// DEBUGGING / TEMPORARY FIX
+//  std::vector<int> ncf(1,6);
+//  std::vector<std::vector<int>> c2c(1);
+//  c2c[0].assign(ncells*6, -1);
+
+//  for (int ic = 0; ic < ncells; ic++)
+//  {
+//    for (int j = 0; j < 6; j++)
+//    {
+//      int ff = c2f[6*ic+j];
+//      int ic1 = f2c[2*ff];
+//      int ic2 = f2c[2*ff+1];
+
+//      if (ic1 == ic)
+//        c2c[0][6*ic+j] = ic2;
+//      else
+//        c2c[0][6*ic+j] = ic1;
+//    }
+//  }
+
+//  // New method to try: Expand hole regions by one layer where possible
+//  // For all cells neighboring a hole cell:
+//  //   If all surrounding cells are hole or fringe, set to hole cell
+//  std::vector<int> iblank_tmp(ncells,0);
+
+//  for (int ic = 0; ic < ncells; ic++)
+//  {
+//    int n = get_cell_type(nc,ntypes,ic);
+//    if (iblank_cell[ic] == HOLE)
+//    {
+//      // Set all surrounding cells to 'HOLE' if no neighbors are 'NORMAL'
+//      for (int j = 0; j < ncf[n]; j++)
+//      {
+//        int ic1 = c2c[n][ic*ncf[n]+j];
+//        if (ic1 < 0 || iblank_cell[ic1] != FRINGE || iblank_tmp[ic1] == 1) // Already set to hole, or not possible to set as hole
+//          continue;
+
+//        bool set_hole = true;
+//        int n1 = get_cell_type(nc,ntypes,ic1);
+//        for (int k = 0; k < ncf[n]; k++)
+//        {
+//          int ic2 = c2c[n1][ic1*ncf[n1]+k];
+//          if (ic2 < 0 || iblank_cell[ic2] == NORMAL)
+//          {
+//            set_hole = false;
+//            break;
+//          }
+//        }
+
+//        if (set_hole)
+//          iblank_tmp[ic1] = 1;
+//      }
+//    }
+//  }
+
+//  for (int ic = 0; ic < ncells; ic++)
+//  {
+//    if (iblank_tmp[ic])
+//      iblank_cell[ic] = HOLE;
+//    else if (iblank_cell[ic] == FRINGE)
+//      iblank_cell[ic] = NORMAL;
+//  }
+
+//  int rank;
+//  MPI_Comm_rank(meshComm, &rank);
+
+  /// HACK FOR GOLF BALL CASE: Golf ball radius = .0625, outer radius = .14
+  double cut_rad2 = .1*.1;
+  if (meshtag == 1) /// MUST BE BACKGROUND GRID
+  {
+    int icell = 0;
+    for (int n = 0; n < ntypes; n++)
+    {
+      int nvert = nv[n];
+      for (int ic = 0; ic < nc[n]; ic++)
+      {
+        iblank_cell[icell] = NORMAL;
+
+        double xc[3] = {0,0,0};
+        for (int nd = 0; nd < 8; nd++)
+        {
+          int ind = 3*vconn[n][nvert*ic+nd];
+//          for (int d = 0; d < 3; d++)
+//            xc[d] += x[ind+d];
+
+          double rad2 = 0;
+          for (int d = 0; d < 3; d++)
+            rad2 += x[ind+d]*x[ind+d];
+
+          if (rad2 < cut_rad2)
+          {
+            iblank_cell[icell] = HOLE;
+            break;
+          }
+        }
+//        for (int d = 0; d < 3; d++)
+//          xc[d] /= 8.;
+
+//        double rad2 = 0;
+//        for (int d = 0; d < 3; d++)
+//          rad2 += xc[d]*xc[d];
+////        rad2 = sqrt(rad2);
+
+//        if (rad2 < cut_rad2)
+//          iblank_cell[icell] = HOLE;
+
+        icell++;
+      }
     }
+  }
+  else
+  {
+    for (int ic = 0; ic < ncells; ic++)
+      iblank_cell[ic] = NORMAL;
   }
 }
 
@@ -286,6 +378,15 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
           {
             iblank_face[ff] = FRINGE;
             artBndFaces.insert(ff);
+            /// DEBUGGING
+            int ic = f2c[2*ff];
+            double xc[3] = {0,0,0};
+            for (int m = 0; m < 8; m++)
+              for (int d = 0; d < 3; d++)
+                xc[d] += x[3*vconn[0][8*ic+m]+d]/8.;
+            double rad = sqrt(xc[0]*xc[0]+xc[1]*xc[1]+xc[2]*xc[2]);
+            if (rad < .1)
+              printf("MPI face %d (%d): xc %f, %f, %f -> %f\n",F,ff,xc[0],xc[1],xc[2],rad);
           }
         }
       }
@@ -904,14 +1005,26 @@ void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+
   int fpt_start = 0;
   for(int i = 0; i < nreceptorFaces; i++)
   {
-    if (iblank_face[ftag[i]-BASE] == -1)
+    if (iblank_face[ftag[i]-BASE] == FRINGE)
     {
       for (int j = 0; j < pointsPerFace[i]; j++)
         for (int n = 0; n < nvar; n++)
           get_q_fpt(ftag[i], j, n) = qtmp[fpt_start+j*nvar+n];
+
+      if (rank == 0)
+      {
+        for (int j = 0; j < pointsPerFace[i]; j++) /// DEBUGGING
+        {
+          if (abs(qtmp[fpt_start+j*nvar+1] - .28) > .001)
+            printf("Tioga: face %d, pt %d, rho %f\n",ftag[i],j,qtmp[fpt_start+j*nvar+0]);
+        }
+      }
     }
     fpt_start += (pointsPerFace[i]*nvar);
   }

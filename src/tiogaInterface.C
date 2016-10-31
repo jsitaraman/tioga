@@ -186,9 +186,9 @@ extern "C" {
       }
   }
 
-  void tioga_dataupdate_ab(int nvar, double *q_spts, double *q_fpts, int gradFlag)
+  void tioga_dataupdate_ab(int nvar, double *q_spts, int gradFlag)
   {
-    tg->dataUpdate_artBnd(nvar, q_spts, q_fpts, gradFlag);
+    tg->dataUpdate_artBnd(nvar, q_spts, gradFlag);
   }
 
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)

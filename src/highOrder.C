@@ -39,7 +39,7 @@ extern "C"
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
 }
 
-*
+
 // void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
 //     int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
 // {
@@ -100,6 +100,34 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
   }
 }
 
+void MeshBlock::getCutGroupFaces(std::vector<std::vector<double>> &faceNodes, int nGroups_glob)
+{
+  cutBox.resize(6*nGroups_glob);
+  faceBox.resize(nGroups_glob);
+
+  int nvert = nfv[0];
+
+  // Generate bounding boxes for each cutting group and face
+  for (int g = 0; g < nGroups; g++)
+  {
+    int G = groupIDs[g];
+
+    // Loop over all faces of this cutting group
+    faceNodes[G].resize(3*nvert*nGf[g]);
+    for (int i = 0; i < nGf[g]; i++)
+    {
+      // Loop over vertices of this face
+      int ff = cutFaces[g][i];
+      for (int n = 0; n < nvert; n++)
+      {
+        int iv = f2v[ff*nvert + n];
+        for (int d = 0; d < nDims; d++)
+          faceNodes[G][3*(nvert*i+n)+d] = x[3*iv+d];
+      }
+    }
+  }
+}
+
 void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob)
 {
   /* Use ADT Search to find all cells [on this rank] which intersect with each
@@ -111,6 +139,30 @@ void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList
     if (myGroups.count(G)) continue;
     if (nGroups > 0 && cutType_glob[G] == FIELD_CUT) continue;
     adt->searchADT_box(elementList,cellList[G],&cutBox_global[6*G]);
+  }
+}
+
+void MeshBlock::directCut(std::vector<double> &faceBox, int nCutFaces, std::vector<int> &cutFlag)
+{
+  cutFlag.assign(nCells,0);
+
+  std::unordered_set<int> cellList;
+  for (int ff = 0; ff < nCutFaces; ff++)
+  {
+    cellList.clear();
+
+    // Find all cells that the cutting face might pass through
+    adt->searchADT_box(elementList, cellList, &faceBox[6*ff]);
+
+    // Check each cell to determine if the face intersects it
+    for (auto &ic : cellList)
+    {
+      //getRefLocNewton() // Galbratih says to use Nelder-Mead though...
+      if (intersectionCheck())
+      {
+        cutFlag[ic] = 1;
+      }
+    }
   }
 }
 

@@ -191,8 +191,10 @@ void tioga::performConnectivityArtificialBoundary(void)
   // Get cutting-group bounding-box data for this rank
   std::vector<double> cutBox(6*nGroups_glob);
   std::vector<std::vector<double>> faceBox(nGroups);
+  std::vector<std::vector<double>> faceNodes(nGroups);
 
   mb->getCutGroupBoxes(cutBox, faceBox, nGroups_glob);
+  mb->getCutGroupFaces(faceNodes, nGroups_glob);
 
   // Get the global bounding box info across all the partitions for all meshes
   std::vector<double> cutBox_global(6*nGroups_glob);
@@ -209,14 +211,14 @@ void tioga::performConnectivityArtificialBoundary(void)
   mb->getDirectCutCells(cellList, cutBox_global, nGroups_global);
 
   std::vector<int> nGFaces(nGroups_glob);
-  for (int g =0; g < nGroups; g++)
+  for (int g = 0; g < nGroups; g++)
   {
     nGFaces[groupIDs[g]] = nGf[g];
   }
 
   // Send all face box  data to all ranks?
   std::vector<std::vector<int>> nFaces_glob(nGroups_glob);
-  std::vector<std::vector<double> faceBox_glob(nGroups_glob);
+  std::vector<std::vector<double>> faceBox_glob(nGroups_glob);
   for (int G = 0; G < nGroups_glob; G++)
   {
     nFaces_glob[G].resize(nproc);
@@ -228,40 +230,46 @@ void tioga::performConnectivityArtificialBoundary(void)
     for (int p = 0; p < nproc; p++)
     {
       recvCnts[p] = nFaces_glob[G][p]*6;
-      recvDisp[p] += (p>0) ? 0 : nFaces_glob[G][p-1]*6;
-      nface_glob += nFacesglob[G][p];
+      recvDisp[p] += (p>0) ? nFaces_glob[G][p-1]*6 : 0;
+      nface_glob += nFaces_glob[G][p];
     }
 
-    faceBox_glob[G].resize(nface_glob);
+    faceBox_glob[G].resize(nface_glob*6);
     MPI_Allgatherv(&faceBox[G][0], nGFces[G], MPI_DOUBLE, &faceBox_glob[G][0], recvCnts.data(), recvDisp.data(), MPI_DOUBLE, scomm);
   }
 
-  // use 'PC' object to send/recv faceBox data to correct ranks
-  // Ranks for which cellList[G] != 0 must send data
-  int nsend = 0;
-  int nrecv = 0;
-  std::vector<int> sendMap, sendInts, recvMap, recvGroups;
-  for (int p = 0; p < numprocs; p++)
-  {
-    if (p == rank) continue;
+  /// first try
+//  // use 'PC' object to send/recv faceBox data to correct ranks
+//  // Ranks for which cellList[G] != 0 must send data
+//  int nsend = 0;
+//  int nrecv = 0;
+//  std::vector<int> sendMap, sendInts, recvMap, recvGroups;
+//  for (int p = 0; p < numprocs; p++)
+//  {
+//    if (p == rank) continue;
 
-    int grid = gridIds[p];
-    for (int G = 0; G < nGroups_glob; G++)
-    {
-      if (gridGroups[grid*nGroups_glob+G]) // && cellList[G].size() > 0)
-      {
-        nrecv++;
-        nsend++;
-        recvMap.push_back(p);
-        recvGroups.push_back(G);
-        sendMap.push_back(p);
-        sendInts.push_back(cellList[G].size());
-      }
-    }
-  }
+//    int grid = gridIds[p];
+//    for (int G = 0; G < nGroups_glob; G++)
+//    {
+//      if (gridGroups[grid*nGroups_glob+G]) // && cellList[G].size() > 0)
+//      {
+//        nrecv++;
+//        nsend++;
+//        recvMap.push_back(p);
+//        recvGroups.push_back(G);
+//        sendMap.push_back(p);
+//        sendInts.push_back(cellList[G].size());
+//      }
+//    }
+//  }
   
   // Do the cutting
-  mb->directCut
+  for (int G = 0; G < nGroups_glob; G++)
+  {
+    mb->directCut(faceBox_glob[G]);
+
+  }
+
 
   mb->getBoundaryNodes();  //! Get all AB face point locations
   exchangePointSearchData();

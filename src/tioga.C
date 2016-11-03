@@ -680,7 +680,7 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   if (dcount) free(dcount);
 }
 
-void tioga::dataUpdate_artBnd(int nvar, double *q_spts, double* q_fpts, int dataFlag)
+void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 {
   if (iartbnd && gpu)
     mb->getDonorDataGPU(dataFlag);

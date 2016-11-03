@@ -1,14 +1,18 @@
+MPI4PY_INC_DIR = /home/jcrabill/local/include/python3.5m
+PYTHON_INC_DIR = /home/jcrabill/Workspace/pyfr-venv/lib/python3.5/site-packages/mpi4py/include
+SWIG_BIN = /home/jcrabill/local/bin/
+
 MODULENAME=tioga
 F90= mpif90
 #CC = mpicc
 CXX= mpicxx
 AR = ar -rvs
-SWIG = /home/jcrabill/local/bin/swig -c++ -python
-CFLAGS = -std=c++11 -Ofast -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
-#CFLAGS = -std=c++11 -g -O0 -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
+SWIG = $(SWIG_BIN)/swig -c++ -python
+#CFLAGS = -std=c++11 -Ofast -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
+CFLAGS = -std=c++11 -g -O3 -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
+CFLAGS += -fopenmp
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
-SFLAGS = -I/home/jcrabill/Workspace/pyfr-venv/lib/python3.5/site-packages/mpi4py/include -I/home/jcrabill/local/include/python3.5m
-#SFLAGS = -I/usr/include/python2.7 -I/usr/local/lib/python2.7/dist-packages/mpi4py/include
+SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/
 INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h error.hpp points.hpp funcs.hpp
 OBJF90 = kaiser.o median.o 
 OBJECTS = buildADTrecursion.o searchADTrecursion.o ADT.o\

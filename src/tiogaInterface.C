@@ -252,9 +252,11 @@ extern "C" {
                               double (*gqs)(int ic, int spt, int var),
                               double& (*gqf)(int ff, int fpt, int var),
                               double (*ggs)(int ic, int spt, int dim, int var),
-                              double& (*ggf)(int, int, int, int))
+                              double& (*ggf)(int, int, int, int),
+                              double* (*gqss)(int& es, int& ss, int& vs),
+                              double* (*gdqs)(int& es, int& ss, int& vs, int& ds))
   {
-    tg->set_ab_callback(gnf, gfn, gqs, gqf, ggs, ggf);
+    tg->set_ab_callback(gnf, gfn, gqs, gqf, ggs, ggf, gqss, gdqs);
   }
 
   void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),

@@ -22,6 +22,8 @@
 extern "C"{
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
 }
+
+using namespace tg_funcs;
 			   
 void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch)
 {

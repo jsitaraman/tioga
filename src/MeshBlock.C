@@ -26,6 +26,8 @@ extern "C" {
   void deallocateLinkList2(INTEGERLIST *temp);  
 }
 
+using namespace tg_funcs;
+
 void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 			int *wbcnodei,int *obcnodei,
 			int ntypesi,int *nvi,int *nci,int **vconni)

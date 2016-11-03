@@ -83,8 +83,10 @@ void parallelComm::sendRecvPacketsAll(PACKET *sndPack, PACKET *rcvPack)
 		  tag,scomm,&request[irnum++]);
       }
     }
+  MPI_Pcontrol(1, "tioga_pc_waitall");
   MPI_Waitall(irnum,request,status);
-  
+  MPI_Pcontrol(-1, "tioga_pc_waitall");
+
   free(sint);
   free(sreal);
   free(rint);
@@ -161,7 +163,9 @@ void parallelComm::sendRecvPackets(PACKET *sndPack,PACKET *rcvPack)
 		  tag,scomm,&request[irnum++]);
       }
     }
+  MPI_Pcontrol(1, "tioga_pc_waitall");
   MPI_Waitall(irnum,request,status);
+  MPI_Pcontrol(-1, "tioga_pc_waitall");
   //
   free(scount);
   free(rcount);

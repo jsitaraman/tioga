@@ -34,9 +34,18 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "error.hpp"
 #include "points.hpp"
+
+#define ThrowException(msg) \
+{ std::stringstream s; s << __FILE__ << ":" << __LINE__ << ":" << __func__ << ": " << msg; \
+  throw std::runtime_error(s.str());}\
+
+namespace tg_funcs
+{
 
 /* ---------------------------- Helpful Objects ---------------------------- */
 
@@ -74,6 +83,29 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 /*! Compute the volume of a high-order quad or hex */
 double computeVolume(double *xv, int nNodes, int nDims);
 
+std::vector<int> get_int_list(int N, int start = 0);
+std::vector<uint> get_int_list(uint N, uint start = 0);
+
+std::vector<int> reverse_map(const std::vector<int> &map1);
+
+//! Map a structured ijk-type index to the equivalent Gmsh node index
+std::vector<int> structured_to_gmsh_quad(unsigned int nNodes);
+std::vector<int> structured_to_gmsh_hex(unsigned int nNodes);
+
+//! Map a Gmsh node index to the equivalent structured ijk-type index
+std::vector<int> gmsh_to_structured_quad(unsigned int nNodes);
+std::vector<int> gmsh_to_structured_hex(unsigned int nNodes);
+
+template<typename T>
+int findFirst(const std::vector<T>& vec, T val)
+{
+  for (int i = 0; i < vec.size(); i++)
+    if (vec[i] == val)
+      return i;
+
+  return -1;
+}
+
 /* ---------------------------- Shape Functions ---------------------------- */
 
 //! Shape function for linear or quadratic quad (TODO: Generalize to N-noded quad)
@@ -91,6 +123,8 @@ void shape_hex(const point &in_rst, double* out_shape, int nNodes);
 //! Derivative of shape functions for linear or quadratic hexahedron
 void dshape_hex(const std::vector<point>& loc_pts, double* out_dshape, int nNodes);
 void dshape_hex(const point &in_rst, double* out_dshape, int nNodes);
+
+} // namespace tg_funcs
 
 #endif // FUNCS_HPP
 

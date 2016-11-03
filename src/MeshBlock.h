@@ -128,6 +128,9 @@ class MeshBlock
 
   double& (*get_q_fpt)(int ff, int spt, int var);
 
+  double* (*get_q_spts)(int& ele_stride, int& spt_stride, int& var_stride);
+  double* (*get_dq_spts)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
+
   /*! Copy solution/gradient data for the donor elements from device to host */
   void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
 
@@ -219,6 +222,16 @@ class MeshBlock
   int ninterpCart;
   int interpListCartSize;
   INTERPLIST *interpListCart; 
+
+  // Direct-Cut Method Variables - TO BE CLEANED UP
+  int nDims = 3;
+  int nGroups;
+  std::vector<std::vector<int>> cutFaces;  //! List of faces on each cut group
+  std::vector<int> groupIDs;
+  std::set<int> myGroups;
+  std::vector<int> cutType_glob;
+  std::vector<int> nGf; //! Number of faces on each cutting group
+
   /** basic constructor */
   MeshBlock()
   {
@@ -308,6 +321,8 @@ class MeshBlock
   void getInterpolatedSolutionArtBnd(int &nints, int &nreals,
            std::vector<int> &intData, std::vector<double> &realData, int nvar);
 
+  void getInterpolatedGradientArtBnd(int& nints, int& nreals, std::vector<int>& intData, std::vector<double>& realData, int nvar);
+
   void checkContainment(int *cellIndex,int adtElement,double *xsearch);
 
   void getWallBounds(int *mtag,int *existWall, double wbox[6]);
@@ -358,9 +373,13 @@ class MeshBlock
   //! Find all artificial boundary faces using previously-set cell iblank values
   void calcFaceIblanks(const MPI_Comm &meshComm);
 
-  void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::vector<double>> &faceBox, int nGroups_glob);
+  void getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::vector<double>> &faceBox, int nGroups_glob);
 
-  void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob)
+  void getCutGroupFaces(std::vector<std::vector<double>> &faceNodes, int nGroups_glob);
+
+  void getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob);
+
+  void directCut(std::vector<double> &faceBox, int nCutFaces, std::vector<int> &cutFlag);
 
   void set_cell_iblank(int *iblank_cell_input)
   {
@@ -387,7 +406,9 @@ class MeshBlock
                          double (*gqs)(int ic, int spt, int var),
                          double& (*gqf)(int ff, int fpt, int var),
                          double (*ggs)(int ic, int spt, int dim, int var),
-                         double& (*ggf)(int ff, int fpt, int dim, int var))
+                         double& (*ggf)(int ff, int fpt, int dim, int var),
+                         double* (*gqss)(int& es, int& ss, int& vs),
+                         double* (*gdqs)(int& es, int& ss, int& vs, int& ds))
   {
     // See declaration of functions above for more details
     get_nodes_per_face = gnf;
@@ -396,6 +417,8 @@ class MeshBlock
     get_q_fpt = gqf;
     get_grad_spt = ggs;
     get_grad_fpt = ggf;
+    get_q_spts = gqss;
+    get_dq_spts = gdqs;
 
     iartbnd = 1;
   }

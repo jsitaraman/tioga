@@ -19,6 +19,8 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "MeshBlock.h"
 
+#include <omp.h>
+
 #include <algorithm>
 #include <set>
 #include <vector>
@@ -39,6 +41,7 @@ extern "C"
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
 }
 
+using namespace tg_funcs;
 
 // void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
 //     int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
@@ -73,7 +76,7 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
     }
 
     // Loop over all faces of this cutting group
-    facebox[G].resize(nGf[g]);
+    faceBox[G].resize(nGf[g]);
     for (int i = 0; i < nGf[g]; i++)
     {
       // Initialize this face's bounding box
@@ -87,7 +90,7 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
       int ff = cutFaces[g][i];
       for (int n = 0; n < nfv[0]; n++)
       {
-        int iv = f2v[ff*nfv[0] + n];
+        int iv = fconn[0][ff*nfv[0] + n];
         for (int d = 0; d < nDims; d++)
         {
           cutBox[6*G+d]   = std::min(cutBox[6*G+d], x[3*iv+d]);
@@ -102,9 +105,6 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
 
 void MeshBlock::getCutGroupFaces(std::vector<std::vector<double>> &faceNodes, int nGroups_glob)
 {
-  cutBox.resize(6*nGroups_glob);
-  faceBox.resize(nGroups_glob);
-
   int nvert = nfv[0];
 
   // Generate bounding boxes for each cutting group and face
@@ -120,7 +120,7 @@ void MeshBlock::getCutGroupFaces(std::vector<std::vector<double>> &faceNodes, in
       int ff = cutFaces[g][i];
       for (int n = 0; n < nvert; n++)
       {
-        int iv = f2v[ff*nvert + n];
+        int iv = fconn[0][ff*nvert + n];
         for (int d = 0; d < nDims; d++)
           faceNodes[G][3*(nvert*i+n)+d] = x[3*iv+d];
       }
@@ -144,7 +144,7 @@ void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList
 
 void MeshBlock::directCut(std::vector<double> &faceBox, int nCutFaces, std::vector<int> &cutFlag)
 {
-  cutFlag.assign(nCells,0);
+  cutFlag.assign(ncells,0);
 
   std::unordered_set<int> cellList;
   for (int ff = 0; ff < nCutFaces; ff++)
@@ -158,10 +158,10 @@ void MeshBlock::directCut(std::vector<double> &faceBox, int nCutFaces, std::vect
     for (auto &ic : cellList)
     {
       //getRefLocNewton() // Galbratih says to use Nelder-Mead though...
-      if (intersectionCheck())
+      /*if (intersectionCheck())
       {
         cutFlag[ic] = 1;
-      }
+      }*/
     }
   }
 }
@@ -952,6 +952,7 @@ void MeshBlock::getInterpolatedGradientAtPoints(int &nints, int &nreals,
   int icount = 0;
   int dcount = 0;
 
+  MPI_Pcontrol(1,"get_interp_grad");
   for (int i = 0; i < ninterp2; i++)
   {
     qq.assign(3*nvar,0);
@@ -974,6 +975,7 @@ void MeshBlock::getInterpolatedGradientAtPoints(int &nints, int &nreals,
       for (int k = 0; k < nvar; k++)
         realData[dcount++] = qq[dim*nvar+k];
   }
+  MPI_Pcontrol(-1,"get_interp_grad");
 }
 
 void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
@@ -986,25 +988,64 @@ void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
   intData.resize(2*nints);
   realData.resize(nreals);
 
-  std::vector<double> qq(nvar,0);
-  int icount = 0;
-  int dcount = 0;
+  int estride, sstride, vstride;
+  double *q_spts = get_q_spts(estride, sstride, vstride);
 
+  MPI_Pcontrol(1,"get_interpolated_U");
+#pragma omp parallel for
   for (int i = 0; i < ninterp2; i++)
   {
-    qq.assign(nvar,0);
-    int ic = interpList2[i].donorID;
+    for (int k = 0; k < nvar; k++)
+      realData[nvar*i+k] = 0.;
+
+    double* eptr = q_spts + interpList2[i].donorID*estride;
     for (int spt = 0; spt < interpList2[i].nweights; spt++)
     {
       double weight = interpList2[i].weights[spt];
       for (int k = 0; k < nvar; k++)
-        qq[k] += weight * get_q_spt(ic,spt,k);
+      {
+        realData[nvar*i+k] += weight * eptr[spt*sstride + k*vstride];
+      }
     }
-    intData[icount++] = interpList2[i].receptorInfo[0];
-    intData[icount++] = interpList2[i].receptorInfo[1];
-    for (int k = 0; k < nvar; k++)
-      realData[dcount++] = qq[k];
+    intData[2*i] = interpList2[i].receptorInfo[0];
+    intData[2*i+1] = interpList2[i].receptorInfo[1];
   }
+  MPI_Pcontrol(-1,"get_interpolated_U");
+}
+
+void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
+                std::vector<int> &intData, std::vector<double> &realData, int nvar)
+{
+  nints = ninterp2;
+  nreals = ninterp2*nvar*nDims;
+  if (nints == 0) return;
+
+  intData.resize(2*nints);
+  realData.resize(nreals);
+
+  int estride, sstride, vstride, dstride;
+  double *dq_spts = get_dq_spts(estride, sstride, vstride, dstride);
+
+  MPI_Pcontrol(1, "get_interpolated_grad");
+#pragma omp parallel for
+  for (int i = 0; i < ninterp2; i++)
+  {
+    for (int dim = 0; dim < nDims; dim++)
+      for (int k = 0; k < nvar; k++)
+        realData[nvar*(nDims*i+dim)+k] = 0;
+
+    double *eptr = dq_spts + interpList2[i].donorID*estride;
+    for (int spt = 0; spt < interpList2[i].nweights; spt++)
+    {
+      double weight = interpList2[i].weights[spt];
+      for (int dim = 0; dim < nDims; dim++)
+        for (int k = 0; k < nvar; k++)
+          realData[nvar*(nDims*i+dim)+k] += weight * eptr[spt*sstride + k*vstride + dim*dstride];
+    }
+    intData[2*i] = interpList2[i].receptorInfo[0];
+    intData[2*i+1] = interpList2[i].receptorInfo[1];
+  }
+  MPI_Pcontrol(-1, "get_interpolated_grad");
 }
 	
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
@@ -1057,64 +1098,68 @@ void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
+  MPI_Pcontrol(1, "tioga_update_U_fpts");
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
-  int fpt_start = 0;
+//  int fpt_start = 0;
+#pragma omp parallel for
   for(int i = 0; i < nreceptorFaces; i++)
   {
     if (iblank_face[ftag[i]-BASE] == FRINGE)
     {
+      int fpt_start = pointsPerFace[0]*nvar*i;
       for (int j = 0; j < pointsPerFace[i]; j++)
         for (int n = 0; n < nvar; n++)
           get_q_fpt(ftag[i], j, n) = qtmp[fpt_start+j*nvar+n];
-
-      if (rank == 0)
-      {
-        for (int j = 0; j < pointsPerFace[i]; j++) /// DEBUGGING
-        {
-          if (abs(qtmp[fpt_start+j*nvar+1] - .28) > .001)
-            printf("Tioga: face %d, pt %d, rho %f\n",ftag[i],j,qtmp[fpt_start+j*nvar+0]);
-        }
-      }
     }
-    fpt_start += (pointsPerFace[i]*nvar);
+//    fpt_start += (pointsPerFace[i]*nvar);
   }
+  MPI_Pcontrol(-1, "tioga_update_U_fpts");
 }
 
 void MeshBlock::updateFluxPointGradient(double *dqtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
-  int fpt_start = 0;
-  for(int i = 0; i < nreceptorFaces; i++)
+  MPI_Pcontrol(1, "tioga_update_grad_fpts");
+//  int fpt_start = 0;
+#pragma omp parallel for
+  for (int i = 0; i < nreceptorFaces; i++)
   {
-    if (iblank_face[ftag[i]-BASE] == -1)
+    if (iblank_face[ftag[i]-BASE] == FRINGE)
     {
+      int fpt_start = pointsPerFace[0]*nvar*nDims*i;
       for (int j = 0; j < pointsPerFace[i]; j++)
         for (int dim = 0; dim < 3; dim++)
           for (int n = 0; n < nvar; n++)
             get_grad_fpt(ftag[i], j, dim, n) = dqtmp[fpt_start+nvar*(j*3+dim)+n];
     }
-    fpt_start += (pointsPerFace[i]*nvar*3);
+//    fpt_start += (pointsPerFace[i]*nvar*3);
   }
+  MPI_Pcontrol(-1, "tioga_update_grad_fpts");
 }
 
 void MeshBlock::getDonorDataGPU(int dataFlag)
 {
-  // Get a sorted list of all donor cells on this rank
-  std::set<int> donors;
-  for (int i = 0; i < ninterp2; i++)
-    donors.insert(interpList2[i].donorID);
+  MPI_Pcontrol(1, "getDonorDataGPU");
 
-  std::vector<int> donorIDs;
-  donorIDs.reserve(donors.size());
-  for (auto &ic:donors) donorIDs.push_back(ic);
+  // Get a sorted list of all donor cells on this rank
+  std::vector<int> donorIDs(ninterp2);
+  for (int i = 0; i < ninterp2; i++)
+    donorIDs[i] = interpList2[i].donorID;
+
+  std::sort(donorIDs.begin(), donorIDs.end());
+  donorIDs.erase(std::unique(donorIDs.begin(),donorIDs.end()), donorIDs.end());
 
   data_from_device(donorIDs.data(), donorIDs.size(), dataFlag);
+
+  MPI_Pcontrol(-1, "getDonorDataGPU");
 }
 
 void MeshBlock::sendFringeDataGPU(int gradFlag)
 {
+  MPI_Pcontrol(1, "sendFringeDataGPU");
   data_to_device(ftag, nreceptorFaces, gradFlag);
+  MPI_Pcontrol(-1, "sendFringeDataGPU");
 }

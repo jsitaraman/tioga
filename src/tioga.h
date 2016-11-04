@@ -123,6 +123,12 @@ class tioga
   std::vector<int> intData;
   std::vector<double> dblData;
 
+  /* ---- GPU-Related Variables ---- */
+#ifdef _GPU
+  int ninterp_d = 0;
+  double *interpU_d = NULL;
+#endif
+
  public:
   int ihigh;        /// High-Order flag for current rank
   int iartbnd;      /// Artificial-boundary flag for current rank
@@ -267,9 +273,11 @@ class tioga
   }
 
   void set_ab_callback_gpu(void (*d2h)(int* ids, int nd, int grad),
-                            void (*h2d)(int* ids, int nf, int grad))
+                           void (*h2d)(int* ids, int nf, int grad),
+                           double* (*gqd)(int&, int&, int&),
+                           double* (*gdqd)(int&, int&, int&, int&))
   {
-    mb->setCallbackArtBndGpu(d2h,h2d);
+    mb->setCallbackArtBndGpu(d2h,h2d,gqd,gdqd);
     gpu = true;
   }
   

@@ -131,6 +131,10 @@ class MeshBlock
   double* (*get_q_spts)(int& ele_stride, int& spt_stride, int& var_stride);
   double* (*get_dq_spts)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
 
+  // GPU-related functions
+  double* (*get_q_spts_d)(int& ele_stride, int& spt_stride, int& var_stride);
+  double* (*get_dq_spts_d)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
+
   /*! Copy solution/gradient data for the donor elements from device to host */
   void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
 
@@ -189,6 +193,13 @@ class MeshBlock
   int nreceptorCellsCart;
   int *ctag_cart;
   int *pickedCart;
+
+  /* ---- GPU-Related Variables ---- */
+#ifdef _GPU
+  double *weights_d = NULL;
+  int *donors_d = NULL;
+#endif
+
  	
  public :
   int ntotalPointsCart;
@@ -424,10 +435,14 @@ class MeshBlock
   }
 
   void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd, int grad),
-                            void (*h2d)(int* ids, int nf, int grad))
+                            void (*h2d)(int* ids, int nf, int grad),
+                            double* (*gqd)(int&, int&, int&),
+                            double* (*gdqd)(int&, int&, int&, int&))
   {
     data_from_device = d2h;
     data_to_device = h2d;
+    get_q_spts_d = gqd;
+    get_dq_spts_d = gdqd;
     gpu = true;
   }
 

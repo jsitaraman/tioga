@@ -90,7 +90,9 @@ void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                             double* (*gdqs)(int&, int&, int&, int&));
 
 void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
-                                void (*h2d)(int* ids, int nf, int grad));
+                                void (*h2d)(int* ids, int nf, int grad),
+                                double* (*gqd)(int& es, int& ss, int& vs),
+                                double* (*gdqd)(int& es, int& ss, int& vs, int& ds));
 
 void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 

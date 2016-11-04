@@ -1,3 +1,9 @@
+OPENMP=YES
+CUDA=YES
+DEBUG_LEVEL=1
+WARNINGS=OFF
+CU_SM=35
+
 MPI4PY_INC_DIR = /home/jcrabill/local/include/python3.5m
 PYTHON_INC_DIR = /home/jcrabill/Workspace/pyfr-venv/lib/python3.5/site-packages/mpi4py/include
 SWIG_BIN = /home/jcrabill/local/bin/
@@ -6,13 +12,59 @@ MODULENAME=tioga
 F90= mpif90
 #CC = mpicc
 CXX= mpicxx
+CUC= nvcc
 AR = ar -rvs
 SWIG = $(SWIG_BIN)/swig -c++ -python
-#CFLAGS = -std=c++11 -Ofast -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
-CFLAGS = -std=c++11 -g -O3 -fPIC -rdynamic -Wno-literal-suffix #-Wall -Wextra#-fpe0
-CFLAGS += -fopenmp
+
+CFLAGS = -std=c++11 -g -O3 -fPIC -rdynamic 
+CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
 SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/
+
+# Intel compiler flags: 
+# Floating-point exception; underflow gives 0.0: -fpe0
+
+ifeq ($(strip $(CUDA)),YES)
+	CFLAGS += -D_GPU
+	CUFLAGS += -D_GPU
+	LIBS += -L$(strip $(CUDA_DIR))/lib64 -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_DIR))/lib64
+	INCS += -I$(strip $(CUDA_DIR))/include
+ifeq ($(strip $(CU_SM)),)
+	CUFLAGS += -arch=sm_20
+else
+	CUFLAGS += -arch=sm_$(CU_SM)
+endif
+endif
+
+ifeq ($(strip $(DEBUG_LEVEL)),0)
+	CFLAGS += -Ofast
+	CUFLAGS += -O3 -use_fast_math
+endif
+ifeq ($(strip $(DEBUG_LEVEL)),1)
+	CFLAGS += -g -O3 -D_NVTX
+	CUFLAGS += -g -O3 -D_NVTX
+endif
+ifeq ($(strip $(DEBUG_LEVEL)),2)
+	CFLAGS += -g -O0 -D_NVTX
+	CUFLAGS += -g -O0 -D_NVTX
+endif
+
+WARN_ON = -Wall -Wextra -Wconversion
+WARN_OFF = -Wno-narrowing -Wno-unused-result -Wno-narrowing -Wno-literal-suffix
+
+ifeq ($(strip $(WARNINGS)),ON)
+	CFLAGS += $(WARN_ON)
+endif
+ifeq ($(strip $(WARNINGS)),OFF)
+	CFLAGS += $(WARN_OFF)
+	CUFLAGS += -Xcompiler=-Wno-narrowing,-Wno-unused-result,-Wno-narrowing,-Wno-literal-suffix -Xcudafe "--diag_suppress=subscript_out_of_range"
+endif
+
+ifeq ($(strip $(OPENMP)),YES)
+	CFLAGS += -fopenmp
+	CUFLAGS += -Xcompiler=-fopenmp
+endif
+
 INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h error.hpp points.hpp funcs.hpp
 OBJF90 = kaiser.o median.o 
 OBJECTS = buildADTrecursion.o searchADTrecursion.o ADT.o\
@@ -25,16 +77,20 @@ OBJECTS = buildADTrecursion.o searchADTrecursion.o ADT.o\
 	tiogaInterface.o
 OBJSWIG = tioga_wrap.o
 
+ifeq ($(strip $(CUDA)),YES)
+	OBJECTS += highOrder_kernels.o
+endif
+
 LDFLAGS= -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
 
 lib:	$(OBJECTS) $(OBJF90) $(INCLUDES)
 	$(AR) lib$(MODULENAME).a $(OBJECTS) $(OBJF90)
 
 shared:	$(OBJECTS) $(OBJF90) $(INCLUDES)
-	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o lib$(MODULENAME).so -lc
+	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o lib$(MODULENAME).so -lc $(LIBS)
 
 swig: $(OBJECTS) $(OBJF90) $(OBJSWIG)
-	$(CXX) $(CFLAGS) $(SFLAGS) $(OBJECTS) $(OBJF90) $(OBJSWIG) -shared -fPIC -o _tioga.so -lc
+	$(CXX) $(CFLAGS) $(SFLAGS) $(OBJECTS) $(OBJF90) $(OBJSWIG) -shared -fPIC -o _tioga.so -lc $(LIBS)
 
 default: $(OBJECTS) $(OBJF90) $(INCLUDES)
 	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) $(LDFLAGS) -lm -o $(MODULENAME).exe
@@ -48,7 +104,7 @@ tioga_wrap.o: tioga.i tiogaInterface.h
 	$(CXX) -fPIC $(SFLAGS) tioga_wrap.cpp -c -o tioga_wrap.o
 
 %.o:%.cu
-	$(CUC)  $(CFLAGS) -c $< -o $*.o
+	$(CUC) $(CUFLAGS) $(FLAGS) -c $< -o $*.o
 %.o:%.cpp
 	$(CXX) $(CFLAGS) -c $< -o $*.o
 %.o:%.C

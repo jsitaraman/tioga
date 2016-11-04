@@ -25,6 +25,11 @@
 #include <set>
 #include <vector>
 
+#ifdef _GPU
+#include "cuda_runtime.h"
+#include "highOrder_kernels.h"
+#endif
+
 #define ROW 0
 #define COLUMN 1
 #define NFRAC 1331
@@ -832,6 +837,26 @@ void MeshBlock::processPointDonors(void)
     }
   }
   free(frac);
+
+#ifdef _GPU
+/*  if (ninterp2 > 0)
+  {
+    int nSpts = interpList2[0].nweights;
+    cudaMalloc(&weights_d, ninterp2*nSpts);
+    cudaMalloc(&donors_d, ninterp2);
+    std::vector<double> tmp_weights(ninterp2*nSpts);
+    for (int i = 0; i < ninterp2; i++)
+      for (int j = 0; j < nSpts; j++)
+        tmp_weights[nSpts*i+j] = interpList2[i].weights[j];
+
+    std::vector<int> tmp_donors(ninterp2);
+    for (int i = 0; i < ninterp2; i++)
+      tmp_donors[i] = interpList2[i].donorID;
+
+    cudaMemcpy(weights_d,tmp_weights.data(),ninterp2*nSpts,cudaMemcpyHostToDevice);
+    cudaMemcpy(donors_d,tmp_donors.data(),ninterp2,cudaMemcpyHostToDevice);
+  }*/
+#endif
 }
 
 void MeshBlock::getInterpolatedSolutionAtPoints(int *nints, int *nreals,
@@ -991,6 +1016,7 @@ void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
   int estride, sstride, vstride;
   double *q_spts = get_q_spts(estride, sstride, vstride);
 
+  PUSH_NVTX_RANGE("getInterpU", 4);
   MPI_Pcontrol(1,"get_interpolated_U");
 #pragma omp parallel for
   for (int i = 0; i < ninterp2; i++)
@@ -1011,6 +1037,7 @@ void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
     intData[2*i+1] = interpList2[i].receptorInfo[1];
   }
   MPI_Pcontrol(-1,"get_interpolated_U");
+  POP_NVTX_RANGE;
 }
 
 void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
@@ -1026,6 +1053,7 @@ void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
   int estride, sstride, vstride, dstride;
   double *dq_spts = get_dq_spts(estride, sstride, vstride, dstride);
 
+  PUSH_NVTX_RANGE("getInterpGrad", 5);
   MPI_Pcontrol(1, "get_interpolated_grad");
 #pragma omp parallel for
   for (int i = 0; i < ninterp2; i++)
@@ -1046,6 +1074,7 @@ void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
     intData[2*i+1] = interpList2[i].receptorInfo[1];
   }
   MPI_Pcontrol(-1, "get_interpolated_grad");
+  POP_NVTX_RANGE;
 }
 	
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
@@ -1098,6 +1127,7 @@ void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
+  PUSH_NVTX_RANGE("tg_update_fringeU", 2);
   MPI_Pcontrol(1, "tioga_update_U_fpts");
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
@@ -1116,12 +1146,14 @@ void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
 //    fpt_start += (pointsPerFace[i]*nvar);
   }
   MPI_Pcontrol(-1, "tioga_update_U_fpts");
+  POP_NVTX_RANGE;
 }
 
 void MeshBlock::updateFluxPointGradient(double *dqtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
+  PUSH_NVTX_RANGE("tg_update_fringeGrad", 2);
   MPI_Pcontrol(1, "tioga_update_grad_fpts");
 //  int fpt_start = 0;
 #pragma omp parallel for
@@ -1138,6 +1170,7 @@ void MeshBlock::updateFluxPointGradient(double *dqtmp, int nvar)
 //    fpt_start += (pointsPerFace[i]*nvar*3);
   }
   MPI_Pcontrol(-1, "tioga_update_grad_fpts");
+  POP_NVTX_RANGE;
 }
 
 void MeshBlock::getDonorDataGPU(int dataFlag)

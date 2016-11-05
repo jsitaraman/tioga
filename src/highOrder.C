@@ -26,7 +26,7 @@
 #include <vector>
 
 #ifdef _GPU
-#include "cuda_runtime.h"
+#include "cuda_funcs.h"
 #include "highOrder_kernels.h"
 #endif
 
@@ -839,11 +839,13 @@ void MeshBlock::processPointDonors(void)
   free(frac);
 
 #ifdef _GPU
-/*  if (ninterp2 > 0)
+  if (ninterp2 > 0)
   {
-    int nSpts = interpList2[0].nweights;
-    cudaMalloc(&weights_d, ninterp2*nSpts);
-    cudaMalloc(&donors_d, ninterp2);
+    nSpts = interpList2[0].nweights;
+
+    cuda_malloc(weights_d, ninterp2*nSpts);
+    cuda_malloc(donors_d, ninterp2);
+
     std::vector<double> tmp_weights(ninterp2*nSpts);
     for (int i = 0; i < ninterp2; i++)
       for (int j = 0; j < nSpts; j++)
@@ -853,9 +855,9 @@ void MeshBlock::processPointDonors(void)
     for (int i = 0; i < ninterp2; i++)
       tmp_donors[i] = interpList2[i].donorID;
 
-    cudaMemcpy(weights_d,tmp_weights.data(),ninterp2*nSpts,cudaMemcpyHostToDevice);
-    cudaMemcpy(donors_d,tmp_donors.data(),ninterp2,cudaMemcpyHostToDevice);
-  }*/
+    cuda_copy_h2d(weights_d, tmp_weights.data(), tmp_weights.size());
+    cuda_copy_h2d(donors_d, tmp_donors.data(), tmp_donors.size());
+  }
 #endif
 }
 
@@ -1005,7 +1007,7 @@ void MeshBlock::getInterpolatedGradientAtPoints(int &nints, int &nreals,
 
 void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
                 std::vector<int> &intData, std::vector<double> &realData, int nvar)
-{
+{  
   nints = ninterp2;
   nreals = ninterp2*nvar;
   if (nints == 0) return;
@@ -1076,7 +1078,27 @@ void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
   MPI_Pcontrol(-1, "get_interpolated_grad");
   POP_NVTX_RANGE;
 }
-	
+
+void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
+{
+  int estride, sstride, vstride;
+  double *q_d = get_q_spts_d(estride, sstride, vstride);
+
+  // Perform the interpolation
+  interp_u_wrapper(q_d, q_out_d, donors_d, weights_d, ninterp2, nSpts, nvar,
+                   estride, sstride, vstride);
+}
+
+void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
+{
+  int estride, sstride, vstride, dstride;
+  double *dq_d = get_dq_spts_d(estride, sstride, vstride, dstride);
+
+  // Perform the interpolation
+  interp_du_wrapper(dq_d, dq_out_d, donors_d, weights_d, ninterp2, nSpts, nvar,
+                    nDims, estride, sstride, vstride, dstride);
+}
+
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
 {
   int i,j,k,n,m;

@@ -25,7 +25,7 @@
 #include <sstream>
 
 #ifdef _GPU
-#include "cuda_runtime.h"
+#include "cuda_funcs.h"
 #endif
 
 extern "C"{
@@ -692,17 +692,28 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
   if (mb->ninterp2 > ninterp_d)
   {
     if (ninterp_d > 0)
-      cudaFree(interpU_d);
+      cuda_free(ubuf_d);
 
+    resizeFlag = 1;
     ninterp_d = mb->ninterp2;
-    cudaMalloc(&interpU_d, ninterp_d*nvar);
+    cuda_malloc(ubuf_d, ninterp_d*nvar);
+  }
+  else if (dataFlag && resizeFlag)
+  {
+    if (gradbuf_d)
+      cuda_free(gradbuf_d);
+
+    cuda_malloc(gradbuf_d, ninterp_d*nvar*3);
+    resizeFlag = 0;
   }
 #endif
 
+#ifndef _GPU
   PUSH_NVTX_RANGE("getDonorDataGPU", 1);
   if (iartbnd && gpu)
     mb->getDonorDataGPU(dataFlag);
   POP_NVTX_RANGE;
+#endif
 
   PUSH_NVTX_RANGE("tg_dataUpdate_setup",3);
   // initialize send and recv packets
@@ -726,18 +737,43 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 
   int nints, nreals;
   interpTime.startTimer();
+
+#ifdef _GPU
+  /// TODO: make everything asyc but sync here to wait on corrected gradient
+  nints = ninterp_d;
+  nreals = stride*ninterp_d;
+  if (dataFlag == 0)
+    mb->interpSolution_gpu(ubuf_d, nvar);
+  else
+    mb->interpGradient_gpu(gradbuf_d, nvar);
+
+  dblData.resize(ninterp_d*stride);
+
+  if (dataFlag == 0)
+    cuda_copy_d2h(ubuf_d, dblData.data(), ninterp_d*stride);
+  else
+    cuda_copy_d2h(gradbuf_d, dblData.data(), ninterp_d*stride);
+
+  check_error();
+#endif
+
+#ifndef _GPU
   if (dataFlag == 0)
     mb->getInterpolatedSolutionArtBnd(nints,nreals,intData,dblData,nvar);
 
   else
     mb->getInterpolatedGradientArtBnd(nints,nreals,intData,dblData,nvar);
+#endif
+
   interpTime.stopTimer();
+
+  /// TODO: *** Split function here (like 'send_u_data', 'recv_u_data') ***
 
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
   // Populate the packets [organize interp data by rank to send to]
   for (int i = 0; i < nints; i++)
   {
-    int k = intData[2*i];
+    int k = mb->interpList2[i].receptorInfo[0];
     sndVPack[k].nints++;
     sndVPack[k].nreals += stride;
   }
@@ -751,8 +787,8 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 
   for (int i = 0; i < nints; i++)
   {
-    int k = intData[2*i];
-    sndVPack[k].intData[icount[k]++] = intData[2*i+1];
+    int k = mb->interpList2[i].receptorInfo[0];
+    sndVPack[k].intData[icount[k]++] = mb->interpList2[i].receptorInfo[1];
     for (int j = 0; j < stride; j++)
       sndVPack[k].realData[dcount[k]++] = dblData[stride*i+j];
   }
@@ -833,10 +869,12 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
   // release all memory
   pc->clearPacketsV(sndVPack, rcvVPack);
 
-//  PUSH_NVTX_RANGE("sendFringeGPU", 3);
-//  if (iartbnd && gpu)
-//    mb->sendFringeDataGPU(dataFlag);
-//  POP_NVTX_RANGE;
+//#ifndef _GPU
+  PUSH_NVTX_RANGE("sendFringeGPU", 3);
+  if (iartbnd && gpu)
+    mb->sendFringeDataGPU(dataFlag);
+  POP_NVTX_RANGE;
+//#endif
 }
 
 //void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)

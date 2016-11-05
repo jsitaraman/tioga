@@ -125,8 +125,11 @@ class tioga
 
   /* ---- GPU-Related Variables ---- */
 #ifdef _GPU
+  int resizeFlag = 0;
   int ninterp_d = 0;
-  double *interpU_d = NULL;
+  double *ubuf_d = NULL;
+  double *gradbuf_d = NULL;
+  std::vector<double> dbuffer;
 #endif
 
  public:

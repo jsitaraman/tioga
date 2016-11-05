@@ -195,6 +195,7 @@ class MeshBlock
   int *pickedCart;
 
   /* ---- GPU-Related Variables ---- */
+  int nSpts;  // Number of spts per ele on this rank
 #ifdef _GPU
   double *weights_d = NULL;
   int *donors_d = NULL;
@@ -497,4 +498,10 @@ class MeshBlock
 
   /*! Apply blanking algorithm (to nodal iblank?) to get cell & face iblanks */
   void setArtificialBoundaries(void);
+
+  /* ---- GPU-Related Functions ---- */
+#ifdef _GPU
+  void interpSolution_gpu(double* q_out_d, int nvar);
+  void interpGradient_gpu(double* dq_out_d, int nvar);
+#endif
 };

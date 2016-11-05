@@ -8,6 +8,7 @@
 
 /* Nice NVTX macro from Parallel Forall blog */
 #if defined(_NVTX) && defined(_GPU)
+#include "cuda_runtime.h"
 #include "nvToolsExt.h"
 
 const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
@@ -29,6 +30,20 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #else
 #define PUSH_NVTX_RANGE(name,cid)
 #define POP_NVTX_RANGE
+#endif
+
+#ifdef _GPU
+#define check_error() \
+{ \
+  cudaError_t err = cudaGetLastError(); \
+  if (err != cudaSuccess) \
+  { \
+    std::cout << __FILE__ << ":" << __LINE__ << ":" << __func__ << ": " << std::endl; \
+    FatalError(cudaGetErrorString(err)); \
+  } \
+}
+#else
+#define check_error()
 #endif
 
 //! Prints the error message, the source file and line number, and exits

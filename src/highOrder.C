@@ -837,29 +837,65 @@ void MeshBlock::processPointDonors(void)
     }
   }
   free(frac);
+}
 
 #ifdef _GPU
+void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<VPACKET> &sndPack)
+{
   if (ninterp2 > 0)
   {
     nSpts = interpList2[0].nweights;
 
     cuda_malloc(weights_d, ninterp2*nSpts);
-    cuda_malloc(donors_d, ninterp2);
+    cuda_malloc(donors_d, ninterp2*3);
+    cuda_malloc(buf_inds_d, ninterp2);
 
     std::vector<double> tmp_weights(ninterp2*nSpts);
-    for (int i = 0; i < ninterp2; i++)
-      for (int j = 0; j < nSpts; j++)
-        tmp_weights[nSpts*i+j] = interpList2[i].weights[j];
-
     std::vector<int> tmp_donors(ninterp2);
     for (int i = 0; i < ninterp2; i++)
+    {
       tmp_donors[i] = interpList2[i].donorID;
+      for (int j = 0; j < nSpts; j++)
+        tmp_weights[nSpts*i+j] = interpList2[i].weights[j];
+    }
+
+    std::vector<int> n_ints(nsend);
+    intData.resize(ninterp2*2);
+    for (int i = 0; i < ninterp2; i++)
+    {
+      int p = interpList2[i].receptorInfo[0];
+      intData[2*i] = p;
+      intData[2*i+1] = n_ints[p];
+      n_ints[p]++;
+    }
+
+    sndPack.resize(nsend);
+    for (int p = 0; p < nsend; p++)
+    {
+      sndPack[p].nints = n_ints[p];
+      sndPack[p].intData.resize(n_ints[p]);
+    }
+
+    buf_disp.assign(nsend, 0);
+    for (int p = 1; p < nsend; p++)
+      buf_disp[p] = buf_disp[p-1] + n_ints[p-1];
+
+    // Store final position within MPI buffer to place data
+    buf_inds.resize(ninterp2);
+    for (int i = 0; i < ninterp2; i++)
+    {
+      int p = intData[2*i];
+      int ind = intData[2*i+1];
+      buf_inds[i] = buf_disp[p] + ind;
+      sndPack[p].intData[ind] = interpList2[i].receptorInfo[1];
+    }
 
     cuda_copy_h2d(weights_d, tmp_weights.data(), tmp_weights.size());
     cuda_copy_h2d(donors_d, tmp_donors.data(), tmp_donors.size());
+    cuda_copy_h2d(buf_inds_d, buf_inds.data(), buf_inds.size());
   }
-#endif
 }
+#endif
 
 void MeshBlock::getInterpolatedSolutionAtPoints(int *nints, int *nreals,
                 int **intData, double **realData, double *q, int nvar,
@@ -1085,8 +1121,8 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
   double *q_d = get_q_spts_d(estride, sstride, vstride);
 
   // Perform the interpolation
-  interp_u_wrapper(q_d, q_out_d, donors_d, weights_d, ninterp2, nSpts, nvar,
-                   estride, sstride, vstride);
+  interp_u_wrapper(q_d, q_out_d, donors_d, weights_d, buf_inds_d, ninterp2,
+      nSpts, nvar, estride, sstride, vstride);
 }
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
@@ -1095,8 +1131,8 @@ void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
   double *dq_d = get_dq_spts_d(estride, sstride, vstride, dstride);
 
   // Perform the interpolation
-  interp_du_wrapper(dq_d, dq_out_d, donors_d, weights_d, ninterp2, nSpts, nvar,
-                    nDims, estride, sstride, vstride, dstride);
+  interp_du_wrapper(dq_d, dq_out_d, donors_d, weights_d, buf_inds_d, ninterp2,
+      nSpts, nvar, nDims, estride, sstride, vstride, dstride);
 }
 
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
@@ -1149,6 +1185,9 @@ void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
+#ifdef _GPU
+  data_to_device(ftag, nreceptorFaces, 0, qtmp);
+#else
   PUSH_NVTX_RANGE("tg_update_fringeU", 2);
   MPI_Pcontrol(1, "tioga_update_U_fpts");
   int rank;
@@ -1168,6 +1207,7 @@ void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
 //    fpt_start += (pointsPerFace[i]*nvar);
   }
   MPI_Pcontrol(-1, "tioga_update_U_fpts");
+#endif
   POP_NVTX_RANGE;
 }
 
@@ -1176,6 +1216,9 @@ void MeshBlock::updateFluxPointGradient(double *dqtmp, int nvar)
   if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
 
   PUSH_NVTX_RANGE("tg_update_fringeGrad", 2);
+#ifdef _GPU
+  data_to_device(ftag, nreceptorFaces, 1, dqtmp);
+#else
   MPI_Pcontrol(1, "tioga_update_grad_fpts");
 //  int fpt_start = 0;
 #pragma omp parallel for
@@ -1192,6 +1235,7 @@ void MeshBlock::updateFluxPointGradient(double *dqtmp, int nvar)
 //    fpt_start += (pointsPerFace[i]*nvar*3);
   }
   MPI_Pcontrol(-1, "tioga_update_grad_fpts");
+#endif
   POP_NVTX_RANGE;
 }
 
@@ -1215,6 +1259,6 @@ void MeshBlock::getDonorDataGPU(int dataFlag)
 void MeshBlock::sendFringeDataGPU(int gradFlag)
 {
   MPI_Pcontrol(1, "sendFringeDataGPU");
-  data_to_device(ftag, nreceptorFaces, gradFlag);
+  data_to_device(ftag, nreceptorFaces, gradFlag, NULL);
   MPI_Pcontrol(-1, "sendFringeDataGPU");
 }

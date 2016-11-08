@@ -116,6 +116,11 @@ void tioga::exchangeBoxes(void)
 
   pc->setMap(nsend,nrecv,sndMap,rcvMap);  
 
+#ifdef _GPU
+  /// TODO: come up with better solution...
+  mb->setCommMap(nsend,nrecv,sndMap,rcvMap);
+#endif
+
   // free local memory
   free(alltags);
   free(sndMap);

@@ -321,20 +321,18 @@ void parallelComm::sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack)
   free(status);
 }
 
-void parallelComm::setMap(int ns,int nr, int *snd,int *rcv)
+void parallelComm::setMap(int ns, int nr, int *snd, int *rcv)
 {
-  int i;
-  //
-  if (sndMap) free(sndMap); sndMap=NULL;
-  if (rcvMap) free(rcvMap); rcvMap=NULL;
-  //
-  nsend=ns;
-  nrecv=nr;
-  sndMap=(int *) malloc(sizeof(int)*nsend);
-  rcvMap=(int *) malloc(sizeof(int)*nrecv);
-  //
-  for(i=0;i<nsend;i++) sndMap[i]=snd[i];
-  for(i=0;i<nrecv;i++) rcvMap[i]=rcv[i];
+  free(sndMap); sndMap=NULL;
+  free(rcvMap); rcvMap=NULL;
+
+  nsend = ns;
+  nrecv = nr;
+  sndMap = (int *) malloc(sizeof(int)*nsend);
+  rcvMap = (int *) malloc(sizeof(int)*nrecv);
+
+  for (int i = 0; i < nsend; i++) sndMap[i] = snd[i];
+  for (int i = 0; i < nrecv; i++) rcvMap[i] = rcv[i];
 }
 
 void parallelComm::getMap(int *ns, int *nr, int **snd,int **rcv)

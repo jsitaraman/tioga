@@ -108,7 +108,7 @@ void tioga::performConnectivity(void)
 {
 //  // Generate structured map of solid boundary (hole) locations
 //  getHoleMap();
-
+printf("In performConnectivity()");
   // Send/Recv the hole maps to/from all necessary ranks
   exchangeBoxes();
 
@@ -149,8 +149,30 @@ void tioga::performConnectivity(void)
 
     // Setup interpolation weights and such for final interp-point list
     mb->processPointDonors();
+
+#ifdef _GPU
+    setupCommBuffersGPU();
+#endif
   }
 }
+
+#ifdef _GPU
+void tioga::setupCommBuffersGPU(void)
+{
+  // Setup additional index arrars for GPU to automatically pack MPI buffers
+  int nsend, nrecv, *sndMap, *rcvMap;
+  pc->getMap(&nsend, &nrecv, &sndMap, &rcvMap);
+
+  sndVPack.resize(nsend);
+  rcvVPack.resize(nrecv);
+
+  pc->initPacketsV(sndVPack,rcvVPack);
+
+  mb->setupBuffersGPU(nsend, intData, sndVPack);
+
+  ninterp = mb->ninterp2;
+}
+#endif
 
 void tioga::performConnectivityHighOrder(void)
 {
@@ -686,6 +708,25 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
 
 void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 {
+#ifndef _GPU
+  PUSH_NVTX_RANGE("getDonorDataGPU", 1);
+  if (iartbnd && gpu)
+    mb->getDonorDataGPU(dataFlag);
+  POP_NVTX_RANGE;
+#endif
+
+  // initialize send and recv packets
+  int nsend,nrecv;
+  int *sndMap,*rcvMap;
+
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+
+  if (nsend+nrecv == 0) return;
+
+  // get the interpolated solution now
+  int stride = nvar;
+  if (iartbnd && dataFlag == 1) stride = 3*nvar;
+
   /// TODO: consider placement of this
 #ifdef _GPU
   // Allocate space for the interpolated fringe-point data if needed
@@ -696,44 +737,17 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 
     resizeFlag = 1;
     ninterp_d = mb->ninterp2;
-    cuda_malloc(ubuf_d, ninterp_d*nvar);
+    cuda_malloc(ubuf_d, ninterp_d*stride);
   }
   else if (dataFlag && resizeFlag)
   {
     if (gradbuf_d)
       cuda_free(gradbuf_d);
 
-    cuda_malloc(gradbuf_d, ninterp_d*nvar*3);
+    cuda_malloc(gradbuf_d, ninterp_d*stride);
     resizeFlag = 0;
   }
 #endif
-
-#ifndef _GPU
-  PUSH_NVTX_RANGE("getDonorDataGPU", 1);
-  if (iartbnd && gpu)
-    mb->getDonorDataGPU(dataFlag);
-  POP_NVTX_RANGE;
-#endif
-
-  PUSH_NVTX_RANGE("tg_dataUpdate_setup",3);
-  // initialize send and recv packets
-  int nsend,nrecv;
-  int *sndMap,*rcvMap;
-
-  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
-
-  if (nsend+nrecv == 0) return;
-
-  std::vector<int> icount(nsend), dcount(nsend);
-  sndVPack.resize(nsend);
-  rcvVPack.resize(nrecv);
-
-  pc->initPacketsV(sndVPack,rcvVPack);
-
-  // get the interpolated solution now
-  int stride = nvar;
-  if (iartbnd && dataFlag == 1) stride = 3*nvar;
-  POP_NVTX_RANGE;
 
   int nints, nreals;
   interpTime.startTimer();
@@ -746,6 +760,37 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
     mb->interpSolution_gpu(ubuf_d, nvar);
   else
     mb->interpGradient_gpu(gradbuf_d, nvar);
+#endif
+
+  std::vector<int> icount(nsend);
+
+  // Set up buffer indices for easier MPI communication [GPU packs buffer]
+#ifndef _GPU
+  sndVPack.resize(nsend);
+  rcvVPack.resize(nrecv);
+
+  pc->initPacketsV(sndVPack,rcvVPack);
+
+  for (int i = 0; i < mb->ninterp2; i++)
+  {
+    int k = mb->interpList2[i].receptorInfo[0];
+    sndVPack[k].nints++;
+    sndVPack[k].nreals += stride;
+  }
+
+  for (int k = 0; k < nsend; k++)
+  {
+    sndVPack[k].intData.resize(sndVPack[k].nints);
+    sndVPack[k].realData.resize(sndVPack[k].nreals);
+  }
+#endif
+
+#ifdef _GPU
+  for (int k = 0; k < nsend; k++)
+  {
+    sndVPack[k].nreals = sndVPack[k].nints * stride;
+    sndVPack[k].realData.resize(sndVPack[k].nreals);
+  }
 
   dblData.resize(ninterp_d*stride);
 
@@ -771,20 +816,7 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
   // Populate the packets [organize interp data by rank to send to]
-  for (int i = 0; i < nints; i++)
-  {
-    int k = mb->interpList2[i].receptorInfo[0];
-    sndVPack[k].nints++;
-    sndVPack[k].nreals += stride;
-  }
-
-  for (int k = 0; k < nsend; k++)
-  {
-    sndVPack[k].intData.resize(sndVPack[k].nints);
-    sndVPack[k].realData.resize(sndVPack[k].nreals);
-    icount[k] = dcount[k] = 0;
-  }
-
+#ifndef _GPU
   for (int i = 0; i < nints; i++)
   {
     int k = mb->interpList2[i].receptorInfo[0];
@@ -792,6 +824,15 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
     for (int j = 0; j < stride; j++)
       sndVPack[k].realData[dcount[k]++] = dblData[stride*i+j];
   }
+#endif
+
+#ifdef _GPU
+  for (int p = 0; p < nsend; p++)
+  {
+    double *ptr = dblData.data()+mb->buf_disp[p]*stride;
+    sndVPack[p].realData.assign(ptr,ptr+sndVPack[p].nints*stride);
+  }
+#endif
   POP_NVTX_RANGE;
 
   // communicate the data across all partitions
@@ -869,12 +910,12 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
   // release all memory
   pc->clearPacketsV(sndVPack, rcvVPack);
 
-//#ifndef _GPU
+#ifndef _GPU
   PUSH_NVTX_RANGE("sendFringeGPU", 3);
   if (iartbnd && gpu)
     mb->sendFringeDataGPU(dataFlag);
   POP_NVTX_RANGE;
-//#endif
+#endif
 }
 
 //void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)

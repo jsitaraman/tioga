@@ -260,7 +260,7 @@ extern "C" {
   }
 
   void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
-                                  void (*h2d)(int* ids, int nf, int grad),
+                                  void (*h2d)(int* ids, int nf, int grad, double *data),
                                   double* (*gqd)(int&, int&, int&),
                                   double* (*gdqd)(int&, int&, int&, int&))
   {

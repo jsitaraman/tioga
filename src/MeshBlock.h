@@ -74,6 +74,9 @@ class MeshBlock
   int *mpiFidR;   /** < Matching MPI face IDs on opposite rank */
   int *mpiProcR;  /** < Opposite rank for MPI face */
 
+  int nsend, nrecv;
+  std::vector<int> sndMap, rcvMap;
+
   //
   // Alternating digital tree library
   //
@@ -139,7 +142,7 @@ class MeshBlock
   void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
 
   /*! Copy updated solution/gradient for fringe faces from host to device */
-  void (*data_to_device)(int* fringeIDs, int nFringe, int gradFlag);
+  void (*data_to_device)(int* fringeIDs, int nFringe, int gradFlag, double *data);
 
   /*!
    * \brief Determine whether a point (x,y,z) lies within a cell
@@ -193,14 +196,6 @@ class MeshBlock
   int nreceptorCellsCart;
   int *ctag_cart;
   int *pickedCart;
-
-  /* ---- GPU-Related Variables ---- */
-  int nSpts;  // Number of spts per ele on this rank
-#ifdef _GPU
-  double *weights_d = NULL;
-  int *donors_d = NULL;
-#endif
-
  	
  public :
   int ntotalPointsCart;
@@ -243,6 +238,15 @@ class MeshBlock
   std::set<int> myGroups;
   std::vector<int> cutType_glob;
   std::vector<int> nGf; //! Number of faces on each cutting group
+
+  /* ---- GPU-Related Variables ---- */
+  int nSpts;  // Number of spts per ele on this rank
+#ifdef _GPU
+  double *weights_d = NULL;
+  int *donors_d = NULL;
+  int *buf_inds_d = NULL;
+  std::vector<int> buf_inds, buf_disp;
+#endif
 
   /** basic constructor */
   MeshBlock()
@@ -304,7 +308,14 @@ class MeshBlock
                    int* mFaces, int* procR, int* idR);
 
   void setResolutions(double *nres,double *cres);    
-	       
+
+  void setCommMap(int ns, int nr, int *sm, int *rm)
+  {
+    nsend = ns;  nrecv = nr;
+    sndMap.assign(sm, sm+nsend);
+    rcvMap.assign(rm, rm+nrecv);
+  }
+
   void search();
 
   /*! Given a 3D position, find the cell it lies within (-1 if not found) */
@@ -436,7 +447,7 @@ class MeshBlock
   }
 
   void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd, int grad),
-                            void (*h2d)(int* ids, int nf, int grad),
+                            void (*h2d)(int* ids, int nf, int grad, double *data),
                             double* (*gqd)(int&, int&, int&),
                             double* (*gdqd)(int&, int&, int&, int&))
   {
@@ -501,6 +512,7 @@ class MeshBlock
 
   /* ---- GPU-Related Functions ---- */
 #ifdef _GPU
+  void setupBuffersGPU(int nsend, std::vector<int>& intData, std::vector<VPACKET>& sndPack);
   void interpSolution_gpu(double* q_out_d, int nvar);
   void interpGradient_gpu(double* dq_out_d, int nvar);
 #endif

@@ -126,10 +126,13 @@ class tioga
   /* ---- GPU-Related Variables ---- */
 #ifdef _GPU
   int resizeFlag = 0;
+  int ninterp = 0;
   int ninterp_d = 0;
   double *ubuf_d = NULL;
   double *gradbuf_d = NULL;
   std::vector<double> dbuffer;
+  std::vector<int> buf_disp, buf_inds;
+  int *buf_inds_d = NULL;
 #endif
 
  public:
@@ -276,7 +279,7 @@ class tioga
   }
 
   void set_ab_callback_gpu(void (*d2h)(int* ids, int nd, int grad),
-                           void (*h2d)(int* ids, int nf, int grad),
+                           void (*h2d)(int* ids, int nf, int grad, double* data),
                            double* (*gqd)(int&, int&, int&),
                            double* (*gdqd)(int&, int&, int&, int&))
   {
@@ -294,6 +297,10 @@ class tioga
   void register_amr_local_data(int, int ,int *, double *);  
   void exchangeAMRDonors(void);
   void checkComm(void);
+
+#ifdef _GPU
+  void setupCommBuffersGPU(void);
+#endif
 };
       
   

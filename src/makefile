@@ -1,19 +1,24 @@
 OPENMP=YES
 CUDA=YES
-DEBUG_LEVEL=2
+DEBUG_LEVEL=0
 WARNINGS=OFF
-CU_SM=35
+CU_SM=20
 
-MPI4PY_INC_DIR = /home/jcrabill/local/include/python3.5m
-PYTHON_INC_DIR = /home/jcrabill/Workspace/pyfr-venv/lib/python3.5/site-packages/mpi4py/include
-SWIG_BIN = /home/jcrabill/local/bin/
+#MPI4PY_INC_DIR = /home/jcrabill/local/include/python3.5m
+#PYTHON_INC_DIR = /home/jcrabill/Workspace/pyfr-venv/lib/python3.5/site-packages/mpi4py/include
+#SWIG_BIN = /home/jcrabill/local/bin/
+MPI4PY_INC_DIR = /usr/local/lib/python2.7/dist-packages/mpi4py/include
+PYTHON_INC_DIR = /usr/include/python2.7/
+SWIG_BIN = /usr/bin/
+CUDA_DIR = /usr/local/cuda-7.5/
 
 MODULENAME=tioga
 F90= mpif90
 #CC = mpicc
 CXX= mpicxx
-CUC= nvcc
+CUC= /usr/local/cuda-7.5/bin/nvcc
 AR = ar -rvs
+
 SWIG = $(SWIG_BIN)/swig -c++ -python
 
 CFLAGS = -std=c++11 -g -O3 -fPIC -rdynamic 
@@ -96,21 +101,22 @@ default: $(OBJECTS) $(OBJF90) $(INCLUDES)
 	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) $(LDFLAGS) -lm -o $(MODULENAME).exe
 
 clean : 
-	rm -rf *.o lib$(MODULENAME).a lib$(MODULENAME).so
+	rm -rf *.o _$(MODULENAME).so $(MODULENAME).py lib$(MODULENAME).a lib$(MODULENAME).so
 
-tioga_wrap.o: tioga.i tiogaInterface.h
-	@echo `which swig`
-	$(SWIG) $(SFLAGS) -o tioga_wrap.cpp tioga.i
-	$(CXX) -fPIC $(SFLAGS) tioga_wrap.cpp -c -o tioga_wrap.o
+%_wrap.cpp: %.i tiogaInterface.h
+	$(SWIG) $(SFLAGS) -o $@ $<
+
+%_wrap.o: %_wrap.cpp
+	$(CXX) $(CFLAGS) $(SFLAGS) -c -o $@ $< 
 
 %.o:%.cu
-	$(CUC) $(CUFLAGS) $(FLAGS) -c $< -o $*.o
+	$(CUC) $(INCS) $(CUFLAGS) $(FLAGS) -c $< -o $*.o
 %.o:%.cpp
-	$(CXX) $(CFLAGS) -c $< -o $*.o
+	$(CXX) $(INCS) $(CFLAGS) -c $< -o $*.o
 %.o:%.C
-	$(CXX) $(CFLAGS) -c $< -o $*.o
+	$(CXX) $(INCS) $(CFLAGS) -c $< -o $*.o
 %.o:%.c
-	$(CXX) $(CFLAGS) -c $< -o $*.o
+	$(CXX) $(INCS) $(CFLAGS) -c $< -o $*.o
 %.o:%.F90
 	$(F90) $(FFLAGS) -c $< -o $*.o
 %.o:%.f90

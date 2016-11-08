@@ -1,22 +1,17 @@
-OPENMP=YES
-CUDA=YES
-DEBUG_LEVEL=0
-WARNINGS=OFF
-CU_SM=20
-
-#MPI4PY_INC_DIR = /home/jcrabill/local/include/python3.5m
-#PYTHON_INC_DIR = /home/jcrabill/Workspace/pyfr-venv/lib/python3.5/site-packages/mpi4py/include
-#SWIG_BIN = /home/jcrabill/local/bin/
-MPI4PY_INC_DIR = /usr/local/lib/python2.7/dist-packages/mpi4py/include
-PYTHON_INC_DIR = /usr/include/python2.7/
-SWIG_BIN = /usr/bin/
-CUDA_DIR = /usr/local/cuda-7.5/
+ifeq ($(CONFIG),)
+include default.config
+else
+include $(CONFIG)
+endif
 
 MODULENAME=tioga
 F90= mpif90
 #CC = mpicc
 CXX= mpicxx
-CUC= /usr/local/cuda-7.5/bin/nvcc
+ifeq ($(strip $(CUC)),)
+	CUC=nvcc
+endif
+CUC = nvcc
 AR = ar -rvs
 
 SWIG = $(SWIG_BIN)/swig -c++ -python

@@ -92,7 +92,7 @@ void MeshBlock::preprocess(void)
   obb = (OBB *) malloc(sizeof(OBB));
 
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
-printf("before tagBoundary()");
+
   tagBoundary();
 }
 

@@ -40,7 +40,7 @@ void interp_u_wrapper(double *U_spts, double *U_out, int *donors,
 
 template <unsigned int nDims>
 __global__
-void interp_du(double* U_spts, double *U_out, int *donors, double *weights,
+void interp_du(double* dU_spts, double *dU_out, int *donors, double *weights,
     int *out_inds, int nFringe, int nSpts, int nVars, int estride, int sstride,
     int vstride, int dstride)
 {
@@ -56,10 +56,10 @@ void interp_du(double* U_spts, double *U_out, int *donors, double *weights,
   for (int dim = 0; dim < nDims; dim++)
   {
     int ind = nVars * (dim + nDims * out_inds[fpt]) + var;
-    U_out[ind] = 0.;
+    dU_out[ind] = 0.;
     for (int spt = 0; spt < nSpts; spt++)
     {
-      U_out[ind] += weights[w_ind+spt] * U_spts[u_ind + spt*sstride + dim*dstride];
+      dU_out[ind] += weights[w_ind+spt] * dU_spts[u_ind + spt*sstride + dim*dstride];
     }
   }
 }

@@ -842,58 +842,73 @@ void MeshBlock::processPointDonors(void)
 #ifdef _GPU
 void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<VPACKET> &sndPack)
 {
-  if (ninterp2 > 0)
+  if (ninterp2 == 0)
   {
-    nSpts = interpList2[0].nweights;
-
-    cuda_malloc(weights_d, ninterp2*nSpts);
-    cuda_malloc(donors_d, ninterp2*3);
-    cuda_malloc(buf_inds_d, ninterp2);
-
-    std::vector<double> tmp_weights(ninterp2*nSpts);
-    std::vector<int> tmp_donors(ninterp2);
-    for (int i = 0; i < ninterp2; i++)
-    {
-      tmp_donors[i] = interpList2[i].donorID;
-      for (int j = 0; j < nSpts; j++)
-        tmp_weights[nSpts*i+j] = interpList2[i].weights[j];
-    }
-
-    std::vector<int> n_ints(nsend);
-    intData.resize(ninterp2*2);
-    for (int i = 0; i < ninterp2; i++)
-    {
-      int p = interpList2[i].receptorInfo[0];
-      intData[2*i] = p;
-      intData[2*i+1] = n_ints[p];
-      n_ints[p]++;
-    }
+    nSpts = 0;
+    buf_disp.assign(nsend, 0);
+    buf_inds.resize(0);
+    intData.resize(0);
 
     sndPack.resize(nsend);
     for (int p = 0; p < nsend; p++)
     {
-      sndPack[p].nints = n_ints[p];
-      sndPack[p].intData.resize(n_ints[p]);
+      sndPack[p].nints = 0;
+      sndPack[p].nreals = 0;
+      sndPack[p].intData.resize(0);
     }
 
-    buf_disp.assign(nsend, 0);
-    for (int p = 1; p < nsend; p++)
-      buf_disp[p] = buf_disp[p-1] + n_ints[p-1];
-
-    // Store final position within MPI buffer to place data
-    buf_inds.resize(ninterp2);
-    for (int i = 0; i < ninterp2; i++)
-    {
-      int p = intData[2*i];
-      int ind = intData[2*i+1];
-      buf_inds[i] = buf_disp[p] + ind;
-      sndPack[p].intData[ind] = interpList2[i].receptorInfo[1];
-    }
-
-    cuda_copy_h2d(weights_d, tmp_weights.data(), tmp_weights.size());
-    cuda_copy_h2d(donors_d, tmp_donors.data(), tmp_donors.size());
-    cuda_copy_h2d(buf_inds_d, buf_inds.data(), buf_inds.size());
+    return;
   }
+
+  nSpts = interpList2[0].nweights;
+
+  cuda_malloc(weights_d, ninterp2*nSpts);
+  cuda_malloc(donors_d, ninterp2);
+  cuda_malloc(buf_inds_d, ninterp2);
+
+  std::vector<double> tmp_weights(ninterp2*nSpts);
+  std::vector<int> tmp_donors(ninterp2);
+  for (int i = 0; i < ninterp2; i++)
+  {
+    tmp_donors[i] = interpList2[i].donorID;
+    for (int j = 0; j < nSpts; j++)
+      tmp_weights[nSpts*i+j] = interpList2[i].weights[j];
+  }
+
+  std::vector<int> n_ints(nsend);
+  intData.resize(ninterp2*2);
+  for (int i = 0; i < ninterp2; i++)
+  {
+    int p = interpList2[i].receptorInfo[0];
+    intData[2*i] = p;
+    intData[2*i+1] = n_ints[p];
+    n_ints[p]++;
+  }
+
+  sndPack.resize(nsend);
+  for (int p = 0; p < nsend; p++)
+  {
+    sndPack[p].nints = n_ints[p];
+    sndPack[p].intData.resize(n_ints[p]);
+  }
+
+  buf_disp.assign(nsend, 0);
+  for (int p = 1; p < nsend; p++)
+    buf_disp[p] = buf_disp[p-1] + n_ints[p-1];
+
+  // Store final position within MPI buffer to place data
+  buf_inds.resize(ninterp2);
+  for (int i = 0; i < ninterp2; i++)
+  {
+    int p = intData[2*i];
+    int ind = intData[2*i+1];
+    buf_inds[i] = buf_disp[p] + ind;
+    sndPack[p].intData[ind] = interpList2[i].receptorInfo[1];
+  }
+
+  cuda_copy_h2d(weights_d, tmp_weights.data(), ninterp2*nSpts);
+  cuda_copy_h2d(donors_d, tmp_donors.data(), tmp_donors.size());
+  cuda_copy_h2d(buf_inds_d, buf_inds.data(), buf_inds.size());
 }
 #endif
 
@@ -1117,6 +1132,8 @@ void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
 
 void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
 {
+  if (ninterp2 == 0) return;
+
   int estride, sstride, vstride;
   double *q_d = get_q_spts_d(estride, sstride, vstride);
 
@@ -1127,6 +1144,8 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
 {
+  if (ninterp2 == 0) return;
+
   int estride, sstride, vstride, dstride;
   double *dq_d = get_dq_spts_d(estride, sstride, vstride, dstride);
 

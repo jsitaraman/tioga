@@ -302,6 +302,7 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 
   /// HACK FOR GOLF BALL CASE: Golf ball radius = .0625, outer radius = .14
   double cut_rad2 = .1*.1;
+  //double cut_rad2 = 1*1;
   if (meshtag == 1) /// MUST BE BACKGROUND GRID
   {
     int icell = 0;
@@ -435,15 +436,6 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
           {
             iblank_face[ff] = FRINGE;
             artBndFaces.insert(ff);
-            /// DEBUGGING
-            int ic = f2c[2*ff];
-            double xc[3] = {0,0,0};
-            for (int m = 0; m < 8; m++)
-              for (int d = 0; d < 3; d++)
-                xc[d] += x[3*vconn[0][8*ic+m]+d]/8.;
-            double rad = sqrt(xc[0]*xc[0]+xc[1]*xc[1]+xc[2]*xc[2]);
-            if (rad < .1)
-              printf("MPI face %d (%d): xc %f, %f, %f -> %f\n",F,ff,xc[0],xc[1],xc[2],rad);
           }
         }
       }

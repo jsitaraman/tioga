@@ -89,6 +89,7 @@ lib:	$(OBJECTS) $(OBJF90) $(INCLUDES)
 shared:	$(OBJECTS) $(OBJF90) $(INCLUDES)
 	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o lib$(MODULENAME).so -lc $(LIBS)
 
+swig: CFLAGS += $(SFLAGS)
 swig: $(OBJECTS) $(OBJF90) $(OBJSWIG)
 	$(CXX) $(CFLAGS) $(SFLAGS) $(OBJECTS) $(OBJF90) $(OBJSWIG) -shared -fPIC -o _tioga.so -lc $(LIBS)
 
@@ -100,9 +101,6 @@ clean :
 
 %_wrap.cpp: %.i tiogaInterface.h
 	$(SWIG) $(SFLAGS) -o $@ $<
-
-%_wrap.o: %_wrap.cpp
-	$(CXX) $(CFLAGS) $(SFLAGS) -c -o $@ $< 
 
 %.o:%.cu
 	$(CUC) $(INCS) $(CUFLAGS) $(FLAGS) -c $< -o $*.o

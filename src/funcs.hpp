@@ -72,6 +72,9 @@ double dLagrange(std::vector<double> &x_lag, double y, uint mode);
 /*! Calculate the adjoint of a 'size x size' matrix stored row-major in 'mat' */
 std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size);
 
+/*! In-place adjoint calculation */
+void adjoint(const std::vector<double> &mat, std::vector<double> &adj, unsigned int size);
+
 /*! Calculate the determinant of a 'size x size' matrix stored row-major in 'mat' */
 double determinant(const std::vector<double> &mat, unsigned int size);
 

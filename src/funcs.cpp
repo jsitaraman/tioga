@@ -28,9 +28,13 @@
  */
 #include <cmath>
 #include <limits.h>
+#include <map>
 #include <omp.h>
 
 #include "funcs.hpp"
+
+static std::map<int, std::vector<int>> gmsh_maps_hex;
+static std::map<int, std::vector<int>> gmsh_maps_quad;
 
 namespace tg_funcs
 {
@@ -100,6 +104,37 @@ double dLagrange(std::vector<double> &x_lag, double y, uint mode)
   return dLag;
 }
 
+// See Eigen's 'determinant.h' from 2014-9-18,
+// https://bitbucket.org/eigen/eigen file Eigen/src/LU/determinant.h,
+double det_3x3_part(const double* mat, int a, int b, int c)
+{
+  return mat[a] * (mat[3+b] * mat[6+c] - mat[3+c] * mat[6+b]);
+}
+
+double det_4x4_part(const double* mat, int j, int k, int m, int n)
+{
+  return (mat[j*4] * mat[k*4+1] - mat[k*4] * mat[j*4+1])
+      * (mat[m*4+2] * mat[n*4+3] - mat[n*4+2] * mat[m*4+3]);
+}
+
+double det_2x2(const double* mat)
+{
+  return mat[0]*mat[3] - mat[1]*mat[2];
+}
+
+double det_3x3(const double* mat)
+{
+  return det_3x3_part(mat,0,1,2) - det_3x3_part(mat,1,0,2)
+      + det_3x3_part(mat,2,0,1);
+}
+
+double det_4x4(const double* mat)
+{
+  return det_4x4_part(mat,0,1,2,3) - det_4x4_part(mat,0,2,1,3)
+      + det_4x4_part(mat,0,3,1,2) + det_4x4_part(mat,1,2,0,3)
+      - det_4x4_part(mat,1,3,0,2) + det_4x4_part(mat,2,3,0,1);
+}
+
 std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size)
 {
   std::vector<double> adj(size*size);
@@ -131,6 +166,36 @@ std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size)
   return adj;
 }
 
+//! In-place adjoint function
+void adjoint(const std::vector<double> &mat, std::vector<double> &adj, unsigned int size)
+{
+  adj.resize(size*size);
+
+  int signRow = -1;
+  std::vector<double> Minor((size-1)*(size-1));
+  for (int row=0; row<size; row++) {
+    signRow *= -1;
+    int sign = -1*signRow;
+    for (int col=0; col<size; col++) {
+      sign *= -1;
+      // Setup the minor matrix (expanding along row, col)
+      int i0 = 0;
+      for (int i=0; i<size; i++) {
+        if (i==row) continue;
+        int j0 = 0;
+        for (int j=0; j<size; j++) {
+          if (j==col) continue;
+          Minor[i0*(size-1)+j0] = mat[i*size+j];
+          j0++;
+        }
+        i0++;
+      }
+      // Recall: adjoint is TRANSPOSE of cofactor matrix
+      adj[col*size+row] = sign*determinant(Minor,size-1);
+    }
+  }
+}
+
 double determinant(const std::vector<double> &data, unsigned int size)
 {
   if (size == 1) {
@@ -139,6 +204,12 @@ double determinant(const std::vector<double> &data, unsigned int size)
   else if (size == 2) {
     // Base case
     return data[0]*data[3] - data[1]*data[2];
+  }
+  else if (size == 3) {
+    return det_3x3(data.data());
+  }
+  else if (size == 4) {
+    return det_4x4(data.data());
   }
   else {
     // Use minor-matrix recursion
@@ -163,7 +234,6 @@ double determinant(const std::vector<double> &data, unsigned int size)
     return Det;
   }
 }
-
 
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox)
 {
@@ -239,16 +309,34 @@ std::vector<int> gmsh_to_structured_quad(unsigned int nNodes)
 
 std::vector<int> structured_to_gmsh_quad(unsigned int nNodes)
 {
-  auto gmsh2ijk = gmsh_to_structured_quad(nNodes);
+  if (gmsh_maps_quad.count(nNodes))
+  {
+    return gmsh_maps_quad[nNodes];
+  }
+  else
+  {
+    auto gmsh2ijk = gmsh_to_structured_quad(nNodes);
 
-  return reverse_map(gmsh2ijk);
+    gmsh_maps_quad[nNodes] = reverse_map(gmsh2ijk);
+
+    return gmsh_maps_quad[nNodes];
+  }
 }
 
 std::vector<int> structured_to_gmsh_hex(unsigned int nNodes)
 {
-  auto gmsh2ijk = gmsh_to_structured_hex(nNodes);
+  if (gmsh_maps_hex.count(nNodes))
+  {
+    return gmsh_maps_hex[nNodes];
+  }
+  else
+  {
+    auto gmsh2ijk = gmsh_to_structured_hex(nNodes);
 
-  return reverse_map(gmsh2ijk);
+    gmsh_maps_hex[nNodes] = reverse_map(gmsh2ijk);
+
+    return gmsh_maps_hex[nNodes];
+  }
 }
 
 std::vector<int> gmsh_to_structured_hex(unsigned int nNodes)
@@ -551,6 +639,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
   std::vector<double> shape(nNodes);
   std::vector<double> dshape(nNodes*nDims);
   std::vector<double> grad(nDims*nDims);
+  std::vector<double> ginv(nDims*nDims);
 
   int iter = 0;
   int iterMax = 20;
@@ -583,22 +672,22 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 
     double detJ = determinant(grad,nDims);
 
-    auto ginv = adjoint(grad,nDims);
+    adjoint(grad,ginv,nDims);
 
-    point delta = {0,0,0};
+    double delta[3] = {0,0,0};
     for (int i=0; i<nDims; i++)
       for (int j=0; j<nDims; j++)
         delta[i] += ginv[i*nDims+j]*dx[j]/detJ;
 
-    norm = 0;
-    for (int i=0; i<nDims; i++) {
-      norm += dx[i]*dx[i];
-      loc[i] += delta[i];
-      loc[i] = std::max(std::min(loc[i],1.01),-1.01);
-    }
+    norm = dx.norm();
+    for (int i=0; i<nDims; i++)
+      loc[i] = std::max(std::min(loc[i]+delta[i],1.01),-1.01);
 
     iter++;
   }
+
+  for (int i = 0; i < nDims; i++)
+    out_rst[i] = loc[i];
 
   if (std::max( std::abs(loc[0]), std::max( std::abs(loc[1]), std::abs(loc[2]) ) ) <= 1. + 1e-10)
     return true;
@@ -660,16 +749,10 @@ double computeVolume(double *xv, int nNodes, int nDims)
 
     double detJac = 0;
     if (nDims == 2)
-    {
-      detJac = jaco[0*nDims+0]*jaco[1*nDims+1] - jaco[1*nDims+0]*jaco[0*nDims+1];
-    }
+      detJac = det_2x2(jaco.data());
     else
-    {
-      double xr = jaco[0*nDims+0];   double xs = jaco[0*nDims+1];   double xt = jaco[0*nDims+2];
-      double yr = jaco[1*nDims+0];   double ys = jaco[1*nDims+1];   double yt = jaco[1*nDims+2];
-      double zr = jaco[2*nDims+0];   double zs = jaco[2*nDims+1];   double zt = jaco[2*nDims+2];
-      detJac = xr*(ys*zt - yt*zs) - xs*(yr*zt - yt*zr) + xt*(yr*zs - ys*zr);
-    }
+      detJac = det_3x3(jaco.data());
+
     if (detJac<0) FatalError("Negative Jacobian at quadrature point.");
 
     vol += detJac * weights[spt];
@@ -812,7 +895,7 @@ void shape_hex(const point &in_rst, double* out_shape, int nNodes)
   }
 }
 
-void dshape_quad(const std::vector<point> loc_pts, double* out_dshape, int nNodes)
+void dshape_quad(const std::vector<point> &loc_pts, double* out_dshape, int nNodes)
 {
   for (int i = 0; i < loc_pts.size(); i++)
     dshape_quad(loc_pts[i], &out_dshape[i*nNodes*2], nNodes);

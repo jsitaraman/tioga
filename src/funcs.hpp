@@ -29,6 +29,7 @@
 #ifndef FUNCS_HPP
 #define FUNCS_HPP
 
+#include <algorithm>
 #include <cstdlib>
 #include <stdio.h>
 #include <iostream>
@@ -61,13 +62,13 @@ std::ostream& operator<<(std::ostream &os, const std::vector<double> &vec);
 
 double getDist(point a, point b);
 
+/* ---------------------------- Misc. Functions ---------------------------- */
+
 /*! Evaluate the 1D Lagrange polynomial mode based on points x_lag at point y */
 double Lagrange(std::vector<double> &x_lag, double y, uint mode);
 
 /*! Evaluate the first derivative of the 1D Lagrange polynomial mode based on points x_lag at point y */
 double dLagrange(std::vector<double> &x_lag, double y, uint mode);
-
-/* ---------------------------- Misc. Functions ---------------------------- */
 
 /*! Calculate the adjoint of a 'size x size' matrix stored row-major in 'mat' */
 std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size);
@@ -78,6 +79,7 @@ void adjoint(const std::vector<double> &mat, std::vector<double> &adj, unsigned 
 /*! Calculate the determinant of a 'size x size' matrix stored row-major in 'mat' */
 double determinant(const std::vector<double> &mat, unsigned int size);
 
+/*! Return the bounding box of a collection of points [min x,y,z; max x,y,z] */
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
 
 /*! Get reference location out_rst of point in_xyz within an element defined by the points in xv */
@@ -85,6 +87,9 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 
 /*! Compute the volume of a high-order quad or hex */
 double computeVolume(double *xv, int nNodes, int nDims);
+
+/*! Determine whether a given face and cell intersect */
+bool intersectionCheck(double *fx, int nvf, double *ex, int nve, int nDims);
 
 std::vector<int> get_int_list(int N, int start = 0);
 std::vector<uint> get_int_list(uint N, uint start = 0);
@@ -128,6 +133,124 @@ void dshape_hex(const std::vector<point>& loc_pts, double* out_dshape, int nNode
 void dshape_hex(const point &in_rst, double* out_dshape, int nNodes);
 
 } // namespace tg_funcs
+
+/*!
+ * Nelder-Mead Minimzation Routine
+ *
+ * Returns: the coordinates of the point found to be the minimum
+ *
+ * \param[in] U0: Starting coordinates for search
+ * \param[in] minFunc: a normal or lambda function accepting a
+ *            std::vector<double> and returning a double
+ */
+template<typename Func>
+std::vector<double> NelderMead(const std::vector<double> &U0, Func minFunc)
+{
+  /// TODO: Optimize the crap out of this
+
+  int nVars = U0.size();
+  int nPts = nVars+1;
+  std::vector<std::pair<double,std::vector<double>>> FX(nPts);
+
+  // Starting location for search
+  /// TODO: write function to generate ND-simplex of given size around a point
+  for (int i=0; i<nPts; i++) {
+    FX[i].second = U0;
+    if (i>0) {
+      FX[i].second[i-1] += .03*FX[i].second[i-1];
+    } else {
+      for (int j=0; j<nVars; j++) {
+        FX[i].second[j] -= .01*FX[i].second[j];
+      }
+    }
+  }
+
+  // Evaluate the 'function' at the initial 'points'
+  for (int i=0; i<nPts; i++)
+    FX[i].first = minFunc(FX[i].second);
+
+  std::sort(FX.begin(),FX.end());
+
+  std::vector<double> Xn(nVars);  // Point with the highest value of F
+  std::vector<double> X0(nVars);              // Centroid of all other points
+  std::vector<double> Xr(nVars);              // Reflected point
+  std::vector<double> Xe(nVars);              // Expanded point
+  std::vector<double> Xc(nVars);              // Contracted point
+
+  // Use a relative tolerance...?
+  double tol = 1e-8;
+  int iter = 0;
+  while (iter < 200 && FX[0].first > tol) {
+    Xn = FX[nVars].second;
+
+    // Take centroid of all points besides Xn
+    for (int j=0; j<nPts-1; j++)
+      for (int k=0; k<nVars; k++)
+        X0[k] += FX[j].second[k]/(nPts-1);
+
+    // Reflect Xn around X0
+    for (int k=0; k<nVars; k++)
+      Xr[k] = X0[k] + (X0[k]-Xn[k]);
+
+    double Fr = minFunc(Xr);
+
+    // Determine what to do with the new point
+    if (Fr < FX[nPts-2].first) {
+      // We will be keeping this point
+      if (Fr < FX[0].first) {
+        // This one's good; keep going! Expand from Xr
+        for (int i=0; i<nVars; i++)
+          Xe[i] = Xr[i] + (X0[i]-Xn[i]);
+        double Fe = minFunc(Xe);
+
+        if (Fe < Fr) {
+          // This one's even better; use it instead
+          FX[nPts-1].first = Fe;
+          FX[nPts-1].second = Xe;
+        }
+        else {
+          // Xe/Fe was no better; stick with Fr, Xr
+          FX[nPts-1].first = Fr;
+          FX[nPts-1].second = Xr;
+        }
+      }
+      else {
+        // This one's somewhere in the middle; replace Xn with Xr
+        FX[nPts-1].first = Fr;
+        FX[nPts-1].second = Xr;
+      }
+    }
+    else {
+      // Try reducing the size of the simplex
+      for (int i=0; i<nVars; i++)
+        Xc[i] = X0[i] - (X0[i]-Xn[i])*.5;
+      double Fc = minFunc(Xc);
+      if (Fc < FX[nPts-1].first) {
+        // Bringing this point in is better; use it
+        FX[nPts-1].first = Fc;
+        FX[nPts-1].second = Xc;
+      }
+      else {
+        // Bringing this point in didn't work; shrink the simplex onto
+        // the smallest-valued vertex
+        Xc = FX[0].second;
+        for (int i=1; i<nPts; i++) {
+          for (int j=0; j<nVars; j++) {
+            FX[i].second[j] = Xc[j] + 0.5*(FX[i].second[j]-Xc[j]);
+          }
+          FX[i].first = minFunc(FX[i].second);
+        }
+      }
+    }
+
+    std::sort(FX.begin(),FX.end());
+
+    // Continue to iterate
+    iter++;
+  }
+
+  return FX[0].second;
+}
 
 #endif // FUNCS_HPP
 

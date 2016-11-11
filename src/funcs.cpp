@@ -26,6 +26,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
+#include <algorithm>
 #include <cmath>
 #include <limits.h>
 #include <map>
@@ -1042,6 +1043,36 @@ void dshape_hex(const point &in_rst, double* out_dshape, int nNodes)
       }
     }
   }
+}
+
+double MinFunc(const std::vector<double> &coords)
+{
+  /// TODO: possibly re-write as lambda function (or write lambda wrapper)
+}
+
+bool intersectionCheck(double* fx, int nvf, double* ex, int nve, int nDims = 3)
+{
+  /// TODO
+  // Use NelderMead() function to determine minimum distance between the hex
+  // element and the quad face (both potentially curved)
+  // See Galbraith - should be a 5D minimization problem (xi,eta,zeta,r,s)
+
+  // Function to minimize using Nelder-Mead algorithm
+  /* Lambda function syntax example:
+  auto minFunc = [=](const vector<double> &U_IN) -> double {
+    double val = do_stuff;
+    return val;
+  };
+  */
+
+  std::vector<double> U0 = {0,0,0,0,0};
+  auto coords = NelderMead(U0, MinFunc);
+
+  for (auto val : coords)
+    if (std::abs(val) > 1.)
+      return false;
+
+  return true;
 }
 
 } // namespace tg_funcs

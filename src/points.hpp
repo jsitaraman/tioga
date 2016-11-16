@@ -51,7 +51,7 @@ struct point
     z = _z;
   }
 
-  point(double* pt, int nDims=3) {
+  point(const double* pt, int nDims=3) {
     x = pt[0];
     y = pt[1];
     if (nDims==3)

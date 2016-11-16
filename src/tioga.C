@@ -39,9 +39,9 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
 {
   scomm=communicator;
   myid=id_proc;
-  numprocs=nprocs;
-  sendCount=(int *) malloc(sizeof(int)*numprocs); /// Never used?
-  recvCount=(int *) malloc(sizeof(int)*numprocs);
+  nproc=nprocs;
+  sendCount=(int *) malloc(sizeof(int)*nproc); /// Never used?
+  recvCount=(int *) malloc(sizeof(int)*nproc);
   //
   // only one mesh block per process for now
   // this can be changed at a later date
@@ -55,14 +55,14 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   pc=new parallelComm[1];
   pc->myid=myid;
   pc->scomm=scomm;
-  pc->numprocs=numprocs;  
+  pc->numprocs=nproc;
  
   // instantiate the parallel communication class
   //   
   pc_cart=new parallelComm[1];
   pc_cart->myid=myid;
   pc_cart->scomm=scomm;
-  pc_cart->numprocs=numprocs;
+  pc_cart->numprocs=nproc;
   //
 }
 /**
@@ -101,6 +101,14 @@ void tioga::profile(void)
     MPI_Comm_split(scomm, mytag, myid, &meshcomm);
     MPI_Comm_rank(meshcomm, &meshRank);
     MPI_Comm_size(meshcomm, &nprocMesh);
+
+    // For the direct-cut method
+    gridIDs.resize(nproc);
+    gridTypes.resize(nproc);
+    MPI_Allgather(&mytag, 1, MPI_INT, gridIDs.data(), 1, MPI_INT, scomm);
+    MPI_Allgather(&gridType, 1, MPI_INT, gridTypes.data(), 1, MPI_INT, scomm);
+
+    mb->extraConn();
   }
 }
 
@@ -183,9 +191,150 @@ void tioga::performConnectivityHighOrder(void)
   iorphanPrint=1;
 }
 
-// !! PLACEHOLDERS - TO BE COMPLETED !!
 void tioga::performConnectivityArtificialBoundary(void)
 {
+  // Setup send/recv map based on grid ID
+  std::vector<int> ptags(nproc);
+  MPI_Allgather(&mytag, 1, MPI_INT, ptags.data(), 1, MPI_INT, scomm);
+
+  // Enforcing symmetry in sends/recvs
+  int nsend = 0;
+  for (int i = 0; i < nproc; i++)
+    if (ptags[i] != mytag)
+      nsend++;
+
+  std::vector<int> sndMap(nsend);
+  for (int p = 0, m = 0; p < nproc; p++)
+  {
+    if (ptags[p] != mytag)
+    {
+      sndMap[m] = p;
+      m++;
+    }
+  }
+
+  pc->setMap(nsend, nsend, sndMap.data(), sndMap.data());
+
+  /* --- Direct Cut Method [copied from highOrder.C] --- */
+  int nDims = mb->nDims;
+
+  // Get cutting-group bounding-box data for this rank
+//  std::vector<double> cutBox(6*nproc);             // implement more involved algorithm later
+//  std::vector<std::vector<double>> faceBox(nproc); // keep it simple for now
+  std::vector<double> faceNodesW; // wall face nodes
+  std::vector<double> faceNodesO; // overset face nodes
+
+  //mb->getCutGroupBoxes(cutBox, faceBox, nGroups_glob); // implement later
+  int nvert = mb->getCuttingFaces(faceNodesW, faceNodesO);
+  /// IDEA: restrict overset faces to linear face nodes? (ignore curvature, if present)
+
+  // # nodes-per-face, and # of cutting faces, for each rank
+  std::vector<int> nvertf(nproc);
+  std::vector<int> nHoleFace(nproc), nOverFace(nproc);
+  MPI_Allgather(&nvert, 1, MPI_INT, nvertf.data(), 1, MPI_INT, scomm);
+  MPI_Allgather(&nCutHole, 1, MPI_INT, nHoleFace.data(), 1, MPI_INT, scomm);
+  MPI_Allgather(&nCutFringe, 1, MPI_INT, nOverFace.data(), 1, MPI_INT, scomm);
+
+  // Send / recv face nodes data
+  std::vector<MPI_Request> sreqs, rreqs;
+  sreqs.reserve(nproc); rreqs.reserve(nproc);
+  std::vector<std::vector<double>> faceNodesW_g(nproc), faceNodesO_g(nproc);
+  for (int p = 0; p < nproc; p++)
+  {
+    if (p != myid and mytag != gridIDs[p])
+    {
+      if (nHoleFace[p] > 0)
+      {
+        // recv from rank
+        faceNodesW_g[p].resize(nHoleFace[p]);
+        rreqs.emplace_back();
+        MPI_Irecv(faceNodesW_g[p].data(), nHoleFace[p]*nvertf[p]*nDims, MPI_DOUBLE,
+            p, 0, scomm, &rreqs.back());
+      }
+
+      if (nCutHole > 0)
+      {
+        // send to rank
+        sreqs.emplace_back();
+        MPI_Isend(faceNodesW.data(), nCutHole*nvert*nDims, MPI_DOUBLE,
+            p, 0, scomm, &sreqs.back());
+      }
+
+      if (gridType == 0 && nOverFace[p] > 0)
+      {
+        // recv from rank
+        faceNodesO_g[p].resize(nOverFace[p]);
+        rreqs.emplace_back();
+        MPI_Irecv(faceNodesO_g[p].data(), nOverFace[p]*nvertf[p]*nDims, MPI_DOUBLE,
+            p, 0, scomm, &rreqs.back());
+      }
+
+      if (gridTypes[p] == 0 && nCutFringe > 0)
+      {
+        // Send our overset faces to the background grid
+        sreqs.emplace_back();
+        MPI_Isend(faceNodesO.data(), nCutFringe*nvert*nDims, MPI_DOUBLE,
+            p, 1, scomm, &sreqs.back());
+      }
+    }
+  }
+
+  // Complete the communication
+  MPI_Waitall(sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
+  MPI_Waitall(rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
+
+//  // Get the global bounding box info across all the partitions for all meshes
+//  std::vector<double> cutBox_global(6*nGroups_glob);
+//  for (int G = 0; G < nGroups_glob; G++)
+//  {
+//    MPI_Allreduce(&cutBox[6*G],  &cutBox_global[6*G],  3,MPI_DOUBLE,MPI_MIN,scomm);
+//    MPI_Allreduce(&cutBox[6*G+3],&cutBox_global[6*G+3],3,MPI_DOUBLE,MPI_MAX,scomm);
+//  }
+
+//  // Figure out which cutting groups overlap with this rank
+//  // [use rank-local OBB?]
+//  // send/recv facebox data to/from ranks that need it
+//  std::vector<std::unordered_set<int>> cellList(nGroups_glob);
+//  mb->getDirectCutCells(cellList, cutBox_global, nGroups_global);
+
+
+  // Do the cutting
+  std::vector<CutMap> cutMap(nproc);
+
+  if (gridType == 0)
+    cutMap.resize(2*nproc); // Bkgd grid - cut with both wall and overset faces
+
+  for (int p = 0; p < nproc; p++)
+  {
+    mb->directCut(faceNodesW_g[p], nHoleFace[p], nvertf[p], cutMap[p]);
+
+    if (gridType == 0)
+      mb->directCut(faceNodesO_g[p], nOverFace[p], nvertf[p], cutMap[nproc+p], 0);
+  }
+
+  mb->unifyCutFlags(cutMap);
+
+  // Find artificial boundary faces
+  mb->calcFaceIblanks(meshcomm);
+
+  // Get all AB face point locations
+  mb->getBoundaryNodes();
+
+  // Exchange new list of points, including high-order Artificial Boundary
+  // face points or internal points (or fringe nodes for non-high order)
+  exchangePointSearchData();
+
+  mb->search();
+
+  // Setup interpolation weights and such for final interp-point list
+  mb->processPointDonors();
+
+#ifdef _GPU
+  setupCommBuffersGPU();
+#endif
+}
+
+//{
 //  /* --- Direct Cut Method [copied from highOrder.C] --- */
 //  int nDims = 3; /// TODO: add to MB.h ...
 
@@ -213,6 +362,20 @@ void tioga::performConnectivityArtificialBoundary(void)
 //  MPI_Allreduce(&cutType_glob[0], MPI_IN_PLACE, nGroups_glob, MPI_INT, MPI_MAX, scomm);
 //  MPI_Allreduce(&gridGroups[0], MPI_IN_PLACE, nGrids*nGroups_glob, MPI_INT, MPI_MAX, scomm);
 
+//  // Get the number of face nodes for each grid
+//  for (int g = 0; g < nGroups; g++)
+//  {
+//    if (meshRank == 0 && myGroups.count(g))
+//    {
+
+//    }
+//    else
+//    {
+
+//    }
+//  }
+//  std::vector<int> nvertf(numprocs);
+//  MPI_Allgather(&mb->nfv[0], 1, MPI_INT, nvertf.data(), 1, MPI_INT, scomm);
 
 //  // Get cutting-group bounding-box data for this rank
 //  std::vector<double> cutBox(6*nGroups_glob);
@@ -245,22 +408,27 @@ void tioga::performConnectivityArtificialBoundary(void)
 //  // Send all face box  data to all ranks?
 //  std::vector<std::vector<int>> nFaces_glob(nGroups_glob);
 //  std::vector<std::vector<double>> faceBox_glob(nGroups_glob);
+//  std::vector<std::vector<double>> faceNodes_glob(nGroups_glob);
 //  for (int G = 0; G < nGroups_glob; G++)
 //  {
-//    nFaces_glob[G].resize(nproc);
+//    nFaces_glob[G].resize(numprocs);
 //    MPI_Allgather(&nGFaces[G], 1, MPI_INT, &nFaces_glob[G][0], 1, MPI_INT, scomm);
 
-//    std::vector<int> recvCnts(nproc);
-//    std::vector<int> recvDisp(nproc);
+//    std::vector<int> recvCnts(numprocs), recvCntsN(numprocs);
+//    std::vector<int> recvDisp(numprocs), recvDispN(numprocs);
 //    int nface_glob = 0;
-//    for (int p = 0; p < nproc; p++)
+//    for (int p = 0; p < numprocs; p++)
 //    {
 //      recvCnts[p] = nFaces_glob[G][p]*6;
 //      recvDisp[p] += (p>0) ? nFaces_glob[G][p-1]*6 : 0;
+
+//      recvCntsN[p] = nFaces_glob[G][p]*nDims*nvertf[p];
+//      recvDispN[p] += (p>0) ? nFaces_glob[G][p-1]*nDims*nvertf[p] : 0;
 //      nface_glob += nFaces_glob[G][p];
 //    }
 
 //    faceBox_glob[G].resize(nface_glob*6);
+//    faceNodes_glob[G].resize(nface_glob*6);
 //    MPI_Allgatherv(&faceBox[G][0], nGFces[G], MPI_DOUBLE, &faceBox_glob[G][0], recvCnts.data(), recvDisp.data(), MPI_DOUBLE, scomm);
 //  }
 
@@ -302,7 +470,7 @@ void tioga::performConnectivityArtificialBoundary(void)
 //  mb->search();
 //  mb->processPointDonors();
 //  iorphanPrint=1;
-}
+//}
 
 void tioga::performConnectivityAMR(void)
 {

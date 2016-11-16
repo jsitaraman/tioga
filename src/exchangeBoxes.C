@@ -26,7 +26,7 @@ extern "C"{
 
 void tioga::exchangeBoxes(void)
 {
-  int* alltags=(int *)malloc(sizeof(int)*numprocs);
+  int* alltags=(int *)malloc(sizeof(int)*nproc);
   MPI_Allgather(&mytag, 1, MPI_INT, alltags,1,MPI_INT,scomm);
 
   // count number of other processors to communicate to
@@ -35,7 +35,7 @@ void tioga::exchangeBoxes(void)
   // talk to your sister partitions)
   int nsend = 0;
   int nrecv = 0;
-  for (int i = 0; i < numprocs; i++) if (alltags[i] != mytag) nsend++;
+  for (int i = 0; i < nproc; i++) if (alltags[i] != mytag) nsend++;
 
   // In general we communicate forward
   // and backward, separate lists are maintained for
@@ -44,7 +44,7 @@ void tioga::exchangeBoxes(void)
   int* sndMap=(int *)malloc(sizeof(int)*nsend);
   int* rcvMap=(int *)malloc(sizeof(int)*nrecv);
 
-  for (int i = 0, m = 0; i < numprocs; i++)
+  for (int i = 0, m = 0; i < nproc; i++)
     if (alltags[i]!=mytag)
     {
       sndMap[m]=rcvMap[m]=i;

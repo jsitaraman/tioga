@@ -37,6 +37,8 @@
 static std::map<int, std::vector<int>> gmsh_maps_hex;
 static std::map<int, std::vector<int>> gmsh_maps_quad;
 
+#define TOL 1e-10
+
 namespace tg_funcs
 {
 
@@ -762,6 +764,65 @@ double computeVolume(double *xv, int nNodes, int nDims)
   return vol;
 }
 
+//! Assuming 4-point quad face or 2-point line, calculate unit 'outward' normal
+Vec3 faceNormal(double* xv, int nDims)
+{
+  if (nDims == 3)
+  {
+    /* Assuming nodes of face ordered CCW such that right-hand rule gives
+     * outward normal */
+
+    // Triangle #1
+    point pt0 = point(&xv[0]);
+    point pt1 = point(&xv[3]);
+    point pt2 = point(&xv[6]);
+    Vec3 a = pt1 - pt0;
+    Vec3 b = pt2 - pt0;
+    Vec3 norm1 = a.cross(b);           // Face normal vector
+
+    // Triangle #2
+    pt1 = point(&xv[9]);
+    a = pt1 - pt0;
+    Vec3 norm2 = b.cross(a);
+
+    // Average the two triangle's normals
+    Vec3 norm = (norm1+norm2)/2.;
+    norm /= norm.norm();
+
+    return norm;
+  }
+  else
+  {
+    /* Assuming nodes of face taken from CCW ordering within cell
+     * (i.e. cell center is to 'left' of vector from pt1 to pt2) */
+    point pt1 = point(&xv[0],2);
+    point pt2 = point(&xv[2],2);
+    Vec3 dx = pt2 - pt1;
+    Vec3 norm = Vec3({-dx.y,dx.x,0});
+    norm /= norm.norm();
+
+    return norm;
+  }
+}
+
+void shape_line(double xi, std::vector<double> &out_shape, int nNodes)
+{
+  out_shape.resize(nNodes);
+  shape_line(xi, out_shape.data(), nNodes);
+}
+
+void shape_line(double xi, double* out_shape, int nNodes)
+{
+  std::vector<double> xlist(nNodes);
+  double dxi = 2./(nNodes-1);
+
+  for (int i = 0; i < nNodes; i++)
+    xlist[i] = -1. + i*dxi;
+
+  for (int i = 0; i < nNodes; i++)
+    out_shape[i] = Lagrange(xlist, xi, i);
+}
+
 void shape_quad(const point &in_rs, std::vector<double> &out_shape, int nNodes)
 {
   out_shape.resize(nNodes);
@@ -1045,34 +1106,172 @@ void dshape_hex(const point &in_rst, double* out_dshape, int nNodes)
   }
 }
 
-double MinFunc(const std::vector<double> &coords)
+void getSimplex(int nDims, const std::vector<double> &x0, double L, std::vector<double> &X)
 {
-  /// TODO: possibly re-write as lambda function (or write lambda wrapper)
+  int nPts = nDims+1;
+  double DOT = -1./nDims;
+
+  // Storing each N-D point contiguously
+  X.assign(nDims*nPts, 0);
+
+  // Initialize the first dimension
+  X[0] = 1.;
+
+  for (int i = 0; i < nDims; i++)
+  {
+    // Calculate dot product with most recent point
+    double dot = 0.;
+    for (int k = 0; k < i; k++)
+      dot += X[i*nDims+k] * X[i*nDims+k];
+
+    // Ensure x_i dot x_j = -1/nDims
+    dot = (DOT - dot) / X[i*nDims+i];
+    for (int j = i+1; j < nPts; j++)
+      X[j*nDims+i] = dot;
+
+    // Ensure norm(x_i) = 1
+    dot = 0.;
+    for (int j = 0; j < i; j++)
+      dot += X[(i+1)*nDims+j]*X[(i+1)*nDims+j];
+
+    X[(i+1)*nDims+i+1] = std::sqrt(1.-std::abs(dot));
+  }
+
+  // Scale and translate the final simplex
+  for (int i = 0; i < nPts; i++)
+  {
+    for (int j = 0; j < nDims; j++)
+    {
+      X[i*nDims+j] *= L;
+      X[i*nDims+j] += x0[j];
+    }
+  }
 }
 
-bool intersectionCheck(double* fx, int nvf, double* ex, int nve, int nDims = 3)
+double CellFaceDist(std::vector<double> &shapeC, std::vector<double> &shapeF,
+                    double* ex, double* fx, const std::vector<double> &xloc, int nDims)
 {
-  /// TODO
+  point pc = point(&xloc[0],nDims);
+  point pf = point(&xloc[nDims],nDims-1);
+
+  double pen = 1.; // penalty term to keep points within ref. domain
+
+  for (int i = 0; i < nDims; i++)
+    if (std::abs(pc[i]) > 1.)
+      pen *= std::abs(pc[i]);
+
+  for (int i = 0; i < nDims-1; i++)
+    if (std::abs(pf[i]) > 1.)
+      pen *= std::abs(pf[i]);
+
+  if (nDims == 3)
+  {
+    shape_hex(pc, shapeC, shapeC.size());
+    shape_quad(pf, shapeF, shapeF.size());
+  }
+  else
+  {
+    shape_quad(pc, shapeC, shapeC.size());
+    shape_line(pc.x, shapeF, shapeF.size());
+  }
+
+  pc.zero();
+  for (int n = 0; n < shapeC.size(); n++) {
+    for (int i = 0; i < nDims; i++) {
+      pc[i] += shapeC[n] * ex[n*nDims+i];
+    }
+  }
+
+  pf.zero();
+  for (int n = 0; n < shapeF.size(); n++) {
+    for (int i = 0; i < nDims; i++) {
+      pf[i] += shapeF[n] * fx[n*nDims+i];
+    }
+  }
+
+  return (pc-pf).norm() * pen;
+}
+
+Vec3 CellFaceVec(std::vector<double> &shapeC, std::vector<double> &shapeF,
+                 double* ex, double* fx, const std::vector<double> &xloc, int nDims)
+{
+  point pc = point(&xloc[0],nDims);
+  point pf = point(&xloc[nDims],nDims-1);
+
+  if (nDims == 3)
+  {
+    shape_hex(pc, shapeC, shapeC.size());
+    shape_quad(pf, shapeF, shapeF.size());
+  }
+  else
+  {
+    shape_quad(pc, shapeC, shapeC.size());
+    shape_line(pc.x, shapeF, shapeF.size());
+  }
+
+  pc.zero();
+  for (int n = 0; n < shapeC.size(); n++) {
+    for (int i = 0; i < nDims; i++) {
+      pc[i] += shapeC[n] * ex[n*nDims+i];
+    }
+  }
+
+  pf.zero();
+  for (int n = 0; n < shapeF.size(); n++) {
+    for (int i = 0; i < nDims; i++) {
+      pf[i] += shapeF[n] * fx[n*nDims+i];
+    }
+  }
+
+  return pc-pf;
+}
+
+Vec3 intersectionCheck(double* fxv, int nvf, double* exv, int nve, int nDims = 3)
+{
+  // Not needed right now due to how this is being called...
+//  // Start by checking for bounding-box intersection
+//  double boxC[6], boxF[6];
+//  getBoundingBox(exv, nve, nDims, boxC);
+//  getBoundingBox(fxv, nvf, nDims, boxF);
+
+//  bool flag = true;
+//  for (int d = 0; d < nDims; d++)
+//  {
+//    flag = (flag && (boxC[nDims+d] >= boxF[d] - TOL));
+//    flag = (flag && (boxC[d] <= boxF[nDims+d] + TOL));
+//  }
+
+//  if (!flag) // Face and cell do not intersect
+//    return false;
+
+  /// TODO: look for convex optimization tricks to improve problem robustness
   // Use NelderMead() function to determine minimum distance between the hex
   // element and the quad face (both potentially curved)
   // See Galbraith - should be a 5D minimization problem (xi,eta,zeta,r,s)
 
   // Function to minimize using Nelder-Mead algorithm
-  /* Lambda function syntax example:
-  auto minFunc = [=](const vector<double> &U_IN) -> double {
-    double val = do_stuff;
-    return val;
+  std::vector<double> shapeC(nve), shapeF(nvf);
+
+  auto minFunc = [&](const std::vector<double> &U_IN) -> double
+  {
+    return CellFaceDist(shapeC,shapeF,exv,fxv,U_IN,nDims);
   };
-  */
 
-  std::vector<double> U0 = {0,0,0,0,0};
-  auto coords = NelderMead(U0, MinFunc);
+  auto mini = NelderMead({0,0,0,0,0}, minFunc, .5);
 
-  for (auto val : coords)
-    if (std::abs(val) > 1.)
-      return false;
+  double minval = mini.first;
+  auto coords = mini.second;
 
-  return true;
+  if (minval > 1e-6) // Above tolerance
+    return CellFaceVec(shapeC,shapeF,exv,fxv,mini.second,nDims);
+
+  double maxcoord = *std::max_element(coords.begin(), coords.end());
+  double mincoord = *std::min_element(coords.begin(), coords.end());
+
+  if (maxcoord > 1. or mincoord < -1.)
+    return CellFaceVec(shapeC,shapeF,exv,fxv,mini.second,nDims);
+
+  return point(0,0,0);
 }
 
 } // namespace tg_funcs

@@ -48,6 +48,27 @@ extern "C"
 
 using namespace tg_funcs;
 
+void MeshBlock::extraConn(void)
+{
+  int nface = nDims*2; // Quad or hex only, same as rest of artBnd stuff
+  c2c.assign(ncells*nface,-1);
+
+  for (int ic = 0; ic < ncells; ic++)
+  {
+    for (int j = 0; j < nface; j++)
+    {
+      int ff = c2f[nface*ic+j];
+      int ic1 = f2c[2*ff];
+      int ic2 = f2c[2*ff+1];
+
+      if (ic1 == ic)
+        c2c[nface*ic+j] = ic2;
+      else
+        c2c[nface*ic+j] = ic1;
+    }
+  }
+}
+
 // void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
 //     int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
 // {
@@ -108,30 +129,65 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
   }
 }
 
-void MeshBlock::getCutGroupFaces(std::vector<std::vector<double>> &faceNodes, int nGroups_glob)
+//void MeshBlock::getCutGroupFaces(std::vector<std::vector<double>> &faceNodes, int nGroups_glob)
+//{
+//  int nvert = nfv[0];
+
+//  // Generate bounding boxes for each cutting group and face
+//  for (int g = 0; g < nGroups; g++)
+//  {
+//    int G = groupIDs[g];
+
+//    // Loop over all faces of this cutting group
+//    faceNodes[G].resize(3*nvert*nGf[g]);
+//    for (int i = 0; i < nGf[g]; i++)
+//    {
+//      // Loop over vertices of this face
+//      int ff = cutFaces[g][i];
+//      for (int n = 0; n < nvert; n++)
+//      {
+//        int iv = fconn[0][ff*nvert + n];
+//        for (int d = 0; d < nDims; d++)
+//          faceNodes[G][3*(nvert*i+n)+d] = x[3*iv+d];
+//      }
+//    }
+//  }
+//}
+
+int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<double> &faceNodesO)
 {
   int nvert = nfv[0];
 
   // Generate bounding boxes for each cutting group and face
-  for (int g = 0; g < nGroups; g++)
+  faceNodesW.resize(nDims*nvert*nCutHole);
+  for (int i = 0; i < nCutHole; i++)
   {
-    int G = groupIDs[g];
-
-    // Loop over all faces of this cutting group
-    faceNodes[G].resize(3*nvert*nGf[g]);
-    for (int i = 0; i < nGf[g]; i++)
+    // Loop over vertices of this face
+    int ff = cutFacesW[i];
+    for (int n = 0; n < nvert; n++)
     {
-      // Loop over vertices of this face
-      int ff = cutFaces[g][i];
-      for (int n = 0; n < nvert; n++)
-      {
-        int iv = fconn[0][ff*nvert + n];
-        for (int d = 0; d < nDims; d++)
-          faceNodes[G][3*(nvert*i+n)+d] = x[3*iv+d];
-      }
+      int iv = fconn[0][ff*nvert + n];
+      for (int d = 0; d < nDims; d++)
+        faceNodesW[nDims*(nvert*i+n)+d] = x[3*iv+d];
     }
   }
+
+  faceNodesO.resize(nDims*nvert*nCutFringe);
+  for (int i = 0; i < nCutFringe; i++)
+  {
+    // Loop over vertices of this face
+    int ff = cutFacesO[i];
+    for (int n = 0; n < nvert; n++)
+    {
+      int iv = fconn[0][ff*nvert + n];
+      for (int d = 0; d < nDims; d++)
+        faceNodesO[nDims*(nvert*i+n)+d] = x[3*iv+d];
+    }
+  }
+
+  return nvert;
 }
+
 
 void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob)
 {
@@ -147,26 +203,229 @@ void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList
   }
 }
 
-void MeshBlock::directCut(std::vector<double> &faceBox, int nCutFaces, std::vector<int> &cutFlag)
+//void MeshBlock::directCut(std::vector<double> &faceBox, int nCutFaces, std::vector<int> &cutFlag)
+//{
+//  cutFlag.assign(ncells,0);
+
+//  std::unordered_set<int> cellList;
+//  for (int ff = 0; ff < nCutFaces; ff++)
+//  {
+//    cellList.clear();
+
+//    // Find all cells that the cutting face might pass through
+//    adt->searchADT_box(elementList, cellList, &faceBox[6*ff]);
+
+//    // Check each cell to determine if the face intersects it
+//    for (auto &ic : cellList)
+//    {
+//      //getRefLocNewton() // Galbratih says to use Nelder-Mead though...
+//      /*if (intersectionCheck())
+//      {
+//        cutFlag[ic] = 1;
+//      }*/
+//    }
+//  }
+//}
+
+#define FILL_LOOP
+//#define FILL_QUEUE
+
+void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
+    CutMap &cutMap, int cutType)
 {
-  cutFlag.assign(ncells,0);
+  /* Peform hole cutting with solid or overset boundary faces
+   *
+   * Cells intersecting cut faces are immediately flagged, and normal/hole
+   * status is filled by advancing outwards from flagged cells
+   *
+   * If two (or more) cutting faces are (close to) the same distance away from a
+   * cell, the normals of the faces are averged and used to determine a more
+   * accurate cut flag
+   *
+   * See Galbraith's thesis, Section 4.2
+   */
+  cutMap.flag.assign(ncells,DC_UNASSIGNED);
 
   std::unordered_set<int> cellList;
-  for (int ff = 0; ff < nCutFaces; ff++)
+
+#ifdef FILL_QUEUE
+  std::set<int> paintQueue;
+#endif
+
+  double bbox[6];
+  std::vector<double> xv(nv[0]*nDims);
+  int stride = nDims*nvertf;
+  int nvert = nv[0];
+  int nface = nDims*2;
+  double tol = 1e-6;
+
+  for (int ff = 0; ff < nCut; ff++)
   {
     cellList.clear();
 
+    getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox);
+
     // Find all cells that the cutting face might pass through
-    adt->searchADT_box(elementList, cellList, &faceBox[6*ff]);
+    adt->searchADT_box(elementList, cellList, bbox);
 
     // Check each cell to determine if the face intersects it
     for (auto &ic : cellList)
     {
-      //getRefLocNewton() // Galbratih says to use Nelder-Mead though...
-      /*if (intersectionCheck())
+      if (cutMap.flag[ic] != DC_CUT) // If not already found to be cut
       {
-        cutFlag[ic] = 1;
-      }*/
+        // Load up the cell nodes into an array
+        for (int i = 0; i < nvert; i++)
+          for (int d = 0; d < nDims; d++)
+            xv[nDims*i+d] = x[nDims*vconn[0][ic*nvert+i]+d];
+
+        // Find distance from face to cell
+        Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+
+        if (vec.norm() == 0.) // They intersect
+        {
+          cutMap.flag[ic] = DC_CUT;
+#ifdef FILL_QUEUE
+          paintQueue.insert(ic);
+#endif
+
+          // Check all neighboring elements and assign status
+          for (int j = 0; j < nface; j++)
+          {
+            int ic2 = c2c[nface*ic+j];
+            if (ic2 >= 0 and cutMap.flag[ic2] != DC_CUT)
+            {
+              for (int i = 0; i < nvert; i++)
+                for (int d = 0; d < nDims; d++)
+                  xv[nDims*i+d] = x[nDims*vconn[0][ic2*nvert+i]+d];
+
+              vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+              double dist = vec.norm();
+
+              if (dist < tol)
+              {
+                cutMap.flag[ic2] = DC_CUT;
+              }
+              else if (cutMap.flag[ic2] == DC_UNASSIGNED or dist < cutMap.dist[ic2] - tol)
+              {
+                // Unflagged cell, or have a closer face to use
+                cutMap.dist[ic2] = dist;
+                cutMap.norm[ic2] = faceNormal(&cutFaces[ff*stride], nDims);
+                cutMap.nMin[ic2] = 1;
+
+                if (cutMap.norm[ic2] * vec > 0)
+                  cutMap.flag[ic2] = DC_HOLE; // outwards normal = inside hole
+                else
+                  cutMap.flag[ic2] = DC_NORMAL;
+              }
+              else if (std::abs(dist-cutMap.dist[ic2]) < tol)
+              {
+                // Same dist. to two faces; avg. their normals to decide
+                Vec3 norm = faceNormal(&cutFaces[ff*stride], nDims);
+
+                int N = cutMap.nMin[ic2];
+                for (int d = 0; d < nDims; d++)
+                  cutMap.norm[ic2][d] = (N*cutMap.norm[ic2][d] + norm[d])
+                      / (N + 1.);
+                cutMap.nMin[ic2]++;
+
+                if (cutMap.norm[ic2] * vec > 0)
+                  cutMap.flag[ic2] = DC_HOLE;
+                else
+                  cutMap.flag[ic2] = DC_NORMAL;
+              }
+            }
+          }
+        }
+
+      }
+    }
+  }
+
+  // Now paint-fill the remainder of the grid based upon the cutting boundary
+
+  // ----- Linear loop version -----
+#ifdef FILL_LOOP
+  int nUnassigned = 0;
+  for (auto &flag : cutMap.flag)
+    if (flag == DC_UNASSIGNED)
+      nUnassigned++;
+
+  std::vector<int> mark(ncells);
+
+  while (nUnassigned > 0)
+  {
+    for (int ic = 0; ic < ncells; ic++)
+    {
+      if (cutMap.flag[ic] == DC_UNASSIGNED or mark[ic])
+        continue;
+
+      if (cutMap.flag[ic] == DC_CUT)
+      {
+        if (cutType == 1) // Solid-boundary surface
+          cutMap.flag[ic] = DC_HOLE;
+        else              // Overset-boundary surface for background grid
+          cutMap.flag[ic] = DC_NORMAL;
+      }
+
+      for (int j = 0; j < nface; j++)
+      {
+        int ic2 = c2c[nface*ic+j];
+        if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
+        {
+          cutMap.flag[ic2] = cutMap.flag[ic];
+          nUnassigned--;
+        }
+      }
+
+      mark[ic] = 1;
+    }
+  }
+#endif
+
+  // ----- Queue version -----
+#ifdef FILL_QUEUE
+  while (paintQueue.size() > 0)
+  {
+    for (auto ic : paintQueue)
+    {
+      paintQueue.erase(ic);
+
+      if (ic < 0) continue;
+
+      if (cutMap.flag[ic] == DC_CUT)
+      {
+        if (cutType == 1) // Solid-boundary surface
+          cutMap.flag[ic] = DC_HOLE;
+        else              // Overset-boundary surface for background grid
+          cutMap.flag[ic] = DC_NORMAL;
+      }
+
+      for (int j = 0; j < nface; j++)
+      {
+        int ic2 = c2c[nface*ic+j];
+        if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
+        {
+          cutMap.flag[ic2] = cutMap.flag[ic];
+          paintQueue.insert(ic2);
+        }
+      }
+    }
+  }
+#endif
+}
+
+void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
+{
+  for (int ic = 0; ic < ncells; ic++)
+  {
+    iblank_cell[ic] = NORMAL;
+    for (int g = 0; g < cutMap.size(); g++)
+    {
+      if (cutMap[g].flag[ic] == DC_HOLE)
+      {
+        iblank_cell[ic] = HOLE;
+        break;
+      }
     }
   }
 }

@@ -28,7 +28,23 @@
 
 #include "codetypes.h"
 #include "funcs.hpp"
+#include "points.hpp"
 #include "ADT.h"
+
+//! Helper struct for direct-cut method [Galbraith 2013]
+typedef struct CutMap
+{
+  std::vector<int> flag;     //! Cut flag for all cells (essentially iblank)
+  std::map<int,double> dist; //! Minimum distance to a cutting face
+  std::map<int,int> nMin;    //! # of cut faces that are approx. 'dist' away
+  std::map<int,Vec3> norm;   //! Normal vector of cutting face (or avg. of several)
+  //std::map<int,Vec3> vec;    //! Vector from face to cell (between closest points)
+} CutMap;
+
+enum DIRECT_CUT_FLAG
+{
+  DC_HOLE, DC_UNASSIGNED, DC_CUT, DC_NORMAL
+};
 
 // forward declare to instantiate one of the methods
 class parallelComm;
@@ -73,6 +89,8 @@ class MeshBlock
   int *mpiFaces;  /** < List of MPI face IDs on rank */
   int *mpiFidR;   /** < Matching MPI face IDs on opposite rank */
   int *mpiProcR;  /** < Opposite rank for MPI face */
+
+  std::vector<int> c2c;
 
   int nsend, nrecv;
   std::vector<int> sndMap, rcvMap;
@@ -233,6 +251,9 @@ class MeshBlock
   // Direct-Cut Method Variables - TO BE CLEANED UP
   int nDims = 3;
   int nGroups;
+  int nCutFringe, nCutHole;   //! # of fringe/hole-cutting faces on this rank
+  int gridType;               //! Type of grid: background (0) or normal (1)
+  std::vector<int> cutFacesW, cutFacesO; //! Wall and overset cut face lists
   std::vector<std::vector<int>> cutFaces;  //! List of faces on each cut group
   std::vector<int> groupIDs;
   std::set<int> myGroups;
@@ -398,11 +419,15 @@ class MeshBlock
 
   void getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::vector<double>> &faceBox, int nGroups_glob);
 
-  void getCutGroupFaces(std::vector<std::vector<double>> &faceNodes, int nGroups_glob);
+  int getCuttingFaces(std::vector<double> &faceNodesW, std::vector<double> &faceNodesO);
 
   void getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob);
 
-  void directCut(std::vector<double> &faceBox, int nCutFaces, std::vector<int> &cutFlag);
+  //! Determine blanking status based upon given set of wall and overset faces
+  void directCut(std::vector<double> &cutFaces, int nCut, int nvertf, CutMap& cutMap, int cutType = 1);
+
+  //! Take the union of all cut flags
+  void unifyCutFlags(std::vector<CutMap> &cutMap);
 
   void set_cell_iblank(int *iblank_cell_input)
   {
@@ -509,6 +534,9 @@ class MeshBlock
 
   /*! Apply blanking algorithm (to nodal iblank?) to get cell & face iblanks */
   void setArtificialBoundaries(void);
+
+  /*! Setup additional helpful connectivity structures */
+  void extraConn(void);
 
   /* ---- GPU-Related Functions ---- */
 #ifdef _GPU

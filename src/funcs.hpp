@@ -62,7 +62,7 @@ std::ostream& operator<<(std::ostream &os, const std::vector<double> &vec);
 
 double getDist(point a, point b);
 
-/* ---------------------------- Misc. Functions ---------------------------- */
+/* ------------------------ Mathematical Functions ------------------------- */
 
 /*! Evaluate the 1D Lagrange polynomial mode based on points x_lag at point y */
 double Lagrange(std::vector<double> &x_lag, double y, uint mode);
@@ -79,8 +79,15 @@ void adjoint(const std::vector<double> &mat, std::vector<double> &adj, unsigned 
 /*! Calculate the determinant of a 'size x size' matrix stored row-major in 'mat' */
 double determinant(const std::vector<double> &mat, unsigned int size);
 
+Vec3 faceNormal(double* xv, int nDims);
+
+/* ---------------------------- Misc. Functions ---------------------------- */
+
 /*! Return the bounding box of a collection of points [min x,y,z; max x,y,z] */
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
+
+/*! Create an N-dimensional simplex of size L centered at x0 */
+void getSimplex(int nDims, const std::vector<double> &x0, double L, std::vector<double> &X);
 
 /*! Get reference location out_rst of point in_xyz within an element defined by the points in xv */
 bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, int nDims);
@@ -89,7 +96,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 double computeVolume(double *xv, int nNodes, int nDims);
 
 /*! Determine whether a given face and cell intersect */
-bool intersectionCheck(double *fx, int nvf, double *ex, int nve, int nDims);
+Vec3 intersectionCheck(double *fxv, int nvf, double *exv, int nve, int nDims);
 
 std::vector<int> get_int_list(int N, int start = 0);
 std::vector<uint> get_int_list(uint N, uint start = 0);
@@ -116,6 +123,9 @@ int findFirst(const std::vector<T>& vec, T val)
 
 /* ---------------------------- Shape Functions ---------------------------- */
 
+void shape_line(double xi, std::vector<double> &out_shape, int nNodes);
+void shape_line(double xi, double* out_shape, int nNodes);
+
 //! Shape function for linear or quadratic quad (TODO: Generalize to N-noded quad)
 void shape_quad(const point &in_rs, std::vector<double> &out_shape, int nNodes);
 void shape_quad(const point &in_rs, double* out_shape, int nNodes);
@@ -132,8 +142,6 @@ void shape_hex(const point &in_rst, double* out_shape, int nNodes);
 void dshape_hex(const std::vector<point>& loc_pts, double* out_dshape, int nNodes);
 void dshape_hex(const point &in_rst, double* out_dshape, int nNodes);
 
-} // namespace tg_funcs
-
 /*!
  * Nelder-Mead Minimzation Routine
  *
@@ -144,7 +152,7 @@ void dshape_hex(const point &in_rst, double* out_dshape, int nNodes);
  *            std::vector<double> and returning a double
  */
 template<typename Func>
-std::vector<double> NelderMead(const std::vector<double> &U0, Func minFunc)
+std::pair<double,std::vector<double>> NelderMead(const std::vector<double> &U0, Func minFunc, double L = 1.)
 {
   /// TODO: Optimize the crap out of this
 
@@ -153,17 +161,12 @@ std::vector<double> NelderMead(const std::vector<double> &U0, Func minFunc)
   std::vector<std::pair<double,std::vector<double>>> FX(nPts);
 
   // Starting location for search
-  /// TODO: write function to generate ND-simplex of given size around a point
-  for (int i=0; i<nPts; i++) {
-    FX[i].second = U0;
-    if (i>0) {
-      FX[i].second[i-1] += .03*FX[i].second[i-1];
-    } else {
-      for (int j=0; j<nVars; j++) {
-        FX[i].second[j] -= .01*FX[i].second[j];
-      }
-    }
-  }
+  std::vector<double> X;
+  getSimplex(nVars, U0, L, X);
+
+  for (int i = 0; i < nPts; i++)
+    for (int j = 0; j < nVars; j++)
+      FX[i].second[j] = X[i*nVars+j];
 
   // Evaluate the 'function' at the initial 'points'
   for (int i=0; i<nPts; i++)
@@ -172,10 +175,10 @@ std::vector<double> NelderMead(const std::vector<double> &U0, Func minFunc)
   std::sort(FX.begin(),FX.end());
 
   std::vector<double> Xn(nVars);  // Point with the highest value of F
-  std::vector<double> X0(nVars);              // Centroid of all other points
-  std::vector<double> Xr(nVars);              // Reflected point
-  std::vector<double> Xe(nVars);              // Expanded point
-  std::vector<double> Xc(nVars);              // Contracted point
+  std::vector<double> X0(nVars);  // Centroid of all other points
+  std::vector<double> Xr(nVars);  // Reflected point
+  std::vector<double> Xe(nVars);  // Expanded point
+  std::vector<double> Xc(nVars);  // Contracted point
 
   // Use a relative tolerance...?
   double tol = 1e-8;
@@ -249,8 +252,9 @@ std::vector<double> NelderMead(const std::vector<double> &U0, Func minFunc)
     iter++;
   }
 
-  return FX[0].second;
+  return FX[0];
 }
 
+} // namespace tg_funcs
 #endif // FUNCS_HPP
 

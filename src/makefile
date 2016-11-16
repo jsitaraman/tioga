@@ -11,7 +11,6 @@ CXX= mpicxx
 ifeq ($(strip $(CUC)),)
 	CUC=nvcc
 endif
-CUC = nvcc
 AR = ar -rvs
 
 SWIG = $(SWIG_BIN)/swig -c++ -python

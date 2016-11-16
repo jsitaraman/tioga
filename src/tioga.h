@@ -110,13 +110,18 @@ class tioga
   int isym;
   int ierr;
   int mytag;
-  int myid,numprocs;
+  int myid,nproc;
   int *sendCount;
   int *recvCount;
   OBB *obblist;
   int iorphanPrint;
 
   int nprocMesh, meshRank;
+
+  int nCutFringe, nCutHole;   //! # of fringe/hole-cutting faces on this rank
+  int gridType;               //! Type of grid: background (0) or normal (1)
+  std::vector<int> gridIDs;   //! Grid ID for each rank
+  std::vector<int> gridTypes; //! Grid type for each rank
 
   //! NEW - attempting to speed up code...
   std::vector<VPACKET> sndVPack, rcvVPack;

@@ -241,6 +241,66 @@ void MeshBlock::tagBoundary(void)
   }
 }
 
+void MeshBlock::setupADT(void)
+{
+  free(elementBbox);
+  free(elementList);
+
+  /// TODO: take in a bounding box of the region we're interested in searching (search.c)
+  elementBbox = (double *)malloc(sizeof(double)*ncells*6);
+  elementList = (int *)malloc(sizeof(int)*ncells);
+
+  double xmin[3], xmax[3];
+  for (int i = 0; i < ncells; i++)
+  {
+    int isum = 0;
+    int ic = i;
+    int n;
+    for (n = 0; n < ntypes; n++)
+    {
+      isum += nc[n];
+      if (ic < isum)
+      {
+        ic = i - (isum - nc[n]);
+        break;
+      }
+    }
+
+    int nvert = nv[n];
+    xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
+    xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
+    for (int m = 0; m < nvert; m++)
+    {
+      int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+      for (int j = 0; j < 3; j++)
+      {
+        xmin[j] = min(xmin[j], x[i3+j]);
+        xmax[j] = max(xmax[j], x[i3+j]);
+      }
+    }
+
+    elementBbox[6*i] = xmin[0];
+    elementBbox[6*i+1] = xmin[1];
+    elementBbox[6*i+2] = xmin[2];
+    elementBbox[6*i+3] = xmax[0];
+    elementBbox[6*i+4] = xmax[1];
+    elementBbox[6*i+5] = xmax[2];
+
+    elementList[i] = i;
+  }
+
+  if (adt)
+  {
+    adt->clearData();
+  }
+  else
+  {
+    adt=new ADT[1];
+  }
+
+  adt->buildADT(2*nDims, ncells, elementBbox);
+}
+
 void MeshBlock::writeGridFile(int bid)
 {
   char fname[80];

@@ -28,6 +28,7 @@
  */
 #include <algorithm>
 #include <cmath>
+#include <iomanip>
 #include <limits.h>
 #include <map>
 #include <omp.h>
@@ -626,18 +627,19 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
   xmax = box[3];  ymax = box[4];  zmax = box[5];
 
   point pos = point(in_xyz);
-  if (pos.x < xmin-eps || pos.y < ymin-eps || pos.z < zmin-eps ||
-      pos.x > xmax+eps || pos.y > ymax+eps || pos.z > zmax+eps) {
-    // Point does not lie within cell - return an obviously bad ref position
-    for (int i = 0; i < nDims; i++) out_rst[i] = 99.;
-    return false;
-  }
+//  if (pos.x < xmin-eps || pos.y < ymin-eps || pos.z < zmin-eps ||
+//      pos.x > xmax+eps || pos.y > ymax+eps || pos.z > zmax+eps) {
+//    // Point does not lie within cell - return an obviously bad ref position
+//    for (int i = 0; i < nDims; i++) out_rst[i] = 99.;
+//    return false;
+//  }
 
   // Use a relative tolerance to handle extreme grids
   double h = std::min(xmax-xmin,ymax-ymin);
   if (nDims==3) h = std::min(h,zmax-zmin);
 
-  double tol = 1e-12*h;
+//  double tol = 1e-12*h;
+  double tol = 1e-10*h;
 
   std::vector<double> shape(nNodes);
   std::vector<double> dshape(nNodes*nDims);
@@ -683,8 +685,10 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
         delta[i] += ginv[i*nDims+j]*dx[j]/detJ;
 
     norm = dx.norm();
-    for (int i=0; i<nDims; i++)
-      loc[i] = std::max(std::min(loc[i]+delta[i],1.01),-1.01);
+    for (int i = 0; i < nDims; i++) /// DEBUGGING DIRECT_CUT
+      loc[i] += .8*delta[i];
+//    for (int i=0; i<nDims; i++)
+//      loc[i] = std::max(std::min(loc[i]+delta[i],1.01),-1.01);
 
     iter++;
   }
@@ -1130,11 +1134,14 @@ void getSimplex(int nDims, const std::vector<double> &x0, double L, std::vector<
       X[j*nDims+i] = dot;
 
     // Ensure norm(x_i) = 1
-    dot = 0.;
-    for (int j = 0; j < i; j++)
-      dot += X[(i+1)*nDims+j]*X[(i+1)*nDims+j];
+    if (i+1 < nDims)
+    {
+      dot = 0.;
+      for (int j = 0; j < i; j++)
+        dot += X[(i+1)*nDims+j]*X[(i+1)*nDims+j];
 
-    X[(i+1)*nDims+i+1] = std::sqrt(1.-std::abs(dot));
+      X[(i+1)*nDims+i+1] = std::sqrt(1.-std::abs(dot));
+    }
   }
 
   // Scale and translate the final simplex
@@ -1148,130 +1155,151 @@ void getSimplex(int nDims, const std::vector<double> &x0, double L, std::vector<
   }
 }
 
-double CellFaceDist(std::vector<double> &shapeC, std::vector<double> &shapeF,
-                    double* ex, double* fx, const std::vector<double> &xloc, int nDims)
+point CalcPos(std::vector<double> &shape, double* xv,
+    const std::vector<double> &xloc, int nDims)
 {
-  point pc = point(&xloc[0],nDims);
-  point pf = point(&xloc[nDims],nDims-1);
-
-  double pen = 1.; // penalty term to keep points within ref. domain
-
-  for (int i = 0; i < nDims; i++)
-    if (std::abs(pc[i]) > 1.)
-      pen *= std::abs(pc[i]);
-
-  for (int i = 0; i < nDims-1; i++)
-    if (std::abs(pf[i]) > 1.)
-      pen *= std::abs(pf[i]);
+  point pt = point(&xloc[0],nDims);
 
   if (nDims == 3)
-  {
-    shape_hex(pc, shapeC, shapeC.size());
-    shape_quad(pf, shapeF, shapeF.size());
-  }
+    shape_hex(pt, shape, shape.size());
   else
-  {
-    shape_quad(pc, shapeC, shapeC.size());
-    shape_line(pc.x, shapeF, shapeF.size());
-  }
+    shape_quad(pt, shape, shape.size());
 
-  pc.zero();
-  for (int n = 0; n < shapeC.size(); n++) {
-    for (int i = 0; i < nDims; i++) {
-      pc[i] += shapeC[n] * ex[n*nDims+i];
-    }
-  }
+  pt.zero();
+  for (int n = 0; n < shape.size(); n++)
+    for (int i = 0; i < 3; i++)
+      pt[i] += shape[n] * xv[n*3+i];
 
-  pf.zero();
-  for (int n = 0; n < shapeF.size(); n++) {
-    for (int i = 0; i < nDims; i++) {
-      pf[i] += shapeF[n] * fx[n*nDims+i];
-    }
-  }
-
-  return (pc-pf).norm() * pen;
+  return pt;
 }
 
-Vec3 CellFaceVec(std::vector<double> &shapeC, std::vector<double> &shapeF,
-                 double* ex, double* fx, const std::vector<double> &xloc, int nDims)
+
+point CalcPos1D(std::vector<double> &shape, double* xv,
+    const std::vector<double> &xloc)
 {
-  point pc = point(&xloc[0],nDims);
-  point pf = point(&xloc[nDims],nDims-1);
+  shape_line(xloc[0], shape, shape.size());
 
-  if (nDims == 3)
-  {
-    shape_hex(pc, shapeC, shapeC.size());
-    shape_quad(pf, shapeF, shapeF.size());
-  }
-  else
-  {
-    shape_quad(pc, shapeC, shapeC.size());
-    shape_line(pc.x, shapeF, shapeF.size());
-  }
+  point pt;
+  for (int n = 0; n < shape.size(); n++)
+    for (int i = 0; i < 2; i++)
+      pt[i] += shape[n] * xv[n*2+i];
 
-  pc.zero();
-  for (int n = 0; n < shapeC.size(); n++) {
-    for (int i = 0; i < nDims; i++) {
-      pc[i] += shapeC[n] * ex[n*nDims+i];
-    }
-  }
-
-  pf.zero();
-  for (int n = 0; n < shapeF.size(); n++) {
-    for (int i = 0; i < nDims; i++) {
-      pf[i] += shapeF[n] * fx[n*nDims+i];
-    }
-  }
-
-  return pc-pf;
+  return pt;
 }
 
-Vec3 intersectionCheck(double* fxv, int nvf, double* exv, int nve, int nDims = 3)
+point CalcPos2D(std::vector<double> &shape, double* xv,
+    const std::vector<double> &xloc)
 {
-  // Not needed right now due to how this is being called...
-//  // Start by checking for bounding-box intersection
-//  double boxC[6], boxF[6];
-//  getBoundingBox(exv, nve, nDims, boxC);
-//  getBoundingBox(fxv, nvf, nDims, boxF);
+  point pt = point(&xloc[0],2);
 
-//  bool flag = true;
-//  for (int d = 0; d < nDims; d++)
+  shape_quad(pt, shape, shape.size());
+
+  pt.zero();
+  for (int n = 0; n < shape.size(); n++)
+    for (int i = 0; i < 2; i++)
+      pt[i] += shape[n] * xv[n*2+i];
+
+  return pt;
+}
+
+point CalcPos3D(std::vector<double> &shape, double* xv,
+    const std::vector<double> &xloc)
+{
+  point pt = point(&xloc[0],2);
+
+  shape_quad(pt, shape, shape.size());
+
+  pt.zero();
+  for (int n = 0; n < shape.size(); n++)
+    for (int i = 0; i < 3; i++)
+      pt[i] += shape[n] * xv[n*3+i];
+
+  return pt;
+}
+
+double constraintFunc(const std::vector<double> &refLoc)
+{
+  double maxVal = 0;
+  for (auto &coord : refLoc)
+    maxVal = std::max(maxVal,std::abs(coord));
+
+  if (maxVal > 1.)
+    return maxVal;
+  else
+    return -1.;
+}
+
+Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
+{
+//  printf("Element nodes:\n");
+//  for (int i = 0; i < nev; i++)
 //  {
-//    flag = (flag && (boxC[nDims+d] >= boxF[d] - TOL));
-//    flag = (flag && (boxC[d] <= boxF[nDims+d] + TOL));
+//    printf("%d: %f %f %f\n",i,exv[3*i],exv[3*i+1],exv[3*i+2]);
 //  }
 
-//  if (!flag) // Face and cell do not intersect
-//    return false;
+//  printf("\nFace nodes:\n");
+//  for (int i = 0; i < nfv; i++)
+//  {
+//    printf("%d: %f %f %f\n",i,fxv[3*i],fxv[3*i+1],fxv[3*i+2]);
+//  }
 
-  /// TODO: look for convex optimization tricks to improve problem robustness
-  // Use NelderMead() function to determine minimum distance between the hex
-  // element and the quad face (both potentially curved)
-  // See Galbraith - should be a 5D minimization problem (xi,eta,zeta,r,s)
+  std::vector<double> shapeC(nev), shapeF(nfv);
 
-  // Function to minimize using Nelder-Mead algorithm
-  std::vector<double> shapeC(nve), shapeF(nvf);
+  int num_evals = 0;
 
-  auto minFunc = [&](const std::vector<double> &U_IN) -> double
+  double eps = 2e-8;
+  auto minFunc = [&](const std::vector<double> &X_IN) -> double
   {
-    return CellFaceDist(shapeC,shapeF,exv,fxv,U_IN,nDims);
+    double rst[3];
+    point pt = (nDims==2) ? CalcPos1D(shapeF, fxv, X_IN)
+                          : CalcPos3D(shapeF, fxv, X_IN);
+    double xyz[3] = {pt.x,pt.y,pt.z};
+    getRefLocNewton(exv, xyz, rst, nev, nDims);
+
+    double maxVal = 0;
+    for (int i = 0; i < nDims; i++)
+      maxVal = std::max(maxVal,std::abs(rst[i]));
+
+    num_evals++;
+
+    if (maxVal > 1. + eps)
+      return maxVal - 1.;
+    else
+      return 0.;
   };
 
-  auto mini = NelderMead({0,0,0,0,0}, minFunc, .5);
+  NM_FVAL mini;
+  if (nDims == 2)
+    mini = NelderMead_constrained({0}, minFunc, constraintFunc, .75);
+  else
+    mini = NelderMead_constrained({0,0}, minFunc, constraintFunc, .3);
 
-  double minval = mini.first;
-  auto coords = mini.second;
+  if (mini.f < eps)
+  {
+    for (int i = 0; i < nev; i++)
+      if (exv[3*i+0] < -.08)
+      {
+        printf("This element should not intersect, but it did!\n");
+        break;
+      }
 
-  if (minval > 1e-6) // Above tolerance
-    return CellFaceVec(shapeC,shapeF,exv,fxv,mini.second,nDims);
+    return Vec3(0,0,0);
+  }
+  else
+  {
+    double rst[3];
+    point pt = (nDims==2) ? CalcPos1D(shapeF, fxv, mini.x)
+                          : CalcPos3D(shapeF, fxv, mini.x);
+    double xyz[3] = {pt.x,pt.y,pt.z};
+    getRefLocNewton(exv, xyz, rst, nev, nDims);
 
-  double maxcoord = *std::max_element(coords.begin(), coords.end());
-  double mincoord = *std::min_element(coords.begin(), coords.end());
+    for (int i = 0; i < nDims; i++)
+      rst[i] = std::min(std::max(rst[i], -1.), 1.);
 
-  if (maxcoord > 1. or mincoord < -1.)
-    return CellFaceVec(shapeC,shapeF,exv,fxv,mini.second,nDims);
+    point ptC = CalcPos(shapeC, exv, {rst[0],rst[1],rst[2]}, 3);
 
-  return point(0,0,0);
+    return ptC - pt;
+  }
 }
 
 } // namespace tg_funcs

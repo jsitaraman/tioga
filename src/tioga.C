@@ -102,11 +102,39 @@ void tioga::profile(void)
     MPI_Comm_rank(meshcomm, &meshRank);
     MPI_Comm_size(meshcomm, &nprocMesh);
 
+    /// TODO: put into callback function somewhere
+    gridType = mytag;
+    printf("%d -> %d\n",myid,gridType);
+
     // For the direct-cut method
     gridIDs.resize(nproc);
     gridTypes.resize(nproc);
     MPI_Allgather(&mytag, 1, MPI_INT, gridIDs.data(), 1, MPI_INT, scomm);
     MPI_Allgather(&gridType, 1, MPI_INT, gridTypes.data(), 1, MPI_INT, scomm);
+
+    // Setup send/recv map based on grid ID
+    std::vector<int> ptags(nproc);
+    MPI_Allgather(&mytag, 1, MPI_INT, ptags.data(), 1, MPI_INT, scomm);
+
+    // Enforcing symmetry in sends/recvs
+    int nsend = 0;
+    for (int i = 0; i < nproc; i++)
+      if (ptags[i] != mytag)
+        nsend++;
+
+    std::vector<int> sndMap(nsend);
+    for (int p = 0, m = 0; p < nproc; p++)
+    {
+      if (ptags[p] != mytag)
+      {
+        sndMap[m] = p;
+        m++;
+      }
+    }
+
+    pc->setMap(nsend, nsend, sndMap.data(), sndMap.data());
+
+    mb->setupADT();
 
     mb->extraConn();
   }
@@ -133,7 +161,8 @@ void tioga::performConnectivity(void)
   if (ihighGlobal)
   {
     // Calculate cell iblank values from nodal iblank values
-    mb->getCellIblanks(meshcomm);
+    ///mb->getCellIblanks(meshcomm);
+    directCut();
 
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {
@@ -191,32 +220,14 @@ void tioga::performConnectivityHighOrder(void)
   iorphanPrint=1;
 }
 
-void tioga::performConnectivityArtificialBoundary(void)
+void tioga::directCut(void)
 {
-  // Setup send/recv map based on grid ID
-  std::vector<int> ptags(nproc);
-  MPI_Allgather(&mytag, 1, MPI_INT, ptags.data(), 1, MPI_INT, scomm);
-
-  // Enforcing symmetry in sends/recvs
-  int nsend = 0;
-  for (int i = 0; i < nproc; i++)
-    if (ptags[i] != mytag)
-      nsend++;
-
-  std::vector<int> sndMap(nsend);
-  for (int p = 0, m = 0; p < nproc; p++)
-  {
-    if (ptags[p] != mytag)
-    {
-      sndMap[m] = p;
-      m++;
-    }
-  }
-
-  pc->setMap(nsend, nsend, sndMap.data(), sndMap.data());
-
   /* --- Direct Cut Method [copied from highOrder.C] --- */
   int nDims = mb->nDims;
+
+  /// TODO: Callbacks
+  nCutFringe = mb->nCutFringe;
+  nCutHole = mb->nCutHole;
 
   // Get cutting-group bounding-box data for this rank
 //  std::vector<double> cutBox(6*nproc);             // implement more involved algorithm later
@@ -245,8 +256,9 @@ void tioga::performConnectivityArtificialBoundary(void)
     {
       if (nHoleFace[p] > 0)
       {
+        printf("%d, nhole[%d] = %d\n",myid,p,nHoleFace[p]);
         // recv from rank
-        faceNodesW_g[p].resize(nHoleFace[p]);
+        faceNodesW_g[p].resize(nHoleFace[p]*nvertf[p]*nDims);
         rreqs.emplace_back();
         MPI_Irecv(faceNodesW_g[p].data(), nHoleFace[p]*nvertf[p]*nDims, MPI_DOUBLE,
             p, 0, scomm, &rreqs.back());
@@ -254,6 +266,7 @@ void tioga::performConnectivityArtificialBoundary(void)
 
       if (nCutHole > 0)
       {
+        printf("%d, nCutHole = %d\n",myid,nCutHole);
         // send to rank
         sreqs.emplace_back();
         MPI_Isend(faceNodesW.data(), nCutHole*nvert*nDims, MPI_DOUBLE,
@@ -262,15 +275,17 @@ void tioga::performConnectivityArtificialBoundary(void)
 
       if (gridType == 0 && nOverFace[p] > 0)
       {
+        printf("%d, nover[%d] = %d\n",myid,p,nOverFace[p]);
         // recv from rank
-        faceNodesO_g[p].resize(nOverFace[p]);
+        faceNodesO_g[p].resize(nOverFace[p]*nvertf[p]*nDims);
         rreqs.emplace_back();
         MPI_Irecv(faceNodesO_g[p].data(), nOverFace[p]*nvertf[p]*nDims, MPI_DOUBLE,
-            p, 0, scomm, &rreqs.back());
+            p, 1, scomm, &rreqs.back());
       }
 
       if (gridTypes[p] == 0 && nCutFringe > 0)
       {
+        printf("%d, nCutFringe = %d\n",myid,nCutFringe);
         // Send our overset faces to the background grid
         sreqs.emplace_back();
         MPI_Isend(faceNodesO.data(), nCutFringe*nvert*nDims, MPI_DOUBLE,
@@ -280,10 +295,10 @@ void tioga::performConnectivityArtificialBoundary(void)
   }
 
   // Complete the communication
-  MPI_Waitall(sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
-  MPI_Waitall(rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
+  MPI_Waitall((int)sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
+  MPI_Waitall((int)rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
 
-//  // Get the global bounding box info across all the partitions for all meshes
+  //  // Get the global bounding box info across all the partitions for all meshes
 //  std::vector<double> cutBox_global(6*nGroups_glob);
 //  for (int G = 0; G < nGroups_glob; G++)
 //  {
@@ -304,34 +319,23 @@ void tioga::performConnectivityArtificialBoundary(void)
   if (gridType == 0)
     cutMap.resize(2*nproc); // Bkgd grid - cut with both wall and overset faces
 
+  int ncut = 0;
   for (int p = 0; p < nproc; p++)
   {
-    mb->directCut(faceNodesW_g[p], nHoleFace[p], nvertf[p], cutMap[p]);
+    if (gridIDs[p] == mytag) continue;
 
-    if (gridType == 0)
-      mb->directCut(faceNodesO_g[p], nOverFace[p], nvertf[p], cutMap[nproc+p], 0);
+    mb->directCut(faceNodesW_g[p], nHoleFace[p], nvertf[p], cutMap[ncut]);
+    ncut++;
+
+//    if (gridType == 0)
+//    {
+//      mb->directCut(faceNodesO_g[p], nOverFace[p], nvertf[p], cutMap[ncut], 0);
+//      ncut++;
+//    }
   }
 
+  cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
-
-  // Find artificial boundary faces
-  mb->calcFaceIblanks(meshcomm);
-
-  // Get all AB face point locations
-  mb->getBoundaryNodes();
-
-  // Exchange new list of points, including high-order Artificial Boundary
-  // face points or internal points (or fringe nodes for non-high order)
-  exchangePointSearchData();
-
-  mb->search();
-
-  // Setup interpolation weights and such for final interp-point list
-  mb->processPointDonors();
-
-#ifdef _GPU
-  setupCommBuffersGPU();
-#endif
 }
 
 //{

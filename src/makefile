@@ -27,25 +27,25 @@ ifeq ($(strip $(CUDA)),YES)
 	CFLAGS += -D_GPU
 	CUFLAGS += -D_GPU
 	LIBS += -L$(strip $(CUDA_DIR))/lib64 -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_DIR))/lib64
-	INCS += -I$(strip $(CUDA_DIR))/include
 ifeq ($(strip $(CU_SM)),)
 	CUFLAGS += -arch=sm_20
 else
 	CUFLAGS += -arch=sm_$(CU_SM)
 endif
 endif
+INCS += -I$(strip $(CUDA_DIR))/include
 
 ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CFLAGS += -Ofast
 	CUFLAGS += -O3 -use_fast_math
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),1)
-	CFLAGS += -g -O3 -D_NVTX
-	CUFLAGS += -g -O3 -D_NVTX
+	CFLAGS += -g -O3 #-D_NVTX
+	CUFLAGS += -g -O3 #-D_NVTX
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),2)
-	CFLAGS += -g -O0 -D_NVTX
-	CUFLAGS += -g -O0 -D_NVTX
+	CFLAGS += -g -O0 #-D_NVTX
+	CUFLAGS += -g -O0 #-D_NVTX
 endif
 
 WARN_ON = -Wall -Wextra -Wconversion

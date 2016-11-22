@@ -37,6 +37,7 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
+#include <tuple>
 
 #include "error.hpp"
 #include "points.hpp"
@@ -96,7 +97,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 double computeVolume(double *xv, int nNodes, int nDims);
 
 /*! Determine whether a given face and cell intersect */
-Vec3 intersectionCheck(double *fxv, int nvf, double *exv, int nve, int nDims);
+Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims);
 
 std::vector<int> get_int_list(int N, int start = 0);
 std::vector<uint> get_int_list(uint N, uint start = 0);
@@ -142,6 +143,74 @@ void shape_hex(const point &in_rst, double* out_shape, int nNodes);
 void dshape_hex(const std::vector<point>& loc_pts, double* out_dshape, int nNodes);
 void dshape_hex(const point &in_rst, double* out_dshape, int nNodes);
 
+/* ------------------------- Optimization Functions ------------------------ */
+
+typedef struct NM_FVAL
+{
+  double f;
+  double g;
+  std::vector<double> x;
+} NM_FVAL;
+
+inline bool operator<  (const NM_FVAL &a, const NM_FVAL &b) { return a.f <  b.f; }
+inline bool operator<= (const NM_FVAL &a, const NM_FVAL &b) { return a.f <= b.f; }
+inline bool operator>  (const NM_FVAL &a, const NM_FVAL &b) { return a.f >  b.f; }
+inline bool operator>= (const NM_FVAL &a, const NM_FVAL &b) { return a.f >= b.f; }
+
+inline std::vector<double> operator+ (const std::vector<double> &a,
+                               const std::vector<double> &b)
+{
+  std::vector<double> c(a);
+  for (uint i = 0; i < c.size(); i++)
+    c[i] += b[i];
+
+  return c;
+}
+
+inline std::vector<double> operator* (double a, const std::vector<double> &b)
+{
+  std::vector<double> c(b);
+  for (uint i = 0; i < c.size(); i++)
+    c[i] *= a;
+
+  return c;
+}
+
+inline std::vector<double> operator/ (const std::vector<double> &a, double b)
+{
+  std::vector<double> c(a);
+  for (uint i = 0; i < c.size(); i++)
+    c[i] /= b;
+
+  return c;
+}
+
+inline std::vector<double> operator- (const std::vector<double> &a,
+                               const std::vector<double> &b)
+{
+  std::vector<double> c(a);
+  for (uint i = 0; i < c.size(); i++)
+    c[i] -= b[i];
+
+  return c;
+}
+
+inline unsigned getIndAbsMax(const std::vector<double> &vec)
+{
+  unsigned ind = 0;
+  double maxVal = -1e15;
+  for (unsigned i = 0; i < vec.size(); i++)
+  {
+    if (std::abs(vec[i]) > maxVal)
+    {
+      maxVal = std::abs(vec[i]);
+      ind = i;
+    }
+  }
+
+  return ind;
+}
+
 /*!
  * Nelder-Mead Minimzation Routine
  *
@@ -152,25 +221,44 @@ void dshape_hex(const point &in_rst, double* out_dshape, int nNodes);
  *            std::vector<double> and returning a double
  */
 template<typename Func>
-std::pair<double,std::vector<double>> NelderMead(const std::vector<double> &U0, Func minFunc, double L = 1.)
+NM_FVAL NelderMead(const std::vector<double> &U0, Func minFunc, double L = 1.)
 {
   /// TODO: Optimize the crap out of this
 
   int nVars = U0.size();
   int nPts = nVars+1;
-  std::vector<std::pair<double,std::vector<double>>> FX(nPts);
+  std::vector<NM_FVAL> FX(nPts);
 
   // Starting location for search
-  std::vector<double> X;
-  getSimplex(nVars, U0, L, X);
+  if (nVars == 5) // 3D intersection
+  {
+    double x1 = L*.5;
+    double x2 = L*std::sqrt(3)/2.;
+    double x3 = L*cos(M_PI/3.);
+    double x4 = L*sin(M_PI/3.);
+    FX[0].x = {L,    0,  x1,  x1,   0};
+    FX[1].x = {-x1, x2,  x1,  x3,  x4};
+    FX[2].x = {-x1,-x2,  x1,  x3, -x4};
+    FX[3].x = {-L,   0, -x1, -x1,   0};
+    FX[4].x = {x1, -x2, -x1, -x3, -x4};
+    FX[5].x = {x1,  x2, -x1, -x3,  x4};
+  }
+  else
+  {
+    std::vector<double> X;
+    getSimplex(nVars, U0, L, X);
 
-  for (int i = 0; i < nPts; i++)
-    for (int j = 0; j < nVars; j++)
-      FX[i].second[j] = X[i*nVars+j];
+    for (int i = 0; i < nPts; i++)
+    {
+      FX[i].x.resize(nVars);
+      for (int j = 0; j < nVars; j++)
+        FX[i].x[j] = X[i*nVars+j];
+    }
+  }
 
   // Evaluate the 'function' at the initial 'points'
   for (int i=0; i<nPts; i++)
-    FX[i].first = minFunc(FX[i].second);
+    FX[i].f = minFunc(FX[i].x);
 
   std::sort(FX.begin(),FX.end());
 
@@ -183,65 +271,62 @@ std::pair<double,std::vector<double>> NelderMead(const std::vector<double> &U0, 
   // Use a relative tolerance...?
   double tol = 1e-8;
   int iter = 0;
-  while (iter < 200 && FX[0].first > tol) {
-    Xn = FX[nVars].second;
+  while (iter < 200 && FX[0].f > tol) {
+    Xn = FX[nVars].x;
 
     // Take centroid of all points besides Xn
+    X0.assign(nVars,0);
     for (int j=0; j<nPts-1; j++)
-      for (int k=0; k<nVars; k++)
-        X0[k] += FX[j].second[k]/(nPts-1);
+      X0 = X0 + FX[j].x / (nPts-1.);
 
     // Reflect Xn around X0
-    for (int k=0; k<nVars; k++)
-      Xr[k] = X0[k] + (X0[k]-Xn[k]);
+    Xr = X0 + X0-Xn;
 
     double Fr = minFunc(Xr);
 
     // Determine what to do with the new point
-    if (Fr < FX[nPts-2].first) {
+    if (Fr < FX[nPts-2].f) {
       // We will be keeping this point
-      if (Fr < FX[0].first) {
+      if (Fr < FX[0].f) {
         // This one's good; keep going! Expand from Xr
-        for (int i=0; i<nVars; i++)
-          Xe[i] = Xr[i] + (X0[i]-Xn[i]);
+        Xe = Xr + X0-Xn;
+
         double Fe = minFunc(Xe);
 
         if (Fe < Fr) {
           // This one's even better; use it instead
-          FX[nPts-1].first = Fe;
-          FX[nPts-1].second = Xe;
+          FX[nPts-1].f = Fe;
+          FX[nPts-1].x = Xe;
         }
         else {
           // Xe/Fe was no better; stick with Fr, Xr
-          FX[nPts-1].first = Fr;
-          FX[nPts-1].second = Xr;
+          FX[nPts-1].f = Fr;
+          FX[nPts-1].x = Xr;
         }
       }
       else {
         // This one's somewhere in the middle; replace Xn with Xr
-        FX[nPts-1].first = Fr;
-        FX[nPts-1].second = Xr;
+        FX[nPts-1].f = Fr;
+        FX[nPts-1].x = Xr;
       }
     }
     else {
       // Try reducing the size of the simplex
-      for (int i=0; i<nVars; i++)
-        Xc[i] = X0[i] - (X0[i]-Xn[i])*.5;
+      Xc = X0 + X0-Xn;
+
       double Fc = minFunc(Xc);
-      if (Fc < FX[nPts-1].first) {
+      if (Fc < FX[nPts-1].f) {
         // Bringing this point in is better; use it
-        FX[nPts-1].first = Fc;
-        FX[nPts-1].second = Xc;
+        FX[nPts-1].f = Fc;
+        FX[nPts-1].x = Xc;
       }
       else {
         // Bringing this point in didn't work; shrink the simplex onto
         // the smallest-valued vertex
-        Xc = FX[0].second;
+        Xc = FX[0].x;
         for (int i=1; i<nPts; i++) {
-          for (int j=0; j<nVars; j++) {
-            FX[i].second[j] = Xc[j] + 0.5*(FX[i].second[j]-Xc[j]);
-          }
-          FX[i].first = minFunc(FX[i].second);
+          FX[i].x = Xc + .5*(FX[i].x-Xc);
+          FX[i].f = minFunc(FX[i].x);
         }
       }
     }
@@ -253,6 +338,273 @@ std::pair<double,std::vector<double>> NelderMead(const std::vector<double> &U0, 
   }
 
   return FX[0];
+}
+
+/*!
+ * Nelder-Mead Minimzation Routine With Constraints
+ *
+ * Returns: the coordinates of the point found to be the minimum
+ *
+ * \param[in] U0: Starting coordinates for search
+ * \param[in] minFunc: a normal or lambda function accepting a
+ *            std::vector<double> and returning a double
+ * \param[in] G: Constraint function of form G(x) < 0
+ */
+template<typename MinFunc, typename Constraint>
+NM_FVAL NelderMead_constrained(const std::vector<double> &U0,
+    MinFunc minFunc, Constraint G, double L = 1.)
+{
+  /// TODO: Optimize the crap out of this
+
+  int nVars = U0.size();
+  int nPts = nVars+1;
+  std::vector<NM_FVAL> FX(nPts);
+
+//  std::ofstream fout("nm-output.csv");
+
+  // Starting location for search
+  if (nVars == 5)
+  {
+    double x1 = L*.5;
+    double x2 = L*std::sqrt(3.)/2.;
+    double x3 = x1*cos(M_PI/3.);
+    double x4 = x1*sin(M_PI/3.);
+    FX[0].x = {L,    0,  x1,  x1,   0};
+    FX[1].x = {-x1, x2,  x1,  x3,  x4};
+    FX[2].x = {-x1,-x2,  x1,  x3, -x4};
+    FX[3].x = {-L,   0, -x1, -x1,   0};
+    FX[4].x = {x1, -x2, -x1, -x3, -x4};
+    FX[5].x = {x1,  x2, -x1, -x3,  x4};
+  }
+  else
+  {
+    std::vector<double> X;
+    getSimplex(nVars, U0, L, X);
+
+    for (int i = 0; i < nPts; i++)
+    {
+      FX[i].x.resize(nVars);
+      for (int j = 0; j < nVars; j++)
+        FX[i].x[j] = X[i*nVars+j];
+    }
+  }
+
+  // Evaluate the 'function' at the initial 'points'
+  double maxG = -1;
+  for (int i=0; i<nPts; i++)
+  {
+    FX[i].f = minFunc(FX[i].x);
+    FX[i].g = G(FX[i].x);
+    maxG = std::max(FX[i].g, maxG);
+  }
+
+  std::sort(FX.begin(),FX.end());
+
+  std::vector<double> Xn(nVars);  // Point with the highest value of F
+  std::vector<double> X0(nVars);  // Centroid of all other points
+  std::vector<double> Xr(nVars);  // Reflected point
+  std::vector<double> Xe(nVars);  // Expanded point
+  std::vector<double> Xc(nVars);  // Contracted point
+
+  std::vector<double> Dx(nVars);
+
+  // Use a relative tolerance...?
+  double tol = 1e-8;
+  int iter = 0;
+  while (iter < 200 && FX[0].f > tol)
+  {
+    Xn = FX[nVars].x;
+
+    // Take centroid of all points besides Xn
+    X0.assign(nVars,0);
+    for (int j = 0; j < nPts-1; j++)
+      X0 = X0 + FX[j].x / (nPts-1.);
+
+    // Reflect Xn around X0
+    Dx = X0 - Xn;
+    Xr = X0 + Dx;
+
+    double Gr = G(Xr);
+    if (Gr > 0)
+    {
+      int ind = getIndAbsMax(Xr);
+      double fac = .8*(1.-(std::abs(Xr[ind])-1.)/(std::abs(Dx[ind])));
+      Xr = X0 + fac*Dx;
+    }
+
+    double Fr = minFunc(Xr);
+    Gr = G(Xr);
+
+    // Determine what to do with the new point
+    if (Fr < FX[nPts-2].f and Gr < 0)
+    {
+      // We will be keeping this point
+      if (Fr < FX[0].f)
+      {
+        // This one's good; keep going! Expand from Xr
+        Xe = Xr + X0-Xn;
+
+        double Fe = minFunc(Xe);
+        double Ge = G(Xe);
+
+        if (Fe < Fr and Ge < 0)
+        {
+          // This one's even better; use it instead
+          FX[nPts-1].f = Fe;
+          FX[nPts-1].x = Xe;
+        }
+        else
+        {
+          // Xe/Fe was no better; stick with Fr, Xr
+          FX[nPts-1].f = Fr;
+          FX[nPts-1].x = Xr;
+        }
+      }
+      else
+      {
+        // This one's somewhere in the middle; replace Xn with Xr
+        FX[nPts-1].f = Fr;
+        FX[nPts-1].x = Xr;
+      }
+    }
+    else
+    {
+      // Try reducing the size of the simplex
+      Xc = X0 + .5*(X0-Xn);
+
+      double Fc = minFunc(Xc);
+      double Gc = G(Xc);
+      if (Fc < FX[nPts-1].f and Gc < 0)
+      {
+        // Bringing this point in is better; use it
+        FX[nPts-1].f = Fc;
+        FX[nPts-1].x = Xc;
+      }
+      else
+      {
+        // Bringing this point in didn't work; shrink the simplex onto
+        // the smallest-valued vertex
+        Xc = FX[0].x;
+        for (int i = 1; i < nPts; i++)
+        {
+          auto xn = FX[i].x;
+          xn = Xc + .5*(FX[i].x - Xc);
+
+          double Gn = G(xn);
+          if (Gn < 0)
+          {
+            FX[i].x = xn;
+            FX[i].f = minFunc(FX[i].x);
+            FX[i].g = G(FX[i].x);
+          }
+        }
+      }
+    }
+
+    std::sort(FX.begin(),FX.end());
+
+//    for (auto &fx : FX)
+//    {
+//      fout << iter << ", " << fx.f;
+//      for (auto &x : fx.x)
+//        fout << ", " << x;
+//      fout << std::endl;
+//    }
+    // Continue to iterate
+    iter++;
+  }
+
+  return FX[0];
+}
+
+
+template<typename MinFunc, typename Constraint>
+double NelderMeadStep_constrained(std::vector<NM_FVAL> &FX, MinFunc minFunc,
+    Constraint G)
+{
+  /// TODO: Optimize the crap out of this
+
+  int nPts = FX.size();
+  int nVars = nPts-1;
+
+  std::sort(FX.begin(),FX.end());
+
+  auto Xn = FX[nVars].x;
+
+  // Take centroid of all points besides Xn
+  std::vector<double> X0(nVars);
+  for (int j = 0; j < nPts-1; j++)
+    X0 = X0 + FX[j].x / (nPts-1.);
+
+  // Reflect Xn around X0
+  auto Dx = X0 - Xn;
+  auto Xr = X0 + Dx;
+
+  double Gr = G(Xr);
+  if (Gr > 0)
+  {
+    int ind = getIndAbsMax(Xr);
+    double fac = .8*(1.-(std::abs(Xr[ind])-1.)/(std::abs(Dx[ind])));
+    Xr = X0 + fac*Dx;
+  }
+
+  double Fr = minFunc(Xr);
+  Gr = G(Xr);
+
+  // Determine what to do with the new point
+  if (Fr < FX[nPts-2].f and Gr < 0) {
+    // We will be keeping this point
+    if (Fr < FX[0].f) {
+      // This one's good; keep going! Expand from Xr
+      auto Xe = Xr + Dx;
+
+      double Fe = minFunc(Xe);
+      double Ge = G(Xe);
+
+      if (Fe < Fr and Ge < 0) {
+        // This one's even better; use it instead
+        FX[nPts-1].f = Fe;
+        FX[nPts-1].x = Xe;
+      } else {
+        // Xe/Fe was no better; stick with Fr, Xr
+        FX[nPts-1].f = Fr;
+        FX[nPts-1].x = Xr;
+      }
+    } else {
+      // This one's somewhere in the middle; replace Xn with Xr
+      FX[nPts-1].f = Fr;
+      FX[nPts-1].x = Xr;
+    }
+  } else {
+    // Try reducing the size of the simplex
+    auto Xc = X0 + .5*Dx;
+
+    double Fc = minFunc(Xc);
+    double Gc = G(Xc);
+
+    if (Fc < FX[nPts-1].f and Gc < 0) {
+      // Bringing this point in is better; use it
+      FX[nPts-1].f = Fc;
+      FX[nPts-1].x = Xc;
+    } else {
+      // Bringing this point in didn't work; shrink the simplex onto
+      // the smallest-valued vertex (while adhering to constraints)
+      Xc = FX[0].x;
+      for (int i = 1; i < nPts; i++) {
+        auto xn = Xc + .5*(FX[i].x - Xc);
+
+        double Gn = G(xn);
+        if (Gn < 0) {
+          FX[i].x = xn;
+          FX[i].f = minFunc(FX[i].x);
+        }
+      }
+    }
+  }
+
+  std::sort(FX.begin(),FX.end());
+
+  return FX[0].f;
 }
 
 } // namespace tg_funcs

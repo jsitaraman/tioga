@@ -219,7 +219,7 @@ class tioga
   void performConnectivity(void);
   void performConnectivityHighOrder(void);
   void performConnectivityAMR(void);
-  void performConnectivityArtificialBoundary(void);
+  void directCut(void);
 
   /** Perform overset interpolation and data communication */
 

@@ -34,6 +34,7 @@
 //! Helper struct for direct-cut method [Galbraith 2013]
 typedef struct CutMap
 {
+  int type;                  //! Cut type: Solid wall (1) or overset bound (0)
   std::vector<int> flag;     //! Cut flag for all cells (essentially iblank)
   std::map<int,double> dist; //! Minimum distance to a cutting face
   std::map<int,int> nMin;    //! # of cut faces that are approx. 'dist' away
@@ -531,6 +532,8 @@ class MeshBlock
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);
+
+  void setupADT(void);
 
   /*! Apply blanking algorithm (to nodal iblank?) to get cell & face iblanks */
   void setArtificialBoundaries(void);

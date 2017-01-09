@@ -314,7 +314,10 @@ printf("%d: Starting DirectCut type %d on %d faces\n",myid,cutType,nCut);
   {
     cellList.clear();
 
-    getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox);
+    if (rrot)
+      getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox, Smat.data());
+    else
+      getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox);
 
     // Find all cells that the cutting face might pass through
     adt->searchADT_box(elementList, cellList, bbox);

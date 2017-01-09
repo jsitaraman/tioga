@@ -96,6 +96,9 @@ class MeshBlock
   int nsend, nrecv;
   std::vector<int> sndMap, rcvMap;
 
+  bool rrot = false;
+  std::vector<double> Smat, offset;
+
   //
   // Alternating digital tree library
   //
@@ -337,6 +340,8 @@ class MeshBlock
     sndMap.assign(sm, sm+nsend);
     rcvMap.assign(rm, rm+nrecv);
   }
+
+  void setTransform(double *mat, double* offset, int ndim);
 
   void search();
 

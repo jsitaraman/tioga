@@ -254,6 +254,29 @@ void getBoundingBox(double *pts, int nPts, int nDims, double *bbox)
   }
 }
 
+void getBoundingBox(double *pts, int nPts, int nDims, double *bbox, double *Smat)
+{
+  for (int i=0; i<nDims; i++) {
+    bbox[i]       =  INFINITY;
+    bbox[nDims+i] = -INFINITY;
+  }
+
+  std::vector<double> tmp_pt(nDims);
+  for (int i = 0; i < nPts; i++) {
+    // Apply transform to point
+    for (int d1 = 0; d1 < nDims; d1++) {
+      tmp_pt[d1] = 0;
+      for (int d2 = 0; d2 < nDims; d2++)
+        tmp_pt[d1] += Smat[nDims*d1+d2] * pts[i*nDims+d1];
+    }
+
+    for (int dim = 0; dim < nDims; dim++) {
+      bbox[dim]       = std::min(bbox[dim],      tmp_pt[dim]);
+      bbox[nDims+dim] = std::max(bbox[nDims+dim],tmp_pt[dim]);
+    }
+  }
+}
+
 std::vector<int> gmsh_to_structured_quad(unsigned int nNodes)
 {
   std::vector<int> gmsh_to_ijk(nNodes,0);

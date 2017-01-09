@@ -87,6 +87,9 @@ Vec3 faceNormal(double* xv, int nDims);
 /*! Return the bounding box of a collection of points [min x,y,z; max x,y,z] */
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
 
+/*! Return bounding box of a collection of points after applying linear transform */
+void getBoundingBox(double *pts, int nPts, int nDims, double *bbox, double *Smat);
+
 /*! Create an N-dimensional simplex of size L centered at x0 */
 void getSimplex(int nDims, const std::vector<double> &x0, double L, std::vector<double> &X);
 

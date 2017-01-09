@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "codetypes.h"
+#include "error.hpp"
 #include "ADT.h"
 
 extern "C" {
@@ -118,4 +119,14 @@ void ADT::buildADT(int d, int nelements, double *elementBbox)
 
   free(elementsAvailable);
   free(adtWork);
+}
+
+void ADT::setTransform(double* mat, double* off, int nDims)
+{
+  if (nDims != ndim/2)
+    FatalError("ADT:setTransform:nDims != ADT::ndim/2");
+
+  rrot = true;
+  Smat.assign(mat, mat+nDims*nDims);
+  offset.assign(off, off+nDims);
 }

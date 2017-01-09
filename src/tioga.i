@@ -22,11 +22,13 @@
 void tioga_dataupdate_ab(int nvar, double* q_spts, int gradFlag);
 void tioga_preprocess_grids_(void);
 void tioga_performconnectivity_(void);
+void tioga_set_transform(double *mat, double *off, int ndim);
 %nopythoncallback;
 
 %ignore tioga_dataupdate_ab;
 %ignore tioga_preprocess_grids_;
 %ignore tioga_performconnectivity_;
+%ignore tioga_set_transform;
 %include "tiogaInterface.h"
 
 // <-- Additional C++ declations [anything that would normally go in a header]

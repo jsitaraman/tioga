@@ -271,6 +271,11 @@ extern "C" {
   {
     tg->set_amr_callback(f1);
   }
+
+  void tioga_set_transform(double *rmat, double *offset, int ndim)
+  {
+    tg->setTransform(rmat, offset, ndim);
+  }
   
   void tioga_delete_(void)
    {

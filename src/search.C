@@ -26,160 +26,162 @@ extern "C" {
 
 void MeshBlock::search(void)
 {
-  int i,j,k,l,m,n,p,i3;
-  int ndim;
-  int iptr,isum,nvert;
-  int cell_count; 
-  int cellindex;
-  double xd[3];
-  double dxc[3];
-  double xmin[3];
-  double xmax[3];
-  //
-  // form the bounding box of the 
-  // query points
-  //
-
   if (nsearch == 0) {
     donorCount=0;
     return;
   }
 
-  OBB obq;
-  findOBB(xsearch,obq.xc,obq.dxc,obq.vec,nsearch);
-
-  //writebbox(obq,4);
-  //writePoints(xsearch,nsearch,4);
-  //
-  // find all the cells that may have intersections with
-  // the OBB
-  //
-  std::vector<int> icell(ncells, -1);
-
-  iptr=-1;
-  cell_count=0;
-  p=0;
-  for(n=0;n<ntypes;n++)
-    {
-      nvert=nv[n];
-      for(i=0;i<nc[n];i++)
-	{
-	  //
-	  // find each cell that has
-	  // overlap with the bounding box
-	  //
-	  xmin[0]=xmin[1]=xmin[2]=BIGVALUE;
-	  xmax[0]=xmax[1]=xmax[2]=-BIGVALUE;
-	  for(m=0;m<nvert;m++)
-	    {
-	      i3=3*(vconn[n][nvert*i+m]-BASE);	      
-	      for(j=0;j<3;j++)
-		{
-		  xd[j]=0;
-		  for(k=0;k<3;k++)
-		    xd[j]+=(x[i3+k]-obq.xc[k])*obq.vec[j][k];
-		  xmin[j]=min(xmin[j],xd[j]);
-		  xmax[j]=max(xmax[j],xd[j]);
-		}
-	      for(j=0;j<3;j++)
-		{
-		  xd[j]=(xmax[j]+xmin[j])*0.5;
-		  dxc[j]=(xmax[j]-xmin[j])*0.5;
-		}
-	    }
-	  if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
-	      fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
-	      fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
-	    {
-	      //
-	      // create a LIFO stack
-	      // with all the cells that 
-	      // have bounding box intersection with
-	      // the QP bounding box
-	      //
-	      icell[p]=iptr;
-	      iptr=p;
-	      cell_count++;
-	    }
-	  p++;
-	}
-    }
-  //
-  // now find the axis aligned bounding box
-  // of each cell in the LIFO stack to build the
-  // ADT
-  //
-  free(elementBbox);
-  free(elementList);
-  elementBbox=(double *)malloc(sizeof(double)*cell_count*6);
-  elementList=(int *)malloc(sizeof(int)*cell_count);
-  //
-  k=iptr;
-  l=0;
-  p=0;
-  //for(k=0;k<ncells;k++)
-  while(k!=-1)
-    {
-      cellindex=k;
-      isum=0;
-      for(n=0;n<ntypes;n++) 
-	{
-	  isum+=nc[n];
-	  if (cellindex < isum)
-	    {
-	      i=cellindex-(isum-nc[n]);
-	      break;
-	    }
-	}
-      nvert=nv[n];
-      xmin[0]=xmin[1]=xmin[2]=BIGVALUE;
-      xmax[0]=xmax[1]=xmax[2]=-BIGVALUE;
-      for(m=0;m<nvert;m++)
-	{
-	  i3=3*(vconn[n][nvert*i+m]-BASE);
-	  for(j=0;j<3;j++)
-	    {
-	      xmin[j]=min(xmin[j],x[i3+j]);
-	      xmax[j]=max(xmax[j],x[i3+j]);
-	    }
-	}
-      //
-      elementBbox[l++]=xmin[0];
-      elementBbox[l++]=xmin[1];
-      elementBbox[l++]=xmin[2];
-      elementBbox[l++]=xmax[0];
-      elementBbox[l++]=xmax[1];
-      elementBbox[l++]=xmax[2];
-      //
-      elementList[p++]=k;
-      //
-      k=icell[k];
-    }
-  //
-  // build the ADT now
-  //
-  if (adt) 
-   {
-    adt->clearData();
-   }
+  if (rrot && adt)
+  {
+    /// TODO: worry about updating ADT based on changing OBB of search points
+    adt->setTransform(Smat.data(), offset.data(), nDims);
+  }
   else
-   {
-    adt=new ADT[1];
-   }
-  ndim=6;
-  adt->buildADT(ndim,cell_count,elementBbox);
+  {
+    double xd[3];
+    double dxc[3];
+    double xmin[3];
+    double xmax[3];
+
+    // form the bounding box of the
+    // query points
+    OBB obq;
+    findOBB(xsearch,obq.xc,obq.dxc,obq.vec,nsearch);
+
+    if (rrot)
+    {
+      /// HACK - adding a 20% safety factor to ADT bounds in case of moving grids
+      for (int i = 0; i < nDims; i++)
+        obq.dxc[i] *= 1.2;
+    }
+
+    // find all the cells that may have intersections with
+    // the OBB
+    std::vector<int> icell(ncells, -1);
+
+    int iptr = -1;
+    int cell_count = 0;
+    int p = 0;
+    for (int n = 0; n < ntypes; n++)
+    {
+      int nvert = nv[n];
+      for(int i = 0; i < nc[n]; i++)
+      {
+        // find each cell that has
+        // overlap with the bounding box
+        xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
+        xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
+        for (int m = 0; m < nvert; m++)
+        {
+          int i3 = 3*(vconn[n][nvert*i+m]-BASE);
+          for (int j = 0; j < 3; j++)
+          {
+            xd[j] = 0;
+            for (int k = 0; k < 3; k++)
+              xd[j] += (x[i3+k]-obq.xc[k])*obq.vec[j][k];
+            xmin[j] = min(xmin[j],xd[j]);
+            xmax[j] = max(xmax[j],xd[j]);
+          }
+          for (int j = 0; j < 3; j++)
+          {
+            xd[j] = (xmax[j]+xmin[j])*0.5;
+            dxc[j] = (xmax[j]-xmin[j])*0.5;
+          }
+        }
+        if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
+            fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
+            fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
+        {
+          // create a LIFO stack
+          // with all the cells that
+          // have bounding box intersection with
+          // the QP bounding box
+          icell[p] = iptr;
+          iptr = p;
+          cell_count++;
+        }
+        p++;
+      }
+    }
+
+    // now find the axis aligned bounding box
+    // of each cell in the LIFO stack to build the
+    // ADT
+    free(elementBbox);
+    free(elementList);
+    elementBbox = (double *)malloc(sizeof(double)*cell_count*6);
+    elementList = (int *)malloc(sizeof(int)*cell_count);
+
+    int k = iptr;
+    int l = 0;
+    p = 0;
+    while (k != -1)
+    {
+      int ic = -1;
+      int cellindex = k;
+      int isum = 0;
+      int n;
+      for (n = 0; n < ntypes; n++)
+      {
+        isum += nc[n];
+        if (cellindex < isum)
+        {
+          ic = cellindex-(isum-nc[n]);
+          break;
+        }
+      }
+
+      int nvert = nv[n];
+      xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
+      xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
+      for (int m = 0; m < nvert; m++)
+      {
+        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+        for (int j = 0; j < 3; j++)
+        {
+          xmin[j] = min(xmin[j],x[i3+j]);
+          xmax[j] = max(xmax[j],x[i3+j]);
+        }
+      }
+
+      elementBbox[l++] = xmin[0];
+      elementBbox[l++] = xmin[1];
+      elementBbox[l++] = xmin[2];
+      elementBbox[l++] = xmax[0];
+      elementBbox[l++] = xmax[1];
+      elementBbox[l++] = xmax[2];
+
+      elementList[p++] = k;
+
+      k = icell[k];
+    }
+
+    // build the ADT now
+    if (adt)
+    {
+      adt->clearData();
+    }
+    else
+    {
+      adt = new ADT[1];
+    }
+
+    int ndim = 6;
+    adt->buildADT(ndim,cell_count,elementBbox);
+  }
 
   free(donorId);
-  donorId=(int*)malloc(sizeof(int)*nsearch);
-  //
-  donorCount=0;
-  ipoint=0;
-  for(i=0;i<nsearch;i++)
-    {
-      adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
-      if (donorId[i] > -1) {
-	donorCount++;
-      }
-      ipoint+=3;
-    }
+  donorId = (int*)malloc(sizeof(int)*nsearch);
+
+  donorCount = 0;
+  ipoint = 0;
+  for (int i = 0; i < nsearch; i++)
+  {
+    adt->searchADT(this, &(donorId[i]), &(xsearch[3*i]));
+
+    if (donorId[i] > -1)
+      donorCount++;
+
+    ipoint += 3;
+  }
 }

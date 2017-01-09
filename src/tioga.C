@@ -104,7 +104,6 @@ void tioga::profile(void)
 
     /// TODO: put into callback function somewhere
     gridType = mytag;
-    printf("%d -> %d\n",myid,gridType);
 
     // For the direct-cut method
     gridIDs.resize(nproc);
@@ -161,8 +160,8 @@ void tioga::performConnectivity(void)
   if (ihighGlobal)
   {
     // Calculate cell iblank values from nodal iblank values
-    ///mb->getCellIblanks(meshcomm);
-    directCut();
+    mb->getCellIblanks(meshcomm);
+    ///directCut();
 
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {

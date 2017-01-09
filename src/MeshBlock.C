@@ -874,3 +874,14 @@ void MeshBlock::setResolutions(double *nres,double *cres)
   userSpecifiedNodeRes=nres;
   userSpecifiedCellRes=cres;
 }
+
+void MeshBlock::setTransform(double* mat, double* off, int ndim)
+{
+  if (ndim != nDims)
+    ThrowException("MeshBlock::set_transform: input ndim != nDims");
+
+  Smat.assign(mat, mat+ndim*ndim);
+  offset.assign(off,off+ndim);
+
+  adt->setTransform(mat,off,ndim);
+}

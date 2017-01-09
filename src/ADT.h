@@ -19,6 +19,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdlib.h>
 #include <unordered_set>
+#include <vector>
 
 /** 
  * Generic Alternating Digital Tree For Search Operations
@@ -35,6 +36,10 @@ class ADT
   double *adtReals;  /** < real numbers that provide the extents of each box */
   double *adtExtents; /** < global extents */
   double *coord;          /** < bounding box of each element */
+
+  bool rrot = false;         /** Flag for rigid-body rotation (apply transform to all search points) */
+  std::vector<double> Smat;   /** Rotation Matrix (global->body coords) for rigid motion */
+  std::vector<double> offset; /** Translation Offset (in global coords) for rigid motion */
 
  public :
 
@@ -62,10 +67,17 @@ class ADT
 
   void buildADT(int d,int nelements,double *elementBbox);  
 
+  void setTransform(double* mat, double* off, int ndims);
+
   //! Search the ADT for the element containint the point xsearch
   void searchADT(MeshBlock *mb,int *cellIndex,double *xsearch);
 
   //! Search the ADT for all elements overlapping with bounding-box bbox
   void searchADT_box(int *elementList, std::unordered_set<int>& icells, double *bbox);
+
+  /*! Search ADT for element containing a displaced point
+   *  Apply linear transform to search point to avoid re-creating ADT during
+   *  rigid-body motion */
+  void searchADT_rot(MeshBlock* mb, int* cellIndex, double* xsearch);
 };
 

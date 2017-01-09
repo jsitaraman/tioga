@@ -22,24 +22,34 @@
 void searchIntersections(MeshBlock *mb,int *cellIndex,int *adtIntegers,double *adtReals,
 			 double *coord,int level,int node,double *xsearch,int nelem,int ndim);
 
+void searchIntersections(MeshBlock *mb,int *cellIndex,int *adtIntegers,double *adtReals,
+			 double *coord,int level,int node,double *xsearch,double* xs_adt, int nelem,int ndim);
+
 void searchBoxIntersections(int *elementList, std::unordered_set<int> &icells, int *adtIntegers,
   double *adtReals, double *coord, int level, int node, double *bbox, int nelem, int ndim);
 
 void ADT::searchADT(MeshBlock *mb, int *cellIndex,double *xsearch)
 {
-  // check if the given point is in the bounds of the ADT
-  int rootNode = 0;
-  *cellIndex = -1;
+  if (rrot)
+  {
+    searchADT_rot(mb, cellIndex, xsearch);
+  }
+  else
+  {
+    // check if the given point is in the bounds of the ADT
+    int rootNode = 0;
+    *cellIndex = -1;
 
-  bool flag = true;
-  for (int i = 0; i < ndim/2; i++)
-    flag = (flag && (xsearch[i] >= adtExtents[2*i]-TOL));
-  for (int i = 0; i < ndim/2; i++)
-    flag = (flag && (xsearch[i] <= adtExtents[2*i+1]+TOL));
+    bool flag = true;
+    for (int i = 0; i < ndim/2; i++)
+      flag = (flag && (xsearch[i] >= adtExtents[2*i]-TOL));
+    for (int i = 0; i < ndim/2; i++)
+      flag = (flag && (xsearch[i] <= adtExtents[2*i+1]+TOL));
 
-  // call recursive routine to check intersections with ADT nodes
-  if (flag) searchIntersections(mb,cellIndex,adtIntegers,adtReals,
-				coord,0,rootNode,xsearch,nelem,ndim);
+    // call recursive routine to check intersections with ADT nodes
+    if (flag) searchIntersections(mb,cellIndex,adtIntegers,adtReals,
+                                  coord,0,rootNode,xsearch,nelem,ndim);
+  }
 }
 
 void ADT::searchADT_box(int *elementList, std::unordered_set<int> &icells, double *bbox)
@@ -60,6 +70,29 @@ void ADT::searchADT_box(int *elementList, std::unordered_set<int> &icells, doubl
                                    coord,0,rootNode,bbox,nelem,ndim);
 }
 
+void ADT::searchADT_rot(MeshBlock *mb, int *cellIndex, double *xsearch)
+{
+  // check if the given point is in the bounds of the ADT
+  int rootNode = 0;
+  *cellIndex = -1;
+
+  // Transform point to ADT's reference frame
+  std::vector<double> xs_adt(6);
+  int nd = ndim/2;
+  for (int d1 = 0; d1 < nd; d1++)
+    for (int d2 = 0; d2 < nd; d2++)
+      xs_adt[d1] += Smat[nd*d1+d2] * (xsearch[d2]-offset[d2]);
+
+  bool flag = true;
+  for (int i = 0; i < ndim/2; i++)
+    flag = (flag && (xs_adt[i] >= adtExtents[2*i]-TOL));
+  for (int i = 0; i < ndim/2; i++)
+    flag = (flag && (xs_adt[i] <= adtExtents[2*i+1]+TOL));
+
+  // call recursive routine to check intersections with ADT nodes
+  if (flag) searchIntersections(mb,cellIndex,adtIntegers,adtReals,
+        coord,0,rootNode,xsearch,xs_adt.data(),nelem,ndim);
+}
 
 void searchIntersections(MeshBlock *mb,int *cellIndex,int *adtIntegers,double *adtReals,
 			 double *coord,int level,int node,double *xsearch,int nelem,int ndim)
@@ -156,4 +189,54 @@ void searchBoxIntersections(int *elementList, std::unordered_set<int> &icells, i
       }
     }
   }
+}
+
+void searchIntersections(MeshBlock *mb, int *cellIndex, int *adtInts,
+    double *adtDbls, double *coord, int level, int node, double *xsearch,
+    double *xs_adt, int nelem, int ndim)
+{
+  double element[ndim];
+  bool flag = true;
+
+  for (int i = 0; i < ndim; i++)
+    element[i] = coord[ndim*(adtInts[4*node])+i];
+
+  for (int i = 0; i < ndim/2; i++)
+    flag = (flag && (xs_adt[i] >= element[i]-TOL));
+
+  for (int i = ndim/2; i < ndim; i++)
+    flag = (flag && (xs_adt[i-ndim/2] <= element[i]+TOL));
+
+  if (flag)
+  {
+    mb->checkContainment(cellIndex,adtInts[4*node],xsearch);
+    if (*cellIndex > -1) return;
+  }
+
+  // check the left and right children now
+  for (int d = 1; d < 3; d++)
+  {
+    int nodeChild = adtInts[4*node+d];
+    if (nodeChild > -1)
+    {
+      nodeChild = adtInts[4*nodeChild+3];
+      for (int i = 0; i < ndim; i++)
+        element[i] = adtDbls[ndim*nodeChild+i];
+
+      flag = true;
+      for (int i = 0; i < ndim/2; i++)
+        flag = (flag && (xs_adt[i] >= element[i]-TOL));
+
+      for (int i = ndim/2; i < ndim; i++)
+        flag = (flag && (xs_adt[i-ndim/2] <= element[i]+TOL));
+
+      if (flag)
+      {
+        searchIntersections(mb,cellIndex,adtInts,adtDbls,coord,level+1,
+                            nodeChild,xsearch,xs_adt,nelem,ndim);
+        if (*cellIndex > -1) return;
+      }
+    }
+  }
+  return;
 }

@@ -70,7 +70,10 @@ void tioga::exchangeSearchData(void)
   mb->isearch = (int *)malloc(sizeof(int)*2*mb->nsearch);
   mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
   if (ihigh)
+  {
     mb->rst = (double *)malloc(sizeof(double)*3*mb->nsearch);
+    std::fill(mb->rst, mb->rst+3*mb->nsearch, 0.0);
+  }
 
   // now fill the query point arrays
   int icount = 0;
@@ -144,8 +147,8 @@ void tioga::exchangePointSearchData(void)
   // exchange the data
   pc->sendRecvPackets(sndPack,rcvPack);
 
-  // now assort the data into the search
-  // list arrays
+  // now sort the data into the search list arrays
+  int nsearch_prev = mb->nsearch;
   mb->nsearch=0;
   for (int k = 0; k < nrecv; k++)
     mb->nsearch += rcvPack[k].nints;
@@ -155,13 +158,17 @@ void tioga::exchangePointSearchData(void)
   free(mb->xsearch);
   free(mb->isearch);
   free(mb->donorId);
-  free(mb->rst);
 
   // allocate query point storage
   mb->xsearch = (double *)malloc(sizeof(double)*3*mb->nsearch);
   mb->isearch = (int *)malloc(2*sizeof(int)*mb->nsearch);
   mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
-  mb->rst = (double *)malloc(sizeof(double)*3*mb->nsearch);
+  if (mb->nsearch != nsearch_prev) // Keep previous r,s,t values for checkContainment()
+  {
+    free(mb->rst);
+    mb->rst = (double *)malloc(sizeof(double)*3*mb->nsearch);
+    std::fill(mb->rst, mb->rst+3*mb->nsearch, 0.0);
+  }
 
   // now fill the query point arrays
   int count = 0;

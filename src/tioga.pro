@@ -1,6 +1,7 @@
 TEMPLATE = library
 CONFIG -= app_bundle
 CONFIG -= qt
+DEFINES = _GPU
 
 SOURCES += main.cpp \
     ADT.C \
@@ -55,5 +56,7 @@ HEADERS += \
     MeshBlock.h \
     parallelComm.h \
     points.hpp \
-    tioga.h
+    tioga.h \
+    cuda_funcs.h \
+    tiogaInterface.h
 

@@ -26,14 +26,14 @@ SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/
 ifeq ($(strip $(CUDA)),YES)
 	CFLAGS += -D_GPU
 	CUFLAGS += -D_GPU
-	LIBS += -L$(strip $(CUDA_DIR))/lib64 -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_DIR))/lib64
+	LIBS += -L$(strip $(CUDA_LIB_DIR)) -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_LIB_DIR))
 ifeq ($(strip $(CU_SM)),)
 	CUFLAGS += -arch=sm_20
 else
 	CUFLAGS += -arch=sm_$(CU_SM)
 endif
 endif
-INCS += -I$(strip $(CUDA_DIR))/include
+INCS += -I$(strip $(CUDA_INC_DIR))
 
 ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CFLAGS += -Ofast

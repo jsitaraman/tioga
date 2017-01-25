@@ -641,7 +641,8 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 //  MPI_Comm_rank(meshComm, &rank);
 
   /// HACK FOR GOLF BALL CASE: Golf ball radius = .0625, outer radius = .14
-  double cut_rad2 = .1*.1;
+  //double cut_rad2 = .1*.1;
+  double cut_rad2 = .75*.75;
   //double cut_rad2 = 1*1;
   if (meshtag == 1) /// MUST BE BACKGROUND GRID
   {
@@ -1189,14 +1190,32 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
       sndPack[p].intData.resize(0);
     }
 
+    if (d_buff_size > 0)
+    {
+      cuda_free(weights_d);
+      cuda_free(donors_d);
+      cuda_free(buf_inds_d);
+
+      d_buff_size = 0;
+    }
+
     return;
   }
 
   nSpts = interpList2[0].nweights;
 
-  cuda_malloc(weights_d, ninterp2*nSpts);
-  cuda_malloc(donors_d, ninterp2);
-  cuda_malloc(buf_inds_d, ninterp2);
+  if (ninterp2 > d_buff_size)
+  {
+    cuda_free(weights_d);
+    cuda_free(donors_d);
+    cuda_free(buf_inds_d);
+
+    cuda_malloc(weights_d, ninterp2*nSpts);
+    cuda_malloc(donors_d, ninterp2);
+    cuda_malloc(buf_inds_d, ninterp2);
+
+    d_buff_size = ninterp2;
+  }
 
   std::vector<double> tmp_weights(ninterp2*nSpts);
   std::vector<int> tmp_donors(ninterp2);

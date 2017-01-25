@@ -270,6 +270,7 @@ class MeshBlock
   double *weights_d = NULL;
   int *donors_d = NULL;
   int *buf_inds_d = NULL;
+  int d_buff_size = 0;
   std::vector<int> buf_inds, buf_disp;
 #endif
 

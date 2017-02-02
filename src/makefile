@@ -13,9 +13,9 @@ ifeq ($(strip $(CUC)),)
 endif
 AR = ar -rvs
 
-SWIG = $(SWIG_BIN)/swig -c++ -python
+SWIG = $(SWIG_BIN)/swig
 
-CFLAGS = -std=c++11 -g -O3 -fPIC -rdynamic 
+CFLAGS = -std=c++11 -fPIC -rdynamic 
 CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
 SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/
@@ -26,7 +26,7 @@ SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/
 ifeq ($(strip $(CUDA)),YES)
 	CFLAGS += -D_GPU
 	CUFLAGS += -D_GPU
-	LIBS += -L$(strip $(CUDA_LIB_DIR)) -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_LIB_DIR))
+	LIBS += -L$(strip $(CUDA_LIB_DIR))/ -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_LIB_DIR))/
 ifeq ($(strip $(CU_SM)),)
 	CUFLAGS += -arch=sm_20
 else
@@ -80,7 +80,7 @@ ifeq ($(strip $(CUDA)),YES)
 	OBJECTS += highOrder_kernels.o
 endif
 
-LDFLAGS= -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
+LDFLAGS= -L/lib64/ -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
 
 lib:	$(OBJECTS) $(OBJF90) $(INCLUDES)
 	$(AR) lib$(MODULENAME).a $(OBJECTS) $(OBJF90)
@@ -99,7 +99,7 @@ clean :
 	rm -rf *.o _$(MODULENAME).so $(MODULENAME).py lib$(MODULENAME).a lib$(MODULENAME).so
 
 %_wrap.cpp: %.i tiogaInterface.h
-	$(SWIG) $(SFLAGS) -o $@ $<
+	$(SWIG) -c++ -python $(SFLAGS) -o $@ $<
 
 %.o:%.cu
 	$(CUC) $(INCS) $(CUFLAGS) $(FLAGS) -c $< -o $*.o

@@ -161,7 +161,7 @@ void tioga::performConnectivity(void)
   {
     // Calculate cell iblank values from nodal iblank values
     mb->getCellIblanks(meshcomm);
-    ///directCut();
+    //directCut();
 
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {
@@ -1030,7 +1030,6 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 #ifndef _GPU
 void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 {
-  printf("TIOGA: dataFlag = %d\n",dataFlag);
   if (iartbnd && gpu)
     mb->getDonorDataGPU(dataFlag);
 

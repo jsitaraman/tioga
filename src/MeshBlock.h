@@ -23,6 +23,7 @@
  * Jay Sitaraman
  * 02/20/2014
  */
+#include <map>
 #include <unordered_set>
 #include <set>
 

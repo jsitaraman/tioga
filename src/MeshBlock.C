@@ -884,5 +884,6 @@ void MeshBlock::setTransform(double* mat, double* off, int ndim)
   Smat.assign(mat, mat+ndim*ndim);
   offset.assign(off,off+ndim);
 
-  adt->setTransform(mat,off,ndim);
+  if (adt)
+    adt->setTransform(mat,off,ndim);
 }

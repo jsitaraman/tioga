@@ -77,7 +77,7 @@ void ADT::searchADT_rot(MeshBlock *mb, int *cellIndex, double *xsearch)
   *cellIndex = -1;
 
   // Transform point to ADT's reference frame
-  std::vector<double> xs_adt(6);
+  std::vector<double> xs_adt(ndim);
   int nd = ndim/2;
   for (int d1 = 0; d1 < nd; d1++)
     for (int d2 = 0; d2 < nd; d2++)

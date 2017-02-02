@@ -43,7 +43,8 @@ DISTFILES += \
     median.F90 \
     tioga.pro.user \
     writeqnode.f90 \
-    makefile
+    makefile \
+    highOrder_kernels.cu
 
 HEADERS += \
     ADT.h \

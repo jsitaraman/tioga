@@ -33,7 +33,7 @@ else
 	CUFLAGS += -arch=sm_$(CU_SM)
 endif
 endif
-INCS += -I$(strip $(CUDA_INC_DIR))
+INCS += -I$(strip $(CUDA_INC_DIR))/
 
 ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CFLAGS += -Ofast

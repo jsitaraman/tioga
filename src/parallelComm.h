@@ -38,6 +38,12 @@ class parallelComm
   int myid;
   int numprocs;
   MPI_Comm scomm;
+
+  /// TESTING SEPARATE SEND/RECV FOR OVERLAP
+  std::vector<int> scount, rcount;
+  std::vector<MPI_Request> reqs;
+  std::vector<MPI_Status> stats;
+  int nwait;
   
   parallelComm() { sndMap=NULL; rcvMap=NULL;}
   
@@ -49,6 +55,9 @@ class parallelComm
   void sendRecvPackets(PACKET *sndPack,PACKET *rcvPack);
 
   void sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+
+  void sendPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+  void recvPacketsV(void);
 
   void sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack);
 

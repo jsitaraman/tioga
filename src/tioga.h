@@ -234,6 +234,9 @@ class tioga
   /** Perform data interpolation for artificial boundary method */
   void dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag);
 
+  void dataUpdate_artBnd_send(int nvar, int dataFlag);
+  void dataUpdate_artBnd_recv(int nvar, int dataFlag);
+
   /** get hole map for each mesh */
  
   void getHoleMap(void);

@@ -235,6 +235,72 @@ void parallelComm::sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<V
   MPI_Waitall(irnum,request.data(),status.data());
 }
 
+void parallelComm::sendPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack)
+{
+  scount.resize(2*nsend);
+  rcount.resize(2*nrecv);
+  reqs.resize(2*(nsend+nrecv));
+  stats.resize(2*(nsend+nrecv));
+
+  for (int i = 0; i < nsend; i++) {
+    scount[2*i] = sndPack[i].nints;
+    scount[2*i+1] = sndPack[i].nreals;
+  }
+
+  nwait = 0;
+
+  for (int i = 0; i < nrecv; i++)
+    MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],1,scomm,&reqs[nwait++]);
+
+  for (int i = 0; i < nsend; i++)
+    MPI_Isend(&(scount[2*i]),2,MPI_INT,sndMap[i],1,scomm,&reqs[nwait++]);
+
+  MPI_Waitall(nwait,reqs.data(),stats.data());
+
+  for (int i = 0; i < nrecv; i++)
+  {
+    rcvPack[i].nints = rcount[2*i];
+    rcvPack[i].nreals = rcount[2*i+1];
+  }
+
+  nwait = 0;
+  for (int i = 0; i < nrecv; i++)
+  {
+    if (rcvPack[i].nints > 0)
+    {
+      rcvPack[i].intData.resize(rcvPack[i].nints);
+      MPI_Irecv(rcvPack[i].intData.data(),rcvPack[i].nints,MPI_INT,
+                rcvMap[i],1,scomm,&reqs[nwait++]);
+    }
+
+    if (rcvPack[i].nreals > 0)
+    {
+      rcvPack[i].realData.resize(rcvPack[i].nreals);
+      MPI_Irecv(rcvPack[i].realData.data(),rcvPack[i].nreals,MPI_DOUBLE,
+                rcvMap[i],2,scomm,&reqs[nwait++]);
+    }
+  }
+
+  for (int i = 0; i < nsend;i++)
+  {
+    if (sndPack[i].nints > 0)
+    {
+      MPI_Isend(sndPack[i].intData.data(),sndPack[i].nints,MPI_INT,
+                sndMap[i],1,scomm,&reqs[nwait++]);
+    }
+    if (sndPack[i].nreals > 0)
+    {
+      MPI_Isend(sndPack[i].realData.data(),sndPack[i].nreals,MPI_DOUBLE,
+                sndMap[i],2,scomm,&reqs[nwait++]);
+    }
+  }
+}
+
+void parallelComm::recvPacketsV(void)
+{
+  MPI_Waitall(nwait,reqs.data(),stats.data());
+}
+
 void parallelComm::sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack)
 {
   int i;

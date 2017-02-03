@@ -880,6 +880,13 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
 #ifdef _GPU
 void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 {
+  dataUpdate_artBnd_send(nvar,dataFlag);
+
+  dataUpdate_artBnd_recv(nvar,dataFlag);
+}
+
+void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
+{
   // initialize send and recv packets
   int nsend,nrecv;
   int *sndMap,*rcvMap;
@@ -950,17 +957,34 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
   POP_NVTX_RANGE;
 
   // communicate the data across all partitions
-  PUSH_NVTX_RANGE("tg_pc_sendRecv", 0);
-  MPI_Pcontrol(1, "tioga_dataUpdate_pc");
-  pc->sendRecvPacketsV(sndVPack,rcvVPack);
-  MPI_Pcontrol(-1, "tioga_dataUpdate_pc");
+  PUSH_NVTX_RANGE("tg_pc_send", 0);
+  pc->sendPacketsV(sndVPack,rcvVPack);
+  POP_NVTX_RANGE;
+}
+
+void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
+{
+  // initialize send and recv packets
+  int nsend,nrecv;
+  int *sndMap,*rcvMap;
+
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+
+  if (nsend+nrecv == 0) return;
+
+  // get the interpolated solution now
+  int stride = nvar;
+  if (iartbnd && dataFlag == 1) stride = 3*nvar;
+
+  // Wait on all of the sends/recvs for the interpolated data
+  PUSH_NVTX_RANGE("tg_pc_recv", 0);
+  pc->recvPacketsV();
   POP_NVTX_RANGE;
 
   // Decode the packets and update the values in the solver's data array
   PUSH_NVTX_RANGE("tg_unpack_data", 1);
   if (ihigh)
   {
-    MPI_Pcontrol(1, "tioga_unpack_buffers");
     std::vector<double> qtmp(stride*mb->ntotalPoints);
     std::vector<int> itmp(mb->ntotalPoints);
 
@@ -1005,8 +1029,6 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
     if (!iartbnd)
       mb->clearOrphans(itmp.data());
 
-    MPI_Pcontrol(-1, "tioga_unpack_buffers");
-
     if (iartbnd)
     {
       interpTime.startTimer();
@@ -1017,7 +1039,7 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
       interpTime.startTimer();
     }
     else
-      mb->updatePointData(q_spts,qtmp.data(),nvar,dataFlag);
+      ThrowException("Not written for non-artificial boundary codes right now");
   }
   POP_NVTX_RANGE;
 

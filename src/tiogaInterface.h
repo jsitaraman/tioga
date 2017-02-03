@@ -62,6 +62,9 @@ void tioga_dataupdate_(double *q,int *nvar,char *itype);
 
 void tioga_dataupdate_ab(int nvar, double *q_spts, int gradFlag = 0);
 
+void tioga_dataupdate_ab_send(int nvar, int gradFlag = 0);
+void tioga_dataupdate_ab_recv(int nvar, int gradFlag = 0);
+
 void tioga_writeoutputfiles_(double *q,int *nvar,char *itype);
 
 void tioga_getdonorcount_(int *dcount,int *fcount);

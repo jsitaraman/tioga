@@ -199,12 +199,13 @@ void tioga::setupCommBuffersGPU(void)
   int nsend, nrecv, *sndMap, *rcvMap;
   pc->getMap(&nsend, &nrecv, &sndMap, &rcvMap);
 
-  sndVPack.resize(nsend);
+//  sndVPack.resize(nsend);
+  sndPack2.resize(nsend);
   rcvVPack.resize(nrecv);
 
-  pc->initPacketsV(sndVPack,rcvVPack);
+  pc->initPacketsV2(sndPack2,rcvVPack);
 
-  mb->setupBuffersGPU(nsend, intData, sndVPack);
+  mb->setupBuffersGPU(nsend, intData, sndPack2);
 
   ninterp = mb->ninterp2;
 }
@@ -904,61 +905,68 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
   if (mb->ninterp2 > ninterp_d)
   {
     if (ninterp_d > 0)
+    {
       cuda_free(ubuf_d);
+      cuda_free_pinned(ubuf_h);
+    }
 
     resizeFlag = 1;
     ninterp_d = mb->ninterp2;
     cuda_malloc(ubuf_d, ninterp_d*stride);
+    cuda_malloc_pinned(ubuf_h, ninterp_d*stride);
   }
   else if (dataFlag && resizeFlag)
   {
     if (gradbuf_d)
+    {
       cuda_free(gradbuf_d);
+      cuda_free_pinned(gradbuf_h);
+    }
 
     cuda_malloc(gradbuf_d, ninterp_d*stride);
+    cuda_malloc_pinned(gradbuf_h, ninterp_d*stride);
     resizeFlag = 0;
   }
 
-  int nints, nreals;
+
+  for (int k = 0; k < nsend; k++)
+  {
+//    sndVPack[k].nreals = sndVPack[k].nints * stride;
+//    sndVPack[k].realData.resize(sndVPack[k].nreals);
+    sndPack2[k].nreals = sndPack2[k].nints * stride;
+  }
+
+//  dblData.resize(ninterp_d*stride);
+
   interpTime.startTimer();
 
-  /// TODO: make everything asyc but sync here to wait on corrected gradient
-  nints = ninterp_d;
-  nreals = stride*ninterp_d;
   if (dataFlag == 0)
     mb->interpSolution_gpu(ubuf_d, nvar);
   else
     mb->interpGradient_gpu(gradbuf_d, nvar);
 
-  for (int k = 0; k < nsend; k++)
+  double *ptr;
+  if (dataFlag == 0)
   {
-    sndVPack[k].nreals = sndVPack[k].nints * stride;
-    sndVPack[k].realData.resize(sndVPack[k].nreals);
+    ptr = ubuf_h;
+    cuda_copy_d2h(ubuf_d, ubuf_h, ninterp_d*stride, mb->stream_handle);
+  }
+  else
+  {
+    ptr = gradbuf_h;
+    cuda_copy_d2h(gradbuf_d, gradbuf_h, ninterp_d*stride, mb->stream_handle);
   }
 
-  dblData.resize(ninterp_d*stride);
-
-  if (dataFlag == 0)
-    cuda_copy_d2h(ubuf_d, dblData.data(), ninterp_d*stride);
-  else
-    cuda_copy_d2h(gradbuf_d, dblData.data(), ninterp_d*stride);
-
   interpTime.stopTimer();
-
-  /// TODO: *** Split function here (like 'send_u_data', 'recv_u_data') ***
 
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
   // Populate the packets [organize interp data by rank to send to]
   for (int p = 0; p < nsend; p++)
   {
-    double *ptr = dblData.data()+mb->buf_disp[p]*stride;
-    sndVPack[p].realData.assign(ptr,ptr+sndVPack[p].nints*stride);
+    //double *ptr = dblData.data()+mb->buf_disp[p]*stride;
+    //sndVPack[p].realData.assign(ptr,ptr+sndVPack[p].nints*stride);
+    sndPack2[p].realData = ptr + mb->buf_disp[p]*stride;
   }
-  POP_NVTX_RANGE;
-
-  // communicate the data across all partitions
-  PUSH_NVTX_RANGE("tg_pc_send", 0);
-  pc->sendPacketsV(sndVPack,rcvVPack);
   POP_NVTX_RANGE;
 }
 
@@ -976,6 +984,14 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   int stride = nvar;
   if (iartbnd && dataFlag == 1) stride = 3*nvar;
 
+  // communicate the data across all partitions
+  PUSH_NVTX_RANGE("tg_pc_send", 0);
+  // Wait for device-to-host transfer to complete
+  cudaStreamSynchronize(mb->stream_handle);
+  //pc->sendPacketsV(sndVPack,rcvVPack);
+  pc->sendPacketsV2(sndPack2,rcvVPack);
+  POP_NVTX_RANGE;
+
   // Wait on all of the sends/recvs for the interpolated data
   PUSH_NVTX_RANGE("tg_pc_recv", 0);
   pc->recvPacketsV();
@@ -985,18 +1001,42 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   PUSH_NVTX_RANGE("tg_unpack_data", 1);
   if (ihigh)
   {
-    std::vector<double> qtmp(stride*mb->ntotalPoints);
-    std::vector<int> itmp(mb->ntotalPoints);
+    // Allocate pinned memory for d2h transfer
+    if (mb->ntotalPoints > nfringe_h)
+    {
+      if (nfringe_h > 0)
+      {
+        cuda_free_pinned(fringebuf_h);
+      }
+
+      resizeFringe = 1;
+      nfringe_h = mb->ntotalPoints;
+      cuda_malloc_pinned(fringebuf_h, nfringe_h*stride);
+    }
+    else if (dataFlag && resizeFringe)
+    {
+      if (fringebuf_h)
+      {
+        cuda_free_pinned(fringebuf_h);
+      }
+
+      cuda_malloc_pinned(fringebuf_h, nfringe_h*stride);
+      resizeFringe = 0;
+    }
+
+//    std::vector<double> qtmp(stride*mb->ntotalPoints);
+    recv_itmp.resize(mb->ntotalPoints);
 
     for (int k = 0; k < nrecv;k++)
     {
       int m = 0;
       for (int i = 0; i < rcvVPack[k].nints; i++)
       {
+        int ind = rcvVPack[k].intData[i];
         for (int j = 0; j < stride; j++)
         {
-          itmp[rcvVPack[k].intData[i]] = 1;
-          qtmp[rcvVPack[k].intData[i]*stride+j] = rcvVPack[k].realData[m];
+          recv_itmp[ind] = 1;
+          fringebuf_h[ind*stride+j] = rcvVPack[k].realData[m];
           m++;
         }
       }
@@ -1007,7 +1047,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     int norphanPoint = 0;
     for (int i = 0; i < mb->ntotalPoints; i++)
     {
-      if (itmp[i] == 0) {
+      if (recv_itmp[i] == 0) {
         if (!fp.is_open())
         {
           std::stringstream ss;
@@ -1027,15 +1067,15 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 
     // change the state of cells/nodes who are orphans
     if (!iartbnd)
-      mb->clearOrphans(itmp.data());
+      mb->clearOrphans(recv_itmp.data());
 
     if (iartbnd)
     {
       interpTime.startTimer();
       if (dataFlag == 0)
-        mb->updateFluxPointData(qtmp.data(),nvar);
+        mb->updateFluxPointData(fringebuf_h,nvar);
       else
-        mb->updateFluxPointGradient(qtmp.data(),nvar);
+        mb->updateFluxPointGradient(fringebuf_h,nvar);
       interpTime.startTimer();
     }
     else
@@ -1237,3 +1277,10 @@ void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,double 
 {
   cb[ipatch].registerData(ipatch,global_id,iblank,q);
 }
+
+#ifdef _GPU
+void tioga::set_stream_handle(cudaStream_t handle, cudaEvent_t event)
+{
+  mb->set_stream_handle(handle, event);
+}
+#endif

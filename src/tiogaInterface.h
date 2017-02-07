@@ -18,6 +18,9 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <mpi.h>
+#ifdef _GPU
+#include <cuda_runtime.h>
+#endif
 //
 // All the interfaces that are 
 // accessible to third party f90 and C
@@ -104,4 +107,7 @@ void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 
 void tioga_delete_(void);
 
+#ifdef _GPU
+void tioga_set_stream_handle(cudaStream_t stream, cudaEvent_t event);
+#endif
 } /* extern "C" */

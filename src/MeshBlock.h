@@ -27,6 +27,10 @@
 #include <unordered_set>
 #include <set>
 
+#ifdef _GPU
+#include <cuda_runtime.h>
+#endif
+
 #include "codetypes.h"
 #include "funcs.hpp"
 #include "points.hpp"
@@ -273,6 +277,9 @@ class MeshBlock
   int *buf_inds_d = NULL;
   int d_buff_size = 0;
   std::vector<int> buf_inds, buf_disp;
+
+  cudaStream_t stream_handle;
+  cudaEvent_t event_handle;
 #endif
 
   /** basic constructor */
@@ -550,8 +557,10 @@ class MeshBlock
 
   /* ---- GPU-Related Functions ---- */
 #ifdef _GPU
-  void setupBuffersGPU(int nsend, std::vector<int>& intData, std::vector<VPACKET>& sndPack);
+  void setupBuffersGPU(int nsend, std::vector<int>& intData, std::vector<PACKET>& sndPack);
   void interpSolution_gpu(double* q_out_d, int nvar);
   void interpGradient_gpu(double* dq_out_d, int nvar);
+
+  void set_stream_handle(cudaStream_t handle, cudaEvent_t event);
 #endif
 };

@@ -29,6 +29,9 @@
 #include "CartBlock.h"
 #include "parallelComm.h"
 
+#ifdef _GPU
+#include <cuda_runtime.h>
+#endif
 
 #include <chrono>
 #include <iostream>
@@ -125,18 +128,25 @@ class tioga
 
   //! NEW - attempting to speed up code...
   std::vector<VPACKET> sndVPack, rcvVPack;
+  std::vector<PACKET> sndPack2;
   std::vector<int> intData;
   std::vector<double> dblData;
 
   /* ---- GPU-Related Variables ---- */
 #ifdef _GPU
   int resizeFlag = 0;
+  int resizeFringe = 0;
   int ninterp = 0;
   int ninterp_d = 0;
+  int nfringe_h = 0;
   double *ubuf_d = NULL;
   double *gradbuf_d = NULL;
-  std::vector<double> dbuffer;
+  double *ubuf_h = NULL;
+  double *gradbuf_h = NULL;
+  double *fringebuf_h = NULL;
+//  std::vector<double> dbuffer;
   std::vector<int> buf_disp, buf_inds;
+  std::vector<int> recv_itmp;
   int *buf_inds_d = NULL;
 #endif
 
@@ -310,6 +320,8 @@ class tioga
 
 #ifdef _GPU
   void setupCommBuffersGPU(void);
+
+  void set_stream_handle(cudaStream_t handle, cudaEvent_t event);
 #endif
 };
       

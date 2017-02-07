@@ -18,6 +18,7 @@ SOURCES += main.cpp \
     funcs.cpp \
     getCartReceptors.C \
     highOrder.C \
+    highOrder_kernels.cu \
     holeMap.C \
     MeshBlock.C \
     parallelComm.C \
@@ -44,7 +45,6 @@ DISTFILES += \
     tioga.pro.user \
     writeqnode.f90 \
     makefile \
-    highOrder_kernels.cu
 
 HEADERS += \
     ADT.h \

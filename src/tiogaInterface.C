@@ -297,4 +297,9 @@ extern "C" {
     free(nfv);
     free(fconn);
    }
+
+  void tioga_set_stream_handle(cudaStream_t stream, cudaEvent_t event)
+  {
+    tg->set_stream_handle(stream, event);
+  }
 }

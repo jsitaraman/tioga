@@ -1173,7 +1173,7 @@ void MeshBlock::processPointDonors(void)
 }
 
 #ifdef _GPU
-void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<VPACKET> &sndPack)
+void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<PACKET> &sndPack)
 {
   if (ninterp2 == 0)
   {
@@ -1187,7 +1187,7 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
     {
       sndPack[p].nints = 0;
       sndPack[p].nreals = 0;
-      sndPack[p].intData.resize(0);
+//      sndPack[p].intData.resize(0);
     }
 
     if (d_buff_size > 0)
@@ -1240,7 +1240,10 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
   for (int p = 0; p < nsend; p++)
   {
     sndPack[p].nints = n_ints[p];
-    sndPack[p].intData.resize(n_ints[p]);
+    if (sndPack[p].intData)
+      delete [] sndPack[p].intData;
+    sndPack[p].intData = new int[n_ints[p]];
+//    sndPack[p].intData.resize(n_ints[p]);
   }
 
   buf_disp.assign(nsend, 0);
@@ -1260,6 +1263,12 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
   cuda_copy_h2d(weights_d, tmp_weights.data(), ninterp2*nSpts);
   cuda_copy_h2d(donors_d, tmp_donors.data(), tmp_donors.size());
   cuda_copy_h2d(buf_inds_d, buf_inds.data(), buf_inds.size());
+}
+
+void MeshBlock::set_stream_handle(cudaStream_t stream, cudaEvent_t event)
+{
+  stream_handle = stream;
+  event_handle = event;
 }
 #endif
 
@@ -1491,7 +1500,7 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
 
   // Perform the interpolation
   interp_u_wrapper(q_d, q_out_d, donors_d, weights_d, buf_inds_d, ninterp2,
-      nSpts, nvar, estride, sstride, vstride);
+      nSpts, nvar, estride, sstride, vstride, stream_handle);
 }
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
@@ -1503,7 +1512,7 @@ void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
 
   // Perform the interpolation
   interp_du_wrapper(dq_d, dq_out_d, donors_d, weights_d, buf_inds_d, ninterp2,
-      nSpts, nvar, nDims, estride, sstride, vstride, dstride);
+      nSpts, nvar, nDims, estride, sstride, vstride, dstride, stream_handle);
 }
 #endif
 

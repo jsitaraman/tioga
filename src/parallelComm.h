@@ -57,6 +57,7 @@ class parallelComm
   void sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
 
   void sendPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+  void sendPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACKET> &rcvPack);
   void recvPacketsV(void);
 
   void sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack);
@@ -67,10 +68,12 @@ class parallelComm
 
   void initPackets(PACKET *sndPack, PACKET *rcvPack);
   void initPacketsV(std::vector<VPACKET>& sndPack, std::vector<VPACKET>& rcvPack);
+  void initPacketsV2(std::vector<PACKET>& sndPack, std::vector<VPACKET>& rcvPack);
 
   void clearPackets(PACKET *sndPack, PACKET *rcvPack);
   void clearPackets2(PACKET *sndPack, PACKET *rcvPack);
   void clearPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+  void clearPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACKET> &rcvPack);
   
 };
   

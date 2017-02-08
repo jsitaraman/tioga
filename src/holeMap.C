@@ -140,6 +140,9 @@ void tioga::getHoleMap(void)
      }
    }
  //
+ for(i=0;i<maxtag;i++)
+   if (holeMap[i].existWall) free(holeMap[i].samLocal);
+ //
  // set the global number of meshes to maxtag
  //
  nmesh=maxtag;

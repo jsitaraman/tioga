@@ -128,6 +128,18 @@ class tioga
     mb->setcallback(f1,f2,f3,f4,f5);
     ihigh=1;
   }
+
+  void setp4estcallback(void (*f1)(double *,int *,int *,int *),
+			void (*f2) (int *,int *))
+  {
+    mb->setp4estcallback(f1,f2);
+  }
+
+  void set_p4est(void)
+  {
+    mytag=-mytag;
+    mb->resolutionScale=1000.0;
+  }
   
   void set_amr_callback(void (*f1)(int *,double *,int *,double *))
   {
@@ -139,6 +151,7 @@ class tioga
   void register_amr_local_data(int, int ,int *, double *);  
   void exchangeAMRDonors(void);
   void checkComm(void);
+  void outputStatistics(void);
 };
       
   

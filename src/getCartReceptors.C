@@ -134,7 +134,7 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 			}
 		    }
 		  
-		  if (iflag==ntm) 
+		  if (iflag > 0) 
 		    {
 		      pmap[cg->proc_id[c]]=1;
 		      dataPtr->next=(INTEGERLIST2 *) malloc(sizeof(INTEGERLIST2));

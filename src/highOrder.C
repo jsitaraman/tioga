@@ -26,6 +26,7 @@
 extern "C" 
 {
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
+  int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
 
 void MeshBlock::getCellIblanks(void)
@@ -35,6 +36,7 @@ void MeshBlock::getCellIblanks(void)
   int icell;
   int inode[8];
   int ncount,flag;
+  int verbose;
 
   icell=0;
   if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
@@ -45,10 +47,19 @@ void MeshBlock::getCellIblanks(void)
 	{
 	  flag=1;
 	  iblank_cell[icell]=1;
+          verbose=0;
+	  //if (myid==763 && icell==7975) {
+	  // verbose=1;
+          //}
 	  ncount=0;
 	  for(m=0;m<nvert && flag;m++)
 	    {
 	      inode[m]=vconn[n][nvert*i+m]-BASE;
+	      if (verbose) {
+                tracei(m);
+                tracei(inode[m]);
+                tracei(iblank[inode[m]]);
+              }
 	      if (iblank[inode[m]]==0) 
 		{
 		  iblank_cell[icell]=0;
@@ -56,10 +67,15 @@ void MeshBlock::getCellIblanks(void)
 		}
 	      ncount=ncount+(iblank[inode[m]]==-1);
 	    }
-	  
+	  if (verbose) {
+	    tracei(icell);
+            tracei(ncount);
+            tracei(nvert);
+           } 
 	  if (flag) 
 	    {
 	      if (ncount ==nvert) iblank_cell[icell]=-1;
+//	      if (ncount > 0)  iblank_cell[icell]=-1;
 //	      if (ncount >= nvert/2) iblank_cell[icell]=-1;
 	    }
 	  icell++;
@@ -67,9 +83,9 @@ void MeshBlock::getCellIblanks(void)
     }
 }
 
-void MeshBlock::clearOrphans(int *itmp)
+void MeshBlock::clearOrphans(HOLEMAP *holemap, int nmesh,int *itmp)
 {
-  int i,j,m;
+  int i,j,k,m;
   int reject;
 
   if (ihigh) 
@@ -80,12 +96,28 @@ void MeshBlock::clearOrphans(int *itmp)
 	  reject=0;
 	  for(j=0;j<pointsPerCell[i];j++)
 	    {
-	      if (itmp[m]==0) reject=1;
+	      if (itmp[m]==0) 
+		{
+		  reject=2;
+		  for(k=0;k<nmesh;k++)
+		    if (k!=(meshtag-BASE) && holemap[k].existWall) 
+		      {
+			if (checkHoleMap(&rxyz[3*m],holemap[k].nx,holemap[k].sam,holemap[k].extents)) 
+			  {
+			    reject=1;
+			    break;
+			  }
+		      }
+		}
 	      m++;
 	    }
-	  if (reject) 
+	  if (reject==1) 
 	    {
-	      iblank_cell[ctag[i]-1]=0; // changed to hole for off-body
+	      iblank_cell[ctag[i]-1]=0; // changed to hole if inside hole map
+	    }
+	  else if (reject==2) 
+	    {
+	      iblank_cell[ctag[i]-1]=1; // changed to field if not inside hole map
 	    }
 	}
     }
@@ -117,7 +149,7 @@ void MeshBlock::getInternalNodes(void)
   ctag=(int *)malloc(sizeof(int)*ncells);
   //
   for(i=0;i<ncells;i++)
-      if (iblank_cell[i]==-1) ctag[nreceptorCells++]=i+1;
+      if (iblank_cell[i]==-1) ctag[nreceptorCells++]=i+BASE;
   //
   if (ihigh) 
     {
@@ -377,9 +409,9 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		{
 		  inode=interpList2[i].inode[m];
 		  weight=interpList2[i].weights[m];
-		  if (weight < 0 || weight > 1.0) {
+		  if (weight < -TOL || weight > 1.0+TOL) {
                     traced(weight);
-                    printf("warning: weights are not convex\n");
+                    printf("warning: weights are not convex 2\n");
                    }
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[inode*nvar+k]*weight;

@@ -93,6 +93,7 @@ class MeshBlock
 
   int nfringe;
   int meshtag; /** < tag of the mesh that this block belongs to */
+  double resolutionScale;
   //
   // oriented bounding box of this partition
   // 
@@ -114,6 +115,16 @@ class MeshBlock
   int ninterpCart;
   int interpListCartSize;
   INTERPLIST *interpListCart; 
+
+  //
+  // call back functions to use p4est to search
+  // its own internal data
+  //
+  void (*p4estsearchpt) (double *,int *,int *,int *);
+  void (*check_intersect_p4est) (int *, int *);
+
+
+
   /** basic constructor */
   MeshBlock() { nv=NULL; nc=NULL; x=NULL;iblank=NULL;iblank_cell=NULL;vconn=NULL;wbcnode=NULL;
     obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
@@ -124,6 +135,7 @@ class MeshBlock
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
     interpList2=NULL;picked=NULL;ctag_cart=NULL;rxyzCart=NULL;donorIdCart=NULL;pickedCart=NULL;ntotalPointsCart=0;
     nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;
+    resolutionScale=1.0;
   };
 
   /** basic destructor */
@@ -195,12 +207,16 @@ class MeshBlock
   void getInterpData(int *nrecords, int **intData);
 
   void clearIblanks(void);
+  
+  void getStats(int mstat[2]);
 
   void setIblanks(int inode);
 
   void getDonorCount(int *dcount,int *fcount);
 
   void getDonorInfo(int *receptors,int *indices, double *frac);
+
+  void getReducedOBB(OBB *,double *);
   //
   // routines for high order connectivity and interpolation
   //
@@ -221,6 +237,14 @@ class MeshBlock
     donor_frac=f4;
     convert_to_modal=f5;
   }
+
+  void setp4estcallback(void (*f1)(double *,int *,int *,int *),
+			void (*f2)(int *,int *))
+  {
+    p4estsearchpt=f1;
+    check_intersect_p4est=f2;
+  }
+
   void writeCellFile(int);
   void getInternalNodes(void);
   void getExtraQueryPoints(OBB *obb,int *nints,int **intData,int *nreals,
@@ -235,7 +259,7 @@ class MeshBlock
   {
     fprintf(fp,"%f %f %f\n",rxyz[3*i],rxyz[3*i+1],rxyz[3*i+2]);
   }
-  void clearOrphans(int *itmp);
+  void clearOrphans(HOLEMAP *holemap,int nmesh,int *itmp);
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);

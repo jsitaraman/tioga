@@ -219,8 +219,18 @@ void tioga::exchangeDonors(void)
   free(rcvPack);
 }
 
-
-
+void tioga::outputStatistics(void)
+{
+  int mstats[2],mstats_global[2];
+  mb->getStats(mstats);
+  MPI_Reduce(mstats,mstats_global,2,MPI_INT,MPI_SUM,0,scomm);
+  if (myid==0) {
+    printf("#tioga -----------------------------------------\n");
+    printf("#tioga : total receptors:\t%d\n",mstats_global[1]);
+    printf("#tioga : total holes    :\t%d\n",mstats_global[0]);
+    printf("#tioga -----------------------------------------\n");
+  }
+}
 
 
 

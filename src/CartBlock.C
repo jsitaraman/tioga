@@ -92,7 +92,6 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 	  get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
 			    pdegree,dims[0],dims[1],dims[2],nf,
 			    xlo,dx,&qnode[ploc],index,xtmp);
-	  assert(listptr->receptorInfo[0]<80);
 	  (*intData)[icount++]=listptr->receptorInfo[0];
 	  (*intData)[icount++]=-1;
 	  (*intData)[icount++]=listptr->receptorInfo[1];	  
@@ -273,7 +272,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
   char fname[80];
   char qstr[2];
   char intstring[7];
-
+  int ni,nj,nk,ibcheck;
   //sprintf(intstring,"%d",100000+myid);
   //sprintf(fname,"fringes_%s.dat",&(intstring[1]));
   //if (local_id==0) 
@@ -424,6 +423,32 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		}
 	    }
 	}
+
+  for(k=0;k<dims[2];k++)
+    for(j=0;j<dims[1];j++)
+      for(i=0;i<dims[0];i++)
+        {
+          ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+          if (ibl[ibindex]==1)
+            {
+              ibcheck=1;
+              for(nk=-1;nk<2;nk++)
+                for(nj=-1;nj<2;nj++)
+                  for(ni=-1;ni<2;ni++)
+                    {
+                      ibindex=(k+nf+nk)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf+nj)*(dims[0]+2*nf)+i+nf+ni;
+                      ibcheck=ibcheck && (ibl[ibindex]!=0);
+                    }
+              if (!ibcheck)
+                {
+                  printf("fixing orphan: myid/globalid/localid/(i,j,k)=%d %d %d %d %d %d \n",
+                         myid,global_id,local_id,i,j,k);
+		  ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+		  ibl[ibindex]=0;
+                }
+            }
+        }
+
   // fclose(fp);
 }
 			      

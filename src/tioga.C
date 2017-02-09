@@ -148,27 +148,27 @@ void tioga::performConnectivity(void)
 
 void tioga::doHoleCutting(void)
 {
-//  // Generate structured map of solid boundary (hole) locations
-//  getHoleMap();
+  // Generate structured map of solid boundary (hole) locations
+  getHoleMap();
 
   // Send/Recv the hole maps to/from all necessary ranks
   exchangeBoxes();
 
-//  // Find a list of all potential receptor points and send to all possible
-//  // donor ranks
-//  exchangeSearchData();
+  // Find a list of all potential receptor points and send to all possible
+  // donor ranks
+  exchangeSearchData();
 
-//  // Find donors for all search points (other grids' possible receptor points)
-//  mb->search();
+  // Find donors for all search points (other grids' possible receptor points)
+  mb->search();
 
-//  // Exchange found donor data and do final iblank setting
-//  exchangeDonors();
+  // Exchange found donor data and do final iblank setting
+  exchangeDonors();
 
   if (ihighGlobal)
   {
     // Calculate cell iblank values from nodal iblank values
     mb->getCellIblanks(meshcomm);
-    //directCut();
+    //directCut(); /// TODO: complete a working version
 
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {

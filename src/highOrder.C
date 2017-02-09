@@ -541,37 +541,42 @@ int get_cell_index(int* nc, int ntypes, int ic_in, int &ic_out)
 
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 {
-//  int icell = 0;
-//  if (!iartbnd)
-//  {
-//    if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
-//  }
+  if (!iartbnd)
+  {
+    if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
+  }
 
-//  for (int n = 0; n < ntypes; n++)
-//  {
-//    int nvert = nv[n];
-//    for (int i = 0; i < nc[n]; i++)
-//    {
-//      int flag = 1;
-//      iblank_cell[icell] = NORMAL;
-//      int ncount = 0;
-//      for (int m = 0; m < nvert && flag; m++)
-//      {
-//        int inode = vconn[n][nvert*i+m]-BASE;
-//        if (iblank[inode] == HOLE)
-//        {
-//          iblank_cell[icell] = HOLE;
-//          flag = 0;
-//        }
-//        ncount = ncount + (iblank[inode] == FRINGE);
-//      }
+  int icell = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    for (int i = 0; i < nc[n]; i++)
+    {
+      int flag = 1;
+      int old_iblank = iblank_cell[icell];
+      iblank_cell[icell] = NORMAL;
+      int ncount = 0;
+      for (int m = 0; m < nvert && flag; m++)
+      {
+        int inode = vconn[n][nvert*i+m]-BASE;
+        if (iblank[inode] == HOLE)
+        {
+          iblank_cell[icell] = HOLE;
+          flag = 0;
+        }
+        ncount = ncount + (iblank[inode] == FRINGE);
+      }
 
-//      if (flag && ncount == nvert)
-//        iblank_cell[icell] = FRINGE;
+      if (flag && ncount == nvert)
+        iblank_cell[icell] = HOLE; // FRINGE
 
-//      icell++;
-//    }
-//  }
+      // If cell is being unblanked, actually use it as a 'fringe' cell
+      if (old_iblank == HOLE && iblank_cell[icell] == NORMAL)
+        iblank_cell[icell] = FRINGE;
+
+      icell++;
+    }
+  }
 
 
 //  /// DEBUGGING / TEMPORARY FIX
@@ -639,7 +644,11 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 
 //  int rank;
 //  MPI_Comm_rank(meshComm, &rank);
+}
 
+/**
+void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
+{
   /// HACK FOR GOLF BALL CASE: Golf ball radius = .0625, outer radius = .14
   //double cut_rad2 = .1*.1;
   double cut_rad2 = .75*.75;
@@ -692,6 +701,7 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
       iblank_cell[ic] = NORMAL;
   }
 }
+*/
 
 void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 {
@@ -1641,7 +1651,7 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
     face_data_to_device(ftag, nreceptorFaces, 1, dqtmp);
 
   if (nreceptorCells > 0)
-    cell_data_to_device(ctag, nreceptorCells, 0, qtmp+3*nvar*nFacePoints);
+    cell_data_to_device(ctag, nreceptorCells, 0, dqtmp+3*nvar*nFacePoints);
 #else
   MPI_Pcontrol(1, "tioga_update_grad_fpts");
 //  int fpt_start = 0;

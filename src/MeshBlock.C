@@ -857,7 +857,6 @@ MeshBlock::~MeshBlock()
   if (!iartbnd) free(iblank_cell);
   if (pointsPerCell) free(pointsPerCell);
   if (pointsPerFace) free(pointsPerFace);
-  if (rxyz) free(rxyz);
   if (picked) free(picked);
   if (rxyzCart) free(rxyzCart);
   if (donorIdCart) free(donorIdCart);

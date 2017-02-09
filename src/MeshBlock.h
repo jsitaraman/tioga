@@ -169,7 +169,10 @@ class MeshBlock
   void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
 
   /*! Copy updated solution/gradient for fringe faces from host to device */
-  void (*data_to_device)(int* fringeIDs, int nFringe, int gradFlag, double *data);
+  void (*face_data_to_device)(int* fringeIDs, int nFringe, int gradFlag, double *data);
+
+  /*! Copy updated solution/gradient for fringe cells from host to device */
+  void (*cell_data_to_device)(int* cellIDs, int nCells, int gradFlag, double *data);
 
   /*!
    * \brief Determine whether a point (x,y,z) lies within a cell
@@ -214,9 +217,12 @@ class MeshBlock
   int *pointsPerFace;      /** number of receptor points per face */
   int maxPointsPerFace;    /** max of pointsPerFace vector */
 
+  int nFacePoints;
+  int nCellPoints;
+
   //std::unordered_set<int> overFaces; /** < List of Artificial Boundary face indices */
 
-  double *rxyz;            /**  point coordinates */
+  std::vector<double> rxyz;            /**  point coordinates */
   int ipoint; 
   int *picked;             /** < flag specifying if a node has been selected for high-order interpolation */
 
@@ -303,7 +309,6 @@ class MeshBlock
     pointsPerCell=NULL;
     pointsPerFace=NULL;
     maxPointsPerCell=0;
-    rxyz=NULL;
     ntotalPoints=0;
     nreceptorFaces=0;
     rst=NULL;
@@ -492,7 +497,7 @@ class MeshBlock
                             double* (*gdqd)(int&, int&, int&, int&))
   {
     data_from_device = d2h;
-    data_to_device = h2d;
+    face_data_to_device = h2d;
     get_q_spts_d = gqd;
     get_dq_spts_d = gdqd;
     gpu = true;
@@ -506,7 +511,7 @@ class MeshBlock
 
   /*! Gather a list of all artificial boundary point locations (for high-order)
    * [Requires use of callback functions] */
-  void getBoundaryNodes(void);
+  void getFringeNodes(void);
 
   void getExtraQueryPoints(OBB *obb, int &nints, int*& intData, int &nreals,
                            double*& realData);
@@ -521,10 +526,10 @@ class MeshBlock
   void updatePointData(double *q,double *qtmp,int nvar,int interptype);
 
   /*! Update high-order element data at artificial boundary flux points */
-  void updateFluxPointData(double *qtmp, int nvar);
+  void updateFringePointData(double *qtmp, int nvar);
 
   /*! Update solution gradient at artificial boundary flux points */
-  void updateFluxPointGradient(double *dqtmp, int nvar);
+  void updateFringePointGradient(double *dqtmp, int nvar);
 
   /*! Copy donor-cell data from device to host for use in interpolation */
   void getDonorDataGPU(int dataFlag = 0);

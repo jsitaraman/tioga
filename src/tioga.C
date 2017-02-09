@@ -141,6 +141,13 @@ void tioga::profile(void)
 
 void tioga::performConnectivity(void)
 {
+  doHoleCutting();
+
+  doPointConnectivity();
+}
+
+void tioga::doHoleCutting(void)
+{
 //  // Generate structured map of solid boundary (hole) locations
 //  getHoleMap();
 
@@ -167,29 +174,30 @@ void tioga::performConnectivity(void)
     {
       // Find artificial boundary faces
       mb->calcFaceIblanks(meshcomm);
-
-      // Get all AB face point locations
-      mb->getBoundaryNodes();
     }
-    else
-    {
-      // If this rank isn't high order, this will still load up fringe nodes
-      mb->getInternalNodes();
-    }
+  }
+}
 
-    // Exchange new list of points, including high-order Artificial Boundary
-    // face points or internal points (or fringe nodes for non-high order)
-    exchangePointSearchData();
+void tioga::doPointConnectivity(void)
+{
+  if (!ihighGlobal) return;
 
-    mb->search();
+  // Get all fringe point locations (high-order face/cell points + low-order vertices)
+  mb->getFringeNodes();
 
-    // Setup interpolation weights and such for final interp-point list
-    mb->processPointDonors();
+  // Exchange new list of points, including high-order Artificial Boundary
+  // face points or internal points (or fringe nodes for non-high order)
+  exchangePointSearchData();
+
+  // Search for donor cells for all given points
+  mb->search();
+
+  // Setup interpolation weights and such for final interp-point list
+  mb->processPointDonors();
 
 #ifdef _GPU
-    setupCommBuffersGPU();
+  setupCommBuffersGPU();
 #endif
-  }
 }
 
 #ifdef _GPU
@@ -1073,9 +1081,9 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     {
       interpTime.startTimer();
       if (dataFlag == 0)
-        mb->updateFluxPointData(fringebuf_h,nvar);
+        mb->updateFringePointData(fringebuf_h,nvar);
       else
-        mb->updateFluxPointGradient(fringebuf_h,nvar);
+        mb->updateFringePointGradient(fringebuf_h,nvar);
       interpTime.startTimer();
     }
     else

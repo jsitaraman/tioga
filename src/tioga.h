@@ -231,6 +231,9 @@ class tioga
   void performConnectivityAMR(void);
   void directCut(void);
 
+  void doHoleCutting(void);
+  void doPointConnectivity(void);
+
   void setTransform(double *mat, double *off, int nDims) { mb->setTransform(mat,off,nDims); }
 
   /** Perform overset interpolation and data communication */

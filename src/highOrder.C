@@ -916,9 +916,7 @@ void MeshBlock::getInternalNodes(void)
       maxPointsPerCell = max(maxPointsPerCell,pointsPerCell[i]);
     }
 
-    free(rxyz);
-    //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
-    rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
+    rxyz.resize(ntotalPoints*3);
 
     int m = 0;
     for (int i = 0; i < nreceptorCells; i++)
@@ -941,8 +939,7 @@ void MeshBlock::getInternalNodes(void)
       }
     }
 
-    free(rxyz);
-    rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
+    rxyz.resize(ntotalPoints*3);
 
     int m = 0;
     for (int i = 0; i < nnodes; i++)
@@ -957,9 +954,14 @@ void MeshBlock::getInternalNodes(void)
   }
 }
 
-void MeshBlock::getBoundaryNodes(void)
+void MeshBlock::getFringeNodes(void)
 {
   nreceptorFaces = 0;
+  nreceptorCells = 0;
+  ntotalPoints = 0;
+
+  nFacePoints = 0;
+  nCellPoints = 0;
 
   if (iartbnd)
   {
@@ -977,17 +979,16 @@ void MeshBlock::getBoundaryNodes(void)
 
     // Get total number of face nodes (flux points) for our AB faces
     maxPointsPerFace = 0;
-    ntotalPoints = 0;
 
     for (int i = 0; i < nreceptorFaces; i++)
     {
       get_nodes_per_face(&(ftag[i]),&(pointsPerFace[i]));
-      ntotalPoints += pointsPerFace[i];
+      nFacePoints += pointsPerFace[i];
       maxPointsPerFace = max(maxPointsPerFace,pointsPerFace[i]);
     }
 
-    free(rxyz);
-    rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
+    rxyz.resize(nFacePoints*3);
+    ntotalPoints = nFacePoints;
 
     // Find the position of each flux point using callback function
     int m = 0;
@@ -997,10 +998,45 @@ void MeshBlock::getBoundaryNodes(void)
       m += (3*pointsPerFace[i]);
     }
   }
+
+  if (ihigh)
+  {
+    /* Add in interior nodes from fringe elements (i.e. unblank cells, or
+     * non-AB fringe cells) */
+    free(ctag);
+    ctag = (int *)malloc(sizeof(int)*ncells);
+
+    // Gather a list of cell IDs for all receptor (fringe) cells
+    for (int i = 0; i < ncells; i++)
+      if (iblank_cell[i] == FRINGE)
+        ctag[nreceptorCells++] = i+BASE;
+
+    free(pointsPerCell);
+    pointsPerCell = (int *)malloc(sizeof(int)*nreceptorCells);
+
+    // Get total number of internal nodes (solution points) for our fringe cells
+    maxPointsPerCell=0;
+
+    for (int i = 0; i < nreceptorCells; i++)
+    {
+      get_nodes_per_cell(&(ctag[i]),&(pointsPerCell[i]));
+      nCellPoints += pointsPerCell[i];
+      maxPointsPerCell = max(maxPointsPerCell,pointsPerCell[i]);
+    }
+
+    ntotalPoints = nCellPoints + nFacePoints;
+    rxyz.resize(ntotalPoints*3);
+
+    int m = nFacePoints*3;
+    for (int i = 0; i < nreceptorCells; i++)
+    {
+      get_receptor_nodes(&(ctag[i]),&(pointsPerCell[i]),&(rxyz[m]));
+      m += (3*pointsPerCell[i]);
+    }
+  }
   else
   {
     // Gather all fringe nodes into fringe-point list
-    ntotalPoints = 0;
 
     free(picked);
     picked = (int *) malloc(sizeof(int)*nnodes);
@@ -1013,8 +1049,7 @@ void MeshBlock::getBoundaryNodes(void)
       }
     }
 
-    free(rxyz);
-    rxyz = (double *)malloc(sizeof(double)*ntotalPoints*3);
+    rxyz.resize(ntotalPoints*3);
 
     int m = 0;
     for (int i = 0; i < nnodes; i++)
@@ -1562,12 +1597,16 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
     }
 }
 
-void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
+void MeshBlock::updateFringePointData(double *qtmp, int nvar)
 {
-  if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
+  if (!ihigh) FatalError("updateFringePointData not applicable to non-high order solvers");
 
 #ifdef _GPU
-  data_to_device(ftag, nreceptorFaces, 0, qtmp);
+  if (nreceptorFaces > 0)
+    face_data_to_device(ftag, nreceptorFaces, 0, qtmp);
+
+  if (nreceptorCells > 0)
+    cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
 #else
   PUSH_NVTX_RANGE("tg_update_fringeU", 2);
   MPI_Pcontrol(1, "tioga_update_U_fpts");
@@ -1592,13 +1631,17 @@ void MeshBlock::updateFluxPointData(double *qtmp, int nvar)
   POP_NVTX_RANGE;
 }
 
-void MeshBlock::updateFluxPointGradient(double *dqtmp, int nvar)
+void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
 {
-  if (!ihigh) FatalError("updateFluxPointData not applicable to non-high order solvers");
+  if (!ihigh) FatalError("updateFringePointData not applicable to non-high order solvers");
 
   PUSH_NVTX_RANGE("tg_update_fringeGrad", 2);
 #ifdef _GPU
-  data_to_device(ftag, nreceptorFaces, 1, dqtmp);
+  if (nreceptorFaces > 0)
+    face_data_to_device(ftag, nreceptorFaces, 1, dqtmp);
+
+  if (nreceptorCells > 0)
+    cell_data_to_device(ctag, nreceptorCells, 0, qtmp+3*nvar*nFacePoints);
 #else
   MPI_Pcontrol(1, "tioga_update_grad_fpts");
 //  int fpt_start = 0;
@@ -1640,6 +1683,6 @@ void MeshBlock::getDonorDataGPU(int dataFlag)
 void MeshBlock::sendFringeDataGPU(int gradFlag)
 {
   MPI_Pcontrol(1, "sendFringeDataGPU");
-  data_to_device(ftag, nreceptorFaces, gradFlag, NULL);
+  face_data_to_device(ftag, nreceptorFaces, gradFlag, NULL);
   MPI_Pcontrol(-1, "sendFringeDataGPU");
 }

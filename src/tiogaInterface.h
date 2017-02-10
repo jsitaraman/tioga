@@ -96,7 +96,8 @@ void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                             double* (*gdqs)(int&, int&, int&, int&));
 
 void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
-                                void (*h2d)(int* ids, int nf, int grad, double *data),
+                                void (*h2df)(int* ids, int nf, int grad, double *data),
+                                void (*h2dc)(int* ids, int nc, int grad, double *data),
                                 double* (*gqd)(int& es, int& ss, int& vs),
                                 double* (*gdqd)(int& es, int& ss, int& vs, int& ds));
 

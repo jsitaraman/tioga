@@ -576,8 +576,9 @@ void parallelComm::initPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACK
     pack.nreals = 0;
     if (pack.intData)
       delete [] pack.intData;
-    if (pack.realData)
-      delete [] pack.realData;
+    pack.intData = NULL;
+//    if (pack.realData)
+//      delete [] pack.realData;
   }
 
   for (auto &pack:rcvPack)

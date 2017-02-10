@@ -148,21 +148,21 @@ void tioga::performConnectivity(void)
 
 void tioga::doHoleCutting(void)
 {
-  // Generate structured map of solid boundary (hole) locations
-  getHoleMap();
+//  // Generate structured map of solid boundary (hole) locations
+//  getHoleMap();
 
   // Send/Recv the hole maps to/from all necessary ranks
   exchangeBoxes();
 
-  // Find a list of all potential receptor points and send to all possible
-  // donor ranks
-  exchangeSearchData();
+//  // Find a list of all potential receptor points and send to all possible
+//  // donor ranks
+//  exchangeSearchData();
 
-  // Find donors for all search points (other grids' possible receptor points)
-  mb->search();
+//  // Find donors for all search points (other grids' possible receptor points)
+//  mb->search();
 
-  // Exchange found donor data and do final iblank setting
-  exchangeDonors();
+//  // Exchange found donor data and do final iblank setting
+//  exchangeDonors();
 
   if (ihighGlobal)
   {
@@ -1035,7 +1035,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 //    std::vector<double> qtmp(stride*mb->ntotalPoints);
     recv_itmp.resize(mb->ntotalPoints);
 
-    for (int k = 0; k < nrecv;k++)
+    for (int k = 0; k < nrecv; k++)
     {
       int m = 0;
       for (int i = 0; i < rcvVPack[k].nints; i++)
@@ -1043,7 +1043,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
         int ind = rcvVPack[k].intData[i];
         for (int j = 0; j < stride; j++)
         {
-          recv_itmp[ind] = 1;
+          recv_itmp[ind] = 1;          
           fringebuf_h[ind*stride+j] = rcvVPack[k].realData[m];
           m++;
         }

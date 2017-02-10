@@ -539,6 +539,7 @@ int get_cell_index(int* nc, int ntypes, int ic_in, int &ic_out)
   }
 }
 
+/*
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 {
   if (!iartbnd)
@@ -577,7 +578,6 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
       icell++;
     }
   }
-
 
 //  /// DEBUGGING / TEMPORARY FIX
 //  std::vector<int> ncf(1,6);
@@ -645,7 +645,7 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 //  int rank;
 //  MPI_Comm_rank(meshComm, &rank);
 }
-
+*/
 /**
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 {
@@ -702,6 +702,55 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
   }
 }
 */
+
+void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
+{
+  /// HACK FOR TAYLOR-GREEN VORTEX TEST CASE: INNER BOX (HALF-)LENGTH .25*PI
+  double safety_fac = .9;
+  double L = .25*PI * safety_fac;
+
+  if (meshtag == 1) /// MUST BE BACKGROUND GRID
+  {
+    int icell = 0;
+    for (int n = 0; n < ntypes; n++)
+    {
+      int nvert = nv[n];
+      for (int ic = 0; ic < nc[n]; ic++)
+      {
+        int old_iblank = iblank_cell[icell];
+        iblank_cell[icell] = NORMAL;
+
+        bool inside = true;
+        for (int nd = 0; nd < 8 && inside; nd++)
+        {
+          int ind = 3*vconn[n][nvert*ic+nd];
+
+          for (int d = 0; d < 3; d++)
+          {
+            if (std::abs(x[ind+d] - offset[d]) > L)
+            {
+              inside = false;
+              break;
+            }
+          }
+        }
+
+        if (inside)
+          iblank_cell[icell] = HOLE;
+
+        if (old_iblank == HOLE && iblank_cell[icell] == NORMAL)
+          iblank_cell[icell] = FRINGE;
+
+        icell++;
+      }
+    }
+  }
+  else
+  {
+    for (int ic = 0; ic < ncells; ic++)
+      iblank_cell[ic] = NORMAL;
+  }
+}
 
 void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 {

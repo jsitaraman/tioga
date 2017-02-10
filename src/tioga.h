@@ -302,11 +302,12 @@ class tioga
   }
 
   void set_ab_callback_gpu(void (*d2h)(int* ids, int nd, int grad),
-                           void (*h2d)(int* ids, int nf, int grad, double* data),
+                           void (*h2df)(int* ids, int nf, int grad, double* data),
+                           void (*h2dc)(int* ids, int nc, int grad, double* data),
                            double* (*gqd)(int&, int&, int&),
                            double* (*gdqd)(int&, int&, int&, int&))
   {
-    mb->setCallbackArtBndGpu(d2h,h2d,gqd,gdqd);
+    mb->setCallbackArtBndGpu(d2h,h2df,h2dc,gqd,gdqd);
     gpu = true;
   }
   

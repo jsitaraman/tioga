@@ -102,7 +102,8 @@ class MeshBlock
   std::vector<int> sndMap, rcvMap;
 
   bool rrot = false;
-  std::vector<double> Smat, offset;
+  std::vector<double> Smat;
+  double offset[3] = {0.0};
 
   //
   // Alternating digital tree library
@@ -492,12 +493,14 @@ class MeshBlock
   }
 
   void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd, int grad),
-                            void (*h2d)(int* ids, int nf, int grad, double *data),
+                            void (*h2df)(int* ids, int nf, int grad, double *data),
+                            void (*h2dc)(int* ids, int nf, int grad, double *data),
                             double* (*gqd)(int&, int&, int&),
                             double* (*gdqd)(int&, int&, int&, int&))
   {
     data_from_device = d2h;
-    face_data_to_device = h2d;
+    face_data_to_device = h2df;
+    cell_data_to_device = h2dc;
     get_q_spts_d = gqd;
     get_dq_spts_d = gdqd;
     gpu = true;

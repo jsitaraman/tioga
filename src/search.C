@@ -34,7 +34,7 @@ void MeshBlock::search(void)
   if (rrot && adt)
   {
     /// TODO: worry about updating ADT based on changing OBB of search points
-    adt->setTransform(Smat.data(), offset.data(), nDims);
+    adt->setTransform(Smat.data(), offset, nDims);
   }
   else
   {

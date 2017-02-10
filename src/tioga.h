@@ -24,6 +24,9 @@
  *
  *  Jay Sitaraman 02/24/2014 
  */
+
+#include <vector>
+#include <memory>
 #include "MeshBlock.h"
 #include "CartGrid.h"
 #include "CartBlock.h"
@@ -51,14 +54,21 @@ class tioga
   OBB *obblist;
   int iorphanPrint;
 
+  std::vector<std::unique_ptr<MeshBlock> > mblocks;
+  std::vector<int> mtags;
+
  public:
   int ihigh;
   int ihighGlobal;
   int iamrGlobal;
   /** basic constuctor */
-  tioga() { mb = NULL; cg=NULL; cb=NULL; 
-    holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
-    obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;};
+  tioga()
+      :mblocks(0)
+    {
+        mb = NULL; cg=NULL; cb=NULL;
+        holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
+        obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+    }
  
   /** basic destructor */
   ~tioga(); 

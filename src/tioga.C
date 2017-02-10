@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
 #include "tioga.h"
 #include <assert.h>
 /**
@@ -38,8 +39,8 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   // this can be changed at a later date
   // but will be a fairly invasive change
   //
-  nblocks=0;
-  mb=new MeshBlock[1];
+  // nblocks=0;
+  // mb=new MeshBlock[1];
   //
   // instantiate the parallel communication class
   //
@@ -62,16 +63,19 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			     int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn)
 {
-  if (nnodes > 0) nblocks=1;
+  mtags.push_back(btag);
+  mblocks.push_back(std::unique_ptr<MeshBlock>(new MeshBlock));
+  nblocks = mblocks.size();
+
+  auto& mb = mblocks[nblocks - 1];
   mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
   mb->myid=myid;
-  mytag=btag;
 }
 
 void tioga::profile(void)
 {
-
-  mb->preprocess();
+  for(auto& mb: mblocks)
+    mb->preprocess();
   //mb->writeGridFile(myid);
   //mb->writeOBB(myid);
   //if (myid==4) mb->writeOutput(myid);
@@ -82,18 +86,18 @@ void tioga::performConnectivity(void)
 {
   getHoleMap();
   exchangeBoxes();
-  exchangeSearchData();
-  mb->ihigh=0;
-  mb->search();
-  exchangeDonors();
-  outputStatistics();
-  MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
-  //if (ihighGlobal) {
-  mb->getCellIblanks();
-  mb->writeCellFile(myid);
-  //}
-  //mb->writeOutput(myid);
-  //tracei(myid);
+  // exchangeSearchData();
+  // mb->ihigh=0;
+  // mb->search();
+  // exchangeDonors();
+  // outputStatistics();
+  // MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
+  // //if (ihighGlobal) {
+  // mb->getCellIblanks();
+  // mb->writeCellFile(myid);
+  // //}
+  // //mb->writeOutput(myid);
+  // //tracei(myid);
 }
 
 void tioga::performConnectivityHighOrder(void)
@@ -356,7 +360,7 @@ void tioga::getDonorInfo(int *receptors,int *indices,double *frac,int *dcount)
 tioga::~tioga()
 {      
   int i;
-  if (mb) delete[] mb;
+  //if (mb) delete[] mb;
   if (holeMap) 
     {
       for(i=0;i<nmesh;i++)

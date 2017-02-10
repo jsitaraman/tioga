@@ -45,6 +45,7 @@ class tioga
   int isym;
   int ierr;
   int mytag;
+  int *mytags;
   int myid,numprocs;
   int *sendCount;
   int *recvCount;
@@ -57,7 +58,7 @@ class tioga
   int iamrGlobal;
   /** basic constuctor */
   tioga() { mb = NULL; cg=NULL; cb=NULL; 
-    holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
+    holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;mytags=NULL;
     obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;};
  
   /** basic destructor */
@@ -65,10 +66,15 @@ class tioga
   
   /** set communicator */
   void setCommunicator(MPI_Comm communicator,int id_proc,int nprocs);
+  /** set communicator if there multiple blocks */
+  void setCommunicator(MPI_Comm communicator,int id_proc,int nprocs,int nblocks);
 
   /** registerGrid data */
 
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
+			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
+
+  void registerGridData(int bid,int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
 
   void profile(void);

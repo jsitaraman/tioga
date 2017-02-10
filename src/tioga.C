@@ -56,6 +56,40 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   pc_cart->numprocs=numprocs;
   //
 }
+
+void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs,
+			    int nblocks_in)
+{
+  scomm=communicator;
+  myid=id_proc;
+  numprocs=nprocs;
+  sendCount=(int *) malloc(sizeof(int)*numprocs);
+  recvCount=(int *) malloc(sizeof(int)*numprocs);
+  //
+  // only one mesh block per process for now
+  // this can be changed at a later date
+  // but will be a fairly invasive change
+  //
+  nblocks=nblocks_in;
+  mb=new MeshBlock[nblocks];
+  mytags=(int *) malloc(sizeof(int)*nblocks);
+  //
+  // instantiate the parallel communication class
+  //
+  pc=new parallelComm[1];
+  pc->myid=myid;
+  pc->scomm=scomm;
+  pc->numprocs=numprocs;  
+ 
+  // instantiate the parallel communication class
+  //   
+  pc_cart=new parallelComm[1];
+  pc_cart->myid=myid;
+  pc_cart->scomm=scomm;
+  pc_cart->numprocs=numprocs;
+  //
+}
+
 /**
  * register grid data for each mesh block
  */
@@ -65,13 +99,26 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   if (nnodes > 0) nblocks=1;
   mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
   mb->myid=myid;
-  mytag=btag;
+  mytag=btag
+}
+
+void tioga::registerGridData(int iblk,
+			     int btag,int nnodes,double *xyz,int *ibl, int nwbc,
+			     int nobc,
+			     int *wbcnode,int *obcnode,int ntypes, int *nv, 
+			     int *nc, int **vconn)
+{
+  mb[iblk]->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,
+		   nv,nc,vconn);
+  mb[iblk]->myid=myid;
+  mytags[iblk]=btag;
 }
 
 void tioga::profile(void)
 {
-
-  mb->preprocess();
+  int iblk;
+  for (iblk=0;iblk<nblocks;iblk++)
+    mb[iblk]->preprocess();
   //mb->writeGridFile(myid);
   //mb->writeOBB(myid);
   //if (myid==4) mb->writeOutput(myid);
@@ -80,17 +127,24 @@ void tioga::profile(void)
 
 void tioga::performConnectivity(void)
 {
+  int iblk;
   getHoleMap();
   exchangeBoxes();
   exchangeSearchData();
-  mb->ihigh=0;
-  mb->search();
+  for (iblk=0;iblk<nblocks;iblk++)
+    {
+      mb[iblk]->ihigh=0;
+      mb[iblk]->search();
+    }
   exchangeDonors();
   outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
-  mb->getCellIblanks();
-  mb->writeCellFile(myid);
+  for(iblk=0;iblk<nblocks;iblk++)
+    {
+      mb[iblk]->getCellIblanks();
+      mb[iblk]->writeCellFile(myid*1000+i);
+    }
   //}
   //mb->writeOutput(myid);
   //tracei(myid);
@@ -364,6 +418,7 @@ tioga::~tioga()
       delete [] holeMap;
     }
   if (pc) delete[] pc;
+  if (mytags) free(mytags);
   if (sendCount) free(sendCount);
   if (recvCount) free(recvCount);
   if (obblist) free(obblist);

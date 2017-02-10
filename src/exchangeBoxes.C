@@ -28,13 +28,37 @@ void tioga::exchangeBoxes(void)
   int *alltags;
   int *sndMap;
   int *rcvMap;
+  int *blockcount;
+  int *displs;
   int nsend;
   int nrecv;
+  int ntotalblks;
   int overlap_present;
   PACKET *sndPack,*rcvPack;
   //
-  alltags=(int *)malloc(sizeof(int)*numprocs);
-  MPI_Allgather(&mytag, 1, MPI_INT, alltags,1,MPI_INT,scomm);
+  MPI_Allreduce(&nblocks,&ntotalblks,1,MPI_INT,MPI_SUM,scomm);
+  //
+  alltags=(int *)malloc(sizeof(int)*ntotalblks);
+  pid=(int *)malloc(sizeof(int)*ntotalblks);
+  blockcount=(int *)malloc(sizeof(int)*numprocs);
+  displs=(int *)malloc(sizeof(int)*(numprocs+1));
+  cflag=(int *)malloc(sizeof(int)*numprocs);
+  //
+  MPI_Allgather(&nblocks, 1, MPI_INT, blockcount,1,MPI_INT,scomm);
+  m=0;
+  for(i=0;i<numprocs;i++)
+    {
+      for(j=0;j<blockcount[i];j++)
+	pid[m++]=i;
+      cflag[i]=0;
+    }
+  //
+  displs[0]=0;
+  for(i=1;i<numprocs+1;i++)
+    displs[i]=displs[i-1]+blockcount[i-1];
+  //
+  MPI_Allgatherv(&mytags, nblocks, MPI_INT, alltags,blockcount,displs,
+		 MPI_INT,scomm);
   //
   // count number of other processors to communicate to
   // in overset grid scenario, usually you do not communicate
@@ -42,7 +66,17 @@ void tioga::exchangeBoxes(void)
   // talk to your sister partitions)
   //
   nsend=nrecv=0;
-  for(i=0;i<numprocs;i++) if (alltags[i] != mytag) nsend++;
+  for(i=0;i<ntotalblks;i++) 
+    {
+      for(iblk=0;iblk<nblocks;iblk++)
+	{
+	  if (alltags[i] != mytags[iblk]) 
+	    {
+	      if (cflag[pid[i]]==0) nsend++;
+	      cflag[pid[i]]=1;
+	    }
+	}
+    }
   //
   // In general we communicate forward
   // and backward, separate lists are maintained for
@@ -52,12 +86,14 @@ void tioga::exchangeBoxes(void)
   sndMap=(int *)malloc(sizeof(int)*nsend);
   rcvMap=(int *)malloc(sizeof(int)*nrecv);
   //
-  for(i=0,m=0;i<numprocs;i++) 
-    if (alltags[i]!=mytag) 
-      {
-        sndMap[m]=rcvMap[m]=i;
-	m++;
-      }
+  for(i=0,m=0;i<numprocs;i++)
+    {
+      if (cflag[i]==1)
+	{
+	  sndMap[m]=rcvMap[m]=i;
+	  m++;
+	}
+    }
   //
   pc->setMap(nsend,nrecv,sndMap,rcvMap);
   //
@@ -68,63 +104,80 @@ void tioga::exchangeBoxes(void)
   for(k=0;k<nsend;k++)
     {
       sndPack[k].nints=0;
-      sndPack[k].nreals=15;
-      sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
+      //
+      for(iblk=0;iblk<nblocks;iblk++)
+	for(d=displs[sndMap[k]];d<displs[sndMap[k]+1];d++)
+	  {
+	    if (alltags[d]!=mytags[iblk]) sndPack[k].nints++;
+	  }
+      //
+      sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
       m=0;
-      for(i=0;i<3;i++)
-	for(j=0;j<3;j++)
-	  sndPack[k].realData[m++]=mb->obb->vec[i][j];
-      for(i=0;i<3;i++)
-	sndPack[k].realData[m++]=mb->obb->xc[i];
-      for(i=0;i<3;i++)
-	sndPack[k].realData[m++]=mb->obb->dxc[i];
+      sndPack[k].nreals=15*sndPack[k].nints;
+      sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
+      m=im=0;
+      for(iblk=0;iblk<nblocks;iblk++)
+	{
+	  for(d=displs[sndMap[k]];d<displs[sndMap[k]+1];d++)
+	    if (alltags[d]!=mytags[iblk]) 
+	      {
+		sndPack[k].intData[im++]=d-displs[sndMap[k]];
+		for(i=0;i<3;i++)
+		  for(j=0;j<3;j++)
+		    sndPack[k].realData[m++]=mb[iblk]->obb->vec[i][j];
+		for(i=0;i<3;i++)
+		  sndPack[k].realData[m++]=mb[iblk]->obb->xc[i];
+		for(i=0;i<3;i++)
+		  sndPack[k].realData[m++]=mb[iblk]->obb->dxc[i];
+	      }
+	}
     }
   //
   pc->sendRecvPackets(sndPack,rcvPack);
   //
   if (obblist) free(obblist);
-  obblist=(OBB *) malloc(sizeof(OBB)*nrecv);
+  nobb=0;
+  for(k=0;k<nrecv;k++) nobb+=rcvPack[k].nints;
   //
+  obblist=(OBB *) malloc(sizeof(OBB)*nobb);
+  bid=(int *)malloc(sizeof(int)*nobb);
+  //
+  d=0;
   for(k=0;k<nrecv;k++)
     {
-      m=0;      
-      for(i=0;i<3;i++)
-	for(j=0;j<3;j++)
-	  obblist[k].vec[i][j]=rcvPack[k].realData[m++];
-      for(i=0;i<3;i++)
-	obblist[k].xc[i]=rcvPack[k].realData[m++];
-      for(i=0;i<3;i++)
-	obblist[k].dxc[i]=rcvPack[k].realData[m++];
+      m=im=0;
+      for(n=0;n<rcvPack[k].nints;n++)
+	{
+	  for(i=0;i<3;i++)
+	    for(j=0;j<3;j++)
+	      obblist[d].vec[i][j]=rcvPack[k].realData[m++];
+	  for(i=0;i<3;i++)
+	    obblist[d].xc[i]=rcvPack[k].realData[m++];
+	  for(i=0;i<3;i++)
+	    obblist[d].dxc[i]=rcvPack[k].realData[m++];
+	  bid[d++]=rcvPack[k].intData[im++];
+	}
     }
   //
   m=0;
-  for(k=0;k<nrecv;k++)
+  for(k=0;k<nobb;k++)
     {
-      if ( obbIntersectCheck(mb->obb->vec,mb->obb->xc,mb->obb->dxc,
+      iblk=bid[k];
+      if ( obbIntersectCheck(mb[iblk]->obb->vec,mb[iblk]->obb->xc,mb[iblk]->obb->dxc,
 			     obblist[k].vec,obblist[k].xc,obblist[k].dxc) ||
 	   obbIntersectCheck(obblist[k].vec,obblist[k].xc,obblist[k].dxc,
-			     mb->obb->vec,mb->obb->xc,mb->obb->dxc)) 
+			     mb[iblk]->obb->vec,mb[iblk]->obb->xc,mb[iblk]->obb->dxc)) 
 	{
-	  if (alltags[sndMap[k]] < 0 || mytag < 0) 
-	    {
-	      mb->check_intersect_p4est(&sndMap[k],&overlap_present);	      
-	    }
-	  else
-	    {
-	      overlap_present=1;
-	    }
-	  if (overlap_present==1)
-	    {
-	      rcvMap[m]=sndMap[k];
-	      for(i=0;i<3;i++)
-		for(j=0;j<3;j++)
-		  obblist[m].vec[i][j]=obblist[k].vec[i][j];
-	      for(i=0;i<3;i++)
-		obblist[m].xc[i]=obblist[k].xc[i];
-	      for(i=0;i<3;i++)
-		obblist[m].dxc[i]=obblist[k].dxc[i];
-	      m++;
-	    }
+	  rcvMap[m]=sndMap[k];
+	  for(i=0;i<3;i++)
+	    for(j=0;j<3;j++)
+	      obblist[m].vec[i][j]=obblist[k].vec[i][j];
+	  for(i=0;i<3;i++)
+	    obblist[m].xc[i]=obblist[k].xc[i];
+	  for(i=0;i<3;i++)
+	    obblist[m].dxc[i]=obblist[k].dxc[i];
+	  bid[m]=bid[k];
+	  m++;
 	}
     }
   nsend=nrecv=m;

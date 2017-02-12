@@ -94,8 +94,9 @@ typedef struct OBB
   double dxc[3];
   double vec[3][3];
 
-  int tag_local;
-  int tag_remote;
+  int comm_idx;    /* Index in comm map for this OBB                       */
+  int iblk_local;  /* Index of this mesh block                             */
+  int iblk_remote; /* Index of the remote mesh block (intersecting  pair)  */
 }OBB;
 typedef struct DONORLIST
 {

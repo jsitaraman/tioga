@@ -239,7 +239,7 @@ void tioga::exchangeBoxes(void)
     int ioff = idxOffset[k];      // Index to fill in sndPack
     int roff = ioff * 6;
 
-    sndPack[k].intData[ioff] = mb->getMeshTag();
+    sndPack[k].intData[ioff] = ib; // mb->getMeshTag();
     mb->getReducedOBB(&obbRecv[ob], &(sndPack[k].realData[roff]));
 
     // Increment index offset for next fill
@@ -269,8 +269,9 @@ void tioga::exchangeBoxes(void)
     for (int i=0; i<3; i++)
       obblist[ii].dxc[i] = rcvPack[k].realData[roff+3+i];
 
-    obblist[ii].tag_local = mtags[ib];
-    obblist[ii].tag_remote = rcvPack[k].intData[ioff];
+    obblist[ii].comm_idx = k;
+    obblist[ii].iblk_local = ib;
+    obblist[ii].iblk_remote = rcvPack[k].intData[ioff];
     // Increment index offset for next fill
     idxOffset[k]++;
   }

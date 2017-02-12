@@ -37,7 +37,6 @@ void tioga::exchangeBoxes(void)
   int *rcvMap;
   int nsend;
   int nrecv;
-  int overlap_present;
   PACKET *sndPack,*rcvPack;
 
   std::vector<int> nbPerProc(numprocs); // Number of chunks per processor
@@ -48,14 +47,11 @@ void tioga::exchangeBoxes(void)
 
   std::vector<int> alltags(ntotalblks); // Mesh tags for all blocks across all procs
   std::vector<int> displs(numprocs+1);  // Offsets for tags per proc
-  std::vector<int> pidMap(ntotalblks);  // Processor ID for blocks 
   std::vector<bool> sendFlag(numprocs,false); // Flag indicating send/recv from this proc
 
   displs[0] = 0;
   for (int i=1; i <= numprocs; i++) {
     displs[i] = displs[i-1] + nbPerProc[i-1];
-    std::fill(pidMap.begin() + displs[i-1],
-              pidMap.begin() + displs[i], i-1);
   }
 
   MPI_Allgatherv(mtags.data(), nblocks, MPI_INT, alltags.data(),

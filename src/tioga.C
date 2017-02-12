@@ -96,7 +96,7 @@ void tioga::performConnectivity(void)
 {
   getHoleMap();
   exchangeBoxes();
-  // exchangeSearchData();
+  exchangeSearchData();
   // mb->ihigh=0;
   // mb->search();
   // exchangeDonors();

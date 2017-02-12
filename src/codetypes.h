@@ -93,6 +93,9 @@ typedef struct OBB
   double xc[3];
   double dxc[3];
   double vec[3][3];
+
+  int tag_local;
+  int tag_remote;
 }OBB;
 typedef struct DONORLIST
 {

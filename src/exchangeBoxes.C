@@ -247,8 +247,10 @@ void tioga::exchangeBoxes(void)
   }
   pc->sendRecvPackets(sndPack,rcvPack);
 
-  if (obblist) free(obblist);
-  obblist = (OBB*) malloc(sizeof(OBB) * intersectIDs.size());
+  // if (obblist) free(obblist);
+  // obblist = (OBB*) malloc(sizeof(OBB) * intersectIDs.size());
+  obblist.clear();
+  obblist.resize(intersectIDs.size());
   std::fill(idxOffset.begin(),idxOffset.end(),0);
   for (size_t ii=0; ii < intersectIDs.size(); ii++) {
     auto& ids = intersectIDs[ii];

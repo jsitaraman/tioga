@@ -52,7 +52,8 @@ class tioga
   int myid,numprocs;
   int *sendCount;
   int *recvCount;
-  OBB *obblist;
+  //OBB *obblist;
+  std::vector<OBB> obblist;
   int iorphanPrint;
 
   //! Mesh blocks in this processor 
@@ -73,7 +74,8 @@ class tioga
     {
         mb = NULL; cg=NULL; cb=NULL;
         holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
-        obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        // obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
     }
  
   /** basic destructor */

@@ -380,7 +380,7 @@ tioga::~tioga()
   if (pc) delete[] pc;
   if (sendCount) free(sendCount);
   if (recvCount) free(recvCount);
-  if (obblist) free(obblist);
+  //if (obblist) free(obblist);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 

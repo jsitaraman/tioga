@@ -97,8 +97,10 @@ void tioga::performConnectivity(void)
   getHoleMap();
   exchangeBoxes();
   exchangeSearchData();
-  // mb->ihigh=0;
-  // mb->search();
+  for (auto& mb: mblocks) {
+    mb->ihigh=0;
+    mb->search();
+  }
   // exchangeDonors();
   // outputStatistics();
   // MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);

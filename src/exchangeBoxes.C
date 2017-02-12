@@ -65,7 +65,6 @@ void tioga::exchangeBoxes(void)
   //
   nsend = 0;
   for (int p=0; p < numprocs; p++) {
-    if (p == myid) continue;
 
     for(int d=displs[p]; d < displs[p+1]; d++) {
       for (int ib=0; ib < nblocks; ib++) {
@@ -185,8 +184,7 @@ void tioga::exchangeBoxes(void)
     auto& mb = mblocks[ib];
     int meshtag = mb->getMeshTag();
 
-    for (int k=0, ob=0; k < nrecv; k++)
-      for (int n = 0; n < rcvPack[k].nints; n++) {
+    for (int ob=0; ob < nobb; ob++) {
         if (obbID[ob] == meshtag) continue;
 
         if ( obbIntersectCheck(
@@ -201,7 +199,6 @@ void tioga::exchangeBoxes(void)
           obPerProc[obbProc[ob]]++;
           sendFlag[obbProc[ob]] = true;
       }
-      ob++;
     }
   }
   int new_send = std::count(sendFlag.begin(), sendFlag.end(), true);

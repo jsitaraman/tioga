@@ -26,6 +26,7 @@
  */
 
 #include <vector>
+#include <map>
 #include <memory>
 #include "MeshBlock.h"
 #include "CartGrid.h"
@@ -54,8 +55,12 @@ class tioga
   OBB *obblist;
   int iorphanPrint;
 
+  //! Mesh blocks in this processor 
   std::vector<std::unique_ptr<MeshBlock> > mblocks;
+  //! Solver assigned mesh tags for the mesh blocks
   std::vector<int> mtags;
+  //! Mesh tag to local block index lookup mapping
+  std::map<int, int> tag_iblk_map;
 
  public:
   int ihigh;
@@ -63,7 +68,8 @@ class tioga
   int iamrGlobal;
   /** basic constuctor */
   tioga()
-      :mblocks(0)
+    : mblocks(0),
+      mtags(0)
     {
         mb = NULL; cg=NULL; cb=NULL;
         holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;

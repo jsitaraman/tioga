@@ -63,13 +63,23 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			     int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn)
 {
-  mtags.push_back(btag);
-  mblocks.push_back(std::unique_ptr<MeshBlock>(new MeshBlock));
-  nblocks = mblocks.size();
+  int iblk;
 
-  auto& mb = mblocks[nblocks - 1];
+  auto idxit = tag_iblk_map.find(btag);
+  if (idxit == tag_iblk_map.end()) {
+    mtags.push_back(btag);
+    mblocks.push_back(std::unique_ptr<MeshBlock>(new MeshBlock));
+    nblocks = mblocks.size();
+    iblk = nblocks - 1;
+    tag_iblk_map[btag] = iblk;
+  } else {
+    iblk = idxit->second;
+  }
+
+  auto& mb = mblocks[iblk];
   mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
   mb->myid=myid;
+
 }
 
 void tioga::profile(void)

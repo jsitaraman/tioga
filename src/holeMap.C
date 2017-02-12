@@ -141,11 +141,12 @@ void tioga::getHoleMap(void)
  //
  // mark the wall boundary cells in the holeMap
  //
- for (auto meshtag: mtags) {
+ for (auto& mb: mblocks) {
+   meshtag = mb->getMeshTag();
    if (holeMap[meshtag - 1].existWall) {
-     mb->markWallBoundary(
-       holeMap[meshtag - 1].samLocal, holeMap[meshtag - 1].nx,
-       holeMap[meshtag - 1].extents);
+    mb->markWallBoundary(
+      holeMap[meshtag - 1].samLocal, holeMap[meshtag - 1].nx,
+      holeMap[meshtag - 1].extents);
    }
  }
  //

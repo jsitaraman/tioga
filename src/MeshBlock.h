@@ -263,4 +263,7 @@ class MeshBlock
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);
+
+  // Getters
+  inline int getMeshTag() const { return meshtag + (1 - BASE); }
 };

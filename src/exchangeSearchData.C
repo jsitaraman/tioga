@@ -62,88 +62,45 @@ void tioga::exchangeSearchData(void)
   int** int_data = (int**)malloc(sizeof(int*) * nobb);
   double** real_data = (double**)malloc(sizeof(double*) * nobb);
 
-  // Determine the ints and reals that need to be exchanged for each intersected
-  // block
-  for (int i = 0; i < nobb; i++) {
-    int ib = obblist[i].iblk_local;
-    int k = obblist[i].comm_idx;
-
+  for (int ii=0; ii < nobb; ii++) {
+    int ib = obblist[ii].iblk_local;
     auto& mb = mblocks[ib];
     mb->getQueryPoints(
-      &obblist[i], &nintsSend[i], &int_data[i], &nrealsSend[i], &real_data[i]);
-    sndPack[k].nints += 2;
+      &obblist[ii], &nintsSend[ii], &int_data[ii], &nrealsSend[ii],
+      &real_data[ii]);
   }
 
-  // Prepare data package to exchage array sizes
-  for (int k = 0; k < nsend; k++) {
+  // Populate send packets and exchange data with other processors
+  for (int k=0; k<nsend; k++) {
+    sndPack[k].nints = 3 * ibsPerProc[k];
     sndPack[k].nreals = 0;
-    sndPack[k].realData = NULL;
-    sndPack[k].intData = (int*)malloc(sizeof(int) * sndPack[k].nints);
-  }
 
-  // Populate data package with array dimensions to be exchanged
-  std::vector<int> ixOffset(nsend, 0);
-  for (int i = 0; i < nobb; i++) {
-    int k = obblist[i].comm_idx;
-    int ioff = ixOffset[k];
+    for (int i=0; i < ibsPerProc[k]; i++) {
+      int ii = ibProcMap[k][i];
 
-    sndPack[k].intData[ioff] = nintsSend[i];
-    sndPack[k].intData[ioff + 1] = nrealsSend[i];
-    ixOffset[k] += 2;
-  }
-  pc->sendRecvPackets(sndPack, rcvPack);
-
-  std::fill(ixOffset.begin(), ixOffset.end(), 0);
-  std::vector<int> nintsRecv(nobb);
-  std::vector<int> nrealsRecv(nobb);
-
-  // Save off nints and nreals from the other proc in recv arrays
-  for (int i = 0; i < nobb; i++) {
-    int k = obblist[i].comm_idx;
-    int ioff = ixOffset[k];
-
-    nintsRecv[i] = rcvPack[k].intData[ioff];
-    nrealsRecv[i] = rcvPack[k].intData[ioff + 1];
-    ixOffset[k] += 2;
-  }
-  pc->clearPackets(sndPack, rcvPack);
-
-  // Prepare packets to send the actual node indices and coordinate data
-  //
-  // Estimate array sizes
-  for (int i = 0; i < nobb; i++) {
-    int k = obblist[i].comm_idx;
-
-    sndPack[k].nints += nintsSend[i];
-    sndPack[k].nreals += nrealsSend[i];
-  }
-
-  // Allocate memory
-  for (int k = 0; k < nsend; k++) {
+      sndPack[k].nints += nintsSend[ii];
+      sndPack[k].nreals += nrealsSend[ii];
+    }
     sndPack[k].intData = (int*)malloc(sizeof(int) * sndPack[k].nints);
     sndPack[k].realData = (double*)malloc(sizeof(double) * sndPack[k].nreals);
+
+    int n = 0;
+    int m = 0;
+
+    for (int i=0; i < ibsPerProc[k]; i++) {
+      int ii = ibProcMap[k][i];
+
+      sndPack[k].intData[n++] = obblist[ii].send_tag;
+      sndPack[k].intData[n++] = nintsSend[ii];
+      sndPack[k].intData[n++] = nrealsSend[ii];
+
+      for (int j=0; j < nintsSend[ii]; j++)
+        sndPack[k].intData[n++] = int_data[ii][j];
+
+      for (int j=0; j < nrealsSend[ii]; j++)
+        sndPack[k].realData[m++] = real_data[ii][j];
+    }
   }
-
-  // Index of the next data entry point in the packet arrays
-  std::vector<int> rxOffset(nsend, 0);
-  std::fill(ixOffset.begin(), ixOffset.end(), 0);
-
-  // Populate packets with data
-  for (int i = 0; i < nobb; i++) {
-    int k = obblist[i].comm_idx;
-    int ioff = ixOffset[k];
-    int roff = rxOffset[k];
-
-    for (int j = 0; j < nintsSend[i]; j++)
-      sndPack[k].intData[ioff + j] = int_data[i][j];
-
-    for (int j = 0; j < nrealsSend[j]; j++)
-      sndPack[k].intData[roff + j] = real_data[i][j];
-
-    ixOffset[k] += nintsSend[i];
-    rxOffset[k] += nrealsSend[i];
-  }
-
   pc->sendRecvPackets(sndPack, rcvPack);
 
   // Reset MeshBlock data structures
@@ -158,47 +115,68 @@ void tioga::exchangeSearchData(void)
       free(mb->donorId);
   }
 
-  // Calculate query point sizes for each mesh block
-  for (int i = 0; i < nobb; i++) {
-    int ib = obblist[i].iblk_local;
-    auto& mb = mblocks[ib];
+  // Loop through recv packets and estimate search array sizes in MeshBlock data
+  // structures
+  std::vector<int> nintsRecv(nobb);
+  std::vector<int> nrealsRecv(nobb);
+  for (int k=0; k<nrecv; k++) {
+    int m = 0;
 
-    mb->nsearch += nintsRecv[i];
+    for (int i=0; i < ibsPerProc[k]; i++) {
+      int key = rcvPack[k].intData[m++];
+      int ii = intBoxMap[key];
+      int ib = obblist[ii].iblk_local;
+      auto& mb = mblocks[ib];
+
+      nintsRecv[ii] = rcvPack[k].intData[m++];
+      nrealsRecv[ii] = rcvPack[k].intData[m++];
+
+      mb->nsearch += nintsRecv[ii];
+      // Skip the node indices
+      m += nintsRecv[ii];
+    }
   }
 
-  for (auto& mb : mblocks) {
+  // Resize MeshBlock array sizes
+  for (auto& mb: mblocks) {
+    if (mb->nsearch < 1) continue;
     mb->xsearch = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
     mb->isearch = (int*)malloc(2 * sizeof(int) * mb->nsearch);
     mb->donorId = (int*)malloc(sizeof(int) * mb->nsearch);
   }
 
-  // Finally populate data into individual mesh block arrays
-  std::fill(ixOffset.begin(), ixOffset.end(), 0);
-  std::vector<int> ibOffset(nblocks, 0);
+  // Update search arrays in mesh blocks from recv packets
+  std::vector<int> icOffset(nblocks,0); // Index of isearch arrays where next fill happens
+  std::vector<int> dcOffset(nblocks, 0); // Index of xsearch arrays where next fill happens
+  for (int k=0; k < nrecv; k++) {
+    int l = 0;
+    int m = 0;
 
-  for (int i = 0; i < nobb; i++) {
-    int ib = obblist[i].iblk_local;
-    int k = obblist[i].comm_idx;
-    int ioff = ixOffset[k];
-    int iboff = ibOffset[ib];
+    for (int i=0; i < ibsPerProc[k]; i++) {
+      int key = rcvPack[k].intData[m++];
+      int ii = intBoxMap[key];
+      int ib = obblist[ii].iblk_local;
+      auto& mb = mblocks[ib];
 
-    auto& mb = mblocks[ib];
+      int ioff = icOffset[ib];
+      int doff = dcOffset[ib];
 
-    for (int j = 0; j < nintsRecv[i]; j++) {
-      // Change first index from storing sndMap index to obblist index
-      mb->isearch[2 * iboff + j] = i;
-      mb->isearch[2 * iboff + j + 1] = rcvPack[k].intData[ioff + j];
+      m += 2; // Skip nints and nreals information
+      for (int j=0; j < nintsRecv[ii]; j++) {
+        mb->isearch[ioff++] = ii;
+        mb->isearch[ioff++] = rcvPack[k].intData[m++];
+      }
+
+      for (int j=0; j < nrealsRecv[ii]; j++) {
+        mb->xsearch[doff++] = rcvPack[k].realData[l++];
+      }
+
+      icOffset[ib] = ioff;
+      dcOffset[ib] = doff;
     }
-
-    for (int j = 0; j < nrealsRecv[i]; j++) {
-      mb->xsearch[3 * iboff + j] = rcvPack[k].realData[3 * ioff + j];
-    }
-
-    ixOffset[k] += nintsRecv[i];
-    ibOffset[ib] += 2 * nintsRecv[i];
   }
-  pc->clearPackets(sndPack, rcvPack);
 
+  pc->clearPackets(sndPack, rcvPack);
   free(sndPack);
   free(rcvPack);
   // printf("%d %d\n",myid,mb->nsearch);

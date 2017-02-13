@@ -97,6 +97,8 @@ typedef struct OBB
   int comm_idx;    /* Index in comm map for this OBB                       */
   int iblk_local;  /* Index of this mesh block                             */
   int iblk_remote; /* Index of the remote mesh block (intersecting  pair)  */
+  int send_tag;
+  int recv_tag;
 }OBB;
 typedef struct DONORLIST
 {

@@ -57,6 +57,11 @@ void tioga::exchangeBoxes(void)
   MPI_Allgatherv(mtags.data(), nblocks, MPI_INT, alltags.data(),
                  nbPerProc.data(), displs.data(), MPI_INT, scomm);
 
+  int maxtag = -1;
+  for (auto itag: alltags)
+    if (maxtag < itag) maxtag = itag;
+  int mxtgsqr = maxtag * maxtag;
+
   //
   // count number of other processors to communicate to
   // in overset grid scenario, usually you do not communicate
@@ -180,11 +185,11 @@ void tioga::exchangeBoxes(void)
   //
   // Check for intersection of OBBs
   //
-  for (int ib=0; ib < nblocks; ib++) {
-    auto& mb = mblocks[ib];
-    int meshtag = mb->getMeshTag();
+  for (int ob=0; ob < nobb; ob++) {
+    for (int ib=0; ib < nblocks; ib++) {
+      auto& mb = mblocks[ib];
+      int meshtag = mb->getMeshTag();
 
-    for (int ob=0; ob < nobb; ob++) {
         if (obbID[ob] == meshtag) continue;
 
         if ( obbIntersectCheck(
@@ -220,62 +225,78 @@ void tioga::exchangeBoxes(void)
   pc->setMap(nsend,nrecv,sndMap,rcvMap);
 
 
+  // if (obblist) free(obblist);
+  // obblist = (OBB*) malloc(sizeof(OBB) * intersectIDs.size());
+  intBoxMap.clear();
+  ibsPerProc.clear();
+  ibProcMap.clear();
+  obblist.clear();
+  obblist.resize(intersectIDs.size());
+  ibsPerProc.resize(nsend);
+  ibProcMap.resize(nsend);
+
   // Determine packet sizes and reallocate arrays
   for(int k=0; k < nsend; k++) {
     sndPack[k].nints = obPerProc[sndMap[k]];
-    sndPack[k].nreals = sndPack[k].nints * 6;
+    sndPack[k].nreals = sndPack[k].nints * 15;
     sndPack[k].intData = (int*) malloc(sizeof(int)*sndPack[k].nints);
     sndPack[k].realData = (double*) malloc(sizeof(double)*sndPack[k].nreals);
+    ibsPerProc[k] = obPerProc[sndMap[k]];
+    ibProcMap[k].resize(ibsPerProc[k]);
   }
 
   // Array tracking indices for populating reduced OBBs
   std::vector<int> idxOffset(nsend,0);
-  for (auto ids: intersectIDs){
+  for (size_t i=0; i<intersectIDs.size(); i++){
+    auto ids = intersectIDs[i];
     int ib = ids.first;           // Block ID of the local mesh block
     int ob = ids.second;          // Index of the intersected block in OBB list 
     int k = invMap[obbProc[ob]];  // Index in sndMap for this proc ID
     auto& mb = mblocks[ib];       // Mesh block data object
+    int ip = obbProc[ob];
 
     int ioff = idxOffset[k];      // Index to fill in sndPack
-    int roff = ioff * 6;
+    int roff = ioff * 15;
 
-    sndPack[k].intData[ioff] = ib; // mb->getMeshTag();
+    int key_recv = mxtgsqr * ip + maxtag * (mtags[ib] - 1) + obbID[ob] - 1;
+    int key_send = mxtgsqr * myid + maxtag * (obbID[ob]-1) + (mtags[ib]-1);
+    intBoxMap[key_recv] = i;
+    ibProcMap[k][ioff] = i;
+    obblist[i].comm_idx = k;
+    obblist[i].iblk_local = ib;
+    obblist[i].iblk_remote = ob;
+    obblist[i].send_tag = key_send;
+    obblist[i].recv_tag = key_recv;
+
+    sndPack[k].intData[ioff] = key_send; // mb->getMeshTag();
     mb->getReducedOBB(&obbRecv[ob], &(sndPack[k].realData[roff]));
 
+    int l = 0;
+    for(int ii=0; ii<3; ii++)
+      for(int j=0; j<3; j++)
+        sndPack[k].realData[roff + 6 + l++]= obbRecv[ob].vec[ii][j];
     // Increment index offset for next fill
     idxOffset[k]++;
   }
   pc->sendRecvPackets(sndPack,rcvPack);
 
-  // if (obblist) free(obblist);
-  // obblist = (OBB*) malloc(sizeof(OBB) * intersectIDs.size());
-  obblist.clear();
-  obblist.resize(intersectIDs.size());
-  std::fill(idxOffset.begin(),idxOffset.end(),0);
-  for (size_t ii=0; ii < intersectIDs.size(); ii++) {
-    auto& ids = intersectIDs[ii];
-    int ib = ids.first;           // Block ID of the local mesh block
-    int ob = ids.second;          // Index of the intersected block in OBB list 
-    int k = invMap[obbProc[ob]];  // Index in sndMap for this proc ID
+  for (int k=0; k<nrecv; k++) {
+    int m=0;
 
-    int ioff = idxOffset[k];      // Index to fill in sndPack
-    int roff = ioff * 6;
+    for (int i=0; i< rcvPack[k].nints; i++) {
+      int key = rcvPack[k].intData[i];
+      int ii = intBoxMap[key];
 
-    for(int i=0; i<3; i++)
-      for(int j=0; j<3; j++)
-        obblist[ii].vec[i][j] = obbRecv[ob].vec[i][j];
+      for (int i=0; i<3; i++)
+        obblist[ii].xc[i] = rcvPack[k].realData[m++];
 
-    for (int i=0; i<3; i++)
-      obblist[ii].xc[i] = rcvPack[k].realData[roff+i];
+      for (int i=0; i<3; i++)
+        obblist[ii].dxc[i] = rcvPack[k].realData[m++];
 
-    for (int i=0; i<3; i++)
-      obblist[ii].dxc[i] = rcvPack[k].realData[roff+3+i];
-
-    obblist[ii].comm_idx = k;
-    obblist[ii].iblk_local = ib;
-    obblist[ii].iblk_remote = rcvPack[k].intData[ioff];
-    // Increment index offset for next fill
-    idxOffset[k]++;
+      for(int i=0; i<3; i++)
+        for(int j=0; j<3; j++)
+          obblist[ii].vec[i][j] = rcvPack[k].realData[m++];
+    }
   }
 
   pc->clearPackets(sndPack,rcvPack);

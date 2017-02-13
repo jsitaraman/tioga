@@ -63,6 +63,13 @@ class tioga
   //! Mesh tag to local block index lookup mapping
   std::map<int, int> tag_iblk_map;
 
+  //! Intersect block unique ID to index lookup mapping
+  std::map<int, int> intBoxMap;
+
+  //! Parallel comms to obblist indicies
+  std::vector<int> ibsPerProc;
+  std::vector<std::vector<int>> ibProcMap;
+
  public:
   int ihigh;
   int ihighGlobal;

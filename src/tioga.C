@@ -103,13 +103,15 @@ void tioga::performConnectivity(void)
   }
   exchangeDonors();
   outputStatistics();
-  // MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
-  // //if (ihighGlobal) {
-  // mb->getCellIblanks();
-  // mb->writeCellFile(myid);
-  // //}
-  // //mb->writeOutput(myid);
-  // //tracei(myid);
+  MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
+  //if (ihighGlobal) {
+  for (auto& mb: mblocks) {
+    mb->getCellIblanks();
+    //mb->writeCellFile(myid);
+  }
+  //}
+  //mb->writeOutput(myid);
+  //tracei(myid);
 }
 
 void tioga::performConnectivityHighOrder(void)

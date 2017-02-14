@@ -238,7 +238,7 @@ void tioga::exchangeBoxes(void)
   // Determine packet sizes and reallocate arrays
   for(int k=0; k < nsend; k++) {
     sndPack[k].nints = obPerProc[sndMap[k]];
-    sndPack[k].nreals = sndPack[k].nints * 15;
+    sndPack[k].nreals = sndPack[k].nints * 6;
     sndPack[k].intData = (int*) malloc(sizeof(int)*sndPack[k].nints);
     sndPack[k].realData = (double*) malloc(sizeof(double)*sndPack[k].nreals);
     ibsPerProc[k] = obPerProc[sndMap[k]];
@@ -256,7 +256,7 @@ void tioga::exchangeBoxes(void)
     int ip = obbProc[ob];
 
     int ioff = idxOffset[k];      // Index to fill in sndPack
-    int roff = ioff * 15;
+    int roff = ioff * 6;
 
     int key_recv = mxtgsqr * ip + maxtag * (mtags[ib] - 1) + obbID[ob] - 1;
     int key_send = mxtgsqr * myid + maxtag * (obbID[ob]-1) + (mtags[ib]-1);
@@ -264,17 +264,17 @@ void tioga::exchangeBoxes(void)
     ibProcMap[k][ioff] = i;
     obblist[i].comm_idx = k;
     obblist[i].iblk_local = ib;
-    obblist[i].iblk_remote = ob;
+    obblist[i].iblk_remote = obbID[ob];
     obblist[i].send_tag = key_send;
     obblist[i].recv_tag = key_recv;
 
     sndPack[k].intData[ioff] = key_send; // mb->getMeshTag();
     mb->getReducedOBB(&obbRecv[ob], &(sndPack[k].realData[roff]));
 
-    int l = 0;
     for(int ii=0; ii<3; ii++)
       for(int j=0; j<3; j++)
-        sndPack[k].realData[roff + 6 + l++]= obbRecv[ob].vec[ii][j];
+        obblist[i].vec[ii][j] = obbRecv[ob].vec[ii][j];
+
     // Increment index offset for next fill
     idxOffset[k]++;
   }
@@ -283,8 +283,8 @@ void tioga::exchangeBoxes(void)
   for (int k=0; k<nrecv; k++) {
     int m=0;
 
-    for (int i=0; i< rcvPack[k].nints; i++) {
-      int key = rcvPack[k].intData[i];
+    for (int n=0; n< rcvPack[k].nints; n++) {
+      int key = rcvPack[k].intData[n];
       int ii = intBoxMap[key];
 
       for (int i=0; i<3; i++)
@@ -293,9 +293,6 @@ void tioga::exchangeBoxes(void)
       for (int i=0; i<3; i++)
         obblist[ii].dxc[i] = rcvPack[k].realData[m++];
 
-      for(int i=0; i<3; i++)
-        for(int j=0; j<3; j++)
-          obblist[ii].vec[i][j] = rcvPack[k].realData[m++];
     }
   }
 

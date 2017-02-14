@@ -277,8 +277,7 @@ class MeshBlock
   void getMBDonorPktSizes(std::vector<int>&,
                           std::vector<int>&);
 
-  void getMBDonorPackets(const std::vector<OBB>&,
-                         std::vector<int>&,
+  void getMBDonorPackets(std::vector<int>&,
                          std::vector<int>&,
                          PACKET*);
 };

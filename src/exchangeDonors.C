@@ -85,7 +85,7 @@ void tioga::exchangeDonors(void)
 
   // Populate send packets with data from each mesh block in this partition
   for (auto& mb: mblocks) {
-    mb->getMBDonorPackets(obblist, ixOffset, rxOffset, sndPack);
+    mb->getMBDonorPackets(ixOffset, rxOffset, sndPack);
   }
   pc->sendRecvPackets(sndPack,rcvPack);
 

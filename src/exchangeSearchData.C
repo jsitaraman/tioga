@@ -141,7 +141,7 @@ void tioga::exchangeSearchData(void)
   for (auto& mb: mblocks) {
     if (mb->nsearch < 1) continue;
     mb->xsearch = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
-    mb->isearch = (int*)malloc(2 * sizeof(int) * mb->nsearch);
+    mb->isearch = (int*)malloc(4 * sizeof(int) * mb->nsearch);
     mb->donorId = (int*)malloc(sizeof(int) * mb->nsearch);
   }
 
@@ -164,6 +164,8 @@ void tioga::exchangeSearchData(void)
       m += 2; // Skip nints and nreals information
       for (int j=0; j < nintsRecv[ii]; j++) {
         mb->isearch[ioff++] = ii;
+        mb->isearch[ioff++] = k; // Processor index
+        mb->isearch[ioff++] = obblist[ii].iblk_remote; // Block index of remote 
         mb->isearch[ioff++] = rcvPack[k].intData[m++];
       }
 

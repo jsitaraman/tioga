@@ -23,6 +23,9 @@
  * Jay Sitaraman
  * 02/20/2014
  */
+
+#include <vector>
+
 #include "codetypes.h"
 #include "ADT.h"
 // forward declare to instantiate one of the methods
@@ -266,4 +269,16 @@ class MeshBlock
 
   // Getters
   inline int getMeshTag() const { return meshtag + (1 - BASE); }
+
+  /**
+   * Get donor packet for multi-block/partition setups
+   *
+   */
+  void getMBDonorPktSizes(std::vector<int>&,
+                          std::vector<int>&);
+
+  void getMBDonorPackets(const std::vector<OBB>&,
+                         std::vector<int>&,
+                         std::vector<int>&,
+                         PACKET*);
 };

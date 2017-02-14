@@ -69,6 +69,47 @@ void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
   free(icount);
   free(dcount);
 }
+
+void MeshBlock::getMBDonorPktSizes
+(
+  std::vector<int>& nints,
+  std::vector<int>& nreals
+)
+{
+  for(int i=0; i< nsearch; i++) {
+    if (donorId[i] > -1) {
+      int ii = isearch[2*i];
+      nints[ii] += 3;
+      nreals[ii]++;
+    }
+  }
+}
+
+void MeshBlock::getMBDonorPackets
+(
+  const std::vector<OBB>& obblist,
+  std::vector<int>& ixOffset,
+  std::vector<int>& rxOffset,
+  PACKET* sndPack
+)
+{
+  for(int i=0; i<nsearch; i++) {
+    if (donorId[i] < 0) continue;
+
+    int ii = isearch[2*i];
+    int& ix = ixOffset[ii];
+    int& rx = rxOffset[ii];
+
+    int k = obblist[ii].comm_idx;
+
+    sndPack[k].intData[ix++] = meshtag;           // Unique mesh tag
+    sndPack[k].intData[ix++] = isearch[2*i + 1];  // point ID
+    sndPack[k].intData[ix++] = i;                 // point ID on donor side
+
+    sndPack[k].realData[rx++] = cellRes[donorId[i]];
+  }
+}
+
 void MeshBlock::initializeDonorList(void)
 {
   int i;

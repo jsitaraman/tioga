@@ -101,8 +101,8 @@ void tioga::performConnectivity(void)
     mb->ihigh=0;
     mb->search();
   }
-  // exchangeDonors();
-  // outputStatistics();
+  exchangeDonors();
+  outputStatistics();
   // MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   // //if (ihighGlobal) {
   // mb->getCellIblanks();

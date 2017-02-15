@@ -45,7 +45,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
     }
   if ((*nints)==0) return;
   //
-  (*intData)=(int *)malloc(sizeof(int)*2*(*nints));
+  (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
   icount=dcount=0;
   //
@@ -90,6 +90,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 		}
 	      (*intData)[icount++]=interpList[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }

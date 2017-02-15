@@ -104,7 +104,8 @@ void tioga::exchangeSearchData(void)
   pc->sendRecvPackets(sndPack, rcvPack);
 
   // Reset MeshBlock data structures
-  for (auto& mb : mblocks) {
+  for (int ib=0;ib<nblocks;ib++) {
+    auto &mb = mblocks[ib];
     mb->nsearch = 0;
 
     if (mb->xsearch)
@@ -138,14 +139,16 @@ void tioga::exchangeSearchData(void)
   }
 
   // Resize MeshBlock array sizes
-  for (auto& mb: mblocks) {
+  for (int ib=0;ib<nblocks;ib++) {
+    auto &mb = mblocks[ib];
     if (mb->nsearch < 1) continue;
     mb->xsearch = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
-    mb->isearch = (int*)malloc(4 * sizeof(int) * mb->nsearch);
+    mb->isearch = (int*)malloc(3 * sizeof(int) * mb->nsearch);
     mb->donorId = (int*)malloc(sizeof(int) * mb->nsearch);
   }
-
+  //
   // Update search arrays in mesh blocks from recv packets
+  //
   std::vector<int> icOffset(nblocks,0); // Index of isearch arrays where next fill happens
   std::vector<int> dcOffset(nblocks, 0); // Index of xsearch arrays where next fill happens
   for (int k=0; k < nrecv; k++) {
@@ -163,10 +166,9 @@ void tioga::exchangeSearchData(void)
 
       m += 2; // Skip nints and nreals information
       for (int j=0; j < nintsRecv[ii]; j++) {
-        mb->isearch[ioff++] = ii;
-        mb->isearch[ioff++] = k; // Processor index
-        mb->isearch[ioff++] = obblist[ii].iblk_remote; // Block index of remote 
+        mb->isearch[ioff++] = k;
         mb->isearch[ioff++] = rcvPack[k].intData[m++];
+	mb->isearch[ioff++] = obblist[ii].iblk_remote;
       }
 
       for (int j=0; j < nrealsRecv[ii]; j++) {

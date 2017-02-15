@@ -78,8 +78,8 @@ void MeshBlock::getMBDonorPktSizes
 {
   for(int i=0; i< nsearch; i++) {
     if (donorId[i] > -1) {
-      int ii = isearch[4*i];
-      nints[ii] += 3;
+      int ii = isearch[3*i];
+      nints[ii] += 4;
       nreals[ii]++;
     }
   }
@@ -95,15 +95,14 @@ void MeshBlock::getMBDonorPackets
   for(int i=0; i<nsearch; i++) {
     if (donorId[i] < 0) continue;
 
-    int ii = isearch[4*i];
-    int& ix = ixOffset[ii];
-    int& rx = rxOffset[ii];
-
-    int k = isearch[4*i+1];
+    int k = isearch[3*i];
+    int& ix = ixOffset[k];
+    int& rx = rxOffset[k];
 
     sndPack[k].intData[ix++] = meshtag;           // Unique mesh tag
-    sndPack[k].intData[ix++] = isearch[4*i + 2];  // point ID
+    sndPack[k].intData[ix++] = isearch[3*i + 1];  // point ID
     sndPack[k].intData[ix++] = i;                 // point ID on donor side
+    sndPack[k].intData[ix++] = isearch[3*i + 2];  // receptor block ID
 
     sndPack[k].realData[rx++] = cellRes[donorId[i]];
   }
@@ -290,7 +289,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   // set the records to send back to the donor
   // process
   //
-  (*donorRecords)=(int *)malloc(sizeof(int)*2*(*nrecords));
+  (*donorRecords)=(int *)malloc(sizeof(int)*3*(*nrecords));
   (*receptorResolution)=(double *)malloc(sizeof(double)*(*nrecords));
   m=0;
   k=0;
@@ -311,6 +310,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
 	  (*receptorResolution)[k++]=(resolutionScale > 1.0) ? -nodeRes[i]:nodeRes[i];
 	  (*donorRecords)[m++]=temp->donorData[0];
 	  (*donorRecords)[m++]=temp->donorData[2];
+          (*donorRecords)[m++]=temp->donorData[1];
           if (verbose) {
             tracei(iblank[i]);           
             tracei(m);

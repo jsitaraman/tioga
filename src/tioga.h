@@ -37,6 +37,7 @@ class tioga
 {
  private :
   int nblocks;
+  int nblocksq;
   int ncart;
   MeshBlock *mb;
   CartGrid *cg;
@@ -69,6 +70,9 @@ class tioga
   //! Parallel comms to obblist indicies
   std::vector<int> ibsPerProc;
   std::vector<std::vector<int>> ibProcMap;
+  //! q-variables registered
+  double **qblock;
+
 
  public:
   int ihigh;
@@ -76,13 +80,18 @@ class tioga
   int iamrGlobal;
   /** basic constuctor */
   tioga()
+    /*
     : mblocks(0),
       mtags(0)
+    */
     {
         mb = NULL; cg=NULL; cb=NULL;
         holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
         // obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
         isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        qblock=NULL;
+        mblocks.clear();
+        mtags.clear();
     }
  
   /** basic destructor */
@@ -95,6 +104,8 @@ class tioga
 
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
+
+  void registerSolution(int btag,double *q);
 
   void profile(void);
 
@@ -114,7 +125,7 @@ class tioga
 
   /** update data */
 
-  void dataUpdate(int nvar,double *q,int interptype) ;
+  void dataUpdate(int nvar,int interptype) ;
 
   void dataUpdate_AMR(int nvar,double *q,int interptype) ;
   

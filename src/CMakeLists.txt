@@ -4,7 +4,8 @@ cmake_minimum_required(VERSION 2.8.11)
 project(TIOGA CXX C Fortran)
 
 option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" off)
-set(CMAKE_CXX_FLAGS "-std=c++11" ${CMAKE_CXX_FLAGS})
+set(CMAKE_CXX_FLAGS "-std=c++0x" ${CMAKE_CXX_FLAGS})
+#set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})

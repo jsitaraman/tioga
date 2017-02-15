@@ -57,7 +57,7 @@ void tioga::getHoleMap(void)
  //
  // get the local bounding box
  //
-  meshtag = std::numeric_limits<int>::lowest();
+  meshtag = -BIGINT; //std::numeric_limits<int>::lowest();
   for (int i=0; i<nblocks; i++) {
     auto& mb = mblocks[i];
     mb->getWallBounds(&mtagtmp,&existWall[i],wbox[i].data());
@@ -141,7 +141,8 @@ void tioga::getHoleMap(void)
  //
  // mark the wall boundary cells in the holeMap
  //
- for (auto& mb: mblocks) {
+ for (int ib=0;ib<nblocks;ib++) {
+   auto& mb = mblocks[ib];
    meshtag = mb->getMeshTag();
    if (holeMap[meshtag - 1].existWall) {
     mb->markWallBoundary(

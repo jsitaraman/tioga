@@ -17,6 +17,11 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+#include <limits>
+#include <vector>
+#include <array>
+
 #include "tioga.h"
 extern "C" 
 { 
@@ -35,10 +40,11 @@ void tioga::getHoleMap(void)
 {
   int i,j,k,m;
   int ii,jj,kk;
-  double **wbox;
-  int *existWall;
-  int maxtag;
-  int *meshtag;
+  // double wbox[6];
+  std::vector<std::array<double,6>> wbox(nblocks);
+  //int existWall;
+  std::vector<int> existWall(nblocks);
+  int meshtag,maxtag, mtagtmp;
   int *existHoleLocal;
   int *existHole;
   double *bboxLocal;
@@ -48,42 +54,35 @@ void tioga::getHoleMap(void)
   FILE *fp;
   char fname[80];
   char intstring[7];
-  int iblk;
-  int meshtagmax;
-  //
-  // get the local bounding box
-  //
-  meshtagmax=0;
-  meshtag=(int *) malloc(sizeof(int)*nblocks);
-  existWall=(int *)malloc(sizeof(int)*nblocks);
-  wbox=(double **)malloc(sizeof(double *)*nblocks);
-  for(iblk=0;iblk<nblocks;iblk++)
-    wbox[iblk]=(double *)malloc(sizeof(double)*nblocks); 
-  //
-  for(iblk=0;iblk<nblocks;iblk++)
-    {
-      mb[iblk]->getWallBounds(&(meshtag[iblk]),&(existWall[iblk],&(wbox[iblk]));
-      meshtagmax=max(meshtagmax,meshtag[iblk]);
-    }
-  MPI_Allreduce(&meshtagmax,&maxtag,1,MPI_INT,MPI_MAX,scomm);
-  //
-  if (holeMap) 
-    {
-      for(i=0;i<nmesh;i++)
-	if (holeMap[i].existWall) free(holeMap[i].sam);
-      delete [] holeMap;
-    }
-  holeMap=new HOLEMAP[maxtag];
-  //
-  existHoleLocal=(int *)malloc(sizeof(int)*maxtag);
-  existHole=(int *)malloc(sizeof(int)*maxtag);
-  //
-  for(i=0;i<maxtag;i++) existHole[i]=existHoleLocal[i]=0;
-  //
-  for(iblk=0;iblk<nblocks;iblk++)
-    existHoleLocal[meshtag[iblk]-1]=existWall[iblk];
-  //
-  MPI_Allreduce(existHoleLocal,existHole,maxtag,MPI_INT,MPI_MAX,scomm);
+ //
+ // get the local bounding box
+ //
+  meshtag = -BIGINT; //std::numeric_limits<int>::lowest();
+  for (int i=0; i<nblocks; i++) {
+    auto& mb = mblocks[i];
+    mb->getWallBounds(&mtagtmp,&existWall[i],wbox[i].data());
+    if (mtagtmp > meshtag) meshtag = mtagtmp;
+  }
+  MPI_Allreduce(&meshtag,&maxtag,1,MPI_INT,MPI_MAX,scomm);
+ //
+ if (holeMap) 
+   {
+     for(i=0;i<nmesh;i++)
+       if (holeMap[i].existWall) free(holeMap[i].sam);
+     delete [] holeMap;
+   }
+ holeMap=new HOLEMAP[maxtag];
+ //
+ existHoleLocal=(int *)malloc(sizeof(int)*maxtag);
+ existHole=(int *)malloc(sizeof(int)*maxtag);
+ //
+ for(i=0;i<maxtag;i++) existHole[i]=existHoleLocal[i]=0;
+ //
+ for (int i=0; i<nblocks; i++) {
+   existHoleLocal[mtags[i]-1]=existWall[i];
+ }
+ //
+ MPI_Allreduce(existHoleLocal,existHole,maxtag,MPI_INT,MPI_MAX,scomm);
  //
  for(i=0;i<maxtag;i++) holeMap[i].existWall=existHole[i];
  //
@@ -96,62 +95,61 @@ void tioga::getHoleMap(void)
  for(i=0;i<3*maxtag;i++) bboxGlobal[i+3*maxtag]=-BIGVALUE;
 
  //
- for(iblk=0;iblk<nblocks;iblk++)
-   {
-     for(i=0;i<3;i++)
-       {
-	 bboxLocal[3*(meshtag[iblk]-1)+i]=wbox[iblk][i];
-	 bboxLocal[3*(meshtag[iblk]-1)+i+3*maxtag]=wbox[iblk][i+3];
-       }
+ for (int n=0; n<nblocks; n++) {
+   meshtag = mtags[n];
+   for (i = 0; i < 3; i++) {
+     bboxLocal[3 * (meshtag - 1) + i] = wbox[n][i];
+     bboxLocal[3 * (meshtag - 1) + i + 3 * maxtag] = wbox[n][i + 3];
    }
+ }
  //
  // get the global bounding box info across all the
  // partitions for all meshes
  //
- MPI_Allreduce(bboxLocal,bboxGlobal,3*maxtag,MPI_DOUBLE,MPI_MIN,scomm);
- MPI_Allreduce(&(bboxLocal[3*maxtag]),&(bboxGlobal[3*maxtag]),3*maxtag,MPI_DOUBLE,MPI_MAX,scomm);
+ MPI_Allreduce(bboxLocal, bboxGlobal, 3 * maxtag, MPI_DOUBLE, MPI_MIN, scomm);
+ MPI_Allreduce(
+   &(bboxLocal[3 * maxtag]), &(bboxGlobal[3 * maxtag]), 3 * maxtag, MPI_DOUBLE,
+   MPI_MAX, scomm);
  //
  // find the bounding box for each mesh
  // from the globally reduced data
  //
- for(i=0;i<maxtag;i++)
-   {
-     if (holeMap[i].existWall) 
-       {
-	 for(j=0;j<3;j++)
-	   {
-	     holeMap[i].extents[j]=bboxGlobal[3*i+j];
-	     holeMap[i].extents[j+3]=bboxGlobal[3*i+j+3*maxtag];
-	     ds[j]=holeMap[i].extents[j+3]-holeMap[i].extents[j];
-	   }	 
-	 dsmax=max(ds[0],ds[1]);
-	 dsmax=max(dsmax,ds[2]);	 
-	 dsbox=dsmax/64;
-	 
-	 for(j=0;j<3;j++)
-	   {
-	     holeMap[i].extents[j]-=(2*dsbox);
-	     holeMap[i].extents[j+3]+=(2*dsbox);
-	     holeMap[i].nx[j]=floor(max((holeMap[i].extents[j+3]-holeMap[i].extents[j])/dsbox,1));
-	   }
-	 bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
-	 holeMap[i].sam=(int *)malloc(sizeof(int)*bufferSize);
-	 holeMap[i].samLocal=(int *)malloc(sizeof(int)*bufferSize);	 
-	 for(j=0;j<bufferSize;j++) holeMap[i].sam[j]=holeMap[i].samLocal[j]=0;
-       }
+ for (i = 0; i < maxtag; i++) {
+   if (holeMap[i].existWall) {
+     for (j = 0; j < 3; j++) {
+       holeMap[i].extents[j] = bboxGlobal[3 * i + j];
+       holeMap[i].extents[j + 3] = bboxGlobal[3 * i + j + 3 * maxtag];
+       ds[j] = holeMap[i].extents[j + 3] - holeMap[i].extents[j];
+     }
+     dsmax = max(ds[0], ds[1]);
+     dsmax = max(dsmax, ds[2]);
+     dsbox = dsmax / 64;
+
+     for (j = 0; j < 3; j++) {
+       holeMap[i].extents[j] -= (2 * dsbox);
+       holeMap[i].extents[j + 3] += (2 * dsbox);
+       holeMap[i].nx[j] = floor(
+         max((holeMap[i].extents[j + 3] - holeMap[i].extents[j]) / dsbox, 1));
+     }
+     bufferSize = holeMap[i].nx[0] * holeMap[i].nx[1] * holeMap[i].nx[2];
+     holeMap[i].sam = (int*)malloc(sizeof(int) * bufferSize);
+     holeMap[i].samLocal = (int*)malloc(sizeof(int) * bufferSize);
+     for (j = 0; j < bufferSize; j++)
+       holeMap[i].sam[j] = holeMap[i].samLocal[j] = 0;
    }
+ }
  //
  // mark the wall boundary cells in the holeMap
  //
- for(iblk=0;iblk<nblocks;iblk++)
-   {
-     if (holeMap[meshtag[iblk]-1].existWall) 
-       {
-	 mb[iblk]->markWallBoundary(holeMap[meshtag[iblk]-1].samLocal,
-				    holeMap[meshtag[iblk]-1].nx,
-				    holeMap[meshtag[iblk]-1].extents);
-       }
+ for (int ib=0;ib<nblocks;ib++) {
+   auto& mb = mblocks[ib];
+   meshtag = mb->getMeshTag();
+   if (holeMap[meshtag - 1].existWall) {
+    mb->markWallBoundary(
+      holeMap[meshtag - 1].samLocal, holeMap[meshtag - 1].nx,
+      holeMap[meshtag - 1].extents);
    }
+ }
  //
  // allreduce the holeMap of each mesh
  //
@@ -186,10 +184,6 @@ void tioga::getHoleMap(void)
  free(existHole);
  free(bboxLocal);
  free(bboxGlobal);
- free(meshtag);
- free(existwall);
- for(iblk=0;iblk<nblocks;iblk++) free(wbox[iblk]);
- free(wbox);  
 }
 
 /**

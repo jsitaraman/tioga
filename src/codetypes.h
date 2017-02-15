@@ -27,7 +27,7 @@
 /*====================================================================*/
 # define REAL double
 /*====================================================================*/
-/*  Base for indexing (0 or 1)
+/*  Base for indexing (0 or 1) */
 /*====================================================================*/
 # define BASE 1
 
@@ -76,7 +76,7 @@
         (int) ((fabs((aa) - floor(aa)) >= HALF)? ceil(aa): floor(aa))
 #define swap(a,b) { a=a+b;b=a-b;a=a-b;}
 /*********************************************************************/
-/* Code specific types
+/* Code specific types */
 /*********************************************************************/
 typedef struct HOLEMAP
 {
@@ -93,6 +93,12 @@ typedef struct OBB
   double xc[3];
   double dxc[3];
   double vec[3][3];
+
+  int comm_idx;    /* Index in comm map for this OBB                       */
+  int iblk_local;  /* Index of this mesh block                             */
+  int iblk_remote; /* Index of the remote mesh block (intersecting  pair)  */
+  int send_tag;
+  int recv_tag;
 }OBB;
 typedef struct DONORLIST
 {

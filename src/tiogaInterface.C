@@ -137,7 +137,13 @@ extern "C" {
    tg->performConnectivityAMR();
   }
 
-  void tioga_dataupdate_(double *q,int *nvar,char *itype)
+  void tioga_registersolution_(int *bid,double *q)
+  {
+    tg->registerSolution(*bid,q);
+  }
+
+
+  void tioga_dataupdate_(int *nvar,char *itype)
   {
     int interptype;
     if (strstr(itype,"row")) 
@@ -153,28 +159,31 @@ extern "C" {
 	printf("#tiogaInterface.C:dataupdate_:unknown data orientation\n");
 	return;
       }
-    if (tg->ihighGlobal==0) 
-      {
-	if (tg->iamrGlobal==0) 
-	  {
-	    tg->dataUpdate(*nvar,q,interptype);
-	  }
-	else
-	  {
-	    tg->dataUpdate_AMR(*nvar,q,interptype);
-	  }
-      }
-    else
-      {
-	if (tg->iamrGlobal==0) 
-	  {
-	    tg->dataUpdate_highorder(*nvar,q,interptype);
-	  }
-	else
-	  {
-	    printf("Data udpate between high-order near-body and AMR cartesian Not implemented yet\n");
-	  }
-      }
+
+    tg->dataUpdate(*nvar,interptype);
+
+    // if (tg->ihighGlobal==0) 
+    //   {
+    // 	if (tg->iamrGlobal==0) 
+    // 	  {
+    // 	    tg->dataUpdate(*nvar,interptype);
+    // 	  }
+    // 	else
+    // 	  {
+    // 	    tg->dataUpdate_AMR(*nvar,q,interptype);
+    // 	  }
+    //   }
+    // else
+    //   {
+    // 	if (tg->iamrGlobal==0) 
+    // 	  {
+    // 	    tg->dataUpdate_highorder(*nvar,q,interptype);
+    // 	  }
+    // 	else
+    // 	  {
+    // 	    printf("Data udpate between high-order near-body and AMR cartesian Not implemented yet\n");
+    // 	  }
+    //   }
   }
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)
   {

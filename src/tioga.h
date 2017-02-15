@@ -24,6 +24,10 @@
  *
  *  Jay Sitaraman 02/24/2014 
  */
+
+#include <vector>
+#include <map>
+#include <memory>
 #include "MeshBlock.h"
 #include "CartGrid.h"
 #include "CartBlock.h"
@@ -33,6 +37,7 @@ class tioga
 {
  private :
   int nblocks;
+  int nblocksq;
   int ncart;
   MeshBlock *mb;
   CartGrid *cg;
@@ -45,37 +50,62 @@ class tioga
   int isym;
   int ierr;
   int mytag;
-  int *mytags;
   int myid,numprocs;
   int *sendCount;
   int *recvCount;
-  OBB *obblist;
+  //OBB *obblist;
+  std::vector<OBB> obblist;
   int iorphanPrint;
+
+  //! Mesh blocks in this processor 
+  std::vector<std::unique_ptr<MeshBlock> > mblocks;
+  //! Solver assigned mesh tags for the mesh blocks
+  std::vector<int> mtags;
+  //! Mesh tag to local block index lookup mapping
+  std::map<int, int> tag_iblk_map;
+
+  //! Intersect block unique ID to index lookup mapping
+  std::map<int, int> intBoxMap;
+
+  //! Parallel comms to obblist indicies
+  std::vector<int> ibsPerProc;
+  std::vector<std::vector<int>> ibProcMap;
+  //! q-variables registered
+  double **qblock;
+
 
  public:
   int ihigh;
   int ihighGlobal;
   int iamrGlobal;
   /** basic constuctor */
-  tioga() { mb = NULL; cg=NULL; cb=NULL; 
-    holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;mytags=NULL;
-    obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;};
+  tioga()
+    /*
+    : mblocks(0),
+      mtags(0)
+    */
+    {
+        mb = NULL; cg=NULL; cb=NULL;
+        holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
+        // obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        qblock=NULL;
+        mblocks.clear();
+        mtags.clear();
+    }
  
   /** basic destructor */
   ~tioga(); 
   
   /** set communicator */
   void setCommunicator(MPI_Comm communicator,int id_proc,int nprocs);
-  /** set communicator if there multiple blocks */
-  void setCommunicator(MPI_Comm communicator,int id_proc,int nprocs,int nblocks);
 
   /** registerGrid data */
 
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
 			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
 
-  void registerGridData(int bid,int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
-			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
+  void registerSolution(int btag,double *q);
 
   void profile(void);
 
@@ -95,7 +125,7 @@ class tioga
 
   /** update data */
 
-  void dataUpdate(int nvar,double *q,int interptype) ;
+  void dataUpdate(int nvar,int interptype) ;
 
   void dataUpdate_AMR(int nvar,double *q,int interptype) ;
   

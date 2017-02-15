@@ -307,6 +307,12 @@ void tioga::dataUpdate(int nvar,int interptype)
   //
   integerRecords=(int **)malloc(sizeof(int*)*nblocks);
   realRecords=(double **)malloc(sizeof(double*)*nblocks);
+  for(int ib=0;ib<nblocks;ib++)
+    {
+     integerRecords[ib]=NULL;
+     realRecords[ib]=NULL;
+    }
+   
   std::vector<int> nints(nblocks,0), nreals(nblocks,0);
   std::vector<int> icount(nsend,0),dcount(nsend,0);
 
@@ -374,19 +380,21 @@ void tioga::dataUpdate(int nvar,int interptype)
   free(sndPack);
   free(rcvPack);
   if (integerRecords) {
-    for(int ib=0;ib<nblocks;ib++) free(integerRecords[ib]);
+    for(int ib=0;ib<nblocks;ib++) if (integerRecords[ib]) free(integerRecords[ib]);
     free(integerRecords);
   }
   if (realRecords) {
     for(int ib=0;ib<nblocks;ib++)
-      free(realRecords);
+      if (realRecords[ib]) free(realRecords[ib]);
+    free(realRecords);
   }
 }
 
-void tioga::writeData(int nvar,double *q,int interptype)
+void tioga::writeData(int nvar,int interptype)
 {
   //mb->writeGridFile(myid);
-  mb->writeFlowFile(myid,q,nvar,interptype);
+  for(int ib=0;ib<nblocks;ib++)
+     mblocks[ib]->writeFlowFile(100*myid+ib,qblock[ib],nvar,interptype);
 }
 
 void tioga::getDonorCount(int *dcount,int *fcount)

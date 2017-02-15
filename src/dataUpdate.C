@@ -69,6 +69,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 		}
 	      (*intData)[icount++]=interpList[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }

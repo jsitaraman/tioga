@@ -139,7 +139,7 @@ class tioga
   
   void outputHoleMap(void);
 
-  void writeData(int nvar,double *q,int interptype);
+  void writeData(int nvar,int interptype);
 
   void getDonorCount(int *dcount, int *fcount);
   

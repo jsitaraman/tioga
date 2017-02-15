@@ -58,8 +58,11 @@ void tioga::exchangeBoxes(void)
                  nbPerProc.data(), displs.data(), MPI_INT, scomm);
 
   int maxtag = -1;
-  for (auto itag: alltags)
+  //for (auto itag: alltags)
+  for(int i=0;i<ntotalblks;i++) {
+    int itag=alltags[i];
     if (maxtag < itag) maxtag = itag;
+  }
   int mxtgsqr = maxtag * maxtag;
 
   //

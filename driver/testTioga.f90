@@ -45,7 +45,7 @@ program testTioga
   if (myid==0) write(6,*) '# tioga test on ',numprocs,' processes'
   call readGrid_cell(gr(1),myid)
   call readGrid_cell(gr(2),myid+numprocs)
-  if (myid==0) write(6,*) 'finished reading grid'
+  if (myid==0) write(6,*) '# tioga test : finished reading grids'
   !
   ! initialize tioga
   !
@@ -85,11 +85,7 @@ program testTioga
   !                             ..,            !< number of cells of second type
   !                             ..)            !< connectivity of the second type of cells 
   !                                            !< .. third, fourth etc
-  call mpi_barrier(mpi_comm_world,ierr)
-  if (myid==0) write(6,*) 'begin preprocess'
   call tioga_preprocess_grids                  !< preprocess the grids (call again if dynamic) 
-  call mpi_barrier(mpi_comm_world,ierr)
-  if (myid==0) write(6,*) 'finished prerprocess'
   call cpu_time(t1)         
   call tioga_performconnectivity               !< determine iblanking and interpolation patterns
   call cpu_time(t2)
@@ -154,11 +150,12 @@ program testTioga
   enddo
   if (myid==0) write(6,"(A36)") '-- Interpolation error statistics --'
   if (myid==0) write(6,"(A15)") 'ProcId    Error'
+  call flush()
   call mpi_barrier(mpi_comm_world,ierr)
   write(6,"(I4,3x,E15.7)") myid,sqrt(rnorm/g%nv/g%nvar)
   call mpi_barrier(mpi_comm_world,ierr)
 
-  !call tioga_writeoutputfiles(g%q,g%nvar,'row') !< write output files, if need be
+  call tioga_writeoutputfiles(g%nvar,'row') !< write output files, if need be
 
 200 continue    
   call mpi_barrier(mpi_comm_world,ierr)

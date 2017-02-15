@@ -3,17 +3,18 @@ F90= mpif90
 CC = mpicc
 CXX= mpicxx
 AR = ar -rvs
-FFLAGS=-CB -traceback -r8
+#FFLAGS=-CB -traceback -r8
+FFLAGS = -fdefault-real-8 -g -fbounds-check -fbacktrace
 CFLAGS = -g -rdynamic #-fpe0
 INCLUDES = 
 OBJEXEC=
 OBJECTS=
 OBJF90 = modules.o gridutils.o testTioga.o
-TIOGALIB=../src.d/libtioga.a
+TIOGALIB=../build/libtioga.a
 
 #LDFLAGS= -L../src/ -L/usr/local/intel/10.1.011/fce/lib -L/usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl  -ltioga -lstdc++
 
-LDFLAGS= -L../src/ -ltioga -lstdc++ -lmpi_cxx
+LDFLAGS= -L../build -ltioga -lstdc++ 
 
 default: $(OBJF90) $(LIB)
 	$(F90) $(OBJECTS) $(OBJF90) $(OBJEXEC) $(LDFLAGS) -lm -o $(MODULENAME).exe

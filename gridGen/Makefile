@@ -22,8 +22,8 @@ srcdir= $(PWD)
 .SUFFIXES:	.cc .C .f90
 CFLAGS	  = $(OPTFLAGS) 
 CCFLAGS	  = $(CFLAGS)
-FFLAGS	  = $(OPTFLAGS) -r8 -traceback -CB
-#FFLAGS	  = $(OPTFLAGS) -fdefault-real-8 -ffree-line-length-132 -fcheck=bounds -g
+#FFLAGS	  = $(OPTFLAGS) -r8 -traceback -CB
+FFLAGS	  = $(OPTFLAGS) -fdefault-real-8 -ffree-line-length-132 -fcheck=bounds -g
 LDFLAGS   =  
 LIBS	  = -lm
 ALL_EXECS = buildGrid 

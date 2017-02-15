@@ -49,9 +49,12 @@ extern "C" {
     MPI_Comm_size(tcomm,&nprocs);
     //
     tg->setCommunicator(tcomm,id_proc,nprocs);
-    nc=NULL;
-    nv=NULL;
-    vconn=NULL;
+    for(int i=0;i<MAXBLOCKS;i++)
+     {
+      idata[i].nc=NULL;
+      idata[i].nv=NULL;
+      idata[i].vconn=NULL;
+     }
   }
 
   void tioga_init_(MPI_Comm tcomm)
@@ -69,34 +72,37 @@ extern "C" {
     MPI_Comm_size(tcomm,&nprocs);
     //
     tg->setCommunicator(tcomm,id_proc,nprocs);
-    nc=NULL;
-    nv=NULL;
-    vconn=NULL;
+    for (int i=0;i<MAXBLOCKS;i++)
+     {
+      idata[i].nc=NULL;
+      idata[i].nv=NULL;
+      idata[i].vconn=NULL;
+     }
   }
   
 
-  void tioga_registergrid_data_(int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
+  void tioga_registergrid_data_(int *bid, int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
 			       int *obcnode,int *ntypes,...)
   {
     va_list arguments;
     int i;
+    int iblk=*bid-BASE;
 
     va_start(arguments, ntypes);
 
-    if(nv) free(nv);
-    if(nc) free(nc);
-    if(vconn) free(vconn);
-
-    nv=(int *) malloc(sizeof(int)*(*ntypes));    
-    nc=(int *) malloc(sizeof(int)*(*ntypes));
-    vconn=(int **)malloc(sizeof(int *)*(*ntypes));
+    if(idata[iblk].nv) free(idata[iblk].nv);
+    if(idata[iblk].nc) free(idata[iblk].nc);
+    if(idata[iblk].vconn) free(idata[iblk].vconn);
+    idata[iblk].nv=(int *) malloc(sizeof(int)*(*ntypes));    
+    idata[iblk].nc=(int *) malloc(sizeof(int)*(*ntypes));
+    idata[iblk].vconn=(int **)malloc(sizeof(int *)*(*ntypes));
     for(i=0;i<*ntypes;i++)
      {
-      nv[i]=*(va_arg(arguments, int *));
-      nc[i]=*(va_arg(arguments, int *));
-      vconn[i]=va_arg(arguments, int *);
+      idata[iblk].nv[i]=*(va_arg(arguments, int *));
+      idata[iblk].nc[i]=*(va_arg(arguments, int *));
+      idata[iblk].vconn[i]=va_arg(arguments, int *);
      }
-    tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,nv,nc,vconn);
+    tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,idata[iblk].nv,idata[iblk].nc,idata[iblk].vconn);
   }
 
   void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
@@ -258,8 +264,11 @@ extern "C" {
   void tioga_delete_(void)
    {
     delete [] tg;
-    if (nc) free(nc);
-    if (nv) free(nv);
-    if (vconn) free(vconn);
+    for(int i=0;i<MAXBLOCKS;i++)
+     {
+       if (idata[i].nc) free(idata[i].nc);
+       if (idata[i].nv) free(idata[i].nv);
+       if (idata[i].vconn) free(idata[i].vconn);
+     }
    }
 }

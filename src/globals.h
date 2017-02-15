@@ -21,12 +21,16 @@
  global definitions for
  the interface code
 */
+#define MAXBLOCKS 100
 tioga *tg;
 /*
 ** pointer storage for connectivity arrays that
 ** comes from external solver
 */
+typedef struct inpdata
+{
 int **vconn;
 int *nc;
 int *nv;
-
+} inpdata;
+inpdata idata[MAXBLOCKS];

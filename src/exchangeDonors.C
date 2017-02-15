@@ -208,6 +208,7 @@ void tioga::exchangeDonors(void)
   for (int n=0; n < nblocks; n++) {
     for (int i=0; i<nrecords[n]; i++) {
       int k= donorRecords[n][3*i];
+      printf("%d %d %d\n",k,ixOffset[k],sndPack[k].nints);
       sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+1];
       sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+2];
     }

@@ -17,7 +17,8 @@ program testTioga
   !
   include 'mpif.h'
   !
-  type(grid) :: g
+  type(grid), target :: gr(2)
+  type(grid), pointer :: g
   integer :: myid,numprocs,ierr,nsave
   integer :: itime,ntimesteps,iter,nsubiter
   real*8 :: t0
@@ -26,7 +27,7 @@ program testTioga
   integer :: ntypes
   integer :: nv1,nv2
   real*8 :: t1,t2
-  integer :: i,n,m
+  integer :: i,n,m,ib
   real*8 :: xt(3),rnorm
   integer :: dcount,fcount
   integer, allocatable :: receptorInfo(:),inode(:)
@@ -42,23 +43,29 @@ program testTioga
   ! strand/Cart generator
   !
   if (myid==0) write(6,*) '# tioga test on ',numprocs,' processes'
-  call readGrid_cell(g,myid)
+  call readGrid_cell(gr(1),myid)
+  call readGrid_cell(gr(2),myid+numprocs)
+  if (myid==0) write(6,*) 'finished reading grid'
   !
   ! initialize tioga
   !
   call tioga_init_f90(mpi_comm_world)
   call mpi_barrier(mpi_comm_world,ierr)
   !
+  
   ntypes=1
   nv1=6
   nv2=8
-  if (g%n6 > 0)  then
-   call tioga_registergrid_data(g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
+  do ib=1,2
+   g=>gr(ib)
+   if (g%n6 > 0)  then
+    call tioga_registergrid_data(ib,g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
        ntypes,nv1,g%n6,g%ndc6)
-  else if (g%n8 > 0) then
-   call tioga_registergrid_data(g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
+   else if (g%n8 > 0) then
+    call tioga_registergrid_data(ib,g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
        ntypes,nv2,g%n8,g%ndc8)
-  endif
+   endif
+  enddo
   !
   ! example call to tioga_registergrid_data should be like this
   !
@@ -78,8 +85,11 @@ program testTioga
   !                             ..,            !< number of cells of second type
   !                             ..)            !< connectivity of the second type of cells 
   !                                            !< .. third, fourth etc
-
+  call mpi_barrier(mpi_comm_world,ierr)
+  if (myid==0) write(6,*) 'begin preprocess'
   call tioga_preprocess_grids                  !< preprocess the grids (call again if dynamic) 
+  call mpi_barrier(mpi_comm_world,ierr)
+  if (myid==0) write(6,*) 'finished prerprocess'
   call cpu_time(t1)         
   call tioga_performconnectivity               !< determine iblanking and interpolation patterns
   call cpu_time(t2)
@@ -88,6 +98,8 @@ program testTioga
   if (myid==0) write(6,*) 'connectivity time=',t2-t1
  
   call cpu_time(t1)
+  do ib=1,2
+  g=>gr(ib)
   m=1
   do i=1,g%nv
      xt(:)=g%x(3*i-2:3*i)
@@ -96,12 +108,11 @@ program testTioga
        m=m+1
      enddo
   enddo
+  enddo
 
-  call tioga_getdonorcount(dcount,fcount)
-
-  allocate(receptorInfo(3*dcount))
-  allocate(inode(fcount),frac(fcount))
-  
+  !call tioga_getdonorcount(dcount,fcount)
+  !allocate(receptorInfo(3*dcount))
+  !allocate(inode(fcount),frac(fcount))
   !
   ! use this API if you need to interpolate the field variables yourself
   !
@@ -113,11 +124,14 @@ program testTioga
   !> frac  = weights for each receptor one group after the other
   !>
 
-
-  call tioga_dataupdate(g%q,g%nvar,'row')      !< update the q-variables (can be called anywhere)
-                                               !< nvar = number of field variables per node
-                                               !< if fields are different arrays, you can also 
-                                               !< call this multiple times for each field
+  do ib=1,2
+    g=>gr(ib)
+    call tioga_registersolution(g%bodytag(1),g%q)
+  enddo
+  call tioga_dataupdate(gr(1)%nvar,'row')    !< update the q-variables (can be called anywhere)
+                                             !< nvar = number of field variables per node
+                                             !< if fields are different arrays, you can also 
+                                             !< call this multiple times for each field
   call mpi_barrier(mpi_comm_world,ierr)
     call cpu_time(t2)
   if (myid==0) write(6,*) 'data update time=',t2-t1
@@ -127,13 +141,16 @@ program testTioga
   ! should be machine-zero for the linear
   ! problem here
   ! 
-  m=1
-  do i=1,g%nv
+  do ib=1,2
+   g=>gr(ib)
+   m=1
+   do i=1,g%nv
      xt(:)=g%x(3*i-2:3*i)
      do n=1,g%nvar
        rnorm=rnorm+(g%q(m)-(xt(1)+xt(2)+xt(3)))**2
        m=m+1
      enddo
+   enddo
   enddo
   if (myid==0) write(6,"(A36)") '-- Interpolation error statistics --'
   if (myid==0) write(6,"(A15)") 'ProcId    Error'
@@ -141,7 +158,7 @@ program testTioga
   write(6,"(I4,3x,E15.7)") myid,sqrt(rnorm/g%nv/g%nvar)
   call mpi_barrier(mpi_comm_world,ierr)
 
-  call tioga_writeoutputfiles(g%q,g%nvar,'row') !< write output files, if need be
+  !call tioga_writeoutputfiles(g%q,g%nvar,'row') !< write output files, if need be
 
 200 continue    
   call mpi_barrier(mpi_comm_world,ierr)

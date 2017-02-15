@@ -359,7 +359,7 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
   int i,j,i3,m,n;
   int nvert;
   int isum;
-  int procid,pointid;
+  int procid,pointid,blockid;
   double xv[8][3];
   double xp[3];
   double frac[8];
@@ -373,8 +373,9 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
   verbose=0;
   //if (myid==63 && irecord==3224) verbose=1;
   receptorRes=fabs(receptorRes2);
-  procid=isearch[2*irecord];
-  pointid=isearch[2*irecord+1];
+  procid=isearch[3*irecord];
+  pointid=isearch[3*irecord+1];
+  blockid=isearch[3*irecord+2];
   if (verbose) {
       tracei(procid);
       tracei(pointid);
@@ -463,6 +464,7 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
   interpList[*recid].nweights=nvert;
   interpList[*recid].receptorInfo[0]=procid;
   interpList[*recid].receptorInfo[1]=pointid;
+  interpList[*recid].receptorInfo[2]=blockid;
   if (verbose) {
     tracei(interpList[*recid].receptorInfo[0]);
     tracei(interpList[*recid].receptorInfo[1]);
@@ -490,13 +492,14 @@ void MeshBlock::getCancellationData(int *nrecords,int **intData)
   *nrecords=ncancel;
   if (ncancel > 0) 
     {
-      (*intData)=(int *)malloc(sizeof(int)*(*nrecords)*2);
+      (*intData)=(int *)malloc(sizeof(int)*(*nrecords)*3);
       i=0;
       for(clist=cancelList;clist!=NULL;clist=clist->next) 
 	{
 	  inode=clist->inode;
 	  (*intData)[i++]=donorList[inode]->donorData[0];
 	  (*intData)[i++]=donorList[inode]->donorData[2];
+	  (*intData)[i++]=donorList[inode]->donorData[1];
 	}
     }
 }
@@ -516,11 +519,12 @@ void MeshBlock::getInterpData(int *nrecords, int **intData)
   for(i=0;i<ninterp;i++)
     if (!interpList[i].cancel) (*nrecords)++;
   //
-  (*intData)=(int *)malloc(sizeof(int)*2*(*nrecords));
+  (*intData)=(int *)malloc(sizeof(int)*3*(*nrecords));
   for(i=0,k=0;i<ninterp;i++)
     if (!interpList[i].cancel) {
        (*intData)[k++]=interpList[i].receptorInfo[0];
        (*intData)[k++]=interpList[i].receptorInfo[1];
+       (*intData)[k++]=interpList[i].receptorInfo[2];
     }
 }
 

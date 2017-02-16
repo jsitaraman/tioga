@@ -209,13 +209,13 @@ extern "C" {
       }
     tg->writeData(*nvar,interptype);
   }    
-  void tioga_getdonorcount_(int *dcount,int *fcount)
+  void tioga_getdonorcount_(int *btag,int *dcount,int *fcount)
   {
-    tg->getDonorCount(dcount,fcount);
+    tg->getDonorCount(*btag,dcount,fcount);
   }
-  void tioga_getdonorinfo_(int *receptors,int *indices,double *frac,int *dcount)
+  void tioga_getdonorinfo_(int *btag,int *receptors,int *indices,double *frac,int *dcount)
   {
-    tg->getDonorInfo(receptors,indices,frac,dcount);
+    tg->getDonorInfo(*btag,receptors,indices,frac,dcount);
   }
 
   void tioga_setsymmetry_(int *isym)

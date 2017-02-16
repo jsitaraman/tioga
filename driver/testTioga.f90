@@ -106,19 +106,22 @@ program testTioga
   enddo
   enddo
 
-  !call tioga_getdonorcount(dcount,fcount)
-  !allocate(receptorInfo(3*dcount))
-  !allocate(inode(fcount),frac(fcount))
-  !
-  ! use this API if you need to interpolate the field variables yourself
-  !
-  !call tioga_getdonorinfo(receptorInfo,inode,frac,dcount)
-  !
-  !> dcount = number of donors
-  !> receptorInfo = {receptorProcess Id, receptor Index, number of fractions}*dcount
-  !> inode = indices for each receptor one group after the other
-  !> frac  = weights for each receptor one group after the other
-  !>
+  do ib=1,2
+   call tioga_getdonorcount(ib,dcount,fcount)
+   allocate(receptorInfo(4*dcount))
+   allocate(inode(fcount),frac(fcount))
+   !
+   ! use this API if you need to interpolate the field variables yourself
+   !
+   call tioga_getdonorinfo(ib,receptorInfo,inode,frac,dcount)
+   !
+   !> dcount = number of donors
+   !> receptorInfo = {receptorProcess Id, receptor Index, receptor Block id, number of fractions}*dcount
+   !> inode = indices for each receptor one group after the other
+   !> frac  = weights for each receptor one group after the other
+   !>
+   deallocate(receptorInfo,inode,frac)
+  end do
 
   do ib=1,2
     g=>gr(ib)

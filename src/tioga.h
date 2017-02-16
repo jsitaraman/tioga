@@ -141,9 +141,9 @@ class tioga
 
   void writeData(int nvar,int interptype);
 
-  void getDonorCount(int *dcount, int *fcount);
+  void getDonorCount(int btag, int *dcount, int *fcount);
   
-  void getDonorInfo(int *receptors,int *indices,double *frac,int *dcount);
+  void getDonorInfo(int btag, int *receptors,int *indices,double *frac,int *dcount);
   /** set symmetry bc */
   void setSymmetry(int syminput) { isym=syminput;};
   /** set resolutions for nodes and cells */

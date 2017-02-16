@@ -397,22 +397,29 @@ void tioga::writeData(int nvar,int interptype)
      mblocks[ib]->writeFlowFile(100*myid+ib,qblock[ib],nvar,interptype);
 }
 
-void tioga::getDonorCount(int *dcount,int *fcount)
+void tioga::getDonorCount(int btag, int *dcount,int *fcount)
 {
+  auto idxit=tag_iblk_map.find(btag);
+  int iblk=idxit->second;
+  auto &mb = mblocks[iblk];
   mb->getDonorCount(dcount,fcount);
 }
 
-void tioga::getDonorInfo(int *receptors,int *indices,double *frac,int *dcount)
+void tioga::getDonorInfo(int btag,int *receptors,int *indices,double *frac,int *dcount)
 {
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   int i;
+
+  auto idxit=tag_iblk_map.find(btag);
+  int iblk=idxit->second;
+  auto &mb = mblocks[iblk];
   mb->getDonorInfo(receptors,indices,frac);
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap); 
   //
   // change to actual processor id here
   //
-  for(i=0;i<3*(*dcount);i+=3)
+  for(i=0;i<3*(*dcount);i+=4)
     receptors[i]=sndMap[receptors[i]];
       
 }

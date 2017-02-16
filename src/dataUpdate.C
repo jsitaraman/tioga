@@ -149,6 +149,7 @@ void MeshBlock::getDonorInfo(int *receptors,int *indices,double *frac)
 	    }
 	  receptors[k++]=interpList[i].receptorInfo[0];
 	  receptors[k++]=interpList[i].receptorInfo[1];
+	  receptors[k++]=interpList[i].receptorInfo[2];
 	  receptors[k++]=interpList[i].nweights;
 	}
     }

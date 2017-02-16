@@ -34,7 +34,9 @@ SOURCES += main.cpp \
     linklist.c \
     math.c \
     test_amr_functions.c \
-    utils.c
+    utils.c \
+    math.C \
+    utils.C
 
 DISTFILES += \
     cellVolume.f90 \

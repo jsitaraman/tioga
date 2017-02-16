@@ -980,6 +980,8 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 
 void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 {
+  int nunblank = 0; /// DEBUGGING
+  MPI_Allreduce(&mb->nreceptorCells, &nunblank, 1, MPI_INT, MPI_MAX, scomm);
   // initialize send and recv packets
   int nsend,nrecv;
   int *sndMap,*rcvMap;
@@ -1033,19 +1035,18 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     }
 
 //    std::vector<double> qtmp(stride*mb->ntotalPoints);
-    recv_itmp.resize(mb->ntotalPoints);
-
+    recv_itmp.assign(mb->ntotalPoints,0);
+if (mb->nreceptorCells>0) /// DEBUGGING
+  printf("nFringePoints %d, nUnblankPoints %d\n",mb->nFacePoints,mb->nCellPoints);
     for (int k = 0; k < nrecv; k++)
     {
-      int m = 0;
       for (int i = 0; i < rcvVPack[k].nints; i++)
       {
         int ind = rcvVPack[k].intData[i];
         for (int j = 0; j < stride; j++)
         {
           recv_itmp[ind] = 1;          
-          fringebuf_h[ind*stride+j] = rcvVPack[k].realData[m];
-          m++;
+          fringebuf_h[ind*stride+j] = rcvVPack[k].realData[i*stride+j];
         }
       }
     }
@@ -1067,7 +1068,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
       }
     }
     fp.close();
-
+    if (norphanPoint > 0) ThrowException("Orphan points found!");
     if (norphanPoint > 0 && iorphanPrint) {
       printf("Warning::number of orphans in rank %d = %d of %d\n",myid,norphanPoint,mb->ntotalPoints);
       iorphanPrint = 0;
@@ -1084,7 +1085,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
         mb->updateFringePointData(fringebuf_h,nvar);
       else
         mb->updateFringePointGradient(fringebuf_h,nvar);
-      interpTime.startTimer();
+      interpTime.stopTimer();
     }
     else
       ThrowException("Not written for non-artificial boundary codes right now");
@@ -1094,6 +1095,17 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   /// TODO: modify for moving grids
   // release all memory
   //pc->clearPacketsV(sndVPack, rcvVPack);
+
+  if (nunblank > 0) /// DEBUGGING
+  {
+    printf("UNBLANKING COMPLETE - Removing unblank cells\n");
+    // Remove unblank cells from interp lists
+    for (int i = 0; i < mb->ncells; i++)
+      if (mb->iblank_cell[i] == FRINGE)
+        mb->iblank_cell[i] = NORMAL;
+
+    doPointConnectivity();
+  }
 }
 #endif
 

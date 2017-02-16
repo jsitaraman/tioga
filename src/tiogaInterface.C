@@ -288,6 +288,11 @@ extern "C" {
     tg->setTransform(rmat, offset, ndim);
   }
   
+  void tioga_do_point_connectivity(void)
+  {
+    tg->doPointConnectivity();
+  }
+
   void tioga_delete_(void)
    {
     delete tg;

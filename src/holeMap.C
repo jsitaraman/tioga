@@ -92,12 +92,14 @@ void tioga::getHoleMap(void)
         ds[j] = holeMap[i].extents[j+3]-holeMap[i].extents[j];
       }
       double dsmax = max(max(ds[0], ds[1]), ds[2]);
-      int NX_HOLEMAP = 100; // Originally 64
-      double dsbox = dsmax/NX_HOLEMAP;
+      double dsmin = min(min(ds[0], ds[1]), ds[2]);
+      double dx_avg = .5*(dsmax + dsmin);
+      int NX_HOLEMAP = 75; // Originally 64
+      double dsbox = dx_avg/NX_HOLEMAP; // Accounting somewhat for high aspect ratios
 
       for (int j = 0; j < 3; j++)
       {
-        // Extend bounding box by 1/32 of max dimension in each direction
+        // Extend bounding box by 2/NX_HOLEMAP of max dimension in each direction
         holeMap[i].extents[j]   -= (2*dsbox);
         holeMap[i].extents[j+3] += (2*dsbox);
         // nx should end up equal to 68 for maximum dimension

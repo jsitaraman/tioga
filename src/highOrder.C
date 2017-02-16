@@ -706,7 +706,7 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 {
   /// HACK FOR TAYLOR-GREEN VORTEX TEST CASE: INNER BOX (HALF-)LENGTH .25*PI
-  double safety_fac = .9;
+  double safety_fac = .8;
   double L = .25*PI * safety_fac;
 
   if (meshtag == 1) /// MUST BE BACKGROUND GRID
@@ -724,7 +724,6 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
         for (int nd = 0; nd < 8 && inside; nd++)
         {
           int ind = 3*vconn[n][nvert*ic+nd];
-
           for (int d = 0; d < 3; d++)
           {
             if (std::abs(x[ind+d] - offset[d]) > L)
@@ -739,7 +738,10 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
           iblank_cell[icell] = HOLE;
 
         if (old_iblank == HOLE && iblank_cell[icell] == NORMAL)
+        {
+//          printf("Unblank cell ID %d\n",icell); /// DEBUGGING
           iblank_cell[icell] = FRINGE;
+        }
 
         icell++;
       }
@@ -755,12 +757,16 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 {
   nreceptorFaces = 0;
-
+/// TODO: FIX TO ALLOW FRINGE CELLS!
+std::set<int> unblanks;
   // First, correct iblank_cell to contain only normal or hole cells (no fringe)
   for (int ic = 0; ic < ncells; ic++)
   {
     if (iblank_cell[ic] == FRINGE)
-      iblank_cell[ic] = HOLE;
+    {
+      unblanks.insert(ic);
+      iblank_cell[ic] = NORMAL; /// Check
+    }
   }
 
   std::set<int> artBndFaces;
@@ -854,13 +860,17 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   }
 
   nreceptorFaces = artBndFaces.size();
-//printf("Rank %d: Grid %d: # Overset Faces = %d\n",myid,meshtag,nreceptorFaces);
+//printf("Rank %d: Grid %d: # Overset Faces = %d\n",myid,meshtag,nreceptorFaces); /// DEBUGGING
   // Setup final Artificial Boundary face list
   free(ftag);
   ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
 
   int ind = 0;
   for (auto &ff: artBndFaces) ftag[ind++] = ff;
+
+  /// HACK - FIX ME
+  for (auto &ic : unblanks)
+    iblank_cell[ic] = FRINGE;
 }
 
 void MeshBlock::setArtificialBoundaries(void)
@@ -1068,7 +1078,10 @@ void MeshBlock::getFringeNodes(void)
     // Gather a list of cell IDs for all receptor (fringe) cells
     for (int i = 0; i < ncells; i++)
       if (iblank_cell[i] == FRINGE)
+      {
         ctag[nreceptorCells++] = i+BASE;
+//        iblank_cell[i] = NORMAL;
+      }
 
     free(pointsPerCell);
     pointsPerCell = (int *)malloc(sizeof(int)*nreceptorCells);
@@ -1116,6 +1129,8 @@ void MeshBlock::getFringeNodes(void)
         for (int j = 0; j < 3; j++)
           rxyz[m++] = x[3*i+j];
   }
+  if (nreceptorCells > 0) /// DEBUGGING
+    printf("Rank %d: # Unblank cells = %d, # pts = %d\n",myid,nreceptorCells,nCellPoints);
 }
 
 void MeshBlock::getExtraQueryPoints(OBB *obc, int &nints, int *&intData,
@@ -1289,6 +1304,9 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
       cuda_free(weights_d);
       cuda_free(donors_d);
       cuda_free(buf_inds_d);
+      weights_d = NULL;
+      donors_d = NULL;
+      buf_inds_d = NULL;
 
       d_buff_size = 0;
     }
@@ -1300,9 +1318,12 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
 
   if (ninterp2 > d_buff_size)
   {
-    cuda_free(weights_d);
-    cuda_free(donors_d);
-    cuda_free(buf_inds_d);
+    if (d_buff_size > 0)
+    {
+      cuda_free(weights_d);
+      cuda_free(donors_d);
+      cuda_free(buf_inds_d);
+    }
 
     cuda_malloc(weights_d, ninterp2*nSpts);
     cuda_malloc(donors_d, ninterp2);
@@ -1625,7 +1646,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
       m=0;
       for (int i = 0; i < nreceptorCells;i++)
 	{
-	  if (iblank_cell[ctag[i]-1]==-1) 
+    if (iblank_cell[ctag[i]-1]==-1)
 	    {
 	      convert_to_modal(&(ctag[i]),&(pointsPerCell[i]),&(qtmp[m]),&npts,
 			       &index_out,qout);
@@ -1665,7 +1686,16 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
     face_data_to_device(ftag, nreceptorFaces, 0, qtmp);
 
   if (nreceptorCells > 0)
+  {
     cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
+
+    for (int i = 0; i < nreceptorCells; i++)
+    {
+      if (iblank_cell[ctag[i]] == FRINGE)
+        iblank_cell[ctag[i]] = NORMAL;
+    }
+    nreceptorCells = 0;
+  }
 #else
   PUSH_NVTX_RANGE("tg_update_fringeU", 2);
   MPI_Pcontrol(1, "tioga_update_U_fpts");
@@ -1699,8 +1729,8 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
   if (nreceptorFaces > 0)
     face_data_to_device(ftag, nreceptorFaces, 1, dqtmp);
 
-  if (nreceptorCells > 0)
-    cell_data_to_device(ctag, nreceptorCells, 0, dqtmp+3*nvar*nFacePoints);
+//  if (nreceptorCells > 0)
+//    cell_data_to_device(ctag, nreceptorCells, 1, dqtmp+3*nvar*nFacePoints);
 #else
   MPI_Pcontrol(1, "tioga_update_grad_fpts");
 //  int fpt_start = 0;

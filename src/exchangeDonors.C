@@ -303,7 +303,7 @@ void tioga::outputStatistics(void)
     mstats_sum[0] += mstats[0];
     mstats_sum[1] += mstats[1];
   }
-  MPI_Reduce(mstats,mstats_global,2,MPI_INT,MPI_SUM,0,scomm);
+  MPI_Reduce(mstats_sum,mstats_global,2,MPI_INT,MPI_SUM,0,scomm);
   if (myid==0) {
     printf("#tioga -----------------------------------------\n");
     printf("#tioga : total receptors:\t%d\n",mstats_global[1]);

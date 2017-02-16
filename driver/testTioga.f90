@@ -113,7 +113,7 @@ program testTioga
    !
    ! use this API if you need to interpolate the field variables yourself
    !
-   call tioga_getdonorinfo(ib,receptorInfo,inode,frac,dcount)
+   call tioga_getdonorinfo(gr(ib)%bodytag(1),receptorInfo,inode,frac,dcount)
    !
    !> dcount = number of donors
    !> receptorInfo = {receptorProcess Id, receptor Index, receptor Block id, number of fractions}*dcount

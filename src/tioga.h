@@ -204,6 +204,8 @@ class tioga
                                 int nOverFaces, int nMpi, int* overFaces,
                                 int* mpiFaces, int *procR, int *idR);
 
+  void registerMovingGridData(double *grid_vel) { mb->setGridVelocity(grid_vel); }
+
   void profile(void);
 
   void exchangeBoxes(void);
@@ -231,6 +233,7 @@ class tioga
   void performConnectivityAMR(void);
   void directCut(void);
 
+  void setIterIblanks(double dt, int nvar);
   void doHoleCutting(void);
   void doPointConnectivity(void);
 

@@ -102,9 +102,13 @@ void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
                                 double* (*gdqd)(int& es, int& ss, int& vs, int& ds));
 
 
+void tioga_register_moving_grid_data(double* grid_vel);
+
 void tioga_set_transform(double *mat, double *off, int ndim);
 
 void tioga_do_point_connectivity(void);
+
+void tioga_set_iter_iblanks(double dt, int nvar);
 
 void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 

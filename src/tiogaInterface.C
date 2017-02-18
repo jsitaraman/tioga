@@ -278,6 +278,11 @@ extern "C" {
     tg->set_ab_callback_gpu(d2h,h2df,h2dc,gqd,gdqd);
   }
 
+  void tioga_register_moving_grid_data(double* grid_vel)
+  {
+    tg->registerMovingGridData(grid_vel);
+  }
+
   void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *))
   {
     tg->set_amr_callback(f1);
@@ -291,6 +296,11 @@ extern "C" {
   void tioga_do_point_connectivity(void)
   {
     tg->doPointConnectivity();
+  }
+
+  void tioga_set_iter_iblanks(double dt, int nvar)
+  {
+    tg->setIterIblanks(dt, nvar);
   }
 
   void tioga_delete_(void)

@@ -112,6 +112,77 @@ void MeshBlock::extraConn(void)
     cutFacesO.push_back(ff);
 }
 
+void MeshBlock::setGridVelocity(double *grid_vel)
+{
+  vg = grid_vel;
+
+  // Setup temporary buffers for performing iteration-level hole cutting
+  delete[] ibc_2;
+  delete[] x2;
+printf("Setting up additional moving-grid buffers! pointer = %p\n",grid_vel);
+  ibc_2 = new int[ncells];
+  x2 = new double[3*nnodes];
+}
+
+void MeshBlock::calcNextGrid(double dt)
+{
+  for (int i = 0; i < nnodes; i++)
+    for (int d = 0; d < 3; d++)
+    {
+//      double val = vg[3*i+d];
+      x2[3*i+d] = x[3*i+d] + vg[3*i+d] * dt;
+      if (std::abs(x2[3*i+d]) > PI)
+      {
+        printf("%d: node %d: big value, dim %d: %f [x %f, v %f]\n",myid,i,d,x2[3*i+d],x[3*i+d],vg[3*i+d]);
+        printf("%d: pointer = %p\n",myid,vg);
+        exit(0);
+      }
+    }
+
+  xtmp = x;
+  x = x2;
+
+  ibc_tmp = iblank_cell;
+  iblank_cell = ibc_2;
+}
+
+void MeshBlock::resetCurrentGrid(void)
+{
+  x = xtmp;
+  iblank_cell = ibc_tmp;
+}
+
+int MeshBlock::getIterIblanks(void)
+{
+  unblanks.clear();
+  blanks.clear();
+
+  for (int ic = 0; ic < ncells; ic++)
+  {
+    if (iblank_cell[ic] == HOLE && ibc_2[ic] == NORMAL)
+    {
+      printf("%d: getIterIblanks: Unblank cell %d\n",myid,ic);
+      unblanks.insert(ic);
+      iblank_cell[ic] = NORMAL;
+    }
+    else if (ibc_2[ic] == HOLE)
+    {
+      blanks.insert(ic);
+//      iblank_cell[ic] = HOLE;
+    }
+  }
+
+  return unblanks.size();
+}
+
+void MeshBlock::clearUnblanks(void)
+{
+  unblanks.clear();
+//  nreceptorCells = 0;
+//  nCellPoints = 0;
+//  ntotalPoints = nFacePoints;
+}
+
 // void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
 //     int** cutFaces, int gridID, int nGrids, MPI_Comm &scomm)
 // {
@@ -539,7 +610,7 @@ int get_cell_index(int* nc, int ntypes, int ic_in, int &ic_out)
   }
 }
 
-/*
+
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 {
   if (!iartbnd)
@@ -554,30 +625,33 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
     for (int i = 0; i < nc[n]; i++)
     {
       int flag = 1;
-      int old_iblank = iblank_cell[icell];
       iblank_cell[icell] = NORMAL;
       int ncount = 0;
-      for (int m = 0; m < nvert && flag; m++)
+      for (int m = 0; m < nvert; m++)
       {
         int inode = vconn[n][nvert*i+m]-BASE;
         if (iblank[inode] == HOLE)
         {
           iblank_cell[icell] = HOLE;
           flag = 0;
+          break;
         }
-        ncount = ncount + (iblank[inode] == FRINGE);
+
+        if (iblank[inode] == FRINGE) ncount++;
       }
 
       if (flag && ncount == nvert)
         iblank_cell[icell] = HOLE; // FRINGE
 
-      // If cell is being unblanked, actually use it as a 'fringe' cell
-      if (old_iblank == HOLE && iblank_cell[icell] == NORMAL)
-        iblank_cell[icell] = FRINGE;
-
       icell++;
     }
   }
+
+//  if (myid == 0) /// DEBUGGING
+//  {
+//    for (int i = 0; i < ncells; i++)
+//      iblank_cell[i] = NORMAL;
+//  }
 
 //  /// DEBUGGING / TEMPORARY FIX
 //  std::vector<int> ncf(1,6);
@@ -645,7 +719,7 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 //  int rank;
 //  MPI_Comm_rank(meshComm, &rank);
 }
-*/
+
 /**
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 {
@@ -703,71 +777,53 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 }
 */
 
-void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
-{
-  /// HACK FOR TAYLOR-GREEN VORTEX TEST CASE: INNER BOX (HALF-)LENGTH .25*PI
-  double safety_fac = .8;
-  double L = .25*PI * safety_fac;
+//void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
+//{
+//  /// HACK FOR TAYLOR-GREEN VORTEX TEST CASE: INNER BOX (HALF-)LENGTH .25*PI
+//  double safety_fac = .8;
+//  double L = .25*PI * safety_fac;
 
-  if (meshtag == 1) /// MUST BE BACKGROUND GRID
-  {
-    int icell = 0;
-    for (int n = 0; n < ntypes; n++)
-    {
-      int nvert = nv[n];
-      for (int ic = 0; ic < nc[n]; ic++)
-      {
-        int old_iblank = iblank_cell[icell];
-        iblank_cell[icell] = NORMAL;
+//  if (meshtag == 1) /// MUST BE BACKGROUND GRID
+//  {
+//    int icell = 0;
+//    for (int n = 0; n < ntypes; n++)
+//    {
+//      int nvert = nv[n];
+//      for (int ic = 0; ic < nc[n]; ic++)
+//      {
+//        iblank_cell[icell] = NORMAL;
 
-        bool inside = true;
-        for (int nd = 0; nd < 8 && inside; nd++)
-        {
-          int ind = 3*vconn[n][nvert*ic+nd];
-          for (int d = 0; d < 3; d++)
-          {
-            if (std::abs(x[ind+d] - offset[d]) > L)
-            {
-              inside = false;
-              break;
-            }
-          }
-        }
+//        bool inside = true;
+//        for (int nd = 0; nd < 8 && inside; nd++)
+//        {
+//          int ind = 3*vconn[n][nvert*ic+nd];
+//          for (int d = 0; d < 3; d++)
+//          {
+//            if (std::abs(x[ind+d] - offset[d]) > L)
+//            {
+//              inside = false;
+//              break;
+//            }
+//          }
+//        }
 
-        if (inside)
-          iblank_cell[icell] = HOLE;
+//        if (inside)
+//          iblank_cell[icell] = HOLE;
 
-        if (old_iblank == HOLE && iblank_cell[icell] == NORMAL)
-        {
-//          printf("Unblank cell ID %d\n",icell); /// DEBUGGING
-          iblank_cell[icell] = FRINGE;
-        }
-
-        icell++;
-      }
-    }
-  }
-  else
-  {
-    for (int ic = 0; ic < ncells; ic++)
-      iblank_cell[ic] = NORMAL;
-  }
-}
+//        icell++;
+//      }
+//    }
+//  }
+//  else
+//  {
+//    for (int ic = 0; ic < ncells; ic++)
+//      iblank_cell[ic] = NORMAL;
+//  }
+//}
 
 void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 {
   nreceptorFaces = 0;
-/// TODO: FIX TO ALLOW FRINGE CELLS!
-std::set<int> unblanks;
-  // First, correct iblank_cell to contain only normal or hole cells (no fringe)
-  for (int ic = 0; ic < ncells; ic++)
-  {
-    if (iblank_cell[ic] == FRINGE)
-    {
-      unblanks.insert(ic);
-      iblank_cell[ic] = NORMAL; /// Check
-    }
-  }
 
   std::set<int> artBndFaces;
 
@@ -859,18 +915,11 @@ std::set<int> unblanks;
     }
   }
 
-  nreceptorFaces = artBndFaces.size();
-//printf("Rank %d: Grid %d: # Overset Faces = %d\n",myid,meshtag,nreceptorFaces); /// DEBUGGING
   // Setup final Artificial Boundary face list
   free(ftag);
-  ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
+  ftag = (int*)malloc(sizeof(int)*artBndFaces.size());
 
-  int ind = 0;
-  for (auto &ff: artBndFaces) ftag[ind++] = ff;
-
-  /// HACK - FIX ME
-  for (auto &ic : unblanks)
-    iblank_cell[ic] = FRINGE;
+  for (auto &ff: artBndFaces) ftag[nreceptorFaces++] = ff;
 }
 
 void MeshBlock::setArtificialBoundaries(void)
@@ -1072,22 +1121,31 @@ void MeshBlock::getFringeNodes(void)
   {
     /* Add in interior nodes from fringe elements (i.e. unblank cells, or
      * non-AB fringe cells) */
-    free(ctag);
-    ctag = (int *)malloc(sizeof(int)*ncells);
+    if (iartbnd)
+    {
+      free(ctag);
+      ctag = (int*)malloc(sizeof(int)*unblanks.size());
 
-    // Gather a list of cell IDs for all receptor (fringe) cells
-    for (int i = 0; i < ncells; i++)
-      if (iblank_cell[i] == FRINGE)
-      {
-        ctag[nreceptorCells++] = i+BASE;
-//        iblank_cell[i] = NORMAL;
-      }
+      // Gather a list of cell IDs for all receptor (fringe) cells
+      for (auto &ic : unblanks)
+        ctag[nreceptorCells++] = ic;
+    }
+    else
+    {
+      free(ctag);
+      ctag = (int *)malloc(sizeof(int)*ncells);
+
+      // Gather a list of cell IDs for all receptor (fringe) cells
+      for (int i = 0; i < ncells; i++)
+        if (iblank_cell[i] == FRINGE)
+          ctag[nreceptorCells++] = i+BASE;
+    }
 
     free(pointsPerCell);
     pointsPerCell = (int *)malloc(sizeof(int)*nreceptorCells);
 
     // Get total number of internal nodes (solution points) for our fringe cells
-    maxPointsPerCell=0;
+    maxPointsPerCell = 0;
 
     for (int i = 0; i < nreceptorCells; i++)
     {
@@ -1129,8 +1187,6 @@ void MeshBlock::getFringeNodes(void)
         for (int j = 0; j < 3; j++)
           rxyz[m++] = x[3*i+j];
   }
-  if (nreceptorCells > 0) /// DEBUGGING
-    printf("Rank %d: # Unblank cells = %d, # pts = %d\n",myid,nreceptorCells,nCellPoints);
 }
 
 void MeshBlock::getExtraQueryPoints(OBB *obc, int &nints, int *&intData,

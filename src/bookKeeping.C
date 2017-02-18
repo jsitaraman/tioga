@@ -31,62 +31,58 @@ using namespace tg_funcs;
 
 void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
 {
-  int i,k;
-  int *icount;
-  int *dcount;
+  int* icount = (int *)malloc(sizeof(int)*nsend);
+  int* dcount = (int *)malloc(sizeof(int)*nsend);
 
-  icount=(int *)malloc(sizeof(int)*nsend);
-  dcount=(int *)malloc(sizeof(int)*nsend);
-  //
   // count numbers to send first
-  //
-  for(i=0;i<nsearch;i++)
+  for (int i = 0; i < nsearch; i++)
+  {
+    if (donorId[i] > -1)
     {
-      if (donorId[i] > -1)
-        {
-          k=isearch[2*i];
-          sndPack[k].nints+=3;
-          sndPack[k].nreals++;
-        }
+      int k = isearch[2*i];
+      sndPack[k].nints += 3;
+      sndPack[k].nreals++;
     }
-  for(k=0;k<nsend;k++)
-    {
-      sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
-      sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
-    }
+  }
 
-  for(i=0;i<nsend;i++) {icount[i]=dcount[i]=0;};
-  //
-  for(i=0;i<nsearch;i++)
+  for (int k = 0; k < nsend; k++)
+  {
+    sndPack[k].intData = (int *)malloc(sizeof(int)*sndPack[k].nints);
+    sndPack[k].realData = (double *)malloc(sizeof(double)*sndPack[k].nreals);
+  }
+
+  for (int i = 0; i < nsend; i++)
+    icount[i] = dcount[i] = 0;
+
+  for (int i = 0; i < nsearch; i++)
+  {
+    if (donorId[i] > -1)
     {
-      if (donorId[i] > -1)
-        {
-          k=isearch[2*i];
-          sndPack[k].intData[icount[k]++]=meshtag;               // mesh tag
-          sndPack[k].intData[icount[k]++]=isearch[2*i+1];        // point id
-          sndPack[k].intData[icount[k]++]=i;                         // point id on the donor side
-          sndPack[k].realData[dcount[k]++]=cellRes[donorId[i]];  // donor resolution
-        }
+      int k = isearch[2*i];
+      sndPack[k].intData[icount[k]++]  = meshtag;             // mesh tag
+      sndPack[k].intData[icount[k]++]  = isearch[2*i+1];      // point id from receptor grid
+      sndPack[k].intData[icount[k]++]  = i;                   // point id on the donor side
+      sndPack[k].realData[dcount[k]++] = cellRes[donorId[i]]; // donor resolution
     }
+  }
+
   free(icount);
   free(dcount);
 }
 void MeshBlock::initializeDonorList(void)
 {
-  int i;
-  if (donorList) 
-    {
-      for(i=0;i<donorListLength;i++){
-	deallocateLinkList(donorList[i]);
-	//printf("\n\t Deallocate (nnodes) i: %d %d ",nnodes,i);
-       }
-      free(donorList);
-    }
+  if (donorList)
+  {
+    for (int i = 0; i < donorListLength; i++)
+      deallocateLinkList(donorList[i]);
+
+    free(donorList);
+  }
 
   donorListLength = nnodes;
-  donorList=(DONORLIST **)malloc(sizeof(DONORLIST *)*donorListLength);
-  for(i=0;i<donorListLength;i++)
-    donorList[i]=NULL;
+  donorList = (DONORLIST **)malloc(sizeof(DONORLIST *)*donorListLength);
+  for (int i = 0; i < donorListLength; i++)
+    donorList[i] = NULL;
 }
 
 void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int remoteid,
@@ -104,9 +100,7 @@ void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int rem
 void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,double **receptorResolution,
 			      int *nrecords)
 {
-  //
-  // first mark hole points
-  //
+  // First mark all hole points
   int *iflag = (int *)malloc(sizeof(int)*nmesh);
 
   for (int i = 0; i < nnodes; i++)
@@ -164,10 +158,8 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
      printf("--------------------------------------------------------------------\n");
     }
   }
-  //
-  // mark mandatory fringes as neighbors (up to nfringe depth)
-  // of hole points 
-  //
+
+  // Mark mandatory fringes as neighbors (up to nfringe depth) of hole points
   int *mtag = (int *)malloc(sizeof(int)*nnodes);
   int *mtag1 = (int *)malloc(sizeof(int)*nnodes);
  
@@ -207,9 +199,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   free(mtag);
   free(mtag1);
 
-  //
-  // now find fringes
-  //
+  // Now find fringes
   *nrecords=0;
   for (int i = 0; i < nnodes; i++)
   {
@@ -229,12 +219,10 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
     }
   }
 
-  //
   // set the records to send back to the donor
   // process
-  //
-  (*donorRecords)=(int *)malloc(sizeof(int)*2*(*nrecords));
-  (*receptorResolution)=(double *)malloc(sizeof(double)*(*nrecords));
+  (*donorRecords) = (int *)malloc(sizeof(int)*2*(*nrecords));
+  (*receptorResolution) = (double *)malloc(sizeof(double)*(*nrecords));
 
   int m = 0;
   int k = 0;
@@ -249,9 +237,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
     }
   }
 
-  //
   // release local memory
-  //
   free(iflag);
 }
 
@@ -286,9 +272,8 @@ void MeshBlock::initializeInterpList(int ninterp_input)
 void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
 {
   double xv[8][3];
-  double frac[8];
   std::vector<double> xv2;
-  std::vector<double> frac2;
+  std::vector<double> frac;
   std::vector<int> inode;
   INTEGERLIST *clist;
 
@@ -326,7 +311,8 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
   {
     inode[m]=vconn[n][nvert*idonor+m]-BASE;
     i3 = 3*inode[m];
-    if (iblank[inode[m]] <=0)
+    ///if (iblank[inode[m]] == HOLE || (!iartbnd && iblank[inode[m]] == FRINGE))
+    if (iblank[inode[m]] != NORMAL)
     {
       acceptFlag = 0;
     }
@@ -339,21 +325,21 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
         xv[m][j] = x[i3+j];
   }
 
-  if (acceptFlag==0 && receptorRes!=BIGVALUE) return;
+  if (acceptFlag == 0 && receptorRes != BIGVALUE) return;
 
-  if (receptorRes==BIGVALUE)
+  if (receptorRes == BIGVALUE) /// && !iartbnd) // Node tagged as 'mandatory fringe' receptor
   {
     clist=cancelList;
 
     // go to the end of the list
     if (clist !=NULL) while(clist->next !=NULL) clist=clist->next;
-    //
+
     for (int m = 0; m < nvert; m++)
     {
-      inode[m]=vconn[n][nvert*idonor+m]-BASE;
-      if (iblank[inode[m]]==-1 && nodeRes[inode[m]]!=BIGVALUE)
+      inode[m] = vconn[n][nvert*idonor+m]-BASE;
+      if (iblank[inode[m]] == FRINGE && nodeRes[inode[m]] != BIGVALUE)
       {
-        iblank[inode[m]]=1;
+        iblank[inode[m]]=NORMAL;
         if (clist == NULL)
         {
           clist=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
@@ -375,15 +361,15 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
 
   /* Compute the (linear) shape-function interpolation weights of the receptor
    * node within the donor cell */
+  frac.resize(nvert);
   if (nvert <= 8)
   {
-    computeNodalWeights(xv,xp,frac,nvert); /// TODO: support nvert > 8
+    computeNodalWeights(xv,xp,frac.data(),nvert); /// TODO: support nvert > 8
   } else
   {
     double xref[3];
     getRefLocNewton(xv2.data(), &xp[0], &xref[0], nvert, 3);
-    frac2.resize(nvert);
-    shape_hex(point(&xref[0]),frac2,nvert);
+    shape_hex(point(&xref[0]),frac,nvert);
   }
 
   interp2donor[irecord]=*recid;
@@ -395,11 +381,8 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
   interpList[*recid].weights=(double *)malloc(sizeof(double)*nvert);
   for (int m = 0; m < nvert; m++)
   {
-    interpList[*recid].inode[m]=inode[m];
-    if (nvert > 8)
-      interpList[*recid].weights[m]=frac2[m];
-    else
-      interpList[*recid].weights[m]=frac[m];
+    interpList[*recid].inode[m]   = inode[m];
+    interpList[*recid].weights[m] = frac[m];
   }
   (*recid)++;
 }
@@ -409,46 +392,44 @@ void MeshBlock::set_ninterp(int ninterp_input)
   ninterp=ninterp_input;
 }
   
-void MeshBlock::getCancellationData(int *nrecords,int **intData)
+void MeshBlock::getCancellationData(int &nrecords,int*& intData)
 {
-  int i;
-  int inode;
-  INTEGERLIST *clist;   
-  *nrecords=ncancel;
-  if (ncancel > 0) 
+  nrecords = ncancel;
+  if (ncancel > 0)
+  {
+    intData = (int *)malloc(sizeof(int)*nrecords*2);
+    int i = 0;
+    for (INTEGERLIST* clist = cancelList; clist != NULL; clist = clist->next)
     {
-      (*intData)=(int *)malloc(sizeof(int)*(*nrecords)*2);
-      i=0;
-      for(clist=cancelList;clist!=NULL;clist=clist->next) 
-	{
-	  inode=clist->inode;
-	  (*intData)[i++]=donorList[inode]->donorData[0];
-	  (*intData)[i++]=donorList[inode]->donorData[2];
-	}
+      int inode = clist->inode;
+      intData[i++] = donorList[inode]->donorData[0];
+      intData[i++] = donorList[inode]->donorData[2];
     }
+  }
 }
 
 void MeshBlock::cancelDonor(int irecord)
 {
-  int iptr;
-  iptr=interp2donor[irecord];
-  if (iptr > -1) interpList[iptr].cancel=1;
+  int iptr = interp2donor[irecord];
+  if (iptr > -1) interpList[iptr].cancel = 1;
 }
 
-void MeshBlock::getInterpData(int *nrecords, int **intData)
+void MeshBlock::getInterpData(int& nrecords, int*& donorData)
 {
-  int i,k;
-  //
-  *nrecords=0;
-  for(i=0;i<ninterp;i++)
-    if (!interpList[i].cancel) (*nrecords)++;
-  //
-  (*intData)=(int *)malloc(sizeof(int)*2*(*nrecords));
-  for(i=0,k=0;i<ninterp;i++)
-    if (!interpList[i].cancel) {
-       (*intData)[k++]=interpList[i].receptorInfo[0];
-       (*intData)[k++]=interpList[i].receptorInfo[1];
+  nrecords = 0;
+  for (int i = 0; i < ninterp; i++)
+    if (!interpList[i].cancel) nrecords++;
+
+  donorData = (int *)malloc(sizeof(int)*2*nrecords);
+
+  for (int i = 0, k = 0; i < ninterp; i++)
+  {
+    if (!interpList[i].cancel)
+    {
+       donorData[k++] = interpList[i].receptorInfo[0];
+       donorData[k++] = interpList[i].receptorInfo[1];
     }
+  }
 }
 
 void MeshBlock::clearIblanks(void)

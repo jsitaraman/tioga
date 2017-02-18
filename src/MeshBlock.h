@@ -60,7 +60,7 @@ class MeshBlock
 {
  private:
   int nnodes;  /** < number of grid nodes */
-//  int ncells;  /** < total number of cells */
+  int ncells;  /** < total number of cells */
   int nfaces;  /** < total number of faces (Art. Bnd.) */
   int ntypes;  /** < number of different types of cells */
   int nftype;  /** < number of different face types (triangle or quad) */
@@ -72,8 +72,15 @@ class MeshBlock
   int nwbc;    /** < number of wall boundary nodes */
   //
   double *x;        /** < grid nodes x[3*nnodes] */
+
+  //! Moving artbnd grid buffer variables
+  double *xtmp, *x2 = NULL;
+  int *ibc_tmp, *ibc_2 = NULL;
+  double *vg;
+  std::set<int> unblanks, blanks;
+
   int *iblank;      /** < iblank value for each grid node */
-//  int *iblank_cell; /** < iblank value at each grid cell */
+  int *iblank_cell; /** < iblank value at each grid cell */
   int *iblank_face; /** < iblank value at each grid face (Art. Bnd.) */
   //
   int **vconn;      /** < connectivity (cell to nodes) for each cell type */
@@ -207,19 +214,19 @@ class MeshBlock
 
   void (*convert_to_modal)(int *,int *,double *,int *,int *,double *);
 
-//  int nreceptorCells;      /** number of receptor cells */
+  int nreceptorCells;      /** number of receptor cells */
   int *ctag;               /** index of receptor cells */
   int *pointsPerCell;      /** number of receptor points per cell */
   int maxPointsPerCell;    /** max of pointsPerCell vector */
 
   /* ---- Artificial Boundary Variables ---- */
-//  int nreceptorFaces;      /** Number of artificial boundary faces */
+  int nreceptorFaces;      /** Number of artificial boundary faces */
   int *ftag;               /** Indices of artificial boundary faces */
   int *pointsPerFace;      /** number of receptor points per face */
   int maxPointsPerFace;    /** max of pointsPerFace vector */
 
-//  int nFacePoints; /// DEBUGGING
-//  int nCellPoints; /// DEBUGGING
+  int nFacePoints;
+  int nCellPoints;
 
   //std::unordered_set<int> overFaces; /** < List of Artificial Boundary face indices */
 
@@ -232,12 +239,6 @@ class MeshBlock
   int *pickedCart;
  	
  public :
-  int ncells; /// DEBUGGING
-  int* iblank_cell; /// DEBUGGING
-  int nreceptorCells; /// DEBUGGING
-  int nreceptorFaces; /// DEBUGGING
-  int nFacePoints; /// DEBUGGING
-  int nCellPoints; /// DEBUGGING
   int ntotalPointsCart;
   double *rxyzCart;
   int *donorIdCart;
@@ -308,7 +309,7 @@ class MeshBlock
     nsearch=0; isearch=NULL; xsearch=NULL;
     donorId=NULL; cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
-    nfringe=4;
+    nfringe=0;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;
@@ -362,7 +363,14 @@ class MeshBlock
     rcvMap.assign(rm, rm+nrecv);
   }
 
+  void setGridVelocity(double *grid_vel);
+
   void setTransform(double *mat, double* offset, int ndim);
+
+  void calcNextGrid(double dt);
+  void resetCurrentGrid(void);
+  int getIterIblanks(void);
+  void clearUnblanks(void);
 
   void search();
 
@@ -423,11 +431,11 @@ class MeshBlock
 
   void set_ninterp(int);
 
-  void getCancellationData(int *nints, int **intData);
+  void getCancellationData(int& nints, int*& intData);
 
   void cancelDonor(int irecord);
 
-  void getInterpData(int *nrecords, int **intData);
+  void getInterpData(int& nrecords, int*& donorData);
 
   void clearIblanks(void);
 

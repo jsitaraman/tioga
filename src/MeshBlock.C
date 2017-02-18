@@ -150,7 +150,8 @@ void MeshBlock::tagBoundary(void)
             for (int j = 0; j < 3; j++)
               xv[m][j] = x[i3+j];
           }
-          vol = computeCellVolume(xv, nvert);
+//          vol = computeCellVolume(xv, nvert);
+          vol = computeVolume(&xv[0][0], nvert, 3);
         }
 
         cellRes[k++] = vol;
@@ -176,67 +177,73 @@ void MeshBlock::tagBoundary(void)
     for (int k = 0; k < nnodes; k++) nodeRes[k] = userSpecifiedNodeRes[k];
   }
 
-  // compute nodal resolution as the average of
-  // all the cells associated with it. This takes care
-  // of partition boundaries as well.
+  // compute nodal resolution as the average of all the cells associated with it.
+  // This takes care of partition boundaries as well.
   for (int i = 0; i < nnodes; i++)
   {
-    if (iflag[i] != 0)  nodeRes[i] /= iflag[i];
+    if (iflag[i] != 0)
+      nodeRes[i] /= iflag[i];
     iflag[i] = 0;
   }
 
   // now tag the boundary nodes
   // reuse the iflag array
-  //tracei(nobc);
-  for (int i = 0; i < nobc; i++)
+  if (iartbnd)
   {
-    iflag[(obcnode[i]-BASE)] = 1;
+    for (int i = 0; i < nobc; i++)
+      nodeRes[obcnode[i]-BASE] = BIGVALUE;
   }
-
-  // now tag all the nodes of boundary cells
-  // to be mandatory receptors
-  for (int n = 0; n < ntypes; n++)
+  else
   {
-    int nvert = nv[n];
-    inode.resize(nvert);
-    for (int i = 0; i < nc[n]; i++)
+    for (int i = 0; i < nobc; i++)
     {
-      int itag = 0;
-      for (int m = 0; m < nvert; m++)
+      iflag[(obcnode[i]-BASE)] = 1;
+    }
+
+    // now tag all the nodes of boundary cells
+    // to be mandatory receptors
+    for (int n = 0; n < ntypes; n++)
+    {
+      int nvert = nv[n];
+      inode.resize(nvert);
+      for (int i = 0; i < nc[n]; i++)
       {
-        inode[m] = vconn[n][nvert*i+m]-BASE;
-        if (iflag[inode[m]]) itag = 1;
-      }
-      if (itag)
-      {
+        int itag = 0;
         for (int m = 0; m < nvert; m++)
         {
-          nodeRes[inode[m]]=BIGVALUE;
+          inode[m] = vconn[n][nvert*i+m]-BASE;
+          if (iflag[inode[m]]) itag = 1;
+        }
+        if (itag)
+        {
+          for (int m = 0; m < nvert; m++)
+          {
+            nodeRes[inode[m]]=BIGVALUE;
+          }
         }
       }
     }
-  }
 
-  // now tag all the cells which have
-  // mandatory receptors as nodes as not acceptable
-  // donors
-  int k = 0;
-  for (int n = 0; n < ntypes; n++)
-  {
-    int nvert = nv[n];
-    inode.resize(nvert);
-    for (int i = 0; i < nc[n]; i++)
+    // now tag all the cells which have mandatory receptors as nodes as not
+    // acceptable donors
+    int k = 0;
+    for (int n = 0; n < ntypes; n++)
     {
-      for (int m = 0; m < nvert; m++)
+      int nvert = nv[n];
+      inode.resize(nvert);
+      for (int i = 0; i < nc[n]; i++)
       {
-        inode[m] = vconn[n][nvert*i+m]-BASE;
-        if (iflag[inode[m]])
+        for (int m = 0; m < nvert; m++)
         {
-          cellRes[k]=BIGVALUE;
-          break;
+          inode[m] = vconn[n][nvert*i+m]-BASE;
+          if (iflag[inode[m]])
+          {
+            cellRes[k]=BIGVALUE;
+            break;
+          }
         }
+        k++;
       }
-      k++;
     }
   }
 }
@@ -862,6 +869,9 @@ MeshBlock::~MeshBlock()
   if (donorIdCart) free(donorIdCart);
   if (pickedCart) free(pickedCart);
   if (ctag_cart) free(ctag_cart);
+
+  delete[] x2;
+  delete[] ibc_2;
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 }

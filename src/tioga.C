@@ -146,23 +146,57 @@ void tioga::performConnectivity(void)
   doPointConnectivity();
 }
 
+void tioga::setIterIblanks(double dt, int nvar)
+{
+  // Determine blanking status for approximate grid at end of time step
+  mb->calcNextGrid(dt);
+
+  mb->preprocess();
+
+  doHoleCutting();
+
+  // Determine blanking status for current grid
+  mb->resetCurrentGrid();
+
+  mb->preprocess();
+
+  doHoleCutting();
+
+  // Determine final blanking status to use over time step
+  int nunblank = mb->getIterIblanks();
+
+  mb->calcFaceIblanks(meshcomm);
+
+  MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
+
+  if (nunblank > 0)
+  {
+    if (myid==0) printf("N UNBLANKS FOUND: %d\n",nunblank);
+    doPointConnectivity();
+
+    dataUpdate_artBnd(nvar, NULL, 0);
+
+    mb->clearUnblanks();
+  }
+}
+
 void tioga::doHoleCutting(void)
 {
-//  // Generate structured map of solid boundary (hole) locations
-//  getHoleMap();
+  // Generate structured map of solid boundary (hole) locations
+  getHoleMap();
 
   // Send/Recv the hole maps to/from all necessary ranks
   exchangeBoxes();
 
-//  // Find a list of all potential receptor points and send to all possible
-//  // donor ranks
-//  exchangeSearchData();
+  // Find a list of all potential receptor points and send to all possible
+  // donor ranks
+  exchangeSearchData();
 
-//  // Find donors for all search points (other grids' possible receptor points)
-//  mb->search();
+  // Find donors for all search points (other grids' possible receptor points)
+  mb->search();
 
-//  // Exchange found donor data and do final iblank setting
-//  exchangeDonors();
+  // Exchange found donor data and do final iblank setting
+  exchangeDonors();
 
   if (ihighGlobal)
   {
@@ -980,8 +1014,6 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 
 void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 {
-  int nunblank = 0; /// DEBUGGING
-  MPI_Allreduce(&mb->nreceptorCells, &nunblank, 1, MPI_INT, MPI_MAX, scomm);
   // initialize send and recv packets
   int nsend,nrecv;
   int *sndMap,*rcvMap;
@@ -1034,10 +1066,8 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
       resizeFringe = 0;
     }
 
-//    std::vector<double> qtmp(stride*mb->ntotalPoints);
     recv_itmp.assign(mb->ntotalPoints,0);
-if (mb->nreceptorCells>0) /// DEBUGGING
-  printf("nFringePoints %d, nUnblankPoints %d\n",mb->nFacePoints,mb->nCellPoints);
+
     for (int k = 0; k < nrecv; k++)
     {
       for (int i = 0; i < rcvVPack[k].nints; i++)
@@ -1095,17 +1125,6 @@ if (mb->nreceptorCells>0) /// DEBUGGING
   /// TODO: modify for moving grids
   // release all memory
   //pc->clearPacketsV(sndVPack, rcvVPack);
-
-  if (nunblank > 0) /// DEBUGGING
-  {
-    printf("UNBLANKING COMPLETE - Removing unblank cells\n");
-    // Remove unblank cells from interp lists
-    for (int i = 0; i < mb->ncells; i++)
-      if (mb->iblank_cell[i] == FRINGE)
-        mb->iblank_cell[i] = NORMAL;
-
-    doPointConnectivity();
-  }
 }
 #endif
 

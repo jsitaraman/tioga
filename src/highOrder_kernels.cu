@@ -23,14 +23,6 @@ void interp_u(const double* __restrict__ U_spts, double *U_out,
     sum += weights[w_ind+spt] * U_spts[u_ind + spt*sstride];
 
   U_out[ind] = sum;
-
-//  if (var == 0 && fpt == 928) printf("FACE 232: cell %d, fpt %d, rho %f\n",donors[fpt],fpt,sum);
-//  if (var == 0 && abs(sum-1.)>1e-6) printf("cell %d, fpt %d, rho %f\n",donors[fpt],fpt,sum);
-  if ((var == 0) && sum < .99)
-  {
-    printf("Interp point %d/%d: donor %d, val %f\n",fpt,nFringe,donors[fpt],sum);
-    printf("  U_spts[%d,%d] = %f\n",donors[fpt],0,U_spts[u_ind]);
-  }
 }
 
 void interp_u_wrapper(double *U_spts, double *U_out, int *donors,

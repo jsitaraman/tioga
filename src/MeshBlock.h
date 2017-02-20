@@ -77,7 +77,7 @@ class MeshBlock
   double *xtmp, *x2 = NULL;
   int *ibc_tmp, *ibc_2 = NULL;
   double *vg;
-  std::set<int> unblanks, blanks;
+  std::set<int> unblanks;
 
   int *iblank;      /** < iblank value for each grid node */
   int *iblank_cell; /** < iblank value at each grid cell */

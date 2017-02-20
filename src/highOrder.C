@@ -119,25 +119,18 @@ void MeshBlock::setGridVelocity(double *grid_vel)
   // Setup temporary buffers for performing iteration-level hole cutting
   delete[] ibc_2;
   delete[] x2;
-printf("Setting up additional moving-grid buffers! pointer = %p\n",grid_vel);
+
   ibc_2 = new int[ncells];
   x2 = new double[3*nnodes];
+
+  std::fill(ibc_2,ibc_2+ncells,NORMAL);
 }
 
 void MeshBlock::calcNextGrid(double dt)
 {
   for (int i = 0; i < nnodes; i++)
     for (int d = 0; d < 3; d++)
-    {
-//      double val = vg[3*i+d];
       x2[3*i+d] = x[3*i+d] + vg[3*i+d] * dt;
-      if (std::abs(x2[3*i+d]) > PI)
-      {
-        printf("%d: node %d: big value, dim %d: %f [x %f, v %f]\n",myid,i,d,x2[3*i+d],x[3*i+d],vg[3*i+d]);
-        printf("%d: pointer = %p\n",myid,vg);
-        exit(0);
-      }
-    }
 
   xtmp = x;
   x = x2;
@@ -155,20 +148,13 @@ void MeshBlock::resetCurrentGrid(void)
 int MeshBlock::getIterIblanks(void)
 {
   unblanks.clear();
-  blanks.clear();
 
   for (int ic = 0; ic < ncells; ic++)
   {
-    if (iblank_cell[ic] == HOLE && ibc_2[ic] == NORMAL)
+    if (iblank_cell[ic] != NORMAL && ibc_2[ic] == NORMAL)
     {
-      printf("%d: getIterIblanks: Unblank cell %d\n",myid,ic);
       unblanks.insert(ic);
-      iblank_cell[ic] = NORMAL;
-    }
-    else if (ibc_2[ic] == HOLE)
-    {
-      blanks.insert(ic);
-//      iblank_cell[ic] = HOLE;
+      iblank_cell[ic] = FRINGE;
     }
   }
 
@@ -177,10 +163,12 @@ int MeshBlock::getIterIblanks(void)
 
 void MeshBlock::clearUnblanks(void)
 {
+  for (auto & ic : unblanks)
+    iblank_cell[ic] = NORMAL;
+
+  nreceptorCells = 0;
+
   unblanks.clear();
-//  nreceptorCells = 0;
-//  nCellPoints = 0;
-//  ntotalPoints = nFacePoints;
 }
 
 // void MeshBlock::directCut(int nGroups, int* groupIDs, int* cutType, int* nGf,
@@ -837,12 +825,12 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
     if (ic2 < 0)
     {
       // Boundary or MPI face
-      iblank_face[ff] = iblank_cell[ic1];
+      iblank_face[ff] = abs(iblank_cell[ic1]);
     }
     else
     {
       // Internal face
-      int isum = iblank_cell[ic1] + iblank_cell[ic2];
+      int isum = abs(iblank_cell[ic1]) + abs(iblank_cell[ic2]);
       if (isum == HOLE+NORMAL)  // Artificial Boundary
       {
         iblank_face[ff] = FRINGE;
@@ -1742,16 +1730,7 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
     face_data_to_device(ftag, nreceptorFaces, 0, qtmp);
 
   if (nreceptorCells > 0)
-  {
     cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
-
-    for (int i = 0; i < nreceptorCells; i++)
-    {
-      if (iblank_cell[ctag[i]] == FRINGE)
-        iblank_cell[ctag[i]] = NORMAL;
-    }
-    nreceptorCells = 0;
-  }
 #else
   PUSH_NVTX_RANGE("tg_update_fringeU", 2);
   MPI_Pcontrol(1, "tioga_update_U_fpts");

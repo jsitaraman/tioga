@@ -171,8 +171,7 @@ void tioga::setIterIblanks(double dt, int nvar)
 
   if (nunblank > 0)
   {
-    if (myid==0) printf("N UNBLANKS FOUND: %d\n",nunblank);
-    doPointConnectivity();
+    doPointConnectivity(); /// TODO: just do unblank cells only, no faces
 
     dataUpdate_artBnd(nvar, NULL, 0);
 

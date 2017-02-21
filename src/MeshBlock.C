@@ -459,7 +459,7 @@ void MeshBlock::writeCellFile(int bid)
 		      vconn[n][nvert*i+5]+ba,
 		      vconn[n][nvert*i+5]+ba);
 	    }
-	  else if (nvert==8)
+    else if (nvert>=8)
 	    {
 	      fprintf(fp,"%d %d %d %d %d %d %d %d\n",
 		      vconn[n][nvert*i]+ba,

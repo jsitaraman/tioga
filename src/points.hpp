@@ -60,12 +60,14 @@ struct point
       z = 0;
   }
 
+  inline
   void zero() {
     x = 0;
     y = 0;
     z = 0;
   }
 
+  inline
   double& operator[](int ind) {
     switch(ind) {
       case 0:
@@ -80,6 +82,7 @@ struct point
     }
   }
 
+  inline
   double operator[](int ind) const {
     switch(ind) {
       case 0:

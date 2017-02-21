@@ -201,7 +201,7 @@ void tioga::doHoleCutting(void)
   {
     // Calculate cell iblank values from nodal iblank values
     mb->getCellIblanks(meshcomm);
-    //directCut(); /// TODO: complete a working version
+//    directCut(); /// TODO: complete a working version
 
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {
@@ -377,6 +377,10 @@ void tioga::directCut(void)
 
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
+
+  mb->writeCellFile(mytag); /// DEBUGGING
+  MPI_Barrier(scomm);
+  exit(0); /// DEBUGGING
 }
 
 //{

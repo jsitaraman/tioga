@@ -354,13 +354,8 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
   else
     cutMap.flag.assign(ncells,DC_UNASSIGNED);
 
-  std::unordered_set<int> cellList;
-
-#ifdef FILL_QUEUE
+  std::unordered_set<int> cellList, checked_cells;
   std::set<int> paintQueue;
-#endif
-
-  printf("NCUT = %d\n",nCut);
 
   double bbox[6];
   std::vector<double> xv(nv[0]*nDims);
@@ -368,9 +363,10 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
   int nvert = nv[0];
   int nface = nDims*2;
   double tol = 1e-6;
-printf("%d: Starting DirectCut type %d on %d faces\n",myid,cutType,nCut);
+
   for (int ff = 0; ff < nCut; ff++)
   {
+    checked_cells.clear();
     cellList.clear();
 
     if (rrot)
@@ -381,13 +377,13 @@ printf("%d: Starting DirectCut type %d on %d faces\n",myid,cutType,nCut);
     // Find all cells that the cutting face might pass through
     adt->searchADT_box(elementList, cellList, bbox);
 
-  printf("found %d cells for face %d\n", (int)cellList.size(), ff);
     // Check each cell to determine if the face intersects it
     for (auto ic : cellList)
     {
-//      printf("IC = %d\n",ic);
-      if (cutMap.flag[ic] != DC_CUT) // If not already found to be cut
+      if (cutMap.flag[ic] != DC_CUT && !checked_cells.count(ic)) // If not already found to be cut
       {
+        checked_cells.insert(ic);
+
         // Load up the cell nodes into an array
         for (int i = 0; i < nvert; i++)
           for (int d = 0; d < nDims; d++)
@@ -395,80 +391,71 @@ printf("%d: Starting DirectCut type %d on %d faces\n",myid,cutType,nCut);
 
         // Find distance from face to cell
         Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
-//printf("distance from cell %d to cutFace %d is %.3e\n",ic,ff,vec.norm());
-//exit(0);
 
         if (vec.norm() == 0.) // They intersect
         {
           cutMap.flag[ic] = DC_CUT;
-#ifdef FILL_QUEUE
           paintQueue.insert(ic);
-#endif
-
-          // Check all neighboring elements and assign status
-          for (int j = 0; j < nface; j++)
-          {
-            int ic2 = c2c[nface*ic+j];
-            if (ic2 >= 0 and cutMap.flag[ic2] != DC_CUT)
-            {
-//              printf("IC2 = %d\n",ic2);
-              for (int i = 0; i < nvert; i++)
-                for (int d = 0; d < nDims; d++)
-                  xv[nDims*i+d] = x[nDims*vconn[0][ic2*nvert+i]+d];
-
-              if (ic2 == 787)
-              {
-                for (int i = 0; i < nvert; i++)
-                  printf("Element node %d: %f  %f  %f\n",i,xv[3*i+0],xv[3*i+1],xv[3*i+2]);
-
-                for (int i = 0; i < 4; i++)
-                  printf("Face node %d: %f  %f  %f\n",i,cutFaces[ff*stride+3*i+0],cutFaces[ff*stride+3*i+1],cutFaces[ff*stride+3*i+2]);
-              }
-
-              vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
-//              printf("distance from cell %d to cutFace %d is %.3e\n",ic2,ff,vec.norm());
-              double dist = vec.norm();
-
-              if (dist == 0)
-              {
-                cutMap.flag[ic2] = DC_CUT;
-              }
-              else if (cutMap.flag[ic2] == DC_UNASSIGNED or dist < cutMap.dist[ic2] - tol)
-              {
-                // Unflagged cell, or have a closer face to use
-                cutMap.dist[ic2] = dist;
-                cutMap.norm[ic2] = faceNormal(&cutFaces[ff*stride], nDims);
-                cutMap.nMin[ic2] = 1;
-
-                if (cutMap.norm[ic2] * vec > 0)
-                  cutMap.flag[ic2] = DC_HOLE; // outwards normal = inside hole
-                else
-                  cutMap.flag[ic2] = DC_NORMAL;
-              }
-              else if (std::abs(dist-cutMap.dist[ic2]) < tol)
-              {
-                // Same dist. to two faces; avg. their normals to decide
-                Vec3 norm = faceNormal(&cutFaces[ff*stride], nDims);
-
-                int N = cutMap.nMin[ic2];
-                for (int d = 0; d < nDims; d++)
-                  cutMap.norm[ic2][d] = (N*cutMap.norm[ic2][d] + norm[d])
-                      / (N + 1.);
-                cutMap.nMin[ic2]++;
-
-                if (cutMap.norm[ic2] * vec > 0)
-                  cutMap.flag[ic2] = DC_HOLE;
-                else
-                  cutMap.flag[ic2] = DC_NORMAL;
-              }
-            }
-          }
         }
+      }
 
+      if (cutMap.flag[ic] == DC_CUT)
+      {
+        // Check all neighboring elements and assign status
+        for (int j = 0; j < nface; j++)
+        {
+          int ic2 = c2c[nface*ic+j];
+          if (checked_cells.count(ic2)) continue;
+          checked_cells.insert(ic2);
+
+          if (ic2 >= 0 && cutMap.flag[ic2] != DC_CUT)
+          {
+            for (int i = 0; i < nvert; i++)
+              for (int d = 0; d < nDims; d++)
+                xv[nDims*i+d] = x[nDims*vconn[0][ic2*nvert+i]+d];
+
+            Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+            double dist = vec.norm();
+
+            if (dist == 0)
+            {
+              cutMap.flag[ic2] = DC_CUT;
+            }
+            else if (cutMap.flag[ic2] == DC_UNASSIGNED || dist < (cutMap.dist[ic2] - tol))
+            {
+              // Unflagged cell, or have a closer face to use
+              cutMap.dist[ic2] = dist;
+              cutMap.norm[ic2] = faceNormal(&cutFaces[ff*stride], nDims);
+              cutMap.nMin[ic2] = 1;
+
+              if (cutMap.norm[ic2] * vec < 0) /// TODO: decide on standard orientation
+                cutMap.flag[ic2] = DC_HOLE; // outwards normal = inside hole
+              else
+                cutMap.flag[ic2] = DC_NORMAL;
+            }
+            else if (std::abs(dist-cutMap.dist[ic2]) < tol)
+            {
+              // Same dist. to two faces; avg. their normals to decide
+              Vec3 norm = faceNormal(&cutFaces[ff*stride], nDims);
+
+              int N = cutMap.nMin[ic2];
+              for (int d = 0; d < nDims; d++)
+                cutMap.norm[ic2][d] = (N*cutMap.norm[ic2][d] + norm[d]) / (N + 1.);
+              cutMap.nMin[ic2]++;
+
+              if (cutMap.norm[ic2] * vec < 0) /// TODO: decide on standard orientation
+                cutMap.flag[ic2] = DC_HOLE;
+              else
+                cutMap.flag[ic2] = DC_NORMAL;
+            }
+
+            paintQueue.insert(ic2);
+          }
+
+        }
       }
     }
 
-//    exit(0); /// DEBUGGING
   }
 
   // Now paint-fill the remainder of the grid based upon the cutting boundary
@@ -514,45 +501,47 @@ printf("%d: Starting DirectCut type %d on %d faces\n",myid,cutType,nCut);
 
   // ----- Queue version -----
 #ifdef FILL_QUEUE
-  for (int ic = 0; ic < ncells; ic++)
-  {
-    if (cutMap.flag[ic] == DC_CUT)
-      cutMap.flag[ic] = DC_HOLE;
-    else
-      cutMap.flag[ic] = DC_NORMAL;
-  } /// DEBUGGING
-//  while (paintQueue.size() > 0)
+//  for (int ic = 0; ic < ncells; ic++)
 //  {
-//    for (auto ic : paintQueue)
-//    {
-//      paintQueue.erase(ic);
+//    if (cutMap.flag[ic] == DC_CUT)
+//      cutMap.flag[ic] = DC_HOLE;
+//    else
+//      cutMap.flag[ic] = DC_NORMAL;
+//  } /// DEBUGGING
 
-//      if (ic < 0) continue;
+  while (paintQueue.size() > 0)
+  {
+    for (auto ic : paintQueue)
+    {
+      paintQueue.erase(ic);
 
-//      if (cutMap.flag[ic] == DC_CUT)
-//      {
-//        if (cutType == 1) // Solid-boundary surface
-//          cutMap.flag[ic] = DC_HOLE;
-//        else              // Overset-boundary surface for background grid
-//          cutMap.flag[ic] = DC_NORMAL;
-//      }
+      if (ic < 0) continue;
 
-//      for (int j = 0; j < nface; j++)
-//      {
-//        int ic2 = c2c[nface*ic+j];
-//        if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
-//        {
-//          cutMap.flag[ic2] = cutMap.flag[ic];
-//          paintQueue.insert(ic2);
-//        }
-//      }
-//    }
-//  }
+      if (cutMap.flag[ic] == DC_CUT)
+      {
+        if (cutType == 1) // Solid-boundary surface
+          cutMap.flag[ic] = DC_HOLE;
+        else              // Overset-boundary surface for background grid
+          cutMap.flag[ic] = DC_NORMAL;
+      }
+
+      for (int j = 0; j < nface; j++)
+      {
+        int ic2 = c2c[nface*ic+j];
+        if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
+        {
+          cutMap.flag[ic2] = cutMap.flag[ic];
+          paintQueue.insert(ic2);
+        }
+      }
+    }
+  }
 #endif
 }
 
 void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
 {
+  int nhole = 0; /// DEBUGGING
   for (int ic = 0; ic < ncells; ic++)
   {
     iblank_cell[ic] = NORMAL;
@@ -562,12 +551,13 @@ void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
 
       if (cutMap[g].flag[ic] == DC_HOLE)
       {
-        printf("%d: hole cell %d\n",myid,ic);
         iblank_cell[ic] = HOLE;
+        nhole++;
         break;
       }
     }
   }
+  printf("%d: Final # of hole cells = %d\n",myid,nhole);
 }
 
 int get_cell_type(int* nc, int ntypes, int ic_in)

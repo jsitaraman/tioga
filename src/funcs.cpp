@@ -38,6 +38,12 @@
 static std::map<int, std::vector<int>> gmsh_maps_hex;
 static std::map<int, std::vector<int>> gmsh_maps_quad;
 
+std::vector<double> xlist;
+std::vector<double> lag_i, lag_j, lag_k;
+std::vector<double> dlag_i, dlag_j, dlag_k;
+
+std::vector<int> ijk2gmsh;
+
 #define TOL 1e-10
 
 namespace tg_funcs
@@ -137,6 +143,53 @@ double det_4x4(const double* mat)
   return det_4x4_part(mat,0,1,2,3) - det_4x4_part(mat,0,2,1,3)
       + det_4x4_part(mat,0,3,1,2) + det_4x4_part(mat,1,2,0,3)
       - det_4x4_part(mat,1,3,0,2) + det_4x4_part(mat,2,3,0,1);
+}
+
+void adjoint_3x3(double *mat, double *adj)
+{
+  double a11 = mat[0], a12 = mat[1], a13 = mat[2];
+  double a21 = mat[3], a22 = mat[4], a23 = mat[5];
+  double a31 = mat[6], a32 = mat[7], a33 = mat[8];
+
+  adj[0] = a22*a33 - a23*a32;
+  adj[1] = a13*a32 - a12*a33;
+  adj[2] = a12*a23 - a13*a22;
+
+  adj[3] = a23*a31 - a21*a33;
+  adj[4] = a11*a33 - a13*a31;
+  adj[5] = a13*a21 - a11*a23;
+
+  adj[6] = a21*a32 - a22*a31;
+  adj[7] = a12*a31 - a11*a32;
+  adj[8] = a11*a22 - a12*a21;
+}
+
+void adjoint_4x4(double *mat, double *adj)
+{
+  double a11 = mat[0],  a12 = mat[1],  a13 = mat[2],  a14 = mat[3];
+  double a21 = mat[4],  a22 = mat[5],  a23 = mat[6],  a24 = mat[7];
+  double a31 = mat[8],  a32 = mat[9],  a33 = mat[10], a34 = mat[11];
+  double a41 = mat[12], a42 = mat[13], a43 = mat[14], a44 = mat[15];
+
+  adj[0] = -a24*a33*a42 + a23*a34*a42 + a24*a32*a43 - a22*a34*a43 - a23*a32*a44 + a22*a33*a44;
+  adj[1] =  a14*a33*a42 - a13*a34*a42 - a14*a32*a43 + a12*a34*a43 + a13*a32*a44 - a12*a33*a44;
+  adj[2] = -a14*a23*a42 + a13*a24*a42 + a14*a22*a43 - a12*a24*a43 - a13*a22*a44 + a12*a23*a44;
+  adj[3] =  a14*a23*a32 - a13*a24*a32 - a14*a22*a33 + a12*a24*a33 + a13*a22*a34 - a12*a23*a34;
+
+  adj[4] =  a24*a33*a41 - a23*a34*a41 - a24*a31*a43 + a21*a34*a43 + a23*a31*a44 - a21*a33*a44;
+  adj[5] = -a14*a33*a41 + a13*a34*a41 + a14*a31*a43 - a11*a34*a43 - a13*a31*a44 + a11*a33*a44;
+  adj[6] =  a14*a23*a41 - a13*a24*a41 - a14*a21*a43 + a11*a24*a43 + a13*a21*a44 - a11*a23*a44;
+  adj[7] = -a14*a23*a31 + a13*a24*a31 + a14*a21*a33 - a11*a24*a33 - a13*a21*a34 + a11*a23*a34;
+
+  adj[8] = -a24*a32*a41 + a22*a34*a41 + a24*a31*a42 - a21*a34*a42 - a22*a31*a44 + a21*a32*a44;
+  adj[9] =  a14*a32*a41 - a12*a34*a41 - a14*a31*a42 + a11*a34*a42 + a12*a31*a44 - a11*a32*a44;
+  adj[10]= -a14*a22*a41 + a12*a24*a41 + a14*a21*a42 - a11*a24*a42 - a12*a21*a44 + a11*a22*a44;
+  adj[11]=  a14*a22*a31 - a12*a24*a31 - a14*a21*a32 + a11*a24*a32 + a12*a21*a34 - a11*a22*a34;
+
+  adj[12]=  a23*a32*a41 - a22*a33*a41 - a23*a31*a42 + a21*a33*a42 + a22*a31*a43 - a21*a32*a43;
+  adj[13]= -a13*a32*a41 + a12*a33*a41 + a13*a31*a42 - a11*a33*a42 - a12*a31*a43 + a11*a32*a43;
+  adj[14]=  a13*a22*a41 - a12*a23*a41 - a13*a21*a42 + a11*a23*a42 + a12*a21*a43 - a11*a22*a43;
+  adj[15]= -a13*a22*a31 + a12*a23*a31 + a13*a21*a32 - a11*a23*a32 - a12*a21*a33 + a11*a22*a33;
 }
 
 std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size)
@@ -635,6 +688,11 @@ std::vector<uint> get_int_list(uint N, uint start)
   return list;
 }
 
+std::vector<double> shape;
+std::vector<double> dshape;
+std::vector<double> grad;
+std::vector<double> ginv;
+
 bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, int nDims)
 {
   // First, do a quick check to see if the point is even close to being in the element
@@ -644,12 +702,13 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
   xmax = ymax = zmax = -1e15;
   double eps = 1e-10;
 
-  std::vector<double> box(6);
-  getBoundingBox(xv, nNodes, nDims, box.data());
+  double box[6];
+  getBoundingBox(xv, nNodes, nDims, box);
   xmin = box[0];  ymin = box[1];  zmin = box[2];
   xmax = box[3];  ymax = box[4];  zmax = box[5];
 
   point pos = point(in_xyz);
+  /* --- Want the closest reference location to the given point, so don't just give up --- */
 //  if (pos.x < xmin-eps || pos.y < ymin-eps || pos.z < zmin-eps ||
 //      pos.x > xmax+eps || pos.y > ymax+eps || pos.z > zmax+eps) {
 //    // Point does not lie within cell - return an obviously bad ref position
@@ -664,14 +723,15 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 //  double tol = 1e-12*h;
   double tol = 1e-10*h;
 
-  std::vector<double> shape(nNodes);
-  std::vector<double> dshape(nNodes*nDims);
-  std::vector<double> grad(nDims*nDims);
-  std::vector<double> ginv(nDims*nDims);
+  shape.resize(nNodes);
+  dshape.resize(nNodes*nDims);
+  grad.resize(nDims*nDims);
+  ginv.resize(nDims*nDims);
 
   int iter = 0;
   int iterMax = 20;
   double norm = 1;
+  double norm_prev = 2;
 
   // Starting location: {0,0,0}
   for (int i = 0; i < nDims; i++) out_rst[i] = 0;
@@ -700,7 +760,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 
     double detJ = determinant(grad,nDims);
 
-    adjoint(grad,ginv,nDims);
+    adjoint_3x3(grad.data(),ginv.data());
 
     double delta[3] = {0,0,0};
     for (int i=0; i<nDims; i++)
@@ -708,10 +768,13 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
         delta[i] += ginv[i*nDims+j]*dx[j]/detJ;
 
     norm = dx.norm();
-    for (int i = 0; i < nDims; i++) /// DEBUGGING DIRECT_CUT
-      loc[i] += .8*delta[i];
-//    for (int i=0; i<nDims; i++)
-//      loc[i] = std::max(std::min(loc[i]+delta[i],1.01),-1.01);
+    for (int i=0; i<nDims; i++)
+      loc[i] = std::max(std::min(loc[i]+delta[i],1.01),-1.01);
+
+    if (iter > 1 && norm > .99*norm_prev) // If it's clear we're not converging
+      break;
+
+    norm_prev = norm;
 
     iter++;
   }
@@ -719,7 +782,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
   for (int i = 0; i < nDims; i++)
     out_rst[i] = loc[i];
 
-  if (std::max( std::abs(loc[0]), std::max( std::abs(loc[1]), std::abs(loc[2]) ) ) <= 1. + 1e-10)
+  if (std::max( std::abs(loc[0]), std::max( std::abs(loc[1]), std::abs(loc[2]) ) ) <= 1.+eps)
     return true;
   else
     return false;
@@ -866,17 +929,21 @@ void shape_quad(const point &in_rs, double* out_shape, int nNodes)
   if (nSide*nSide != nNodes)
     FatalError("For Lagrange quad of order N, must have (N+1)^2 shape points.");
 
-  std::vector<double> xlist(nSide);
-  double dxi = 2./(nSide-1);
+  if (xlist.size() != nSide)
+  {
+    xlist.resize(nSide);
+    double dxi = 2./(nSide-1);
 
-  for (int i=0; i<nSide; i++)
-    xlist[i] = -1. + i*dxi;
+    for (int i=0; i<nSide; i++)
+      xlist[i] = -1. + i*dxi;
+  }
 
   int nLevels = nSide / 2;
   int isOdd = nSide % 2;
 
   // Pre-compute Lagrange values to avoid redundant calculations
-  std::vector<double> lag_i(nSide), lag_j(nSide);
+  lag_i.resize(nSide);
+  lag_j.resize(nSide);
   for (int i = 0; i < nSide; i++)
   {
     lag_i[i] = Lagrange(xlist,  xi, i);
@@ -957,16 +1024,22 @@ void shape_hex(const point &in_rst, double* out_shape, int nNodes)
       ThrowException("For Lagrange hex of order N, must have (N+1)^3 shape points.");
     }
 
-    std::vector<double> xlist(nSide);
-    double dxi = 2./(nSide-1);
+    if (xlist.size() != nSide)
+    {
+      xlist.resize(nSide);
+      double dxi = 2./(nSide-1);
 
-    for (int i=0; i<nSide; i++)
-      xlist[i] = -1. + i*dxi;
+      for (int i=0; i<nSide; i++)
+        xlist[i] = -1. + i*dxi;
+    }
 
-    auto ijk2gmsh = structured_to_gmsh_hex(nNodes);
+    if (ijk2gmsh.size() != nNodes)
+      ijk2gmsh = structured_to_gmsh_hex(nNodes);
 
     // Pre-compute Lagrange function values to avoid redundant calculations
-    std::vector<double> lag_i(nSide), lag_j(nSide), lag_k(nSide);
+    lag_i.resize(nSide);
+    lag_j.resize(nSide);
+    lag_k.resize(nSide);
 
 #pragma omp parallel for
     for (int i = 0; i < nSide; i++)
@@ -1000,11 +1073,14 @@ void dshape_quad(const point &in_rs, double* out_dshape, int nNodes)
   if (nSide*nSide != nNodes)
     FatalError("For Lagrange quad of order N, must have (N+1)^2 shape points.");
 
-  std::vector<double> xlist(nSide);
-  double dxi = 2./(nSide-1);
+  if (xlist.size() != nSide)
+  {
+    xlist.resize(nSide);
+    double dxi = 2./(nSide-1);
 
-  for (int i=0; i<nSide; i++)
-    xlist[i] = -1. + i*dxi;
+    for (int i=0; i<nSide; i++)
+      xlist[i] = -1. + i*dxi;
+  }
 
   int nLevels = nSide / 2;
   int isOdd = nSide % 2;
@@ -1096,17 +1172,25 @@ void dshape_hex(const point &in_rst, double* out_dshape, int nNodes)
     if (nSide*nSide*nSide != nNodes)
       ThrowException("For Lagrange hex of order N, must have (N+1)^3 shape points.");
 
-    std::vector<double> xlist(nSide);
-    double dxi = 2./(nSide-1);
+    if (xlist.size() != nSide)
+    {
+      xlist.resize(nSide);
+      double dxi = 2./(nSide-1);
 
-    for (int i=0; i<nSide; i++)
-      xlist[i] = -1. + i*dxi;
+      for (int i=0; i<nSide; i++)
+        xlist[i] = -1. + i*dxi;
+    }
 
-    auto ijk2gmsh = structured_to_gmsh_hex(nNodes);
+    if (ijk2gmsh.size() != nNodes)
+      ijk2gmsh = structured_to_gmsh_hex(nNodes);
 
     // Pre-compute Lagrange function values to save redundant calculations
-    std::vector<double>  lag_i(nSide),  lag_j(nSide),  lag_k(nSide);
-    std::vector<double> dlag_i(nSide), dlag_j(nSide), dlag_k(nSide);
+    lag_i.resize(nSide);
+    lag_j.resize(nSide);
+    lag_k.resize(nSide);
+    dlag_i.resize(nSide);
+    dlag_j.resize(nSide);
+    dlag_k.resize(nSide);
 
 #pragma omp parallel for
     for (int i = 0; i < nSide; i++)
@@ -1254,18 +1338,6 @@ double constraintFunc(const std::vector<double> &refLoc)
 
 Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
 {
-//  printf("Element nodes:\n");
-//  for (int i = 0; i < nev; i++)
-//  {
-//    printf("%d: %f %f %f\n",i,exv[3*i],exv[3*i+1],exv[3*i+2]);
-//  }
-
-//  printf("\nFace nodes:\n");
-//  for (int i = 0; i < nfv; i++)
-//  {
-//    printf("%d: %f %f %f\n",i,fxv[3*i],fxv[3*i+1],fxv[3*i+2]);
-//  }
-
   std::vector<double> shapeC(nev), shapeF(nfv);
 
   int num_evals = 0;
@@ -1293,19 +1365,12 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
 
   NM_FVAL mini;
   if (nDims == 2)
-    mini = NelderMead_constrained({0}, minFunc, constraintFunc, .75);
+    mini = NelderMead_constrained<1>({0}, minFunc, constraintFunc, .75);
   else
-    mini = NelderMead_constrained({0,0}, minFunc, constraintFunc, .3);
+    mini = NelderMead_constrained<2>({0,0}, minFunc, constraintFunc, .3);
 
   if (mini.f < eps)
   {
-    for (int i = 0; i < nev; i++)
-      if (exv[3*i+0] < -.08)
-      {
-        printf("This element should not intersect, but it did!\n");
-        break;
-      }
-
     return Vec3(0,0,0);
   }
   else

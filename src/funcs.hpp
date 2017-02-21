@@ -71,6 +71,9 @@ double Lagrange(std::vector<double> &x_lag, double y, uint mode);
 /*! Evaluate the first derivative of the 1D Lagrange polynomial mode based on points x_lag at point y */
 double dLagrange(std::vector<double> &x_lag, double y, uint mode);
 
+void adjoint_3x3(double *mat, double *adj);
+void adjoint_4x4(double *mat, double *adj);
+
 /*! Calculate the adjoint of a 'size x size' matrix stored row-major in 'mat' */
 std::vector<double> adjoint(const std::vector<double> &mat, unsigned int size);
 
@@ -214,6 +217,16 @@ inline unsigned getIndAbsMax(const std::vector<double> &vec)
   return ind;
 }
 
+/*! ----------------------------------- Optimization Routines ----------------------------------- */
+
+static std::vector<double> Xn;  // Point with the highest value of F
+static std::vector<double> X0;  // Centroid of all other points
+static std::vector<double> Xr;  // Reflected point
+static std::vector<double> Xe;  // Expanded point
+static std::vector<double> Xc;  // Contracted point
+
+static std::vector<double> Dx;
+
 /*!
  * Nelder-Mead Minimzation Routine
  *
@@ -265,11 +278,11 @@ NM_FVAL NelderMead(const std::vector<double> &U0, Func minFunc, double L = 1.)
 
   std::sort(FX.begin(),FX.end());
 
-  std::vector<double> Xn(nVars);  // Point with the highest value of F
-  std::vector<double> X0(nVars);  // Centroid of all other points
-  std::vector<double> Xr(nVars);  // Reflected point
-  std::vector<double> Xe(nVars);  // Expanded point
-  std::vector<double> Xc(nVars);  // Contracted point
+  Xn.resize(nVars);  // Point with the highest value of F
+  X0.resize(nVars);  // Centroid of all other points
+  Xr.resize(nVars);  // Reflected point
+  Xe.resize(nVars);  // Expanded point
+  Xc.resize(nVars);  // Contracted point
 
   // Use a relative tolerance...?
   double tol = 1e-8;
@@ -353,13 +366,13 @@ NM_FVAL NelderMead(const std::vector<double> &U0, Func minFunc, double L = 1.)
  *            std::vector<double> and returning a double
  * \param[in] G: Constraint function of form G(x) < 0
  */
-template<typename MinFunc, typename Constraint>
+template<int nVars, typename MinFunc, typename Constraint>
 NM_FVAL NelderMead_constrained(const std::vector<double> &U0,
     MinFunc minFunc, Constraint G, double L = 1.)
 {
   /// TODO: Optimize the crap out of this
 
-  int nVars = U0.size();
+//  int nVars = U0.size();
   int nPts = nVars+1;
   std::vector<NM_FVAL> FX(nPts);
 
@@ -403,13 +416,13 @@ NM_FVAL NelderMead_constrained(const std::vector<double> &U0,
 
   std::sort(FX.begin(),FX.end());
 
-  std::vector<double> Xn(nVars);  // Point with the highest value of F
-  std::vector<double> X0(nVars);  // Centroid of all other points
-  std::vector<double> Xr(nVars);  // Reflected point
-  std::vector<double> Xe(nVars);  // Expanded point
-  std::vector<double> Xc(nVars);  // Contracted point
+  Xn.resize(nVars);  // Point with the highest value of F
+  X0.resize(nVars);  // Centroid of all other points
+  Xr.resize(nVars);  // Reflected point
+  Xe.resize(nVars);  // Expanded point
+  Xc.resize(nVars);  // Contracted point
 
-  std::vector<double> Dx(nVars);
+  Dx.resize(nVars);
 
   // Use a relative tolerance...?
   double tol = 1e-8;

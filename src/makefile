@@ -26,6 +26,7 @@ SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/
 ifeq ($(strip $(CUDA)),YES)
 	CFLAGS += -D_GPU
 	CUFLAGS += -D_GPU
+	SFLAGS += -D_GPU
 	LIBS += -L$(strip $(CUDA_LIB_DIR))/ -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_LIB_DIR))/
 ifeq ($(strip $(CU_SM)),)
 	CUFLAGS += -arch=sm_20

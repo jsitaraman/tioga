@@ -61,5 +61,6 @@ HEADERS += \
     points.hpp \
     tioga.h \
     cuda_funcs.h \
-    tiogaInterface.h
+    tiogaInterface.h \
+    tioga.i
 

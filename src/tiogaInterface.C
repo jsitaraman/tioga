@@ -314,8 +314,11 @@ extern "C" {
     free(fconn);
    }
 
-  void tioga_set_stream_handle(cudaStream_t stream, cudaEvent_t event)
+  void tioga_set_stream_handle(void* stream, void* event)
   {
-    tg->set_stream_handle(stream, event);
+#ifdef _GPU
+    // Using void*'s for the sake of a build-independent wrapping interface
+    tg->set_stream_handle(*(cudaStream_t*)stream, *(cudaEvent_t*)event);
+#endif
   }
 }

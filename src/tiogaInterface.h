@@ -114,7 +114,7 @@ void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 
 void tioga_delete_(void);
 
-#ifdef _GPU
-void tioga_set_stream_handle(cudaStream_t stream, cudaEvent_t event);
-#endif
+//! For GPU-based interpolation, pointers to the CUDA stream & event to use
+void tioga_set_stream_handle(void* stream, void* event);
+
 } /* extern "C" */

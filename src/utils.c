@@ -174,7 +174,7 @@ int checkHoleMap(double *x,int *nx,int *sam,double *extents)
   int mm;
   double dx[3];
   int ix[3];
-
+  if (sam==NULL) return 0;
   for(i=0;i<3;i++) dx[i]=(extents[i+3]-extents[i])/nx[i];
   for(i=0;i<3;i++) 
     {

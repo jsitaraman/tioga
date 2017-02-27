@@ -21,9 +21,11 @@
 extern "C" 
 { 
   void fillHoleMap(int *holeMap, int ix[3],int isym);
+  int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
+			double vB[3][3],double xB[3],double dxB[3]);			   
 
 };
-
+# define NSAM 64
 /**
  * Create hole maps for all grids
  * this routine is not efficient
@@ -47,19 +49,73 @@ void tioga::getHoleMap(void)
   FILE *fp;
   char fname[80];
   char intstring[7];
- //
- // get the local bounding box
- //
- mb->getWallBounds(&meshtag,&existWall,wbox);
- MPI_Allreduce(&meshtag,&maxtag,1,MPI_INT,MPI_MAX,scomm);
- //
+  //
+  int itag,iflag,nb,anyval,recvmeshtag;
+  int nsend,nrecv;
+  int *proc2meshtagmap,*meshtag2procmap,*meshtagcft;
+  int *commcount,*commcountGlobal;
+  int *procListRecv,*procListSend,*blockmap;
+  OBB wobb;
+  PACKET *sndPack,*rcvPack;
+  MPI_Request *mpirequest;
+  MPI_Status *mpistatus;
+  MPI_Status status2,status3;
+  //
+  proc2meshtagmap=(int *)malloc(sizeof(int)*pc->numprocs);
+  commcount=(int *)malloc(sizeof(int)*pc->numprocs);
+  meshtag2procmap=(int *)malloc(sizeof(int)*pc->numprocs);
+  //
+  mb->getWallBounds(&meshtag,&existWall,wbox);
+  MPI_Allgather(&meshtag,1,MPI_INT,proc2meshtagmap,1,MPI_INT,scomm);
+  maxtag=0;
+  for(i=0;i<pc->numprocs;i++) maxtag=max(maxtag,proc2meshtagmap[i]);
+  //
+  meshtagcft=(int *)malloc(sizeof(int)*(maxtag+1));
+  commcount=(int *)malloc(sizeof(int)*(maxtag+1));
+  blockmap=(int *)malloc(sizeof(int)*maxtag);
+  //
+  // invert the map now
+  //
+  for(i=0;i<maxtag+1;i++) {
+    meshtagcft[i]=0;
+    commcount[i]=0;
+  }
+  for(i=0;i<pc->numprocs;i++)
+      meshtagcft[proc2meshtagmap[i]+1]++;
+  for(i=1;i<maxtag+1;i++)
+      meshtagcft[i]=meshtagcft[i]+meshtagcft[i-1];
+  for(i=0;i<pc->numprocs;i++)
+    {
+      itag=proc2meshtagmap[i];
+      meshtag2procmap[meshtagcft[itag]+commcount[itag]]=i;
+      commcount[itag]++;
+    }
+  free(commcount);
+  //
+  commcount=(int *)malloc(sizeof(int)*pc->numprocs);
+  commcountGlobal=(int *)malloc(sizeof(int)*pc->numprocs);
+  procListRecv=(int *)malloc(sizeof(int)*pc->numprocs);
+  //
+  for(i=0;i<pc->numprocs;i++) {
+    commcount[i]=0;
+    commcountGlobal[i]=0;
+  }
+  //
+  //
+  // get the local bounding box
+  //  
  if (holeMap) 
    {
      for(i=0;i<nmesh;i++)
-       if (holeMap[i].existWall) free(holeMap[i].sam);
+       if (holeMap[i].existWall) \
+	 {
+	   if (holeMap[i].sam) free(holeMap[i].sam);
+	 }
      delete [] holeMap;
    }
  holeMap=new HOLEMAP[maxtag];
+ for(i=0;i<maxtag;i++)
+   holeMap[i].sam=NULL;
  //
  existHoleLocal=(int *)malloc(sizeof(int)*maxtag);
  existHole=(int *)malloc(sizeof(int)*maxtag);
@@ -79,7 +135,6 @@ void tioga::getHoleMap(void)
  for(i=0;i<3*maxtag;i++) bboxLocal[i+3*maxtag]=-BIGVALUE;
  for(i=0;i<3*maxtag;i++) bboxGlobal[i]=BIGVALUE;
  for(i=0;i<3*maxtag;i++) bboxGlobal[i+3*maxtag]=-BIGVALUE;
-
  //
  for(i=0;i<3;i++)
    {
@@ -93,12 +148,21 @@ void tioga::getHoleMap(void)
  MPI_Allreduce(bboxLocal,bboxGlobal,3*maxtag,MPI_DOUBLE,MPI_MIN,scomm);
  MPI_Allreduce(&(bboxLocal[3*maxtag]),&(bboxGlobal[3*maxtag]),3*maxtag,MPI_DOUBLE,MPI_MAX,scomm);
  //
- // find the bounding box for each mesh
- // from the globally reduced data
+ // test bounding boxes against OBB for 
+ // possible intersection
  //
+ wobb.vec[0][0]=1;wobb.vec[0][1]=0;wobb.vec[0][2]=0;
+ wobb.vec[1][0]=0;wobb.vec[1][1]=1;wobb.vec[1][2]=0;
+ wobb.vec[2][0]=0;wobb.vec[2][1]=0;wobb.vec[2][2]=1;
+ //
+ // figure out who may have a wall box that
+ // the local mesh block has intersection with
+ // and set comm patterns for those.
+ //
+ nrecv=nb=0;
  for(i=0;i<maxtag;i++)
    {
-     if (holeMap[i].existWall) 
+     if (holeMap[i].existWall && i!=meshtag-1)
        {
 	 for(j=0;j<3;j++)
 	   {
@@ -108,19 +172,65 @@ void tioga::getHoleMap(void)
 	   }	 
 	 dsmax=max(ds[0],ds[1]);
 	 dsmax=max(dsmax,ds[2]);	 
-	 dsbox=dsmax/64;
-	 
+	 dsbox=dsmax/NSAM;	 
 	 for(j=0;j<3;j++)
 	   {
 	     holeMap[i].extents[j]-=(2*dsbox);
 	     holeMap[i].extents[j+3]+=(2*dsbox);
 	     holeMap[i].nx[j]=floor(max((holeMap[i].extents[j+3]-holeMap[i].extents[j])/dsbox,1));
+	     wobb.xc[j]=(holeMap[i].extents[j+3]+holeMap[i].extents[j])*0.5;
+	     wobb.dxc[j]=(holeMap[i].extents[j+3]-holeMap[i].extents[j])*0.5;
 	   }
-	 bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
-	 holeMap[i].sam=(int *)malloc(sizeof(int)*bufferSize);
-	 holeMap[i].samLocal=(int *)malloc(sizeof(int)*bufferSize);	 
-	 for(j=0;j<bufferSize;j++) holeMap[i].sam[j]=holeMap[i].samLocal[j]=0;
+	 	 	 
+	 if ( obbIntersectCheck(mb->obb->vec,mb->obb->xc,mb->obb->dxc,
+				wobb.vec,wobb.xc,wobb.dxc) ||
+	      obbIntersectCheck(wobb.vec,wobb.xc,wobb.dxc,
+				mb->obb->vec,mb->obb->xc,mb->obb->dxc))
+	   {
+	     for(j=meshtag2procmap[i];j<meshtag2procmap[i+1];j++)
+	       {
+		 commcount[j]++;
+		 procListRecv[nrecv]=j;
+		 nrecv++;
+	       }
+	     blockmap[nb]=i;
+	     nb++;
+	   }
        }
+   }
+ //
+ // all reduce the comm map to produce the
+ // sender side info
+ //
+ mpirequest=(MPI_Request *) malloc(sizeof(MPI_Request)*nrecv);
+ mpistatus=(MPI_Status *) malloc(sizeof(MPI_Status)*nrecv);
+ MPI_Allreduce(commcount,commcountGlobal,pc->numprocs,MPI_INT,MPI_SUM,scomm);
+ for(i=0;i<nrecv;i++)
+   MPI_Isend(&i,1,MPI_INT,procListRecv[i],1,scomm,&mpirequest[i]);
+ procListSend=(int *)malloc(sizeof(int)*commcountGlobal[pc->myid]);
+ nsend=0;
+ while(nsend < commcountGlobal[pc->myid])
+   {
+     MPI_Iprobe(MPI_ANY_SOURCE,MPI_ANY_TAG,scomm,&iflag,&status2);
+     if (iflag) {       
+       MPI_Recv(&anyval,1,MPI_INT,status2.MPI_SOURCE,1,scomm,&status3);
+       procListSend[nsend]=status2.MPI_SOURCE;
+       nsend++;
+     }
+   }
+ MPI_Waitall(nrecv,mpirequest,mpistatus);
+ free(mpirequest);
+ free(mpistatus);
+ //
+ pc->setMap(nsend,nrecv,procListSend,procListRecv);
+ //
+ i=meshtag-1;
+ bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
+ holeMap[i].samLocal=(int *)malloc(sizeof(int)*bufferSize);	  
+ for(i=0;i<nb;i++)
+   {
+     bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
+     holeMap[blockmap[i]].sam=(int *)malloc(sizeof(int)*bufferSize);
    }
  //
  // mark the wall boundary cells in the holeMap
@@ -129,19 +239,38 @@ void tioga::getHoleMap(void)
  mb->markWallBoundary(holeMap[meshtag-1].samLocal,holeMap[meshtag-1].nx,holeMap[meshtag-1].extents);
  }
  //
- // allreduce the holeMap of each mesh
+ // now send the information across of the
+ // stuff we painted
+ // this can be compacted to not send zeros
+ // next level of optimization TODO
  //
- for(i=0;i<maxtag;i++)
+ sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
+ rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
+ pc->initPackets(sndPack,rcvPack);
+ //
+ for(i=0;i<nsend;i++)
    {
-    if (holeMap[i].existWall) 
-     {
-      bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
-      MPI_Allreduce(holeMap[i].samLocal,holeMap[i].sam,bufferSize,MPI_INT,MPI_MAX,scomm);
-     }
+     sndPack[i].nints=holeMap[meshtag-1].nx[0]*holeMap[meshtag-1].nx[1]*holeMap[i].nx[2];
+     for(j=0;j<sndPack[i].nints;j++)
+       sndPack[i].intData[j]=holeMap[meshtag-1].sam[j];
+   }
+ pc->sendRecvPackets(sndPack,rcvPack);
+ //
+ for(i=0;i<nrecv;i++)
+   {
+     recvmeshtag=proc2meshtagmap[procListRecv[i]];
+     for(j=0;j<rcvPack[i].nints;j++)
+       holeMap[recvmeshtag-1].sam[j]+=rcvPack[i].intData[j];
    }
  //
- for(i=0;i<maxtag;i++)
-   if (holeMap[i].existWall) free(holeMap[i].samLocal);
+ pc->clearPackets(sndPack,rcvPack);
+ free(sndPack);
+ free(rcvPack);
+ //
+ // free sam local
+ //
+ i=meshtag-1;
+ if (holeMap[i].existWall) free(holeMap[i].samLocal);
  //
  // set the global number of meshes to maxtag
  //
@@ -149,8 +278,11 @@ void tioga::getHoleMap(void)
  //
  // now fill the holeMap
  //
- for(i=0;i<maxtag;i++)
-   if (holeMap[i].existWall) fillHoleMap(holeMap[i].sam,holeMap[i].nx,isym);
+ for(j=0;j<nb;j++)
+   {
+     i=blockmap[j];
+     if (holeMap[i].existWall) fillHoleMap(holeMap[i].sam,holeMap[i].nx,isym);
+   }
  //
  // output the hole map
  //
@@ -162,6 +294,15 @@ void tioga::getHoleMap(void)
  free(existHole);
  free(bboxLocal);
  free(bboxGlobal);
+ //
+ free(proc2meshtagmap);
+ free(meshtag2procmap);
+ free(meshtagcft);
+ free(commcount);
+ free(commcountGlobal);
+ free(procListSend);
+ free(procListRecv);
+ free(blockmap);
 }
 
 /**

@@ -81,12 +81,15 @@ void tioga::getHoleMap(void)
     commcount[i]=0;
   }
   for(i=0;i<pc->numprocs;i++)
-      meshtagcft[proc2meshtagmap[i]+1]++;
+      { 
+      meshtagcft[proc2meshtagmap[i]]++;
+      meshtag2procmap[i]=0;      
+     }
   for(i=1;i<maxtag+1;i++)
       meshtagcft[i]=meshtagcft[i]+meshtagcft[i-1];
   for(i=0;i<pc->numprocs;i++)
     {
-      itag=proc2meshtagmap[i];
+      itag=proc2meshtagmap[i]-1;
       meshtag2procmap[meshtagcft[itag]+commcount[itag]]=i;
       commcount[itag]++;
     }
@@ -107,7 +110,7 @@ void tioga::getHoleMap(void)
  if (holeMap) 
    {
      for(i=0;i<nmesh;i++)
-       if (holeMap[i].existWall) \
+       if (holeMap[i].existWall)
 	 {
 	   if (holeMap[i].sam) free(holeMap[i].sam);
 	 }
@@ -126,7 +129,7 @@ void tioga::getHoleMap(void)
  //
  MPI_Allreduce(existHoleLocal,existHole,maxtag,MPI_INT,MPI_MAX,scomm);
  //
- for(i=0;i<maxtag;i++) holeMap[i].existWall=existHole[i];
+ for(i=0;i<maxtag;i++) { holeMap[i].existWall=existHole[i];}
  //
  bboxLocal=(double *) malloc(sizeof(double)*6*maxtag);
  bboxGlobal=(double *) malloc(sizeof(double)*6*maxtag);
@@ -162,7 +165,7 @@ void tioga::getHoleMap(void)
  nrecv=nb=0;
  for(i=0;i<maxtag;i++)
    {
-     if (holeMap[i].existWall && i!=meshtag-1)
+     if (holeMap[i].existWall )
        {
 	 for(j=0;j<3;j++)
 	   {
@@ -181,21 +184,22 @@ void tioga::getHoleMap(void)
 	     wobb.xc[j]=(holeMap[i].extents[j+3]+holeMap[i].extents[j])*0.5;
 	     wobb.dxc[j]=(holeMap[i].extents[j+3]-holeMap[i].extents[j])*0.5;
 	   }
-	 	 	 
+	 if (i!=meshtag-1) { 	 	 
 	 if ( obbIntersectCheck(mb->obb->vec,mb->obb->xc,mb->obb->dxc,
 				wobb.vec,wobb.xc,wobb.dxc) ||
 	      obbIntersectCheck(wobb.vec,wobb.xc,wobb.dxc,
 				mb->obb->vec,mb->obb->xc,mb->obb->dxc))
 	   {
-	     for(j=meshtag2procmap[i];j<meshtag2procmap[i+1];j++)
+	     for(j=meshtagcft[i];j<meshtagcft[i+1];j++)
 	       {
 		 commcount[j]++;
-		 procListRecv[nrecv]=j;
+		 procListRecv[nrecv]=meshtag2procmap[j];
 		 nrecv++;
 	       }
 	     blockmap[nb]=i;
 	     nb++;
 	   }
+         }
        }
    }
  //
@@ -227,10 +231,13 @@ void tioga::getHoleMap(void)
  i=meshtag-1;
  bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
  holeMap[i].samLocal=(int *)malloc(sizeof(int)*bufferSize);	  
+ for(j=0;j<bufferSize;j++) holeMap[i].samLocal[j]=0;
+ //
  for(i=0;i<nb;i++)
    {
-     bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
+     bufferSize=holeMap[blockmap[i]].nx[0]*holeMap[blockmap[i]].nx[1]*holeMap[blockmap[i]].nx[2];
      holeMap[blockmap[i]].sam=(int *)malloc(sizeof(int)*bufferSize);
+     for(j=0;j<bufferSize;j++) holeMap[blockmap[i]].sam[j]=0;
    }
  //
  // mark the wall boundary cells in the holeMap
@@ -250,9 +257,10 @@ void tioga::getHoleMap(void)
  //
  for(i=0;i<nsend;i++)
    {
-     sndPack[i].nints=holeMap[meshtag-1].nx[0]*holeMap[meshtag-1].nx[1]*holeMap[i].nx[2];
+     sndPack[i].nints=holeMap[meshtag-1].nx[0]*holeMap[meshtag-1].nx[1]*holeMap[meshtag-1].nx[2];
+     sndPack[i].intData=(int *)malloc(sndPack[i].nints*sizeof(int));
      for(j=0;j<sndPack[i].nints;j++)
-       sndPack[i].intData[j]=holeMap[meshtag-1].sam[j];
+       sndPack[i].intData[j]=holeMap[meshtag-1].samLocal[j];
    }
  pc->sendRecvPackets(sndPack,rcvPack);
  //

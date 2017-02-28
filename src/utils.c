@@ -442,4 +442,55 @@ void writePoints(double *x,int nsearch,int bid)
     fprintf(fp,"%f %f %f\n",x[3*i],x[3*i+1],x[3*i+2]);
   fclose(fp);
 }
-
+//
+// invert recv map to send map
+//
+void invertCommMap(MPI_Comm scomm,int myid, int numprocs,int nrecv, int *rcvMap, int *nsend, int **sndMap)
+{
+  MPI_Request *mpirequest;
+  MPI_Status *mpistatus;
+  MPI_Status status2,status3;
+  int *commcount,*commcountGlobal;
+  int i,k,id,iflag;
+  //
+  commcount=(int *)malloc(sizeof(int)*numprocs);
+  commcountGlobal=(int *)malloc(sizeof(int)*numprocs);
+  mpirequest=(MPI_Request *)malloc(sizeof(MPI_Request)*numprocs);
+  mpistatus=(MPI_Status *)malloc(sizeof(MPI_Status)*nrecv);
+  //
+  for(i=0;i<numprocs;i++) { commcount[i]=0;commcountGlobal[i]=0;}
+  for(i=0;i<nrecv;i++) commcount[rcvMap[i]]=1;
+  //
+  MPI_Reduce(commcount,commcountGlobal,numprocs,MPI_INT,MPI_SUM,0,scomm);
+  //
+  if (myid==0) 
+    {
+      for(i=0;i<numprocs;i++)
+	MPI_Isend(&commcountGlobal[i],1,MPI_INT,i,1,scomm,&(mpirequest[i]));
+    }
+  MPI_Recv(nsend,1,MPI_INT,0,1,scomm,MPI_STATUS_IGNORE);
+  if (myid==0) MPI_Waitall(numprocs,mpirequest,MPI_STATUSES_IGNORE);
+  //
+  (*sndMap)=(int *)malloc(sizeof(int)*(*nsend));
+  for(i=0;i<nrecv;i++)
+    MPI_Isend(&myid,1,MPI_INT,rcvMap[i],1,scomm,&(mpirequest[i]));  
+  //
+  k=0;
+  while(k < *nsend)
+    {
+     MPI_Iprobe(MPI_ANY_SOURCE,MPI_ANY_TAG,scomm,&iflag,&status2);
+     //printf("(myid,status2.mpi_source)=%d %d\n",status2.MPI_SOURCE);
+     if (iflag) {       
+       MPI_Recv(&id,1,MPI_INT,status2.MPI_SOURCE,1,scomm,MPI_STATUS_IGNORE);
+       (*sndMap)[k]=status2.MPI_SOURCE;
+       k++;
+     }
+    }
+  //
+  MPI_Waitall(nrecv,mpirequest,MPI_STATUSES_IGNORE);
+  //
+  free(commcount);
+  free(commcountGlobal);
+  free(mpirequest);
+  free(mpistatus);
+}

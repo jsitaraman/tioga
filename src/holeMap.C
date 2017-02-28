@@ -23,7 +23,7 @@ extern "C"
   void fillHoleMap(int *holeMap, int ix[3],int isym);
   int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
 			double vB[3][3],double xB[3],double dxB[3]);			   
-
+  void invertCommMap(MPI_Comm scomm,int myid, int numprocs,int nrecv, int *rcvMap, int *nsend, int **sndMap);
 };
 # define NSAM 64
 /**
@@ -206,25 +206,26 @@ void tioga::getHoleMap(void)
  // all reduce the comm map to produce the
  // sender side info
  //
- mpirequest=(MPI_Request *) malloc(sizeof(MPI_Request)*nrecv);
- mpistatus=(MPI_Status *) malloc(sizeof(MPI_Status)*nrecv);
- MPI_Allreduce(commcount,commcountGlobal,pc->numprocs,MPI_INT,MPI_SUM,scomm);
- for(i=0;i<nrecv;i++)
-   MPI_Isend(&i,1,MPI_INT,procListRecv[i],1,scomm,&mpirequest[i]);
- procListSend=(int *)malloc(sizeof(int)*commcountGlobal[pc->myid]);
- nsend=0;
- while(nsend < commcountGlobal[pc->myid])
-   {
-     MPI_Iprobe(MPI_ANY_SOURCE,MPI_ANY_TAG,scomm,&iflag,&status2);
-     if (iflag) {       
-       MPI_Recv(&anyval,1,MPI_INT,status2.MPI_SOURCE,1,scomm,&status3);
-       procListSend[nsend]=status2.MPI_SOURCE;
-       nsend++;
-     }
-   }
- MPI_Waitall(nrecv,mpirequest,mpistatus);
- free(mpirequest);
- free(mpistatus);
+ // mpirequest=(MPI_Request *) malloc(sizeof(MPI_Request)*nrecv);
+ // mpistatus=(MPI_Status *) malloc(sizeof(MPI_Status)*nrecv);
+ // MPI_Allreduce(commcount,commcountGlobal,pc->numprocs,MPI_INT,MPI_SUM,scomm);
+ // for(i=0;i<nrecv;i++)
+ //   MPI_Isend(&i,1,MPI_INT,procListRecv[i],1,scomm,&mpirequest[i]);
+ // procListSend=(int *)malloc(sizeof(int)*commcountGlobal[pc->myid]);
+ // nsend=0;
+ // while(nsend < commcountGlobal[pc->myid])
+ //   {
+ //     MPI_Iprobe(MPI_ANY_SOURCE,MPI_ANY_TAG,scomm,&iflag,&status2);
+ //     if (iflag) {       
+ //       MPI_Recv(&anyval,1,MPI_INT,status2.MPI_SOURCE,1,scomm,&status3);
+ //       procListSend[nsend]=status2.MPI_SOURCE;
+ //       nsend++;
+ //     }
+ //   }
+ // MPI_Waitall(nrecv,mpirequest,mpistatus);
+ // free(mpirequest);
+ // free(mpistatus);
+ invertCommMap(scomm,pc->myid,pc->numprocs,nrecv,procListRecv,&nsend,&procListSend);
  //
  pc->setMap(nsend,nrecv,procListSend,procListRecv);
  //

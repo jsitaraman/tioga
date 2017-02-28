@@ -269,7 +269,7 @@ void tioga::getHoleMap(void)
    {
      recvmeshtag=proc2meshtagmap[procListRecv[i]];
      for(j=0;j<rcvPack[i].nints;j++)
-       holeMap[recvmeshtag-1].sam[j]+=rcvPack[i].intData[j];
+       holeMap[recvmeshtag-1].sam[j]=max(rcvPack[i].intData[j],holeMap[recvmeshtag-1].sam[j]);
    }
  //
  pc->clearPackets(sndPack,rcvPack);
@@ -287,6 +287,7 @@ void tioga::getHoleMap(void)
  //
  // now fill the holeMap
  //
+ //printf("myid/nb=%d %d\n",myid,nb);
  for(j=0;j<nb;j++)
    {
      i=blockmap[j];
@@ -295,7 +296,7 @@ void tioga::getHoleMap(void)
  //
  // output the hole map
  //
- //this->outputHoleMap();
+ //if (nb > 0) outputHoleMap();
  //
  // free local memory
  //
@@ -327,9 +328,9 @@ void tioga::outputHoleMap(void)
   double ds[3];
   char intstring[7];
   char fname[80];
-
   for(i=0;i<nmesh;i++)
-    if (holeMap[i].existWall)
+   {
+    if (holeMap[i].existWall && holeMap[i].sam!=NULL)
        {
 	 sprintf(intstring,"%d",100000+i+100*myid);
 	 sprintf(fname,"holeMap%s.dat",&(intstring[1]));
@@ -374,7 +375,8 @@ void tioga::outputHoleMap(void)
 		 fprintf(fp,"%d %d %d %d %d %d %d %d\n",m,m+1,m+1+ns1,m+ns1,
 			 m+ns2,m+1+ns2,m+ns2+ns1+1,m+ns1+ns2);
 	       }
+       fclose(fp);
        }
- fclose(fp);
+    }
 }
 	 

@@ -44,6 +44,11 @@ std::vector<double> dlag_i, dlag_j, dlag_k;
 
 std::vector<int> ijk2gmsh;
 
+std::vector<double> tmp_shape, tmp_dshape, tmp_weights;
+std::vector<point> tmp_loc;
+
+int shape_order = 0;
+
 #define TOL 1e-10
 
 namespace tg_funcs
@@ -791,64 +796,73 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 
 double computeVolume(double *xv, int nNodes, int nDims)
 {
-  int order;
-  std::vector<point> locSpts;
-
   if (nDims == 2)
   {
-    order = std::max((int)std::sqrt(nNodes)-1, 0);
-    locSpts = getLocSpts(QUAD,order,std::string("Legendre"));
-  }
-  else
-  {
-    order = std::max((int)cbrt(nNodes)-1, 0);
-    locSpts = getLocSpts(HEX,order,std::string("Legendre"));
-  }
-
-  auto weights = getQptWeights(order, nDims);
-
-  uint nSpts = locSpts.size();
-
-  std::vector<double> shape(nSpts*nNodes);
-  std::vector<double> dshape(nSpts*nNodes*nDims);
-
-  if (nDims == 2)
-  {
-    for (uint spt = 0; spt < nSpts; spt++)
+    int order = std::max((int)sqrt(nNodes)-1, 0);
+    if (order != shape_order)
     {
-      shape_quad(locSpts[spt], &shape[spt*nNodes], nNodes);
-      dshape_quad(locSpts[spt], &dshape[spt*nNodes*nDims], nNodes);
+      tmp_loc = getLocSpts(QUAD,order,std::string("Legendre"));
+      shape_order = order;
     }
   }
   else
   {
-    for (uint spt = 0; spt < nSpts; spt++)
+    int order = std::max((int)cbrt(nNodes)-1, 0);
+    if (order != shape_order)
     {
-      shape_hex(locSpts[spt], &shape[spt*nNodes], nNodes);
-      dshape_hex(locSpts[spt], &dshape[spt*nNodes*nDims], nNodes);
+      tmp_loc = getLocSpts(HEX,order,std::string("Legendre"));
+      shape_order = order;
     }
   }
 
-  std::vector<double> jaco(nDims*nDims);
+  uint nSpts = tmp_loc.size();
+
+  if (tmp_weights.size() != nSpts)
+    tmp_weights = getQptWeights(shape_order, nDims);
+
+  if (tmp_shape.size() != nSpts*nNodes || tmp_dshape.size() != nSpts*nNodes*nDims)
+  {
+    // Note: for a given element type and shape order, these don't change
+    tmp_shape.resize(nSpts*nNodes);
+    tmp_dshape.resize(nSpts*nNodes*nDims);
+
+    if (nDims == 2)
+    {
+      for (uint spt = 0; spt < nSpts; spt++)
+      {
+        shape_quad(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
+        dshape_quad(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+      }
+    }
+    else
+    {
+      for (uint spt = 0; spt < nSpts; spt++)
+      {
+        shape_hex(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
+        dshape_hex(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+      }
+    }
+  }
+
   double vol = 0.;
 
   for (uint spt = 0; spt < nSpts; spt++)
   {
-    jaco.assign(jaco.size(), 0);
+    double jaco[9] = {0.0};
     for (uint n = 0; n < nNodes; n++)
       for (uint d1 = 0; d1 < nDims; d1++)
         for (uint d2 = 0; d2 < nDims; d2++)
-          jaco[d1*nDims+d2] += dshape[(spt*nNodes+n)*nDims+d2] * xv[n*nDims+d1];
+          jaco[d1*nDims+d2] += tmp_dshape[(spt*nNodes+n)*nDims+d2] * xv[n*nDims+d1];
 
     double detJac = 0;
     if (nDims == 2)
-      detJac = det_2x2(jaco.data());
+      detJac = det_2x2(jaco);
     else
-      detJac = det_3x3(jaco.data());
+      detJac = det_3x3(jaco);
 
-    if (detJac<0) FatalError("Negative Jacobian at quadrature point.");
+    if (detJac<0) FatalError("TIOGA: computeVolume: Negative Jacobian at quadrature point.");
 
-    vol += detJac * weights[spt];
+    vol += detJac * tmp_weights[spt];
   }
 
   return vol;
@@ -1085,43 +1099,57 @@ void dshape_quad(const point &in_rs, double* out_dshape, int nNodes)
   int nLevels = nSide / 2;
   int isOdd = nSide % 2;
 
+  if (lag_i.size() != nSide || dlag_i.size() != nSide)
+  {
+    lag_i.resize(nSide); dlag_i.resize(nSide);
+    lag_j.resize(nSide); dlag_j.resize(nSide);
+  }
+
+  for (int i = 0; i < nSide; i++)
+  {
+    lag_i[i] = Lagrange(xlist, xi, i);
+    lag_j[i] = Lagrange(xlist, eta, i);
+    dlag_i[i] = dLagrange(xlist, xi, i);
+    dlag_j[i] = dLagrange(xlist, eta, i);
+  }
+
   /* Recursion for all high-order Lagrange elements:
      * 4 corners, each edge's points, interior points */
   int nPts = 0;
   for (int i = 0; i < nLevels; i++) {
     // Corners
     int i2 = (nSide-1) - i;
-    out_dshape[2*(nPts+0)+0] = dLagrange(xlist, xi, i)  * Lagrange(xlist, eta, i);
-    out_dshape[2*(nPts+1)+0] = dLagrange(xlist, xi, i2) * Lagrange(xlist, eta, i);
-    out_dshape[2*(nPts+2)+0] = dLagrange(xlist, xi, i2) * Lagrange(xlist, eta, i2);
-    out_dshape[2*(nPts+3)+0] = dLagrange(xlist, xi, i)  * Lagrange(xlist, eta, i2);
+    out_dshape[2*(nPts+0)+0] = dlag_i[i]  * lag_j[i];
+    out_dshape[2*(nPts+1)+0] = dlag_i[i2] * lag_j[i];
+    out_dshape[2*(nPts+2)+0] = dlag_i[i2] * lag_j[i2];
+    out_dshape[2*(nPts+3)+0] = dlag_i[i]  * lag_j[i2];
 
-    out_dshape[2*(nPts+0)+1] = Lagrange(xlist, xi, i)  * dLagrange(xlist, eta, i);
-    out_dshape[2*(nPts+1)+1] = Lagrange(xlist, xi, i2) * dLagrange(xlist, eta, i);
-    out_dshape[2*(nPts+2)+1] = Lagrange(xlist, xi, i2) * dLagrange(xlist, eta, i2);
-    out_dshape[2*(nPts+3)+1] = Lagrange(xlist, xi, i)  * dLagrange(xlist, eta, i2);
+    out_dshape[2*(nPts+0)+1] = lag_i[i]  * dlag_j[i];
+    out_dshape[2*(nPts+1)+1] = lag_i[i2] * dlag_j[i];
+    out_dshape[2*(nPts+2)+1] = lag_i[i2] * dlag_j[i2];
+    out_dshape[2*(nPts+3)+1] = lag_i[i]  * dlag_j[i2];
     nPts += 4;
 
     // Edges
     int nSide2 = nSide - 2 * (i+1);
     for (int j = 0; j < nSide2; j++) {
-      out_dshape[2*(nPts+0*nSide2+j)] = dLagrange(xlist, xi, i+1+j)  * Lagrange(xlist, eta, i);
-      out_dshape[2*(nPts+1*nSide2+j)] = dLagrange(xlist, xi, i2)   * Lagrange(xlist, eta, i+1+j);
-      out_dshape[2*(nPts+2*nSide2+j)] = dLagrange(xlist, xi, i2-1-j) * Lagrange(xlist, eta, i2);
-      out_dshape[2*(nPts+3*nSide2+j)] = dLagrange(xlist, xi, i)    * Lagrange(xlist, eta, i2-1-j);
+      out_dshape[2*(nPts+0*nSide2+j)] = dlag_i[i+1+j]  * lag_j[i];
+      out_dshape[2*(nPts+1*nSide2+j)] = dlag_i[i2]     * lag_j[i+1+j];
+      out_dshape[2*(nPts+2*nSide2+j)] = dlag_i[i2-1-j] * lag_j[i2];
+      out_dshape[2*(nPts+3*nSide2+j)] = dlag_i[i]      * lag_j[i2-1-j];
 
-      out_dshape[2*(nPts+0*nSide2+j)+1] = Lagrange(xlist, xi, i+1+j)  * dLagrange(xlist, eta, i);
-      out_dshape[2*(nPts+1*nSide2+j)+1] = Lagrange(xlist, xi, i2)   * dLagrange(xlist, eta, i+1+j);
-      out_dshape[2*(nPts+2*nSide2+j)+1] = Lagrange(xlist, xi, i2-1-j) * dLagrange(xlist, eta, i2);
-      out_dshape[2*(nPts+3*nSide2+j)+1] = Lagrange(xlist, xi, i)    * dLagrange(xlist, eta, i2-1-j);
+      out_dshape[2*(nPts+0*nSide2+j)+1] = lag_i[i+1+j]  * dlag_j[i];
+      out_dshape[2*(nPts+1*nSide2+j)+1] = lag_i[i2]     * dlag_j[i+1+j];
+      out_dshape[2*(nPts+2*nSide2+j)+1] = lag_i[i2-1-j] * dlag_j[i2];
+      out_dshape[2*(nPts+3*nSide2+j)+1] = lag_i[i]      * dlag_j[i2-1-j];
     }
     nPts += 4*nSide2;
   }
 
   // Center node for even-ordered Lagrange quads (odd value of nSide)
   if (isOdd) {
-    out_dshape[2*(nNodes-1)+0] = dLagrange(xlist, xi, nSide/2) * Lagrange(xlist, eta, nSide/2);
-    out_dshape[2*(nNodes-1)+1] = Lagrange(xlist, xi, nSide/2) * dLagrange(xlist, eta, nSide/2);
+    out_dshape[2*(nNodes-1)+0] = dlag_i[nSide/2] * lag_j[nSide/2];
+    out_dshape[2*(nNodes-1)+1] = lag_i[nSide/2] * dlag_j[nSide/2];
   }
 }
 
@@ -1195,9 +1223,12 @@ void dshape_hex(const point &in_rst, double* out_dshape, int nNodes)
 #pragma omp parallel for
     for (int i = 0; i < nSide; i++)
     {
-      lag_i[i] = Lagrange(xlist,  xi, i);  dlag_i[i] = dLagrange(xlist,  xi, i);
-      lag_j[i] = Lagrange(xlist, eta, i);  dlag_j[i] = dLagrange(xlist, eta, i);
-      lag_k[i] = Lagrange(xlist,  mu, i);  dlag_k[i] = dLagrange(xlist,  mu, i);
+      lag_i[i] = Lagrange(xlist,  xi, i);
+      lag_j[i] = Lagrange(xlist, eta, i);
+      lag_k[i] = Lagrange(xlist,  mu, i);
+      dlag_i[i] = dLagrange(xlist,  xi, i);
+      dlag_j[i] = dLagrange(xlist, eta, i);
+      dlag_k[i] = dLagrange(xlist,  mu, i);
     }
 
 #pragma omp parallel for collapse(3)

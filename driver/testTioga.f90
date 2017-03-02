@@ -52,6 +52,7 @@ program testTioga
   ntypes=1
   nv1=6
   nv2=8
+  do i=1,10
   if (g%n6 > 0)  then
    call tioga_registergrid_data(g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
        ntypes,nv1,g%n6,g%ndc6)
@@ -83,6 +84,7 @@ program testTioga
   call cpu_time(t1)         
   call tioga_performconnectivity               !< determine iblanking and interpolation patterns
   call cpu_time(t2)
+  enddo
 
   call mpi_barrier(mpi_comm_world,ierr)
   if (myid==0) write(6,*) 'connectivity time=',t2-t1

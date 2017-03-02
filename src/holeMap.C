@@ -230,9 +230,11 @@ void tioga::getHoleMap(void)
  pc->setMap(nsend,nrecv,procListSend,procListRecv);
  //
  i=meshtag-1;
+ if (holeMap[i].existWall){
  bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
  holeMap[i].samLocal=(int *)malloc(sizeof(int)*bufferSize);	  
  for(j=0;j<bufferSize;j++) holeMap[i].samLocal[j]=0;
+ }
  //
  for(i=0;i<nb;i++)
    {

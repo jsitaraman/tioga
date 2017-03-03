@@ -117,13 +117,8 @@ void MeshBlock::setGridVelocity(double *grid_vel)
   vg = grid_vel;
 
   // Setup temporary buffers for performing iteration-level hole cutting
-  delete[] ibc_2;
-  delete[] x2;
-
-  ibc_2 = new int[ncells];
-  x2 = new double[3*nnodes];
-
-  std::fill(ibc_2,ibc_2+ncells,NORMAL);
+  ibc_2.assign(ncells, NORMAL);
+  x2.resize(3*nnodes);
 }
 
 void MeshBlock::calcNextGrid(double dt)
@@ -133,10 +128,10 @@ void MeshBlock::calcNextGrid(double dt)
       x2[3*i+d] = x[3*i+d] + vg[3*i+d] * dt;
 
   xtmp = x;
-  x = x2;
+  x = x2.data();
 
   ibc_tmp = iblank_cell;
-  iblank_cell = ibc_2;
+  iblank_cell = ibc_2.data();
 }
 
 void MeshBlock::resetCurrentGrid(void)
@@ -1333,38 +1328,10 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
 //      sndPack[p].intData.resize(0);
     }
 
-    if (d_buff_size > 0)
-    {
-      cuda_free(weights_d);
-      cuda_free(donors_d);
-      cuda_free(buf_inds_d);
-      weights_d = NULL;
-      donors_d = NULL;
-      buf_inds_d = NULL;
-
-      d_buff_size = 0;
-    }
-
     return;
   }
 
   nSpts = interpList2[0].nweights;
-
-  if (ninterp2 > d_buff_size)
-  {
-    if (d_buff_size > 0)
-    {
-      cuda_free(weights_d);
-      cuda_free(donors_d);
-      cuda_free(buf_inds_d);
-    }
-
-    cuda_malloc(weights_d, ninterp2*nSpts);
-    cuda_malloc(donors_d, ninterp2);
-    cuda_malloc(buf_inds_d, ninterp2);
-
-    d_buff_size = ninterp2;
-  }
 
   std::vector<double> tmp_weights(ninterp2*nSpts);
   std::vector<int> tmp_donors(ninterp2);
@@ -1409,9 +1376,9 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
     sndPack[p].intData[ind] = interpList2[i].receptorInfo[1];
   }
 
-  cuda_copy_h2d(weights_d, tmp_weights.data(), ninterp2*nSpts);
-  cuda_copy_h2d(donors_d, tmp_donors.data(), tmp_donors.size());
-  cuda_copy_h2d(buf_inds_d, buf_inds.data(), buf_inds.size());
+  weights_d.assign(tmp_weights.data(), tmp_weights.size());
+  donors_d.assign(tmp_donors.data(), tmp_donors.size());
+  buf_inds_d.assign(buf_inds.data(), buf_inds.size()); // &mb->stream_handle);
 }
 
 void MeshBlock::set_stream_handle(cudaStream_t stream, cudaEvent_t event)
@@ -1648,8 +1615,9 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
   double *q_d = get_q_spts_d(estride, sstride, vstride);
 
   // Perform the interpolation
-  interp_u_wrapper(q_d, q_out_d, donors_d, weights_d, buf_inds_d, ninterp2,
-      nSpts, nvar, estride, sstride, vstride, stream_handle);
+  interp_u_wrapper(q_d, q_out_d, donors_d.data(), weights_d.data(),
+      buf_inds_d.data(), ninterp2, nSpts, nvar, estride, sstride, vstride,
+      stream_handle);
 }
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
@@ -1660,8 +1628,9 @@ void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
   double *dq_d = get_dq_spts_d(estride, sstride, vstride, dstride);
 
   // Perform the interpolation
-  interp_du_wrapper(dq_d, dq_out_d, donors_d, weights_d, buf_inds_d, ninterp2,
-      nSpts, nvar, nDims, estride, sstride, vstride, dstride, stream_handle);
+  interp_du_wrapper(dq_d, dq_out_d, donors_d.data(), weights_d.data(),
+      buf_inds_d.data(), ninterp2, nSpts, nvar, nDims, estride, sstride,
+      vstride, dstride, stream_handle);
 }
 #endif
 

@@ -28,7 +28,7 @@
 #include <set>
 
 #ifdef _GPU
-#include <cuda_runtime.h>
+#include "cuda_funcs.h"
 #endif
 
 #include "codetypes.h"
@@ -74,8 +74,10 @@ class MeshBlock
   double *x;        /** < grid nodes x[3*nnodes] */
 
   //! Moving artbnd grid buffer variables
-  double *xtmp, *x2 = NULL;
-  int *ibc_tmp, *ibc_2 = NULL;
+  std::vector<double> x2;
+  std::vector<int> ibc_2;
+  double *xtmp;
+  int *ibc_tmp;
   double *vg;
   std::set<int> unblanks;
 
@@ -286,10 +288,9 @@ class MeshBlock
   /* ---- GPU-Related Variables ---- */
   int nSpts;  // Number of spts per ele on this rank
 #ifdef _GPU
-  double *weights_d = NULL;
-  int *donors_d = NULL;
-  int *buf_inds_d = NULL;
-  int d_buff_size = 0;
+  dvec<double> weights_d;
+  dvec<int> donors_d;
+  dvec<int> buf_inds_d;
   std::vector<int> buf_inds, buf_disp;
 
   cudaStream_t stream_handle;

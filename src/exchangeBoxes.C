@@ -26,8 +26,8 @@ extern "C"{
 
 void tioga::exchangeBoxes(void)
 {
-  int* alltags=(int *)malloc(sizeof(int)*nproc);
-  MPI_Allgather(&mytag, 1, MPI_INT, alltags,1,MPI_INT,scomm);
+  std::vector<int> alltags(nproc);
+  MPI_Allgather(&mytag, 1, MPI_INT, alltags.data(), 1, MPI_INT, scomm);
 
   // count number of other processors to communicate to
   // in overset grid scenario, usually you do not communicate
@@ -122,7 +122,6 @@ void tioga::exchangeBoxes(void)
 #endif
 
   // free local memory
-  free(alltags);
   free(sndMap);
   free(rcvMap);
   free(sndPack);

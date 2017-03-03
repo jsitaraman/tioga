@@ -870,8 +870,6 @@ MeshBlock::~MeshBlock()
   if (pickedCart) free(pickedCart);
   if (ctag_cart) free(ctag_cart);
 
-  delete[] x2;
-  delete[] ibc_2;
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 }

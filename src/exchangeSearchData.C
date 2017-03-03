@@ -71,6 +71,7 @@ void tioga::exchangeSearchData(void)
   mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
   if (ihigh)
   {
+    free(mb->rst);
     mb->rst = (double *)malloc(sizeof(double)*3*mb->nsearch);
     std::fill(mb->rst, mb->rst+3*mb->nsearch, 0.0);
   }

@@ -30,7 +30,7 @@
 #include "parallelComm.h"
 
 #ifdef _GPU
-#include <cuda_runtime.h>
+#include "cuda_funcs.h"
 #endif
 
 #include <chrono>
@@ -137,17 +137,14 @@ class tioga
   int resizeFlag = 0;
   int resizeFringe = 0;
   int ninterp = 0;
-  int ninterp_d = 0;
-  int nfringe_h = 0;
-  double *ubuf_d = NULL;
-  double *gradbuf_d = NULL;
-  double *ubuf_h = NULL;
-  double *gradbuf_h = NULL;
-  double *fringebuf_h = NULL;
-//  std::vector<double> dbuffer;
+  dvec<double> ubuf_d;
+  dvec<double> gradbuf_d;
+  hvec<double> ubuf_h;
+  hvec<double> gradbuf_h;
+  hvec<double> fringebuf_h;
   std::vector<int> buf_disp, buf_inds;
   std::vector<int> recv_itmp;
-  int *buf_inds_d = NULL;
+  dvec<int> buf_inds_d;
 #endif
 
  public:
@@ -155,7 +152,7 @@ class tioga
   int iartbnd;      /// Artificial-boundary flag for current rank
   int ihighGlobal;  /// Flag for whether high-order grids exist on any rank
   int iamrGlobal;   /// Flag for whether AMR cartesian grids exist on any rank
-  int iabGlobal;    /// Flaag for whether high-order A.B.'s being used on any rank
+  int iabGlobal;    /// Flag for whether high-order A.B.'s being used on any rank
 
   bool gpu = false; /// Flag for whether GPUs are being used on the high-order code
 

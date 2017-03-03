@@ -39,7 +39,11 @@ void tioga::getHoleMap(void)
   if (holeMap)
   {
     for (int i = 0; i < nmesh; i++)
-      if (holeMap[i].existWall) free(holeMap[i].sam);
+      if (holeMap[i].existWall)
+      {
+        free(holeMap[i].sam);
+        free(holeMap[i].samLocal);
+      }
     delete [] holeMap;
   }
 

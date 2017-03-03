@@ -947,32 +947,16 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 
   /// TODO: consider placement of this
   // Allocate space for the interpolated fringe-point data if needed
-  if (mb->ninterp2 > ninterp_d)
+  if (dataFlag == 0)
   {
-    if (ninterp_d > 0)
-    {
-      cuda_free(ubuf_d);
-      cuda_free_pinned(ubuf_h);
-    }
-
-    resizeFlag = 1;
-    ninterp_d = mb->ninterp2;
-    cuda_malloc(ubuf_d, ninterp_d*stride);
-    cuda_malloc_pinned(ubuf_h, ninterp_d*stride);
+    ubuf_d.resize(mb->ninterp2*stride);
+    ubuf_h.resize(mb->ninterp2*stride);
   }
-  else if (dataFlag && resizeFlag)
+  else
   {
-    if (gradbuf_d)
-    {
-      cuda_free(gradbuf_d);
-      cuda_free_pinned(gradbuf_h);
-    }
-
-    cuda_malloc(gradbuf_d, ninterp_d*stride);
-    cuda_malloc_pinned(gradbuf_h, ninterp_d*stride);
-    resizeFlag = 0;
+    gradbuf_d.resize(mb->ninterp2*stride);
+    gradbuf_h.resize(mb->ninterp2*stride);
   }
-
 
   for (int k = 0; k < nsend; k++)
   {
@@ -986,20 +970,20 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
   interpTime.startTimer();
 
   if (dataFlag == 0)
-    mb->interpSolution_gpu(ubuf_d, nvar);
+    mb->interpSolution_gpu(ubuf_d.data(), nvar);
   else
-    mb->interpGradient_gpu(gradbuf_d, nvar);
+    mb->interpGradient_gpu(gradbuf_d.data(), nvar);
 
   double *ptr;
   if (dataFlag == 0)
   {
-    ptr = ubuf_h;
-    cuda_copy_d2h(ubuf_d, ubuf_h, ninterp_d*stride, mb->stream_handle);
+    ubuf_h.assign(ubuf_d.data(), ubuf_d.size(), &mb->stream_handle);
+    ptr = ubuf_h.data();
   }
   else
   {
-    ptr = gradbuf_h;
-    cuda_copy_d2h(gradbuf_d, gradbuf_h, ninterp_d*stride, mb->stream_handle);
+    gradbuf_h.assign(gradbuf_d.data(), gradbuf_d.size(), &mb->stream_handle);
+    ptr = gradbuf_h.data();
   }
 
   interpTime.stopTimer();
@@ -1033,6 +1017,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   PUSH_NVTX_RANGE("tg_pc_send", 0);
   // Wait for device-to-host transfer to complete
   cudaStreamSynchronize(mb->stream_handle);
+
   //pc->sendPacketsV(sndVPack,rcvVPack);
   pc->sendPacketsV2(sndPack2,rcvVPack);
   POP_NVTX_RANGE;
@@ -1046,29 +1031,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   PUSH_NVTX_RANGE("tg_unpack_data", 1);
   if (ihigh)
   {
-    // Allocate pinned memory for d2h transfer
-    if (mb->ntotalPoints > nfringe_h)
-    {
-      if (nfringe_h > 0)
-      {
-        cuda_free_pinned(fringebuf_h);
-      }
-
-      resizeFringe = 1;
-      nfringe_h = mb->ntotalPoints;
-      cuda_malloc_pinned(fringebuf_h, nfringe_h*stride);
-    }
-    else if (dataFlag && resizeFringe)
-    {
-      if (fringebuf_h)
-      {
-        cuda_free_pinned(fringebuf_h);
-      }
-
-      cuda_malloc_pinned(fringebuf_h, nfringe_h*stride);
-      resizeFringe = 0;
-    }
-
+    fringebuf_h.resize(mb->ntotalPoints*stride);
     recv_itmp.assign(mb->ntotalPoints,0);
 
     for (int k = 0; k < nrecv; k++)
@@ -1115,9 +1078,9 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     {
       interpTime.startTimer();
       if (dataFlag == 0)
-        mb->updateFringePointData(fringebuf_h,nvar);
+        mb->updateFringePointData(fringebuf_h.data(),nvar);
       else
-        mb->updateFringePointGradient(fringebuf_h,nvar);
+        mb->updateFringePointGradient(fringebuf_h.data(),nvar);
       interpTime.stopTimer();
     }
     else

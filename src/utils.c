@@ -478,7 +478,9 @@ void invertCommMap(MPI_Comm scomm,int myid, int numprocs,int nrecv, int *rcvMap,
   k=0;
   while(k < *nsend)
     {
-     MPI_Iprobe(MPI_ANY_SOURCE,MPI_ANY_TAG,scomm,&iflag,&status2);
+     //MPI_Iprobe(MPI_ANY_SOURCE,MPI_ANY_TAG,scomm,&iflag,&status2);
+     MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,scomm,&status2);
+     iflag=1;
      //printf("(myid,status2.mpi_source)=%d %d\n",status2.MPI_SOURCE);
      if (iflag) {       
        MPI_Recv(&id,1,MPI_INT,status2.MPI_SOURCE,1,scomm,MPI_STATUS_IGNORE);

@@ -58,7 +58,7 @@ void ADT::buildADT(int d, int nelements, double *elementBbox)
   if (adtReals) free(adtReals);
   adtReals = (double *) malloc(sizeof(double)*nelem*ndim);
 
-  /* Determine extent of elements */
+  /* Determine bounding boxes of mesh elements */
 
   for (int i = 0; i < ndim/2; i++)
   {

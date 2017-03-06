@@ -303,6 +303,16 @@ extern "C" {
     tg->setIterIblanks(dt, nvar);
   }
 
+  void tioga_unblank_part_1(void)
+  {
+    tg->unblankPart1();
+  }
+
+  void tioga_unblank_part_2(int nvar)
+  {
+    tg->unblankPart2(nvar);
+  }
+
   void tioga_delete_(void)
    {
     delete tg;

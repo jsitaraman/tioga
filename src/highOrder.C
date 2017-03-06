@@ -134,6 +134,15 @@ void MeshBlock::calcNextGrid(double dt)
   iblank_cell = ibc_2.data();
 }
 
+void MeshBlock::swapPointers(void)
+{
+  xtmp = x;
+//  x = x2.data();
+
+  ibc_tmp = iblank_cell;
+  iblank_cell = ibc_2.data();
+}
+
 void MeshBlock::resetCurrentGrid(void)
 {
   x = xtmp;

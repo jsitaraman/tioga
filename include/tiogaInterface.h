@@ -110,6 +110,9 @@ void tioga_do_point_connectivity(void);
 
 void tioga_set_iter_iblanks(double dt, int nvar);
 
+void tioga_unblank_part_1(void);
+void tioga_unblank_part_2(int nvar);
+
 void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 
 void tioga_delete_(void);

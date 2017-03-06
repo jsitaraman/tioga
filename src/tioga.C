@@ -179,6 +179,42 @@ void tioga::setIterIblanks(double dt, int nvar)
   }
 }
 
+void tioga::unblankPart1(void)
+{
+  // Switch iblank_cell to separate memory range
+  mb->swapPointers();
+
+  mb->preprocess();
+
+  doHoleCutting();
+}
+
+void tioga::unblankPart2(int nvar)
+{
+  // Swap iblank_cell pointer back
+  mb->resetCurrentGrid();
+
+  mb->preprocess();
+
+  doHoleCutting();
+
+  // Determine final blanking status to use over time step
+  int nunblank = mb->getIterIblanks();
+
+  mb->calcFaceIblanks(meshcomm);
+
+  MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
+
+  if (nunblank > 0)
+  {
+    doPointConnectivity(); /// TODO: just do unblank cells only, no faces
+
+    dataUpdate_artBnd(nvar, NULL, 0);
+
+    mb->clearUnblanks();
+  }
+}
+
 void tioga::doHoleCutting(void)
 {
   // Generate structured map of solid boundary (hole) locations

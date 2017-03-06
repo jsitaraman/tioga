@@ -231,6 +231,8 @@ class tioga
   void directCut(void);
 
   void setIterIblanks(double dt, int nvar);
+  void unblankPart1(void);
+  void unblankPart2(int nvar);
   void doHoleCutting(void);
   void doPointConnectivity(void);
 

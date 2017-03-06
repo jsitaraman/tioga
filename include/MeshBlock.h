@@ -372,6 +372,7 @@ class MeshBlock
   void resetCurrentGrid(void);
   int getIterIblanks(void);
   void clearUnblanks(void);
+  void swapPointers(void);
 
   void search();
 

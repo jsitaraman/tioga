@@ -24,77 +24,63 @@ extern "C"{
 }
 void tioga::exchangeBoxes(void)
 {
-  int i,j,k,m;
-  int *alltags;
+  int i,j,k,m,k1;
+  double *obbdata,*obbdatalocal;
   int *sndMap;
   int *rcvMap;
+  int *displs;
   int nsend;
   int nrecv;
   int overlap_present;
   PACKET *sndPack,*rcvPack;
   //
-  alltags=(int *)malloc(sizeof(int)*numprocs);
-  MPI_Allgather(&mytag, 1, MPI_INT, alltags,1,MPI_INT,scomm);
+  obbdata=(double *)malloc(sizeof(double)*16*numprocs);
+  obbdatalocal=(double *)malloc(sizeof(double)*16);
+  m=0;
+  obbdatalocal[m++]=(double)mytag;
+  for(i=0;i<3;i++)
+    for(j=0;j<3;j++)
+      obbdatalocal[m++]=mb->obb->vec[i][j];
+  for(i=0;i<3;i++)
+    obbdatalocal[m++]=mb->obb->xc[i];
+  for(i=0;i<3;i++)
+    obbdatalocal[m++]=mb->obb->dxc[i];
   //
-  // count number of other processors to communicate to
-  // in overset grid scenario, usually you do not communicate
-  // to mesh blocks that carry the same mesh tag (i.e. you don't
-  // talk to your sister partitions)
-  //
-  nsend=nrecv=0;
-  for(i=0;i<numprocs;i++) if (alltags[i] != mytag) nsend++;
-  //
-  // In general we communicate forward
-  // and backward, separate lists are maintained for
-  // flexibility
-  //
-  nrecv=nsend;
-  sndMap=(int *)malloc(sizeof(int)*nsend);
-  rcvMap=(int *)malloc(sizeof(int)*nrecv);
-  //
-  for(i=0,m=0;i<numprocs;i++) 
-    if (alltags[i]!=mytag) 
-      {
-        sndMap[m]=rcvMap[m]=i;
-	m++;
-      }
-  //
-  pc->setMap(nsend,nrecv,sndMap,rcvMap);
-  //
-  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
-  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
-  // 
-  //  
-  for(k=0;k<nsend;k++)
-    {
-      sndPack[k].nints=0;
-      sndPack[k].nreals=15;
-      sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
-      m=0;
-      for(i=0;i<3;i++)
-	for(j=0;j<3;j++)
-	  sndPack[k].realData[m++]=mb->obb->vec[i][j];
-      for(i=0;i<3;i++)
-	sndPack[k].realData[m++]=mb->obb->xc[i];
-      for(i=0;i<3;i++)
-	sndPack[k].realData[m++]=mb->obb->dxc[i];
-    }
-  //
-  pc->sendRecvPackets(sndPack,rcvPack);
+  MPI_Allgather(obbdatalocal, 16, MPI_DOUBLE, obbdata,16,MPI_DOUBLE,scomm);
+  nrecv=0;
+  for(k=0;k<numprocs;k++) 	
+    if ((int)obbdata[16*k] != mytag) nrecv++;
   //
   if (obblist) free(obblist);
   obblist=(OBB *) malloc(sizeof(OBB)*nrecv);
+  sndMap=(int *)malloc(sizeof(int)*nrecv);
+  rcvMap=(int *)malloc(sizeof(int)*nrecv);
   //
-  for(k=0;k<nrecv;k++)
+  k1=0;
+  for(k=0;k<numprocs;k++)
     {
-      m=0;      
-      for(i=0;i<3;i++)
-	for(j=0;j<3;j++)
-	  obblist[k].vec[i][j]=rcvPack[k].realData[m++];
-      for(i=0;i<3;i++)
-	obblist[k].xc[i]=rcvPack[k].realData[m++];
-      for(i=0;i<3;i++)
-	obblist[k].dxc[i]=rcvPack[k].realData[m++];
+      if ((int)obbdata[16*k] != mytag)
+	{	 
+	  m=1;      
+	  for(i=0;i<3;i++)
+	    for(j=0;j<3;j++)
+	      {
+		obblist[k1].vec[i][j]=obbdata[16*k+m];
+		m++;
+	      }
+	  for(i=0;i<3;i++)
+	    {
+	      obblist[k1].xc[i]=obbdata[16*k+m];
+	      m++;
+	    }	      
+	  for(i=0;i<3;i++)
+	    {
+	      obblist[k1].dxc[i]=obbdata[16*k+m];
+	      m++;
+	    }
+          sndMap[k1]=k;
+	  k1++;
+	}
     }
   //
   m=0;
@@ -105,7 +91,7 @@ void tioga::exchangeBoxes(void)
 	   obbIntersectCheck(obblist[k].vec,obblist[k].xc,obblist[k].dxc,
 			     mb->obb->vec,mb->obb->xc,mb->obb->dxc)) 
 	{
-	  if (alltags[sndMap[k]] < 0 || mytag < 0) 
+	  if ((int)obbdata[16*sndMap[k]] < 0 || mytag < 0) 
 	    {
 	      mb->check_intersect_p4est(&sndMap[k],&overlap_present);	      
 	    }
@@ -131,10 +117,10 @@ void tioga::exchangeBoxes(void)
   for(i=0;i<nsend;i++) sndMap[i]=rcvMap[i];
   //printf("%d %d %d\n",myid,nsend,nrecv);
   //
-
-  // clear packets before nsend and nrecv are modified in pc->setMap
-  pc->clearPackets(sndPack,rcvPack);
   pc->setMap(nsend,nrecv,sndMap,rcvMap);  
+  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
+  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
+  pc->initPackets(sndPack,rcvPack);
   for(k=0;k<nsend;k++) {
    sndPack[k].nints=0;
    sndPack[k].nreals=6;
@@ -151,9 +137,10 @@ void tioga::exchangeBoxes(void)
   //
   // Free local memory
   //
-  free(alltags);
   free(sndMap);
   free(rcvMap);
   free(sndPack);
   free(rcvPack);
+  free(obbdata);
+  free(obbdatalocal);
 }

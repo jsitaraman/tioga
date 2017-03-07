@@ -3,7 +3,7 @@ F90= mpif90
 CC = mpicc
 CXX= mpicxx
 AR = ar -rvs
-CFLAGS = -fPIC -O2 -rdynamic # -g -Wall -Wextra#-fpe0
+CFLAGS = -fPIC -O2 -rdynamic -std=c++0x# -g -Wall -Wextra#-fpe0
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
 INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h
 OBJF90 = kaiser.o median.o cellVolume.o

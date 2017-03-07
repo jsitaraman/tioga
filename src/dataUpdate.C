@@ -125,7 +125,7 @@ void MeshBlock::getDonorCount(int *dcount,int *fcount)
       if (!interpList[i].cancel) 
 	{
 	  (*dcount)++;
-	  (*fcount)+=interpList[i].nweights;
+	  (*fcount)+=(interpList[i].nweights+1);
 	}
     }
 }
@@ -141,7 +141,7 @@ void MeshBlock::getDonorInfo(int *receptors,int *indices,double *frac)
     {
       if (!interpList[i].cancel) 
 	{
-	  for(m=0;m<interpList[i].nweights;m++)
+	  for(m=0;m<interpList[i].nweights+1;m++)
 	    {
 	      indices[j]=interpList[i].inode[m];
 	      frac[j]=interpList[i].weights[m];

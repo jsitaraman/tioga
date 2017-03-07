@@ -469,13 +469,15 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
     tracei(interpList[*recid].receptorInfo[0]);
     tracei(interpList[*recid].receptorInfo[1]);
   }
-  interpList[*recid].inode=(int *)malloc(sizeof(int)*nvert);
-  interpList[*recid].weights=(double *)malloc(sizeof(double)*nvert);
+  interpList[*recid].inode=(int *)malloc(sizeof(int)*(nvert+1));
+  interpList[*recid].weights=(double *)malloc(sizeof(double)*(nvert+1));
   for(m=0;m<nvert;m++)
     {
       interpList[*recid].inode[m]=inode[m];
       interpList[*recid].weights[m]=frac[m];
     }
+  interpList[*recid].inode[m]=donorId[irecord];
+  interpList[*recid].weights[m]=0.0;
   (*recid)++;
 }
 

@@ -1,3 +1,5 @@
+#ifndef TIOGA_H
+#define TIOGA_H
 //
 // This file is part of the Tioga software library
 //
@@ -31,6 +33,7 @@
 
 #ifdef _GPU
 #include "cuda_funcs.h"
+#include "dMeshBlock.h"
 #endif
 
 #include <chrono>
@@ -145,6 +148,8 @@ class tioga
   std::vector<int> buf_disp, buf_inds;
   std::vector<int> recv_itmp;
   dvec<int> buf_inds_d;
+
+//  dMeshBlock *mb_d;
 #endif
 
  public:
@@ -328,9 +333,9 @@ class tioga
   void setupCommBuffersGPU(void);
 
   void set_stream_handle(cudaStream_t handle, cudaEvent_t event);
+
+  void registerDeviceGridData(double *xyz, double* coords, int *ibc, int *ibf);
 #endif
 };
       
-  
-
-
+#endif

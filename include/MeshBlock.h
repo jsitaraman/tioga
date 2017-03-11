@@ -1,3 +1,5 @@
+#ifndef MESHBLOCK_H
+#define MESHBLOCK_H
 //
 // This file is part of the Tioga software library
 //
@@ -27,14 +29,16 @@
 #include <unordered_set>
 #include <set>
 
-#ifdef _GPU
-#include "cuda_funcs.h"
-#endif
-
 #include "codetypes.h"
 #include "funcs.hpp"
 #include "points.hpp"
 #include "ADT.h"
+
+#ifdef _GPU
+#include "cuda_funcs.h"
+#include "dADT.h"
+#include "dMeshBlock.h"
+#endif
 
 //! Helper struct for direct-cut method [Galbraith 2013]
 typedef struct CutMap
@@ -58,7 +62,8 @@ class CartGrid;
 
 class MeshBlock
 {
- private:
+friend class dMeshBlock;
+private:
   int nnodes;  /** < number of grid nodes */
   int ncells;  /** < total number of cells */
   int nfaces;  /** < total number of faces (Art. Bnd.) */
@@ -97,6 +102,7 @@ class MeshBlock
   double *userSpecifiedCellRes;
   double *elementBbox; /** < bounding box of the elements */
   int *elementList;    /** < list of elements in */
+  int ncells_adt;  //! Number of cells within ADT
 
   int nOverFaces;
   int nMpiFaces;
@@ -113,6 +119,9 @@ class MeshBlock
   bool rrot = false;
   std::vector<double> Smat;
   double offset[3] = {0.0};
+
+  dADT adt_d;       /** GPU-based ADT */
+  dMeshBlock mb_d;  /** GPU-based mesh data */
 
   //
   // Alternating digital tree library
@@ -256,8 +265,10 @@ class MeshBlock
   int nsearch;        /** < number of query points to search in this block */
   int *isearch;       /** < index of query points in the remote process */
   double *xsearch;    /** < coordinates of the query points */
-  double *rst;            /**  natrural coordinates */
-  int *donorId;       /** < donor indices for those found */
+  //double *rst;            /**  natrural coordinates */
+  //int *donorId;       /** < donor indices for those found */
+  hvec<double> rst;
+  hvec<int> donorId; /// TODO: allow hvec to be used for non-GPU cases (use malloc vs. cudaMalloc)
   int donorCount;
   int myid;
   double *cellRes;  /** < resolution for each cell */
@@ -293,6 +304,9 @@ class MeshBlock
   dvec<int> buf_inds_d;
   std::vector<int> buf_inds, buf_disp;
 
+  //dvec<int> iblank_cell_d;
+  //dvec<int> iblank_face_d;
+
   cudaStream_t stream_handle;
   cudaEvent_t event_handle;
 #endif
@@ -308,7 +322,7 @@ class MeshBlock
     adt=NULL; obb=NULL;
     donorList=NULL; interpList=NULL; interp2donor=NULL;
     nsearch=0; isearch=NULL; xsearch=NULL;
-    donorId=NULL; cancelList=NULL;
+    cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
     nfringe=0;
     // new vars
@@ -320,7 +334,6 @@ class MeshBlock
     maxPointsPerCell=0;
     ntotalPoints=0;
     nreceptorFaces=0;
-    rst=NULL;
     ihigh=0;
     ipoint=0;
     interpList2=NULL;
@@ -586,5 +599,9 @@ class MeshBlock
   void interpGradient_gpu(double* dq_out_d, int nvar);
 
   void set_stream_handle(cudaStream_t handle, cudaEvent_t event);
+
+  void setDeviceData(double* xyz, double* coords, int* ibc, int* ibf);
 #endif
 };
+
+#endif

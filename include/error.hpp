@@ -39,7 +39,7 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
   if (err != cudaSuccess) \
   { \
     std::cout << __FILE__ << ":" << __LINE__ << ":" << __func__ << ": " << std::endl; \
-    FatalError(cudaGetErrorString(err)); \
+    FatalErrorST(cudaGetErrorString(err)); \
   } \
 }
 #else

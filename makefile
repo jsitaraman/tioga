@@ -46,7 +46,7 @@ ifeq ($(strip $(DEBUG_LEVEL)),1)
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),2)
 	CFLAGS += -g -O0 #-D_NVTX
-	CUFLAGS += -g -O0 #-D_NVTX
+	CUFLAGS += -g -G -O0 #-D_NVTX
 endif
 
 WARN_ON = -Wall -Wextra -Wconversion
@@ -86,7 +86,7 @@ OBJECTS = $(BINDIR)/buildADTrecursion.o $(BINDIR)/searchADTrecursion.o $(BINDIR)
 OBJSWIG = $(BINDIR)/tioga_wrap.o
 
 ifeq ($(strip $(CUDA)),YES)
-	OBJECTS += $(BINDIR)/highOrder_kernels.o
+	OBJECTS += $(BINDIR)/highOrder_kernels.o $(BINDIR)/dADT.o $(BINDIR)/dMeshBlock.o
 endif
 
 LDFLAGS= -L/lib64/ -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl

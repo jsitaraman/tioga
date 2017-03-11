@@ -40,7 +40,9 @@ SOURCES += src/tioga.C \
     src/highOrder_kernels.cu \
     src/kaiser.f \
     src/median.F90 \
-    src/writeqnode.f90
+    src/writeqnode.f90 \
+    src/dADT.cu \
+    src/dMeshBlock.cu
 
 HEADERS += \
     include/ADT.h \
@@ -57,4 +59,6 @@ HEADERS += \
     include/points.hpp \
     include/tioga.h \
     include/tioga.i \
-    include/tiogaInterface.h
+    include/tiogaInterface.h \
+    include/dADT.h \
+    include/dMeshBlock.h

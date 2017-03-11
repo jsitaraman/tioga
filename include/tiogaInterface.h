@@ -120,4 +120,5 @@ void tioga_delete_(void);
 //! For GPU-based interpolation, pointers to the CUDA stream & event to use
 void tioga_set_stream_handle(void* stream, void* event);
 
+void tioga_set_device_geo_data(double* xyz, double* coord, int* ibc, int* ibf);
 } /* extern "C" */

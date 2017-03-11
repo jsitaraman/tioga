@@ -1,4 +1,5 @@
-//
+#ifndef CODETYPES_H
+#define CODETYPES_H
 // This file is part of the Tioga software library
 //
 // Tioga  is a tool for overset grid assembly on parallel distributed systems
@@ -164,3 +165,5 @@ typedef struct INTEGERLIST2
   double *realData;
   struct INTEGERLIST2 *next;
 }INTEGERLIST2; 
+
+#endif // CODETYPES_H

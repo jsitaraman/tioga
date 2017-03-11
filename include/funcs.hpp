@@ -118,6 +118,8 @@ std::vector<int> structured_to_gmsh_hex(unsigned int nNodes);
 std::vector<int> gmsh_to_structured_quad(unsigned int nNodes);
 std::vector<int> gmsh_to_structured_hex(unsigned int nNodes);
 
+double quick_select(int* inds, double* arr, int n);
+
 template<typename T>
 int findFirst(const std::vector<T>& vec, T val)
 {

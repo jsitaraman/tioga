@@ -112,7 +112,6 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
     int passFlag;
     donor_inclusion_test(&icell1,xsearch,&passFlag,&(rst[ipoint]));
     if (passFlag) *cellIndex = icell;
-    return;
   }
 
 }

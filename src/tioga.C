@@ -63,7 +63,10 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   pc_cart->myid=myid;
   pc_cart->scomm=scomm;
   pc_cart->numprocs=nproc;
-  //
+
+#ifdef _GPU
+//  mb_d = new dMeshBlock(); /// TODO
+#endif
 }
 /**
  * register grid data for each mesh block
@@ -86,6 +89,13 @@ void tioga::registerFaceConnectivity(int nftype, int *nf, int *nfv, int **fconn,
   mb->setFaceData(nftype, nf, nfv, fconn, f2c, c2f, iblank_face, nOverFaces,
                   nMpiFaces, overFaces, mpiFaces, mpiProcR, mpiFidR);
 }
+
+#ifdef _GPU
+void tioga::registerDeviceGridData(double *xyz, double *coords, int *ibc, int *ibf)
+{
+  mb->setDeviceData(xyz,coords,ibc,ibf);
+}
+#endif
 
 void tioga::profile(void)
 {

@@ -64,16 +64,14 @@ void tioga::exchangeSearchData(void)
   // If these were already allocated, free & re-allocate
   free(mb->xsearch);
   free(mb->isearch);
-  free(mb->donorId);
 
   mb->xsearch = (double *)malloc(sizeof(double)*3*mb->nsearch);
   mb->isearch = (int *)malloc(sizeof(int)*2*mb->nsearch);
-  mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
+  mb->donorId.resize(mb->nsearch);
   if (ihigh)
   {
-    free(mb->rst);
-    mb->rst = (double *)malloc(sizeof(double)*3*mb->nsearch);
-    std::fill(mb->rst, mb->rst+3*mb->nsearch, 0.0);
+    mb->rst.resize(3*mb->nsearch);
+    std::fill(mb->rst.data(), mb->rst.data()+3*mb->nsearch, 0.0);
   }
 
   // now fill the query point arrays
@@ -158,17 +156,15 @@ void tioga::exchangePointSearchData(void)
   // get rid of them
   free(mb->xsearch);
   free(mb->isearch);
-  free(mb->donorId);
 
   // allocate query point storage
   mb->xsearch = (double *)malloc(sizeof(double)*3*mb->nsearch);
   mb->isearch = (int *)malloc(2*sizeof(int)*mb->nsearch);
-  mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
+  mb->donorId.resize(mb->nsearch);
   if (mb->nsearch != nsearch_prev) // Keep previous r,s,t values for checkContainment()
   {
-    free(mb->rst);
-    mb->rst = (double *)malloc(sizeof(double)*3*mb->nsearch);
-    std::fill(mb->rst, mb->rst+3*mb->nsearch, 0.0);
+    mb->rst.resize(3*mb->nsearch);
+    std::fill(mb->rst.data(), mb->rst.data()+3*mb->nsearch, 0.0);
   }
 
   // now fill the query point arrays

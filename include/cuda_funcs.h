@@ -65,7 +65,6 @@ void cuda_free_pinned(T* &data_h)
   check_error();
 }
 
-
 template<typename T>
 class dvec
 {
@@ -76,30 +75,45 @@ private:
   bool allocated = false;
 
 public:
+  __host__ __device__
   dvec(void) { }
 
+  __host__ __device__
   ~dvec(void);
 
+  __host__ __device__
   int size(void) { return size_; }
 
+  __host__ __device__
   int capacity(void) { return max_size_; }
 
+  __host__ __device__
   T* data(void) { return data_; }
 
+  __host__
   void resize(int size);
 
+  __host__
   void assign(T* data_h, int size, cudaStream_t *stream = NULL);
 
+  __host__
   void free_data(void);
+
+  __device__
+  T& operator[](int ind);
 };
 
 template<typename T>
+__host__ __device__
 dvec<T>::~dvec(void)
 {
-  free_data();
+#ifndef __CUDA_ARCH__
+//  free_data();
+#endif
 }
 
 template<typename T>
+__host__
 void dvec<T>::resize(int size)
 {
   if (allocated)
@@ -127,6 +141,7 @@ void dvec<T>::resize(int size)
 }
 
 template<typename T>
+__host__
 void dvec<T>::assign(T* data_h, int size, cudaStream_t *stream)
 {
   resize(size);
@@ -138,6 +153,7 @@ void dvec<T>::assign(T* data_h, int size, cudaStream_t *stream)
 }
 
 template<typename T>
+__host__
 void dvec<T>::free_data(void)
 {
   if (allocated)
@@ -147,6 +163,12 @@ void dvec<T>::free_data(void)
   }
 }
 
+template<typename T>
+__device__
+T& dvec<T>::operator [](int ind)
+{
+  return data_[ind];
+}
 
 template<typename T>
 class hvec
@@ -232,5 +254,111 @@ void hvec<T>::free_data(void)
 
   allocated = false;
 }
+
+/* ------ Misc. Helper Functions ------ */
+
+namespace cuda_funcs
+{
+
+static
+__device__ __forceinline__
+double det_3x3_part(const double* mat, int a, int b, int c)
+{
+  return mat[a] * (mat[3+b] * mat[6+c] - mat[3+c] * mat[6+b]);
+}
+
+static
+__device__ __forceinline__
+double det_3x3(const double* mat)
+{
+  return det_3x3_part(mat,0,1,2) - det_3x3_part(mat,1,0,2)
+      + det_3x3_part(mat,2,0,1);
+}
+
+static
+__device__ __forceinline__
+void adjoint_3x3(const double* __restrict__ mat, double* __restrict__ adj)
+{
+  double a11 = mat[0], a12 = mat[1], a13 = mat[2];
+  double a21 = mat[3], a22 = mat[4], a23 = mat[5];
+  double a31 = mat[6], a32 = mat[7], a33 = mat[8];
+
+  adj[0] = a22*a33 - a23*a32;
+  adj[1] = a13*a32 - a12*a33;
+  adj[2] = a12*a23 - a13*a22;
+
+  adj[3] = a23*a31 - a21*a33;
+  adj[4] = a11*a33 - a13*a31;
+  adj[5] = a13*a21 - a11*a23;
+
+  adj[6] = a21*a32 - a22*a31;
+  adj[7] = a12*a31 - a11*a32;
+  adj[8] = a11*a22 - a12*a21;
+}
+
+/*! Evaluates the Lagrange function corresponding to the specified mode on xiGrid at location xi.
+ *
+ * \param xiGrid The grid of interpolation points. Sorted in domain [-1,1].
+ * \param mode Mode of the Lagrange function. Defined such that function is 1 at xiGrid(mode)
+ * zero at other grid points.
+ * \param xi  Point of evaluation in domain [-1,1].
+ *
+ * \return Value of Lagrange function at xi.
+ */
+__device__ __forceinline__
+double Lagrange_gpu(double* xiGrid, unsigned int npts, double xi, unsigned int mode)
+{
+  double val = 1.0;
+
+  for (unsigned int i = 0; i < mode; i++)
+    val *= (xi - xiGrid[i])/(xiGrid[mode] - xiGrid[i]);
+
+  for (unsigned int i = mode + 1; i < npts; i++)
+    val *= (xi - xiGrid[i])/(xiGrid[mode] - xiGrid[i]);
+
+  return val;
+}
+
+/*! Evaluates the first derivative of the Lagrange function corresponding to the specified mode
+ *  on xiGrid at location xi.
+ *
+ * \param xiGrid The grid of interpolation points. Sorted in domain [-1,1].
+ * \param mode Mode of the Lagrange function. Defined such that function is 1 at xiGrid[mode]
+ * zero at other grid points.
+ * \param xi  Point of evaluation in domain [-1,1].
+ *
+ * \return Value of first derivative of the Lagrange function at xi.
+ */
+__device__ __forceinline__
+double dLagrange_gpu(double* xiGrid, unsigned int npts, double xi, unsigned int mode)
+{
+  double val = 0.0;
+
+  /* Compute normalization constant */
+  double den = 1.0;
+  for (unsigned int i = 0; i < mode; i++)
+    den *= (xiGrid[mode] - xiGrid[i]);
+
+  for (unsigned int i = mode+1; i < npts; i++)
+    den *= (xiGrid[mode] - xiGrid[i]);
+
+  /* Compute sum of products */
+  for (unsigned int j = 0; j < npts; j++)
+  {
+    if (j == mode)
+      continue;
+
+    double term = 1.0;
+    for (unsigned int i = 0; i < npts; i++)
+      if (i != mode and i != j)
+        term *= (xi - xiGrid[i]);
+
+    val += term;
+  }
+
+  return val/den;
+}
+
+} // namespace cuda_funcs
 
 #endif

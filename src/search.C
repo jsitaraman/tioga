@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include "tioga.h" /// DEBUGGING (profiling - timer)
 #include "MeshBlock.h"
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
@@ -60,7 +61,7 @@ void MeshBlock::search(void)
     std::vector<int> icell(ncells, -1);
 
     int iptr = -1;
-    int cell_count = 0;
+    ncells_adt = 0;
     int p = 0;
     for (int n = 0; n < ntypes; n++)
     {
@@ -98,7 +99,7 @@ void MeshBlock::search(void)
           // the QP bounding box
           icell[p] = iptr;
           iptr = p;
-          cell_count++;
+          ncells_adt++;
         }
         p++;
       }
@@ -109,8 +110,8 @@ void MeshBlock::search(void)
     // ADT
     free(elementBbox);
     free(elementList);
-    elementBbox = (double *)malloc(sizeof(double)*cell_count*6);
-    elementList = (int *)malloc(sizeof(int)*cell_count);
+    elementBbox = (double *)malloc(sizeof(double)*ncells_adt*6);
+    elementList = (int *)malloc(sizeof(int)*ncells_adt);
 
     int k = iptr;
     int l = 0;
@@ -167,12 +168,29 @@ void MeshBlock::search(void)
     }
 
     int ndim = 6;
-    adt->buildADT(ndim,cell_count,elementBbox);
+    adt->buildADT(ndim,ncells_adt,elementBbox);
   }
 
-  free(donorId);
-  donorId = (int*)malloc(sizeof(int)*nsearch);
+  donorId.resize(nsearch);
 
+  Timer dtime("Device ADT Time: ");
+  Timer htime("Host ADT Time: ");
+#ifdef _GPU
+  mb_d.dataToDevice(nDims,nnodes,ncells,ncells_adt,nsearch,nv,nc,elementList,elementBbox,isearch,xsearch);
+
+  adt_d.copyADT(adt);
+
+  //cudaDeviceSynchronize();
+  dtime.startTimer();
+  searchADT(adt_d,mb_d);
+  cudaDeviceSynchronize();
+  dtime.stopTimer();
+
+  //rst.assign(mb_d.rst.data(), mb_d.rst.size());
+  donorId.assign(mb_d.donorId.data(), mb_d.donorId.size());
+#endif
+/*
+  htime.startTimer();
   donorCount = 0;
   ipoint = 0;
   for (int i = 0; i < nsearch; i++)
@@ -184,4 +202,10 @@ void MeshBlock::search(void)
 
     ipoint += 3;
   }
+  htime.stopTimer();
+
+  printf("%d: nsearch %d\n",myid,nsearch);
+  dtime.showTime(5);
+  htime.showTime(5);
+ */ 
 }

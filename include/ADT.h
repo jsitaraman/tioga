@@ -1,4 +1,5 @@
-//
+#ifndef ADT_H
+#define ADT_H
 // This file is part of the Tioga software library
 //
 // Tioga  is a tool for overset grid assembly on parallel distributed systems
@@ -28,7 +29,8 @@
 class MeshBlock; 
 class ADT
 {
-  private :
+friend class dADT;
+private :
   
   int ndim;          /** < number of dimensions (usually 3 but can be more) */
   int nelem;         /** < number of elements */
@@ -41,7 +43,7 @@ class ADT
   std::vector<double> Smat;   /** Rotation Matrix (global->body coords) for rigid motion */
   std::vector<double> offset; /** Translation Offset (in global coords) for rigid motion */
 
- public :
+public :
 
   ADT() {ndim=6;nelem=0;adtIntegers=NULL;adtReals=NULL;adtExtents=NULL;coord=NULL;}
 
@@ -81,3 +83,4 @@ class ADT
   void searchADT_rot(MeshBlock* mb, int* cellIndex, double* xsearch);
 };
 
+#endif

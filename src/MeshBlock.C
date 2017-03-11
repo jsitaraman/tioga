@@ -81,6 +81,14 @@ void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v,
     nfaces += nf[i];
 }
 
+#ifdef _GPU
+void MeshBlock::setDeviceData(double* xyz, double* coords, int* ibc, int* ibf)
+{
+  mb_d.setDeviceData(xyz,coords,ibc,ibf);
+}
+
+#endif
+
 void MeshBlock::preprocess(void)
 {
   // set all iblanks = 1
@@ -856,7 +864,6 @@ MeshBlock::~MeshBlock()
   if (obb) free(obb);
   if (isearch) free(isearch);
   if (xsearch) free(xsearch);
-  if (rst) free(rst);
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);
   if (ctag) free(ctag);

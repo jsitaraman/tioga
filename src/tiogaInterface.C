@@ -331,4 +331,11 @@ extern "C" {
     tg->set_stream_handle(*(cudaStream_t*)stream, *(cudaEvent_t*)event);
 #endif
   }
+
+  void tioga_set_device_geo_data(double* xyz, double* coord, int* ibc, int* ibf)
+  {
+#ifdef _GPU
+    tg->registerDeviceGridData(xyz, coord, ibc,  ibf);
+#endif
+  }
 }

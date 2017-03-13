@@ -841,7 +841,6 @@ MeshBlock::~MeshBlock()
     for (int i = 0; i < nnodes; i++) deallocateLinkList(donorList[i]);
     free(donorList);
   }
-  free(interpList);
   return;  /// Why is this here??
   free(interpListCart);
   if (obb) free(obb);

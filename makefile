@@ -35,6 +35,7 @@ else
 endif
 endif
 INCS += -I$(strip $(CUDA_INC_DIR))/
+INCS += -I$(strip $(MPI_INC_DIR))/
 
 ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CFLAGS += -Ofast

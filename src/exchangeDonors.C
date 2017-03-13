@@ -120,12 +120,12 @@ void tioga::exchangeDonors(void)
   mb->initializeInterpList(ninterp);
 
   // Figure out which points from other grids we should be interpolating to
-  int m = 0;
+  int npoints = 0;
   for (int k = 0; k < nrecv; k++)
     for (int i = 0; i < rcvPack[k].nints; i++)
-      mb->findInterpData(&m,rcvPack[k].intData[i],rcvPack[k].realData[i]);
+      mb->findInterpData(npoints,rcvPack[k].intData[i],rcvPack[k].realData[i]);
 
-  mb->set_ninterp(m);
+  mb->set_ninterp(npoints);
 
   //printf("process %d has (%d,%d) points to interpolate out %d donors\n",myid,ninterp,m,mb->donorCount);
 

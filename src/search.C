@@ -172,7 +172,7 @@ void MeshBlock::search(void)
 
     int ndim = 6;
     adt->buildADT(ndim,ncells_adt,elementBbox.data());
-printf("Hey! You shouldn't be here for this case!\n");
+
 #ifdef _GPU
     mb_d.dataToDevice(nDims,nnodes,ncells,ncells_adt,nsearch,nv,nc,elementList.data(),
                       elementBbox.data(),isearch.data(),xsearch.data());

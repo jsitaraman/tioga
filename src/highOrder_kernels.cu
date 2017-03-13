@@ -80,9 +80,17 @@ void interp_du_wrapper(double *dU_spts, double *dU_out, int *donors,
   unsigned int threads = 128;
   unsigned int blocks = (nFringe + threads - 1) / threads;
 
-  if (nDims == 3 && nVars == 5)
-    interp_du<3,5><<<blocks, threads, 0, stream_h>>>(dU_spts, dU_out, donors, weights,
+  if (nDims == 3)
+  {
+    if (nVars == 1)
+      interp_du<3,1><<<blocks, threads, 0, stream_h>>>(dU_spts, dU_out, donors, weights,
         out_inds, nFringe, nSpts, estride, sstride, vstride, dstride);
+    else if (nVars == 5)
+      interp_du<3,5><<<blocks, threads, 0, stream_h>>>(dU_spts, dU_out, donors, weights,
+        out_inds, nFringe, nSpts, estride, sstride, vstride, dstride);
+    else
+      FatalError("3D nVars case not recognized (expecting 1 or 5)");
+  }
   else
     FatalError("TIOGA support for 3D only currently!");
 

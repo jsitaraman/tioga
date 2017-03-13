@@ -246,8 +246,7 @@ void MeshBlock::initializeInterpList(int ninterp_input)
   ninterp = ninterp_input;
   interpListSize = ninterp_input;
 
-  free(interpList);
-  interpList = (INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListSize);
+  interpList.resize(interpListSize);
 
   deallocateLinkList2(cancelList);
   cancelList = NULL;
@@ -260,7 +259,7 @@ void MeshBlock::initializeInterpList(int ninterp_input)
     
 }
 		
-void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
+void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes)
 {
   double xv[8][3];
   std::vector<double> xv2;
@@ -356,26 +355,27 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
   if (nvert <= 8)
   {
     computeNodalWeights(xv,xp,frac.data(),nvert); /// TODO: support nvert > 8
-  } else
+  }
+  else
   {
     double xref[3];
     getRefLocNewton(xv2.data(), &xp[0], &xref[0], nvert, 3);
     shape_hex(point(&xref[0]),frac,nvert);
   }
 
-  interp2donor[irecord]=*recid;
-  interpList[*recid].cancel=0;
-  interpList[*recid].nweights=nvert;
-  interpList[*recid].receptorInfo[0]=procid;
-  interpList[*recid].receptorInfo[1]=pointid;
-  interpList[*recid].inode.resize(nvert);
-  interpList[*recid].weights.resize(nvert);
+  interp2donor[irecord] = recid;
+  interpList[recid].cancel = 0;
+  interpList[recid].nweights = nvert;
+  interpList[recid].receptorInfo[0] = procid;
+  interpList[recid].receptorInfo[1] = pointid;
+  interpList[recid].inode.resize(nvert);
+  interpList[recid].weights.resize(nvert);
   for (int m = 0; m < nvert; m++)
   {
-    interpList[*recid].inode[m]   = inode[m];
-    interpList[*recid].weights[m] = frac[m];
+    interpList[recid].inode[m]   = inode[m];
+    interpList[recid].weights[m] = frac[m];
   }
-  (*recid)++;
+  recid++;
 }
 
 void MeshBlock::set_ninterp(int ninterp_input)

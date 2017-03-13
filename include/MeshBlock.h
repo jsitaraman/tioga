@@ -132,7 +132,7 @@ private:
   //
   int ninterp;              /**< number of interpolations to be performed */
   int interpListSize;
-  INTERPLIST *interpList;   /**< list of donor nodes in my grid, with fractions and information of
+  std::vector<INTERPLIST> interpList;   /**< list of donor nodes in my grid, with fractions and information of
                                  who they donate to */ 
   int *interp2donor;
 
@@ -320,7 +320,7 @@ private:
     iblank=NULL; iblank_cell=NULL; iblank_face=NULL; vconn=NULL;
     wbcnode=NULL; obcnode=NULL;
     adt=NULL; obb=NULL;
-    donorList=NULL; interpList=NULL; interp2donor=NULL;
+    donorList=NULL; interp2donor=NULL;
     nsearch=0;
     cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
@@ -441,7 +441,7 @@ private:
 
   void initializeInterpList(int ninterp_input);
   
-  void findInterpData(int* recid,int irecord, double receptorRes);
+  void findInterpData(int& recid, int irecord, double receptorRes);
 
   void findInterpListCart();
 

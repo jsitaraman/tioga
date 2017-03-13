@@ -38,10 +38,29 @@ void dMeshBlock::dataToDevice(int ndims, int nnodes, int ncells, int ncells_adt,
   xlist.assign(xlist_h.data(), xlist_h.size());
 }
 
+void dMeshBlock::updateSearchPoints(int nsearch, int *isearch, double *xsearch)
+{
+  this->nsearch = nsearch;
+  this->isearch.assign(isearch, nsearch);
+  this->xsearch.assign(xsearch, nsearch*nDims);
+  rst.resize(nsearch*nDims);
+  donorId.resize(nsearch);
+}
+
 void dMeshBlock::setDeviceData(double* vx, double* ex, int* ibc, int* ibf)
 {
   x = vx;
   iblank_cell = ibc;
   iblank_face = ibf;
   coord = ex;
+}
+
+void dMeshBlock::setTransform(double* mat, double* off, int ndim)
+{
+  if (ndim != nDims)
+    ThrowException("dMeshBlock::set_transform: input ndim != nDims");
+
+  rrot = true;
+  Rmat.assign(mat, ndim*ndim);
+  offset.assign(off, ndim);
 }

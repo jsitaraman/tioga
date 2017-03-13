@@ -61,12 +61,8 @@ void tioga::exchangeSearchData(void)
   for (int k = 0; k < nrecv; k++)
     mb->nsearch += rcvPack[k].nints;
 
-  // If these were already allocated, free & re-allocate
-  free(mb->xsearch);
-  free(mb->isearch);
-
-  mb->xsearch = (double *)malloc(sizeof(double)*3*mb->nsearch);
-  mb->isearch = (int *)malloc(sizeof(int)*2*mb->nsearch);
+  mb->xsearch.resize(3*mb->nsearch);
+  mb->isearch.resize(2*mb->nsearch);
   mb->donorId.resize(mb->nsearch);
   if (ihigh)
   {
@@ -138,7 +134,7 @@ void tioga::exchangePointSearchData(void)
     rcvPack[i].realData = NULL;
   }
 
-  // now get data for each packet
+  // now get data for each packet [all of our fringe points which touch rank k's obb]
   for (int k = 0; k < nsend; k++)
     mb->getExtraQueryPoints(&obblist[k], sndPack[k].nints, sndPack[k].intData,
                             sndPack[k].nreals, sndPack[k].realData);
@@ -152,14 +148,9 @@ void tioga::exchangePointSearchData(void)
   for (int k = 0; k < nrecv; k++)
     mb->nsearch += rcvPack[k].nints;
 
-  // if these were already allocated
-  // get rid of them
-  free(mb->xsearch);
-  free(mb->isearch);
-
   // allocate query point storage
-  mb->xsearch = (double *)malloc(sizeof(double)*3*mb->nsearch);
-  mb->isearch = (int *)malloc(2*sizeof(int)*mb->nsearch);
+  mb->xsearch.resize(3*mb->nsearch);
+  mb->isearch.resize(2*mb->nsearch);
   mb->donorId.resize(mb->nsearch);
   if (mb->nsearch != nsearch_prev) // Keep previous r,s,t values for checkContainment()
   {

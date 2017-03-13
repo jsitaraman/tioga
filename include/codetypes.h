@@ -138,8 +138,8 @@ typedef struct INTERPLIST
   int receptorInfo[3];
   int donorID; // donor-cell ID
   double xtmp[3];
-  int *inode;
-  double *weights;
+  std::vector<int> inode;
+  std::vector<double> weights;
 } INTERPLIST;
 
 typedef struct INTERPLIST2

@@ -35,7 +35,12 @@ void MeshBlock::search(void)
   if (rrot && adt)
   {
     /// TODO: worry about updating ADT based on changing OBB of search points
-    adt->setTransform(Smat.data(), offset, nDims);
+    adt->setTransform(Rmat.data(), offset, nDims);
+#ifdef _GPU
+    adt_d.setTransform(Rmat.data(), offset, nDims);
+    mb_d.setTransform(Rmat.data(), offset, nDims);
+    mb_d.updateSearchPoints(nsearch,isearch.data(),xsearch.data());
+#endif
   }
   else
   {
@@ -47,13 +52,13 @@ void MeshBlock::search(void)
     // form the bounding box of the
     // query points
     OBB obq;
-    findOBB(xsearch,obq.xc,obq.dxc,obq.vec,nsearch);
+    findOBB(xsearch.data(),obq.xc,obq.dxc,obq.vec,nsearch);
 
     if (rrot)
     {
       /// HACK - adding a 20% safety factor to ADT bounds in case of moving grids
       for (int i = 0; i < nDims; i++)
-        obq.dxc[i] *= 1.2;
+        obq.dxc[i] *= 1.5;
     }
 
     // find all the cells that may have intersections with
@@ -108,10 +113,8 @@ void MeshBlock::search(void)
     // now find the axis aligned bounding box
     // of each cell in the LIFO stack to build the
     // ADT
-    free(elementBbox);
-    free(elementList);
-    elementBbox = (double *)malloc(sizeof(double)*ncells_adt*6);
-    elementList = (int *)malloc(sizeof(int)*ncells_adt);
+    elementBbox.resize(ncells_adt*6);
+    elementList.resize(ncells_adt);
 
     int k = iptr;
     int l = 0;
@@ -168,7 +171,14 @@ void MeshBlock::search(void)
     }
 
     int ndim = 6;
-    adt->buildADT(ndim,ncells_adt,elementBbox);
+    adt->buildADT(ndim,ncells_adt,elementBbox.data());
+printf("Hey! You shouldn't be here for this case!\n");
+#ifdef _GPU
+    mb_d.dataToDevice(nDims,nnodes,ncells,ncells_adt,nsearch,nv,nc,elementList.data(),
+                      elementBbox.data(),isearch.data(),xsearch.data());
+
+    adt_d.copyADT(adt);
+#endif
   }
 
   donorId.resize(nsearch);
@@ -176,20 +186,16 @@ void MeshBlock::search(void)
   Timer dtime("Device ADT Time: ");
   Timer htime("Host ADT Time: ");
 #ifdef _GPU
-  mb_d.dataToDevice(nDims,nnodes,ncells,ncells_adt,nsearch,nv,nc,elementList,elementBbox,isearch,xsearch);
-
-  adt_d.copyADT(adt);
 
   //cudaDeviceSynchronize();
-  dtime.startTimer();
+  //dtime.startTimer();
   searchADT(adt_d,mb_d);
-  cudaDeviceSynchronize();
-  dtime.stopTimer();
+  //cudaDeviceSynchronize();
+  //dtime.stopTimer();
 
-  //rst.assign(mb_d.rst.data(), mb_d.rst.size());
+  rst.assign(mb_d.rst.data(), mb_d.rst.size());
   donorId.assign(mb_d.donorId.data(), mb_d.donorId.size());
-#endif
-/*
+#else
   htime.startTimer();
   donorCount = 0;
   ipoint = 0;
@@ -207,5 +213,5 @@ void MeshBlock::search(void)
   printf("%d: nsearch %d\n",myid,nsearch);
   dtime.showTime(5);
   htime.showTime(5);
- */ 
+#endif
 }

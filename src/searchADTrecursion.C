@@ -81,7 +81,7 @@ void ADT::searchADT_rot(MeshBlock *mb, int *cellIndex, double *xsearch)
   int nd = ndim/2;
   for (int d1 = 0; d1 < nd; d1++)
     for (int d2 = 0; d2 < nd; d2++)
-      xs_adt[d1] += Smat[nd*d1+d2] * (xsearch[d2]-offset[d2]);
+      xs_adt[d1] += Rmat[nd*d1+d2] * (xsearch[d2]-offset[d2]);
 
   bool flag = true;
   for (int i = 0; i < ndim/2; i++)

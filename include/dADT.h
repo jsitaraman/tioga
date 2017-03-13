@@ -35,6 +35,9 @@ public:
   dvec<double> adtBBox;  //! Global bounding box of ADT (layout: xmin,xmax,ymin,ymax)
   dvec<double> coord;    //! Actual bounding box of each element in ADT
 
+  dvec<double> offset;
+  dvec<double> Rmat;
+
   bool rrot = false;         /** Flag for rigid-body rotation (apply transform to all search points) */
 
   dADT() { }
@@ -45,7 +48,7 @@ public:
 
   void clearData(void);
 
-  void setTransform(double* mat, double* off, int ndims);
+  void setTransform(double* mat, double* off, int nDims);
 };
 
 //! Search the ADT for the element containint the point xsearch

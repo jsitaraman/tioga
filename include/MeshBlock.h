@@ -97,11 +97,11 @@ private:
   int *wbcnode;     /** < wall boundary node indices */
   int *obcnode;     /** < overset boundary node indices */
   //
-  double *nodeRes;  /** < node resolution  */
+  std::vector<double> nodeRes;  /** < node resolution  */
   double *userSpecifiedNodeRes;
   double *userSpecifiedCellRes;
-  double *elementBbox; /** < bounding box of the elements */
-  int *elementList;    /** < list of elements in */
+  std::vector<double> elementBbox; /** < bounding box of the elements */
+  std::vector<int> elementList;    /** < list of elements in */
   int ncells_adt;  //! Number of cells within ADT
 
   int nOverFaces;
@@ -117,7 +117,7 @@ private:
   std::vector<int> sndMap, rcvMap;
 
   bool rrot = false;
-  std::vector<double> Smat;
+  std::vector<double> Rmat;
   double offset[3] = {0.0};
 
   dADT adt_d;       /** GPU-based ADT */
@@ -183,6 +183,8 @@ private:
   // GPU-related functions
   double* (*get_q_spts_d)(int& ele_stride, int& spt_stride, int& var_stride);
   double* (*get_dq_spts_d)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
+
+  void (*get_face_nodes_gpu)(int* fringeIDs, int nFringe, int* nptPerFace, double* xyz);
 
   /*! Copy solution/gradient data for the donor elements from device to host */
   void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
@@ -263,15 +265,15 @@ private:
   OBB *obb;
   //
   int nsearch;        /** < number of query points to search in this block */
-  int *isearch;       /** < index of query points in the remote process */
-  double *xsearch;    /** < coordinates of the query points */
+  std::vector<int> isearch;       /** < index of query points in the remote process */
+  std::vector<double> xsearch;    /** < coordinates of the query points */
   //double *rst;            /**  natrural coordinates */
   //int *donorId;       /** < donor indices for those found */
   hvec<double> rst;
   hvec<int> donorId; /// TODO: allow hvec to be used for non-GPU cases (use malloc vs. cudaMalloc)
   int donorCount;
   int myid;
-  double *cellRes;  /** < resolution for each cell */
+  std::vector<double> cellRes;  /** < resolution for each cell */
   int ntotalPoints;        /**  total number of extra points to interpolate */
   int ihigh;               /** High-order flag for current rank */
   int iartbnd;             /** High-order artificial boundary flag for current rank */
@@ -279,7 +281,7 @@ private:
 
   int ninterp2;            /** < number of interpolants for high-order points */
   int interp2ListSize;
-  INTERPLIST *interpList2; /** < list for high-interpolation points */
+  std::vector<INTERPLIST> interpList2; /** < list for high-interpolation points */
   int ninterpCart;
   int interpListCartSize;
   INTERPLIST *interpListCart; 
@@ -317,11 +319,9 @@ private:
     nv=NULL; nc=NULL; x=NULL;
     iblank=NULL; iblank_cell=NULL; iblank_face=NULL; vconn=NULL;
     wbcnode=NULL; obcnode=NULL;
-    cellRes=NULL; nodeRes=NULL;
-    elementBbox=NULL; elementList=NULL;
     adt=NULL; obb=NULL;
     donorList=NULL; interpList=NULL; interp2donor=NULL;
-    nsearch=0; isearch=NULL; xsearch=NULL;
+    nsearch=0;
     cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
     nfringe=0;
@@ -336,7 +336,6 @@ private:
     nreceptorFaces=0;
     ihigh=0;
     ipoint=0;
-    interpList2=NULL;
     picked=NULL;
     ctag_cart=NULL;
     rxyzCart=NULL;
@@ -353,6 +352,8 @@ private:
   ~MeshBlock();
       
   void preprocess(void);
+
+  void updateOBB(void);
 
   void tagBoundary(void);
   
@@ -525,13 +526,15 @@ private:
                             void (*h2df)(int* ids, int nf, int grad, double *data),
                             void (*h2dc)(int* ids, int nf, int grad, double *data),
                             double* (*gqd)(int&, int&, int&),
-                            double* (*gdqd)(int&, int&, int&, int&))
+                            double* (*gdqd)(int&, int&, int&, int&),
+                            void (*gfng)(int*, int, int*, double*))
   {
     data_from_device = d2h;
     face_data_to_device = h2df;
     cell_data_to_device = h2dc;
     get_q_spts_d = gqd;
     get_dq_spts_d = gdqd;
+    get_face_nodes_gpu = gfng;
     gpu = true;
   }
 

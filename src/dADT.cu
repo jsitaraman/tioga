@@ -28,78 +28,81 @@ void dADT::copyADT(ADT *adt)
   adtReals.assign(adt->adtReals, nelem*ndim);
   adtBBox.assign(adt->adtExtents, ndim);
   //coord.assign(adt->coord, ndim*nelem);
+  rrot = adt->rrot;
+  if (rrot)
+  {
+    offset.assign(adt->offset.data(), adt->offset.size());
+    Rmat.assign(adt->Rmat.data(), adt->Rmat.size());
+  }
 }
 
-template<int level, int nDims, int nside>
+void dADT::setTransform(double *mat, double *off, int nDims)
+{
+  if (nDims != ndim/2)
+    FatalError("dADT:setTransform:nDims != dADT::ndim/2");
+
+  rrot = true;
+  Rmat.assign(mat, nDims*nDims);
+  offset.assign(off, nDims);
+}
+
+template<int nDims, int nside>
 __device__
-void d_searchADTrecursion(dMeshBlock mb, int& cellIndex, int* adtIntegers, double* adtReals,
-    double* coord, int node, double* element, double* xsearch, double* rst, int nelem);
-
-template<> __device__
-void d_searchADTrecursion<MAX_LEVEL,3,2>(dMeshBlock, int&, int*, double*, double*, int, double*, double*, double*, int)
-{ printf("ERROR: Max recursion depth for d_searchADTrecursion exceeded!\n"); }
-
-template<> __device__
-void d_searchADTrecursion<MAX_LEVEL,3,3>(dMeshBlock, int&, int*, double*, double*, int, double*, double*, double*, int)
-{ printf("ERROR: Max recursion depth for d_searchADTrecursion exceeded!\n"); }
-
-template<> __device__
-void d_searchADTrecursion<MAX_LEVEL,3,4>(dMeshBlock, int&, int*, double*, double*, int, double*, double*, double*, int)
-{ printf("ERROR: Max recursion depth for d_searchADTrecursion exceeded!\n"); }
-
-template<int level, int nDims, int nside>
-__device__
-void d_searchADTrecursion(dMeshBlock mb, int& cellIndex, int* adtIntegers, double* adtReals,
-    double* coord, int node, double* element, double* xsearch, double* rst, int nelem)
+void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, double* xsearch, double* rst)
 {
   const int ndim = 2*nDims;
-  bool flag = true;
+  int stack[MAX_LEVEL] = {0};
+  int size = 1;
 
-  int ele = adtIntegers[4*node];
-  for (int i = 0; i < ndim; i++)
-    element[i] = coord[ndim*ele+i];
-
-  for (int i = 0; i < nDims; i++)
+  while (size > 0)
   {
-    flag = (flag && (xsearch[i] >= element[i]-TOL));
-    flag = (flag && (xsearch[i] <= element[i+nDims]+TOL));
-  }
+    int node = stack[size-1];
+    size--;
 
-  if (flag)
-  {
-    mb.checkContainment<nDims,nside>(ele,cellIndex,element,xsearch,rst);
-    if (cellIndex > -1)
-      return;
-  }
+    int ele = adt.adtInts[4*node];
+    double bbox[ndim];
+    for (int i = 0; i < ndim; i++)
+      bbox[i] = mb.eleBBox[ndim*ele+i];
 
-  // check the left and right children now
-  for (int d = 1; d < 3; d++)
-  {
-    int nodeChild = adtIntegers[4*node+d];
-    if (nodeChild > -1)
+    bool flag = true;
+    for (int i = 0; i < nDims; i++)
     {
-      nodeChild = adtIntegers[4*nodeChild+3];
-      if (nodeChild < 0) printf("ERROR!!! Invalid ADT node number!!\n"); /// DEBUGGING
-      for (int i = 0; i < ndim; i++)
-        element[i] = adtReals[ndim*nodeChild+i];
+      flag = (flag && (xsearch[i] >= bbox[i]-TOL));
+      flag = (flag && (xsearch[i] <= bbox[i+nDims]+TOL));
+    }
 
-      flag = true;
-      for (int i = 0; i < nDims; i++)
-      {
-        flag = (flag && (xsearch[i] >= element[i]-TOL));
-        flag = (flag && (xsearch[i] <= element[i+nDims]+TOL));
-      }
+    if (flag)
+    {
+      mb.checkContainment<nDims,nside>(ele,cellIndex,bbox,xsearch,rst);
+      if (cellIndex > -1)
+        return;
+    }
 
-      if (flag)
+    // check the left and right children now
+    for (int d = 1; d < 3; d++)
+    {
+      int nodeChild = adt.adtInts[4*node+d];
+      if (nodeChild > -1)
       {
-        d_searchADTrecursion<level+1,nDims,nside>(mb,cellIndex,adtIntegers,adtReals,coord,
-                            nodeChild,element,xsearch,rst,nelem);
-        if (cellIndex > -1)
-          return;
+        nodeChild = adt.adtInts[4*nodeChild+3];
+        for (int i = 0; i < ndim; i++)
+          bbox[i] = adt.adtReals[ndim*nodeChild+i];
+
+        flag = true;
+        for (int i = 0; i < nDims; i++)
+        {
+          flag = (flag && (xsearch[i] >= bbox[i]-TOL));
+          flag = (flag && (xsearch[i] <= bbox[i+nDims]+TOL));
+        }
+
+        if (flag)
+          stack[size++] = nodeChild;
       }
     }
   }
 }
+
+
 
 template<int nDims, int nside>
 __global__
@@ -112,12 +115,18 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
   //const int ndim_adt = 2*nDims;
 
   // check if the given point is in the bounds of the ADT
-  int rootNode = 0;
+  //int rootNode = 0;
   int cellID = -1;
 
   double xsearch[3];
   for (int d = 0; d < nDims; d++) /// TODO: templatize ndim
     xsearch[d] = mb.xsearch[3*pt+d];
+
+  if (adt.rrot) // Transform back to ADT's coordinate system
+  {
+    for (int d = 0; d < nDims; d++)
+      xsearch[d] -= adt.offset[d];
+  }
 
   bool flag = true;
   for (int d = 0; d < nDims; d++)
@@ -130,9 +139,9 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
   double rst[nDims] = {0.0};
   if (flag)
   {
-    double element[2*nDims];
-    d_searchADTrecursion<0,nDims,nside>(mb,cellID,adt.adtInts.data(),adt.adtReals.data(),
-      mb.eleBBox.data(),rootNode,element,xsearch,rst,adt.nelem);
+    //double element[2*nDims];
+    //d_searchADTrecursion<0,nDims,nside>(adt,mb,cellID,rootNode,element,xsearch,rst,adt.nelem);
+    d_searchADTstack<nDims,nside>(adt,mb,cellID,xsearch,rst);
   }
 
   __syncthreads();
@@ -152,10 +161,10 @@ void searchADT(dADT &adt, dMeshBlock &mb)
     case 8:
       searchADT_kernel<3,2><<<blocks, threads>>>(adt, mb); break;
 //      searchADT_kernel<3,2><<<blocks, threads, 0, mb.stream>>>(*this, mb); break;
-    case 27:
-      searchADT_kernel<3,3><<<blocks, threads, 0, mb.stream>>>(adt, mb); break;
-    case 64:
-      searchADT_kernel<3,4><<<blocks, threads, 0, mb.stream>>>(adt, mb); break;
+//    case 27:
+//      searchADT_kernel<3,3><<<blocks, threads, 0, mb.stream>>>(adt, mb); break;
+//    case 64:
+//      searchADT_kernel<3,4><<<blocks, threads, 0, mb.stream>>>(adt, mb); break;
     default:
       ThrowException("nvert case not implemented");
   }

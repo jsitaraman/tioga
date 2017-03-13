@@ -104,6 +104,14 @@ void MeshBlock::preprocess(void)
   tagBoundary();
 }
 
+void MeshBlock::updateOBB(void)
+{
+  free(obb);
+  obb = (OBB *) malloc(sizeof(OBB));
+
+  findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
+}
+
 /** Calculate 'cellRes' / 'nodeRes' (cell volume) for each cell / node
  *  and tag overset-boundary nodes by setting their nodeRes to a big value
  */
@@ -117,11 +125,8 @@ void MeshBlock::tagBoundary(void)
   // Do this only once
   // i.e. when the meshblock is first initialized, cellRes would be NULL in
   // this case
-  free(cellRes);
-  free(nodeRes);
-
-  cellRes = (double *) malloc(sizeof(double)*ncells);
-  nodeRes = (double *) malloc(sizeof(double)*nnodes);
+  cellRes.resize(ncells);
+  nodeRes.resize(nnodes);
 
   if (userSpecifiedNodeRes == NULL && userSpecifiedCellRes == NULL)
   {
@@ -258,12 +263,9 @@ void MeshBlock::tagBoundary(void)
 
 void MeshBlock::setupADT(void)
 {
-  free(elementBbox);
-  free(elementList);
-
   /// TODO: take in a bounding box of the region we're interested in searching (search.c)
-  elementBbox = (double *)malloc(sizeof(double)*ncells*6);
-  elementList = (int *)malloc(sizeof(int)*ncells);
+  elementBbox.resize(ncells*6);
+  elementList.resize(ncells);
 
   double xmin[3], xmax[3];
   for (int i = 0; i < ncells; i++)
@@ -313,7 +315,15 @@ void MeshBlock::setupADT(void)
     adt=new ADT[1];
   }
 
-  adt->buildADT(2*nDims, ncells, elementBbox);
+  adt->buildADT(2*nDims, ncells, elementBbox.data());
+
+#ifdef _GPU
+  ncells_adt = ncells;
+  mb_d.dataToDevice(nDims,nnodes,ncells,ncells_adt,nsearch,nv,nc,elementList.data(),
+                    elementBbox.data(),isearch.data(),xsearch.data());
+
+  adt_d.copyADT(adt);
+#endif
 }
 
 void MeshBlock::writeGridFile(int bid)
@@ -812,7 +822,7 @@ int MeshBlock::findPointDonor(double *x_pt)
 std::unordered_set<int> MeshBlock::findCellDonors(double *bbox)
 {
   std::unordered_set<int> foundCells;
-  adt->searchADT_box(elementList,foundCells,bbox);
+  adt->searchADT_box(elementList.data(),foundCells,bbox);
   return foundCells;
 }
 
@@ -822,48 +832,19 @@ std::unordered_set<int> MeshBlock::findCellDonors(double *bbox)
 //
 MeshBlock::~MeshBlock()
 {
-  int i;
   //
   // free all data that is owned by this MeshBlock
   // i.e not the pointers of the external code.
   //
-  if (cellRes) free(cellRes);
-  if (nodeRes) free(nodeRes);
-  if (elementBbox) free(elementBbox);
-  if (elementList) free(elementList);
   if (adt) delete[] adt;
   if (donorList) {
     for (int i = 0; i < nnodes; i++) deallocateLinkList(donorList[i]);
     free(donorList);
   }
-  if (interpList) {
-    for (int i = 0; i < interpListSize; i++)
-      {
-	if (interpList[i].inode) free(interpList[i].inode);
-	if (interpList[i].weights) free(interpList[i].weights);
-      }
-    free(interpList);
-  }
-  return;
-  if (interpList2) {
-    for (int i = 0; i < interp2ListSize; i++)
-      {
-	if (interpList2[i].inode) free(interpList2[i].inode);
-	if (interpList2[i].weights) free(interpList2[i].weights);
-      }
-    free(interpList2);
-  }
-  if (interpListCart) {
-    for (int i = 0; i < interpListCartSize; i++)
-      {
-        if (interpListCart[i].inode) free(interpListCart[i].inode);
- 	if (interpListCart[i].weights) free(interpListCart[i].weights);
-      }
-    free(interpListCart);
-  }
+  free(interpList);
+  return;  /// Why is this here??
+  free(interpListCart);
   if (obb) free(obb);
-  if (isearch) free(isearch);
-  if (xsearch) free(xsearch);
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);
   if (ctag) free(ctag);
@@ -894,10 +875,10 @@ void MeshBlock::setTransform(double* mat, double* off, int ndim)
   if (ndim != nDims)
     ThrowException("MeshBlock::set_transform: input ndim != nDims");
 
-//  rrot = true;
-  Smat.assign(mat, mat+ndim*ndim);
+  rrot = true;
+  Rmat.assign(mat, mat+ndim*ndim);
   std::copy(off,off+ndim,offset);
 
-//  if (adt)
-//    adt->setTransform(mat,off,ndim);
+  if (adt)
+    adt->setTransform(mat,off,ndim);
 }

@@ -305,7 +305,7 @@ void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList
   {
     if (myGroups.count(G)) continue;
     if (nGroups > 0 && cutType_glob[G] == FIELD_CUT) continue;
-    adt->searchADT_box(elementList,cellList[G],&cutBox_global[6*G]);
+    adt->searchADT_box(elementList.data(),cellList[G],&cutBox_global[6*G]);
   }
 }
 
@@ -374,12 +374,12 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
     cellList.clear();
 
     if (rrot)
-      getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox, Smat.data());
+      getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox, Rmat.data());
     else
       getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox);
 
     // Find all cells that the cutting face might pass through
-    adt->searchADT_box(elementList, cellList, bbox);
+    adt->searchADT_box(elementList.data(), cellList, bbox);
 
     // Check each cell to determine if the face intersects it
     for (auto ic : cellList)
@@ -1090,6 +1090,9 @@ void MeshBlock::getFringeNodes(void)
     rxyz.resize(nFacePoints*3);
     ntotalPoints = nFacePoints;
 
+#ifdef _GPU
+    get_face_nodes_gpu(ftag,nreceptorFaces,pointsPerFace,rxyz.data());
+#else
     // Find the position of each flux point using callback function
     int m = 0;
     for (int i = 0; i < nreceptorFaces; i++)
@@ -1097,6 +1100,7 @@ void MeshBlock::getFringeNodes(void)
       get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyz[m]));
       m += (3*pointsPerFace[i]);
     }
+#endif
   }
 
   if (ihigh)
@@ -1227,24 +1231,8 @@ void MeshBlock::processPointDonors(void)
     if (donorId[i] > -1 && iblank_cell[donorId[i]] == NORMAL)
       ninterp2++;
 
-  if (interpList2)
-  {
-    for (int i = 0; i < interp2ListSize; i++)
-    {
-      free(interpList2[i].inode);
-      free(interpList2[i].weights);
-    }
-    free(interpList2);
-  }
-
   interp2ListSize = ninterp2;
-  interpList2 = (INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
-
-  for (int i = 0; i < interp2ListSize; i++)
-  {
-    interpList2[i].inode=NULL;
-    interpList2[i].weights=NULL;
-  }
+  interpList2.resize(interp2ListSize);
 
   int m = 0;
   for (int i = 0; i < nsearch; i++)
@@ -1254,15 +1242,15 @@ void MeshBlock::processPointDonors(void)
       if (ihigh)
       {
         int icell = donorId[i]+BASE;
-        interpList2[m].inode = (int *) malloc(sizeof(int));
+        interpList2[m].inode.resize(1);
         interpList2[m].nweights = 0;
         interpList2[m].donorID = icell;
 
         // Use High-Order callback function to get interpolation weights
         donor_frac(&(icell), &(xsearch[3*i]), &(interpList2[m].nweights),
-                   interpList2[m].inode, frac, &(rst[3*i]), &buffsize);
+                   interpList2[m].inode.data(), frac, &(rst[3*i]), &buffsize);
 
-        interpList2[m].weights = (double *)malloc(sizeof(double)*interpList2[m].nweights);
+        interpList2[m].weights.resize(interpList2[m].nweights);
         for(int j = 0; j < interpList2[m].nweights; j++)
           interpList2[m].weights[j] = frac[j];
 
@@ -1286,9 +1274,9 @@ void MeshBlock::processPointDonors(void)
         }
 
         int nvert = nv[n];
-        interpList2[m].inode = (int *) malloc(sizeof(int)*nvert);
+        interpList2[m].inode.resize(nvert);
         interpList2[m].nweights = nvert;
-        interpList2[m].weights = (double *)malloc(sizeof(double)*interpList2[m].nweights);
+        interpList2[m].weights.resize(interpList2[m].nweights);
 
         double xv[8][3];
         for (int ivert = 0; ivert < nvert; ivert++)

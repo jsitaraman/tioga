@@ -127,6 +127,6 @@ void ADT::setTransform(double* mat, double* off, int nDims)
     FatalError("ADT:setTransform:nDims != ADT::ndim/2");
 
   rrot = true;
-  Smat.assign(mat, mat+nDims*nDims);
+  Rmat.assign(mat, mat+nDims*nDims);
   offset.assign(off, off+nDims);
 }

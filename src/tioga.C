@@ -194,7 +194,8 @@ void tioga::unblankPart1(void)
   // Switch iblank_cell to separate memory range
   mb->swapPointers();
 
-  mb->preprocess();
+//  mb->preprocess();
+  mb->updateOBB();
 
   doHoleCutting();
 }
@@ -204,7 +205,8 @@ void tioga::unblankPart2(int nvar)
   // Swap iblank_cell pointer back
   mb->resetCurrentGrid();
 
-  mb->preprocess();
+//  mb->preprocess();
+  mb->updateOBB();
 
   doHoleCutting();
 

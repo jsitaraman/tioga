@@ -59,6 +59,9 @@ public:
   dvec<int> ijk2gmsh;
   dvec<double> xlist;
 
+  bool rrot = false;
+  dvec<double> Rmat, offset;
+
   /* ------ Member Functions ------ */
 
   dMeshBlock() { }
@@ -67,6 +70,10 @@ public:
       int* nc, int* eleList, double* eleBBox, int* isearch, double* xsearch);
 
   void setDeviceData(double* vx, double* ex, int* ibc, int* ibf);
+
+  void setTransform(double *mat, double *off, int ndim);
+
+  void updateSearchPoints(int nsearch, int* isearch, double* xsearch);
 
   template<int ndim, int nside>
   __device__
@@ -81,7 +88,7 @@ public:
   template<int nSide>
   __device__ __forceinline__
   bool getRefLoc(const double* __restrict__ coords, const double* __restrict__ bbox,
-      const double* __restrict__ xyz, double* __restrict__ rst);
+                 const double* __restrict__ xyz, double* __restrict__ rst);
 };
 
 template<int nSide>
@@ -133,34 +140,9 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
 {
   const int nNodes = nSide*nSide*nSide;
 
-  //const int bid = blockIdx.x;
-  double xmin, ymin, zmin;
-  double xmax, ymax, zmax;
-  xmin = ymin = zmin =  1e15;
-  xmax = ymax = zmax = -1e15;
-
-  rst[0] = 0.;
-  rst[1] = 0.;
-  rst[2] = 0.;
-
-  xmin = bbox[0];  ymin = bbox[1];  zmin = bbox[2];
-  xmax = bbox[3];  ymax = bbox[4];  zmax = bbox[5];
-
-/*
-  double eps = 1e-10;
-
-  if (xyz[0] < xmin-eps || xyz[1] < ymin-eps || xyz[2] < zmin-eps ||
-      xyz[0] > xmax+eps || xyz[1] > ymax+eps || xyz[2] > zmax+eps) {
-    // Point does not lie within cell - return an obviously bad ref position
-    rst_out[0] = 99.;
-    rst_out[1] = 99.;
-    rst_out[2] = 99.;
-    return;
-  }*/
-
   // Use a relative tolerance to handle extreme grids
-  double h = fmin(xmax-xmin,ymax-ymin);
-  h = fmin(h,zmax-zmin);
+  double h = fmin(bbox[3]-bbox[0],bbox[4]-bbox[1]);
+  h = fmin(h,bbox[5]-bbox[2]);
 
   double tol = 1e-12*h;
 
@@ -172,13 +154,17 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
   double shape[nNodes];
   double dshape[3*nNodes];
 
+  rst[0] = 0.;
+  rst[1] = 0.;
+  rst[2] = 0.;
+
   while (norm > tol && iter < iterMax)
   {
     calcDShape<nSide>(shape, dshape, rst);
 
     double dx[3] = {xyz[0], xyz[1], xyz[2]};
     double grad[3][3] = {{0.0}};
-    double ginv[3][3] = {{0.0}};
+    double ginv[3][3];
 
     for (int nd = 0; nd < nNodes; nd++)
       for (int i = 0; i < 3; i++)
@@ -233,7 +219,21 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID, const double* __restr
       ecoord[i*ndim+d] = coord[ele+ncells*(d+ndim*i)];
   //ecoord[i*ndim+d] = coord[d+ndim*(i+nNodes*ele)];
 
-  bool isInEle = getRefLoc<nside>(ecoord,bbox,xyz,rst);
+  bool isInEle = false;
+
+  if (rrot) // Transform search point back to current physical location
+  {
+    double x2[ndim];
+    for (int d = 0; d < ndim; d++)
+      x2[d] = xyz[d] + offset[d];
+
+    isInEle = getRefLoc<nside>(ecoord,bbox,x2,rst);
+  }
+  else
+  {
+    isInEle = getRefLoc<nside>(ecoord,bbox,xyz,rst);
+  }
+
 
   if (isInEle) cellID = ele;
 }

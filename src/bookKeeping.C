@@ -243,29 +243,20 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
 
 void MeshBlock::initializeInterpList(int ninterp_input)
 {
-  int i;
-  if (interpList) {
-    //for(i=0;i<ninterp;i++)
-    for(i=0;i<interpListSize;i++)
-      {
-	if (interpList[i].inode) free(interpList[i].inode);
-	if (interpList[i].weights) free(interpList[i].weights);
-      }
-    free(interpList);
-  }
-  ninterp=ninterp_input;   
-  interpListSize=ninterp_input;
-  interpList=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListSize);
-  for(i=0;i<interpListSize;i++) {
-   interpList[i].inode=NULL;
-   interpList[i].weights=NULL;
-  }
-  if (cancelList) deallocateLinkList2(cancelList);
-  cancelList=NULL;
-  ncancel=0;
-  if (interp2donor) free(interp2donor);
-  interp2donor=(int *)malloc(sizeof(int)*nsearch);
-  for(i=0;i<nsearch;i++) interp2donor[i]=-1;
+  ninterp = ninterp_input;
+  interpListSize = ninterp_input;
+
+  free(interpList);
+  interpList = (INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListSize);
+
+  deallocateLinkList2(cancelList);
+  cancelList = NULL;
+  ncancel = 0;
+
+  free(interp2donor);
+  interp2donor = (int *)malloc(sizeof(int)*nsearch);
+  for(int i = 0; i < nsearch; i++)
+    interp2donor[i]=-1;
     
 }
 		
@@ -377,8 +368,8 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes)
   interpList[*recid].nweights=nvert;
   interpList[*recid].receptorInfo[0]=procid;
   interpList[*recid].receptorInfo[1]=pointid;
-  interpList[*recid].inode=(int *)malloc(sizeof(int)*nvert);
-  interpList[*recid].weights=(double *)malloc(sizeof(double)*nvert);
+  interpList[*recid].inode.resize(nvert);
+  interpList[*recid].weights.resize(nvert);
   for (int m = 0; m < nvert; m++)
   {
     interpList[*recid].inode[m]   = inode[m];

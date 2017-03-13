@@ -54,83 +54,78 @@ void MeshBlock::search(void)
     OBB obq;
     findOBB(xsearch.data(),obq.xc,obq.dxc,obq.vec,nsearch);
 
-    if (rrot)
-    {
-      /// HACK - adding a 20% safety factor to ADT bounds in case of moving grids
-      for (int i = 0; i < nDims; i++)
-        obq.dxc[i] *= 1.5;
-    }
-
     // find all the cells that may have intersections with
     // the OBB
     std::vector<int> icell(ncells, -1);
 
-    int iptr = -1;
-    ncells_adt = 0;
-    int p = 0;
-    for (int n = 0; n < ntypes; n++)
+    if (rrot)
     {
-      int nvert = nv[n];
-      for(int i = 0; i < nc[n]; i++)
+      /// HACK - setting ADT bounds to total grid bounds case of moving grids
+      ncells_adt = ncells;
+      for (int i = 0; i < ncells; i++)
+        icell[i] = i;
+    }
+    else
+    {
+      ncells_adt = 0;
+      int ic = 0;
+      for (int n = 0; n < ntypes; n++)
       {
-        // find each cell that has
-        // overlap with the bounding box
-        xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
-        xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
-        for (int m = 0; m < nvert; m++)
+        int nvert = nv[n];
+        for(int i = 0; i < nc[n]; i++)
         {
-          int i3 = 3*(vconn[n][nvert*i+m]-BASE);
-          for (int j = 0; j < 3; j++)
+          // find each cell that has
+          // overlap with the bounding box
+          xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
+          xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
+          for (int m = 0; m < nvert; m++)
           {
-            xd[j] = 0;
-            for (int k = 0; k < 3; k++)
-              xd[j] += (x[i3+k]-obq.xc[k])*obq.vec[j][k];
-            xmin[j] = min(xmin[j],xd[j]);
-            xmax[j] = max(xmax[j],xd[j]);
+            int i3 = 3*(vconn[n][nvert*i+m]-BASE);
+            for (int j = 0; j < 3; j++)
+            {
+              xd[j] = 0;
+              for (int k = 0; k < 3; k++)
+                xd[j] += (x[i3+k]-obq.xc[k])*obq.vec[j][k];
+              xmin[j] = min(xmin[j],xd[j]);
+              xmax[j] = max(xmax[j],xd[j]);
+            }
+            for (int j = 0; j < 3; j++)
+            {
+              xd[j] = (xmax[j]+xmin[j])*0.5;
+              dxc[j] = (xmax[j]-xmin[j])*0.5;
+            }
           }
-          for (int j = 0; j < 3; j++)
+          /// HACK - making this loop basically useless (ncells_adt will == ncells)
+          if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
+              fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
+              fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
           {
-            xd[j] = (xmax[j]+xmin[j])*0.5;
-            dxc[j] = (xmax[j]-xmin[j])*0.5;
+            // create a list of all the cells that have bounding box intersection
+            // with the QP bounding box
+            icell[ncells_adt++] = ic;
           }
+          ic++;
         }
-        if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
-            fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
-            fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
-        {
-          // create a LIFO stack
-          // with all the cells that
-          // have bounding box intersection with
-          // the QP bounding box
-          icell[p] = iptr;
-          iptr = p;
-          ncells_adt++;
-        }
-        p++;
       }
     }
 
-    // now find the axis aligned bounding box
-    // of each cell in the LIFO stack to build the
-    // ADT
+    // now find the axis aligned bounding box of each cell in the list to
+    // build the ADT
     elementBbox.resize(ncells_adt*6);
     elementList.resize(ncells_adt);
 
-    int k = iptr;
-    int l = 0;
-    p = 0;
-    while (k != -1)
+    for (int adt_ic = 0; adt_ic < ncells_adt; adt_ic++)
     {
-      int ic = -1;
-      int cellindex = k;
+      int loc_ic = -1;
+      int mb_ic = icell[adt_ic];
       int isum = 0;
       int n;
       for (n = 0; n < ntypes; n++)
       {
         isum += nc[n];
-        if (cellindex < isum)
+        if (mb_ic < isum)
         {
-          ic = cellindex-(isum-nc[n]);
+          loc_ic = mb_ic-(isum-nc[n]);
           break;
         }
       }
@@ -140,7 +135,7 @@ void MeshBlock::search(void)
       xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
       for (int m = 0; m < nvert; m++)
       {
-        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+        int i3 = 3*(vconn[n][nvert*loc_ic+m]-BASE);
         for (int j = 0; j < 3; j++)
         {
           xmin[j] = min(xmin[j],x[i3+j]);
@@ -148,16 +143,14 @@ void MeshBlock::search(void)
         }
       }
 
-      elementBbox[l++] = xmin[0];
-      elementBbox[l++] = xmin[1];
-      elementBbox[l++] = xmin[2];
-      elementBbox[l++] = xmax[0];
-      elementBbox[l++] = xmax[1];
-      elementBbox[l++] = xmax[2];
+      elementBbox[6*adt_ic+0] = xmin[0];
+      elementBbox[6*adt_ic+1] = xmin[1];
+      elementBbox[6*adt_ic+2] = xmin[2];
+      elementBbox[6*adt_ic+3] = xmax[0];
+      elementBbox[6*adt_ic+4] = xmax[1];
+      elementBbox[6*adt_ic+5] = xmax[2];
 
-      elementList[p++] = k;
-
-      k = icell[k];
+      elementList[adt_ic] = mb_ic;
     }
 
     // build the ADT now

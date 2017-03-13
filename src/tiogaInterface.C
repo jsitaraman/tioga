@@ -279,9 +279,9 @@ extern "C" {
     tg->set_ab_callback_gpu(d2h,h2df,h2dc,gqd,gdqd,gfng);
   }
 
-  void tioga_register_moving_grid_data(double* grid_vel)
+  void tioga_register_moving_grid_data(double* grid_vel, double* offset, double* Rmat)
   {
-    tg->registerMovingGridData(grid_vel);
+    tg->registerMovingGridData(grid_vel, offset, Rmat);
   }
 
   void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *))

@@ -206,7 +206,15 @@ class tioga
                                 int nOverFaces, int nMpi, int* overFaces,
                                 int* mpiFaces, int *procR, int *idR);
 
-  void registerMovingGridData(double *grid_vel) { mb->setGridVelocity(grid_vel); }
+  void registerMovingGridData(double *grid_vel, double* offset, double *Rmat)
+  {
+    mb->setGridVelocity(grid_vel);
+
+    if (offset != NULL)
+    {
+      mb->setTransform(offset, Rmat, 3);
+    }
+  }
 
   void profile(void);
 

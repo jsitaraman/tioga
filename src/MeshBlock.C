@@ -860,6 +860,7 @@ MeshBlock::~MeshBlock()
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 }
+
 //
 // set user specified node and cell resolutions
 //

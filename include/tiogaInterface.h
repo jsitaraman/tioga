@@ -103,7 +103,7 @@ void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
                                 void (*gfng)(int* ids, int nf, int* nptf, double* xyz));
 
 
-void tioga_register_moving_grid_data(double* grid_vel);
+void tioga_register_moving_grid_data(double* grid_vel, double* offset, double* Rmat);
 
 void tioga_set_transform(double *mat, double *off, int ndim);
 

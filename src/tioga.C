@@ -419,7 +419,7 @@ void tioga::getDonorInfo(int btag,int *receptors,int *indices,double *frac,int *
   //
   // change to actual processor id here
   //
-  for(i=0;i<3*(*dcount);i+=4)
+  for(i=0;i<4*(*dcount);i+=4)
     receptors[i]=sndMap[receptors[i]];
       
 }

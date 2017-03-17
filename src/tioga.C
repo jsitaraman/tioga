@@ -274,7 +274,11 @@ void tioga::doPointConnectivity(void)
   mb->search();
 
   // Setup interpolation weights and such for final interp-point list
+#ifdef _GPU
+  mb->processPointDonorsGPU();
+#else
   mb->processPointDonors();
+#endif
 
 #ifdef _GPU
   setupCommBuffersGPU();
@@ -288,13 +292,15 @@ void tioga::setupCommBuffersGPU(void)
   int nsend, nrecv, *sndMap, *rcvMap;
   pc->getMap(&nsend, &nrecv, &sndMap, &rcvMap);
 
-//  sndVPack.resize(nsend);
-  sndPack2.resize(nsend);
+  sndVPack.resize(nsend);
+//  sndPack2.resize(nsend);
   rcvVPack.resize(nrecv);
 
-  pc->initPacketsV2(sndPack2,rcvVPack);
+//  pc->initPacketsV2(sndPack2,rcvVPack);
+  pc->initPacketsV(sndVPack,rcvVPack);
 
-  mb->setupBuffersGPU(nsend, intData, sndPack2);
+//  mb->setupBuffersGPU(nsend, intData, sndPack2);
+  mb->setupBuffersGPU(nsend, intData, sndVPack);
 
   ninterp = mb->ninterp2;
 }
@@ -931,7 +937,6 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
 	      qtmp[rcvPack[k].intData[i]*nvar+j]=rcvPack[k].realData[m];
 	      m++;
 	    }
-         //if (myid==12) printf("rcvPack[k].intData[i]=%d %d\n",rcvPack[k].intData[i],mb->ntotalPoints);
 	}
     }
   norphanPoint=0;
@@ -993,58 +998,50 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
   int stride = nvar;
   if (iartbnd && dataFlag == 1) stride = 3*nvar;
 
-  /// TODO: consider placement of this
-  // Allocate space for the interpolated fringe-point data if needed
-  if (dataFlag == 0)
-  {
-    ubuf_d.resize(mb->ninterp2*stride);
-    ubuf_h.resize(mb->ninterp2*stride);
-  }
-  else
-  {
-    gradbuf_d.resize(mb->ninterp2*stride);
-    gradbuf_h.resize(mb->ninterp2*stride);
-  }
+  ubuf_d.resize(mb->ninterp2*stride);
+  ubuf_h.resize(mb->ninterp2*stride);
 
   for (int k = 0; k < nsend; k++)
   {
-//    sndVPack[k].nreals = sndVPack[k].nints * stride;
-//    sndVPack[k].realData.resize(sndVPack[k].nreals);
-    sndPack2[k].nreals = sndPack2[k].nints * stride;
+    sndVPack[k].nreals = sndVPack[k].nints * stride;
+    sndVPack[k].realData.resize(sndVPack[k].nreals);
+//    sndPack2[k].nreals = sndPack2[k].nints * stride; /// newer method
   }
-
-//  dblData.resize(ninterp_d*stride);
 
   interpTime.startTimer();
 
   if (dataFlag == 0)
     mb->interpSolution_gpu(ubuf_d.data(), nvar);
   else
-    mb->interpGradient_gpu(gradbuf_d.data(), nvar);
+    mb->interpGradient_gpu(ubuf_d.data(), nvar);
 
-  double *ptr;
-  if (dataFlag == 0)
-  {
-    ubuf_h.assign(ubuf_d.data(), ubuf_d.size(), &mb->stream_handle);
-    ptr = ubuf_h.data();
-  }
-  else
-  {
-    gradbuf_h.assign(gradbuf_d.data(), gradbuf_d.size(), &mb->stream_handle);
-    ptr = gradbuf_h.data();
-  }
+  ubuf_h.assign(ubuf_d.data(), ubuf_d.size(), &mb->stream_handle);
 
   interpTime.stopTimer();
 
+  /* ------------------------------------------------------------------------ */
+  /* Version 1: Wait for D2H transfer to complete and pack separate buffer */
+  // Wait for device-to-host transfer to complete
+  cudaStreamSynchronize(mb->stream_handle);
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
   // Populate the packets [organize interp data by rank to send to]
   for (int p = 0; p < nsend; p++)
   {
-    //double *ptr = dblData.data()+mb->buf_disp[p]*stride;
-    //sndVPack[p].realData.assign(ptr,ptr+sndVPack[p].nints*stride);
-    sndPack2[p].realData = ptr + mb->buf_disp[p]*stride;
+    for (int i = 0; i < sndVPack[p].nints; i++)
+      for (int j = 0; j < stride; j++)
+        sndVPack[p].realData[i*stride+j] = ubuf_h[(mb->buf_disp[p]+i)*stride+j];
   }
   POP_NVTX_RANGE;
+  /* ------------------------------------------------------------------------ */
+
+  /* ------------------------------------------------------------------------ */
+  /* Version 2: Let D2H be async and get pointers into buffer for later send
+  PUSH_NVTX_RANGE("tg_packBuffers", 3);
+  // Populate the packets [organize interp data by rank to send to]
+  for (int p = 0; p < nsend; p++)
+    sndPack2[p].realData = ubuf_h.data() + mb->buf_disp[p]*stride;
+  POP_NVTX_RANGE;
+  /* ------------------------------------------------------------------------ */
 }
 
 void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
@@ -1063,11 +1060,24 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 
   // communicate the data across all partitions
   PUSH_NVTX_RANGE("tg_pc_send", 0);
+
+  /* ------------------------------------------------------------------------ */
+  /* Version 1.2: Do the waiting and buffer packing here instead
   // Wait for device-to-host transfer to complete
   cudaStreamSynchronize(mb->stream_handle);
+  PUSH_NVTX_RANGE("tg_packBuffers", 3);
+  // Populate the packets [organize interp data by rank to send to]
+  for (int p = 0; p < nsend; p++)
+  {
+    for (int i = 0; i < sndVPack[p].nints; i++)
+      for (int j = 0; j < stride; j++)
+        sndVPack[p].realData[i*stride+j] = ubuf_h[(mb->buf_disp[p]+i)*stride+j];
+  }
+  POP_NVTX_RANGE;
+  /* ------------------------------------------------------------------------ */
 
-  //pc->sendPacketsV(sndVPack,rcvVPack);
-  pc->sendPacketsV2(sndPack2,rcvVPack);
+  pc->sendPacketsV(sndVPack,rcvVPack);
+//  pc->sendPacketsV2(sndPack2,rcvVPack); /// newer method
   POP_NVTX_RANGE;
 
   // Wait on all of the sends/recvs for the interpolated data

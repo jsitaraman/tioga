@@ -66,7 +66,7 @@ void tioga::exchangeSearchData(void)
   mb->donorId.resize(mb->nsearch);
   if (ihigh)
   {
-    mb->rst.resize(3*mb->nsearch);
+    mb-> rst.resize(3*mb->nsearch); /// NEEDED HERE?
     std::fill(mb->rst.data(), mb->rst.data()+3*mb->nsearch, 0.0);
   }
 

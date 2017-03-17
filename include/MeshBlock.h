@@ -185,6 +185,10 @@ private:
   double* (*get_dq_spts_d)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
 
   void (*get_face_nodes_gpu)(int* fringeIDs, int nFringe, int* nptPerFace, double* xyz);
+  void (*get_cell_nodes_gpu)(int* cellIDs, int nCells, int* nptPerCell, double* xyz);
+
+  int (*get_n_weights)(int cellID);
+  void (*donor_frac_gpu)(int* donorIDs, int nFringe, double* rst, double* weights);
 
   /*! Copy solution/gradient data for the donor elements from device to host */
   void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
@@ -270,7 +274,9 @@ private:
   //double *rst;            /**  natrural coordinates */
   //int *donorId;       /** < donor indices for those found */
   hvec<double> rst;
+  hvec<double> rst_h; //! Specificallly for donor_frac_gpu
   hvec<int> donorId; /// TODO: allow hvec to be used for non-GPU cases (use malloc vs. cudaMalloc)
+  hvec<int> donorId_h; //! Specificallly for donor_frac_gpu
   int donorCount;
   int myid;
   std::vector<double> cellRes;  /** < resolution for each cell */
@@ -302,9 +308,12 @@ private:
   int nSpts;  // Number of spts per ele on this rank
 #ifdef _GPU
   dvec<double> weights_d;
+  hvec<double> weights_h;
   dvec<int> donors_d;
+  hvec<int> donors_h;
   dvec<int> buf_inds_d;
-  std::vector<int> buf_inds, buf_disp;
+  hvec<int> buf_inds;
+  std::vector<int> buf_disp;
 
   //dvec<int> iblank_cell_d;
   //dvec<int> iblank_face_d;
@@ -527,7 +536,10 @@ private:
                             void (*h2dc)(int* ids, int nf, int grad, double *data),
                             double* (*gqd)(int&, int&, int&),
                             double* (*gdqd)(int&, int&, int&, int&),
-                            void (*gfng)(int*, int, int*, double*))
+                            void (*gfng)(int*, int, int*, double*),
+                            void (*gcng)(int*, int, int*, double*),
+                            int (*gnw)(int),
+                            void (*dfg)(int*, int, double*, double*))
   {
     data_from_device = d2h;
     face_data_to_device = h2df;
@@ -535,6 +547,9 @@ private:
     get_q_spts_d = gqd;
     get_dq_spts_d = gdqd;
     get_face_nodes_gpu = gfng;
+    get_cell_nodes_gpu = gcng;
+    get_n_weights = gnw;
+    donor_frac_gpu = dfg;
     gpu = true;
   }
 
@@ -551,6 +566,9 @@ private:
   void getExtraQueryPoints(OBB *obb, int &nints, int*& intData, int &nreals,
                            double*& realData);
   void processPointDonors(void);
+
+  void processPointDonorsGPU(void);
+
   void getInterpolatedSolutionAtPoints(int *nints, int *nreals, int **intData,
       double **realData, double *q, int nvar, int interpType);
 
@@ -597,7 +615,7 @@ private:
 
   /* ---- GPU-Related Functions ---- */
 #ifdef _GPU
-  void setupBuffersGPU(int nsend, std::vector<int>& intData, std::vector<PACKET>& sndPack);
+  void setupBuffersGPU(int nsend, std::vector<int>& intData, std::vector<VPACKET>& sndPack);
   void interpSolution_gpu(double* q_out_d, int nvar);
   void interpGradient_gpu(double* dq_out_d, int nvar);
 

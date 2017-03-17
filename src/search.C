@@ -179,7 +179,6 @@ void MeshBlock::search(void)
   Timer dtime("Device ADT Time: ");
   Timer htime("Host ADT Time: ");
 #ifdef _GPU
-
   //cudaDeviceSynchronize();
   //dtime.startTimer();
   searchADT(adt_d,mb_d);

@@ -321,9 +321,12 @@ class tioga
                            void (*h2dc)(int* ids, int nc, int grad, double* data),
                            double* (*gqd)(int&, int&, int&),
                            double* (*gdqd)(int&, int&, int&, int&),
-                           void (*gfng)(int*,int,int*,double*))
+                           void (*gfng)(int*,int,int*,double*),
+                           void (*gcng)(int*, int, int*, double*),
+                           int (*gnw)(int),
+                           void (*dfg)(int*, int, double*, double*))
   {
-    mb->setCallbackArtBndGpu(d2h,h2df,h2dc,gqd,gdqd,gfng);
+    mb->setCallbackArtBndGpu(d2h,h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
     gpu = true;
   }
   

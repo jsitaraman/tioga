@@ -100,7 +100,10 @@ void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
                                 void (*h2dc)(int* ids, int nc, int grad, double *data),
                                 double* (*gqd)(int& es, int& ss, int& vs),
                                 double* (*gdqd)(int& es, int& ss, int& vs, int& ds),
-                                void (*gfng)(int* ids, int nf, int* nptf, double* xyz));
+                                void (*gfng)(int* ids, int nf, int* nptf, double* xyz),
+                                void (*gcng)(int* ids, int nf, int* nptf, double* xyz),
+                                int (*gnw)(int),
+                                void (*dfg)(int*, int, double*, double*));
 
 
 void tioga_register_moving_grid_data(double* grid_vel, double* offset, double* Rmat);

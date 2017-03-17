@@ -20,6 +20,10 @@
 *.log
 *.toc
 
+# Profiling Results Files
+*.prof
+*.nvprof
+
 # Other
 *.dat
 *.csv

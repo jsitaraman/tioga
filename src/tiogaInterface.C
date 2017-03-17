@@ -274,9 +274,12 @@ extern "C" {
                                   void (*h2dc)(int* ids, int nc, int grad, double *data),
                                   double* (*gqd)(int&, int&, int&),
                                   double* (*gdqd)(int&, int&, int&, int&),
-                                  void (*gfng)(int*,int,int*,double*))
+                                  void (*gfng)(int*, int, int*, double*),
+                                  void (*gcng)(int*, int, int*, double*),
+                                  int (*gnw)(int),
+                                  void (*dfg)(int*, int, double*, double*))
   {
-    tg->set_ab_callback_gpu(d2h,h2df,h2dc,gqd,gdqd,gfng);
+    tg->set_ab_callback_gpu(d2h,h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
   }
 
   void tioga_register_moving_grid_data(double* grid_vel, double* offset, double* Rmat)

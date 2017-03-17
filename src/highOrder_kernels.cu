@@ -67,7 +67,7 @@ void interp_du(const double* __restrict__ dU_spts, double *dU_out,
   {
     for (int var = 0; var < nVars; var++)
     {
-      int ind = nVars * (dim + nDims * out_inds[fpt]) + var;
+      int ind = var + nVars * (dim + nDims * out_inds[fpt]);
       dU_out[ind] = sum[dim][var];
     }
   }
@@ -77,8 +77,8 @@ void interp_du_wrapper(double *dU_spts, double *dU_out, int *donors,
     double *weights, int* out_inds, int nFringe, int nSpts, int nVars,
     int nDims, int estride, int sstride, int vstride, int dstride, cudaStream_t stream_h)
 {
-  unsigned int threads = 128;
-  unsigned int blocks = (nFringe + threads - 1) / threads;
+  int threads = 128;
+  int blocks = (nFringe + threads - 1) / threads;
 
   if (nDims == 3)
   {

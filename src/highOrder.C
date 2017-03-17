@@ -1143,12 +1143,16 @@ void MeshBlock::getFringeNodes(void)
     ntotalPoints = nCellPoints + nFacePoints;
     rxyz.resize(ntotalPoints*3);
 
+#ifdef _GPU
+    get_cell_nodes_gpu(ctag,nreceptorCells,pointsPerCell,&(rxyz[3*nFacePoints]));
+#else
     int m = nFacePoints*3;
     for (int i = 0; i < nreceptorCells; i++)
     {
       get_receptor_nodes(&(ctag[i]),&(pointsPerCell[i]),&(rxyz[m]));
       m += (3*pointsPerCell[i]);
     }
+#endif
   }
   else
   {
@@ -1220,13 +1224,59 @@ void MeshBlock::getExtraQueryPoints(OBB *obc, int &nints, int *&intData,
   }
 }
 
+void MeshBlock::processPointDonorsGPU(void)
+{
+#ifdef _GPU
+  interp2ListSize = 0;
+  for (int i = 0; i < nsearch; i++)
+    if (donorId[i] > -1 && iblank_cell[donorId[i]] == NORMAL)
+      interp2ListSize++;
+
+  interpList2.resize(interp2ListSize);
+
+  if (interp2ListSize == 0) return;
+
+  std::vector<double> rst2(rst.data(), rst.data()+rst.size());
+  std::vector<int> donorId2(donorId.data(), donorId.data()+donorId.size());
+
+  rst.resize(interp2ListSize*nDims);
+  donorId.resize(interp2ListSize);
+
+  int nWeightsTotal = 0;
+  ninterp2 = 0;
+  for (int i = 0; i < nsearch; i++)
+  {
+    if (donorId2[i] < 0 || iblank_cell[donorId2[i]] != NORMAL) continue;
+
+    interpList2[ninterp2].nweights = get_n_weights(donorId2[i]);
+    interpList2[ninterp2].receptorInfo[0] = isearch[2*i];   // procID
+    interpList2[ninterp2].receptorInfo[1] = isearch[2*i+1]; // pointID
+    interpList2[ninterp2].donorID = donorId2[i];
+    nWeightsTotal += interpList2[ninterp2].nweights;
+
+    for (int d = 0; d < 3; d++)
+      rst[3*ninterp2+d] = rst2[3*i+d];
+
+    donorId[ninterp2] = donorId2[i];
+
+    ninterp2++;
+  }
+
+  // Get the interpolation weights for each of the interpolation points
+  donors_d.assign(donorId.data(), donorId.size(), &stream_handle);
+  mb_d.rst.assign(rst.data(), rst.size(), &stream_handle);
+
+  weights_d.resize(nWeightsTotal);
+  donor_frac_gpu(donors_d.data(), ninterp2, mb_d.rst.data(), weights_d.data());
+#endif
+}
+
 void MeshBlock::processPointDonors(void)
 {
   int buffsize = NFRAC;
   double* frac = (double *)malloc(sizeof(double)*buffsize);
-  interp2ListSize = ninterp2;
-  ninterp2 = 0;
 
+  ninterp2 = 0;
   for (int i = 0; i < nsearch; i++)
     if (donorId[i] > -1 && iblank_cell[donorId[i]] == NORMAL)
       ninterp2++;
@@ -1256,6 +1306,7 @@ void MeshBlock::processPointDonors(void)
 
         interpList2[m].receptorInfo[0] = isearch[2*i];   // procID
         interpList2[m].receptorInfo[1] = isearch[2*i+1]; // pointID
+
         m++;
       }
       else
@@ -1308,7 +1359,8 @@ void MeshBlock::processPointDonors(void)
 }
 
 #ifdef _GPU
-void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<PACKET> &sndPack)
+//void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<PACKET> &sndPack)
+void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<VPACKET> &sndPack)
 {
   if (ninterp2 == 0)
   {
@@ -1322,22 +1374,13 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
     {
       sndPack[p].nints = 0;
       sndPack[p].nreals = 0;
-//      sndPack[p].intData.resize(0);
+      sndPack[p].intData.resize(0); ///
     }
 
     return;
   }
 
   nSpts = interpList2[0].nweights;
-
-  std::vector<double> tmp_weights(ninterp2*nSpts);
-  std::vector<int> tmp_donors(ninterp2);
-  for (int i = 0; i < ninterp2; i++)
-  {
-    tmp_donors[i] = interpList2[i].donorID;
-    for (int j = 0; j < nSpts; j++)
-      tmp_weights[nSpts*i+j] = interpList2[i].weights[j];
-  }
 
   std::vector<int> n_ints(nsend);
   intData.resize(ninterp2*2);
@@ -1353,10 +1396,10 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
   for (int p = 0; p < nsend; p++)
   {
     sndPack[p].nints = n_ints[p];
-    if (sndPack[p].intData)
-      delete [] sndPack[p].intData;
-    sndPack[p].intData = new int[n_ints[p]];
-//    sndPack[p].intData.resize(n_ints[p]);
+//    if (sndPack[p].intData)
+//      delete [] sndPack[p].intData;
+//    sndPack[p].intData = new int[n_ints[p]];
+    sndPack[p].intData.resize(n_ints[p]); ///
   }
 
   buf_disp.assign(nsend, 0);
@@ -1373,9 +1416,7 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
     sndPack[p].intData[ind] = interpList2[i].receptorInfo[1];
   }
 
-  weights_d.assign(tmp_weights.data(), tmp_weights.size());
-  donors_d.assign(tmp_donors.data(), tmp_donors.size());
-  buf_inds_d.assign(buf_inds.data(), buf_inds.size()); // &mb->stream_handle);
+  buf_inds_d.assign(buf_inds.data(), buf_inds.size(), &stream_handle);
 }
 
 void MeshBlock::set_stream_handle(cudaStream_t stream, cudaEvent_t event)
@@ -1707,8 +1748,8 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
 //    fpt_start += (pointsPerFace[i]*nvar);
   }
   MPI_Pcontrol(-1, "tioga_update_U_fpts");
-#endif
   POP_NVTX_RANGE;
+#endif
 }
 
 void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)

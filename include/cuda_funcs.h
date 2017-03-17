@@ -82,10 +82,10 @@ public:
   ~dvec(void);
 
   __host__ __device__
-  int size(void) { return size_; }
+  int size(void) const { return size_; }
 
   __host__ __device__
-  int capacity(void) { return max_size_; }
+  int capacity(void) const { return max_size_; }
 
   __host__ __device__
   T* data(void) { return data_; }
@@ -100,6 +100,9 @@ public:
   void free_data(void);
 
   __device__
+  T operator[](int ind) const;
+
+  __device__
   T& operator[](int ind);
 };
 
@@ -110,6 +113,20 @@ dvec<T>::~dvec(void)
 #ifndef __CUDA_ARCH__
 //  free_data();
 #endif
+}
+
+template<typename T>
+__device__
+T dvec<T>::operator[](int ind) const
+{
+  return data_[ind];
+}
+
+template<typename T>
+__device__
+T& dvec<T>::operator[](int ind)
+{
+  return data_[ind];
 }
 
 template<typename T>
@@ -164,13 +181,6 @@ void dvec<T>::free_data(void)
 }
 
 template<typename T>
-__device__
-T& dvec<T>::operator [](int ind)
-{
-  return data_[ind];
-}
-
-template<typename T>
 class hvec
 {
 private:
@@ -184,9 +194,9 @@ public:
 
   ~hvec(void);
 
-  int size(void) { return size_; }
+  int size(void) const { return size_; }
 
-  int capacity(void) { return max_size_; }
+  int capacity(void) const { return max_size_; }
 
   T* data(void) { return data_; }
 
@@ -196,13 +206,26 @@ public:
 
   void free_data(void);
 
-  T& operator[](int ind) { return data_[ind]; }
+  T operator[](int ind) const;
+  T& operator[](int ind);
 };
 
 template<typename T>
 hvec<T>::~hvec(void)
 {
   free_data();
+}
+
+template<typename T>
+T hvec<T>::operator[](int ind) const
+{
+  return data_[ind];
+}
+
+template<typename T>
+T& hvec<T>::operator[](int ind)
+{
+  return data_[ind];
 }
 
 template<typename T>

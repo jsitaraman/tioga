@@ -154,8 +154,18 @@ void MeshBlock::getDonorInfo(int *receptors,int *indices,double *frac)
 	}
     }
 }
-  
 
-	   
-    
-      
+void MeshBlock::getReceptorInfo(int *receptors)
+{
+  int k=0;
+  for (int i=0; i<ninterp; i++) {
+    if (interpList[i].cancel) continue;
+
+    receptors[k++] = interpList[i].receptorInfo[0];
+    receptors[k++] = interpList[i].receptorInfo[1];
+    receptors[k++] = interpList[i].receptorInfo[2];
+
+    int donID = interpList[i].inode[interpList[i].nweights];
+    receptors[k++] = cellGID[donID];
+  }
+}

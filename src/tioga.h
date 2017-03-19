@@ -103,7 +103,8 @@ class tioga
   /** registerGrid data */
 
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
-			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
+                        int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
+                        unsigned long long* cell_gid=NULL);
 
   void registerSolution(int btag,double *q);
 
@@ -144,6 +145,9 @@ class tioga
   void getDonorCount(int btag, int *dcount, int *fcount);
   
   void getDonorInfo(int btag, int *receptors,int *indices,double *frac,int *dcount);
+
+  void getReceptorInfo(std::vector<int>&);
+
   /** set symmetry bc */
   void setSymmetry(int syminput) { isym=syminput;};
   /** set resolutions for nodes and cells */
@@ -153,6 +157,14 @@ class tioga
   void set_cell_iblank(int *iblank_cell)
   {
    mb->set_cell_iblank(iblank_cell);
+  }
+
+  void set_cell_iblank(int btag, int* ib_cell)
+  {
+    auto idxit = tag_iblk_map.find(btag);
+    int iblk = idxit->second;
+    auto& mb = mblocks[iblk];
+    mb->set_cell_iblank(ib_cell);
   }
 
   void setcallback(void (*f1)(int*, int*),

@@ -49,6 +49,7 @@ class MeshBlock
   int **vconn;        /** < connectivity of each kind of cell */
   int *wbcnode;     /** < wall boundary node indices */
   int *obcnode;     /** < overset boundary node indices */
+  unsigned long long *cellGID;     /**< Global ID of the cell */
   //
   double *nodeRes;  /** < node resolution  */
   double *userSpecifiedNodeRes;
@@ -139,6 +140,8 @@ class MeshBlock
     interpList2=NULL;picked=NULL;ctag_cart=NULL;rxyzCart=NULL;donorIdCart=NULL;pickedCart=NULL;ntotalPointsCart=0;
     nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;
     resolutionScale=1.0;
+
+    cellGID = NULL;
   };
 
   /** basic destructor */
@@ -154,7 +157,9 @@ class MeshBlock
   
   void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 	       int *wbcnodei,int *obcnodei,
-	       int ntypesi, int *nvi, int *nci, int **vconni);
+               int ntypesi, int *nvi, int *nci, int **vconni,
+               unsigned long long* cell_gid=NULL);
+
 
   void setResolutions(double *nres,double *cres);    
 	       
@@ -218,6 +223,8 @@ class MeshBlock
   void getDonorCount(int *dcount,int *fcount);
 
   void getDonorInfo(int *receptors,int *indices, double *frac);
+
+  void getReceptorInfo(int *receptors);
 
   void getReducedOBB(OBB *,double *);
   //

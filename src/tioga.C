@@ -61,7 +61,8 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
  * register grid data for each mesh block
  */
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
-			     int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn)
+                             int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
+                             unsigned long long* cell_gid)
 {
   int iblk;
 
@@ -77,7 +78,7 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   }
 
   auto& mb = mblocks[iblk];
-  mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
+  mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn, cell_gid);
   mb->myid=myid;
 
 }
@@ -422,6 +423,86 @@ void tioga::getDonorInfo(int btag,int *receptors,int *indices,double *frac,int *
   for(i=0;i<4*(*dcount);i+=4)
     receptors[i]=sndMap[receptors[i]];
       
+}
+
+void tioga::getReceptorInfo(std::vector<int>& receptors)
+{
+  int nsend, nrecv;
+  int *sndMap, *rcvMap;
+  PACKET *sndPack, *rcvPack;
+  pc->getMap(&nsend, &nrecv, &sndMap, &rcvMap);
+
+  //
+  // create packets to send and receive
+  // and initialize them to zero
+  //
+  sndPack = (PACKET*)malloc(sizeof(PACKET) * nsend);
+  rcvPack = (PACKET*)malloc(sizeof(PACKET) * nrecv);
+
+  for (int i = 0; i < nsend; i++) {
+    sndPack[i].nints = sndPack[i].nreals = 0;
+    sndPack[i].intData = NULL;
+    sndPack[i].realData = NULL;
+  }
+  //
+  for (int i = 0; i < nrecv; i++) {
+    rcvPack[i].nints = rcvPack[i].nreals = 0;
+    rcvPack[i].intData = NULL;
+    rcvPack[i].realData = NULL;
+  }
+
+  std::vector<int> dcount(nblocks), fcount(nblocks);
+  std::vector<std::vector<int> > fringeSend(nblocks);
+
+  for (int ib=0; ib < nblocks; ib++) {
+    mblocks[ib]->getDonorCount(&dcount[ib], &fcount[ib]);
+    fringeSend[ib].resize(4 * dcount[ib]);
+    mblocks[ib]->getReceptorInfo(fringeSend[ib].data());
+
+    std::vector<int>& fringeData = fringeSend[ib];
+    for (int i=0; i<(4*dcount[ib]); i+=4) {
+      int k = fringeData[i];
+      sndPack[k].nints += 3;
+    }
+  }
+
+  // Allocate buffers for data send
+  for (int k=0; k<nsend; k++) {
+    sndPack[k].intData = (int*) malloc(sizeof(int) * sndPack[k].nints);
+  }
+
+  std::vector<int> ix(nsend, 0);
+  for (int ib=0; ib<nblocks; ib++) {
+    std::vector<int>& fringeData = fringeSend[ib];
+
+    for(size_t i=0; i<fringeData.size(); i+=4) {
+      int k = fringeData[i];
+      sndPack[k].intData[ix[k]++] = fringeData[i+1];  // nodeID
+      sndPack[k].intData[ix[k]++] = fringeData[i+2];  // local block index at receiver
+      sndPack[k].intData[ix[k]++] = fringeData[i+3];  // Global Donor ID
+    }
+  }
+
+  pc->sendRecvPackets(sndPack, rcvPack);
+
+  int rsize=0;
+  for (int k=0; k<nrecv; k++) {
+    rsize += rcvPack[k].nints;
+  }
+  receptors.resize(rsize);
+
+  size_t idx=0;
+  for (int k=0; k<nrecv; k++) {
+    for (int j=0; j<rcvPack[k].nints; j+=3) {
+      receptors[idx++] = rcvPack[k].intData[j];
+      receptors[idx++] = mtags[rcvPack[k].intData[j+1]];
+      receptors[idx++] = rcvPack[k].intData[j+2];
+    }
+  }
+
+  pc->clearPackets(sndPack, rcvPack);
+  free(sndPack);
+  free(rcvPack);
 }
 
 tioga::~tioga()

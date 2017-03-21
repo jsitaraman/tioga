@@ -96,8 +96,8 @@ void tioga::profile(void)
    {
     auto& mb = mblocks[ib];
     mb->preprocess();
+    //mb->writeGridFile(myid);
    }
-  //mb->writeGridFile(myid);
   //mb->writeOBB(myid);
   //if (myid==4) mb->writeOutput(myid);
   //if (myid==4) mb->writeOBB(myid);
@@ -115,18 +115,18 @@ void tioga::performConnectivity(void)
    mb->search();
   }
   exchangeDonors();
-  outputStatistics();
+  //outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
   for (int ib=0;ib<nblocks;ib++) {
     auto& mb = mblocks[ib];
     mb->getCellIblanks();
-    //mb->writeCellFile(myid);
+    // mb->writeGridFile(100*myid+mtags[ib]);
   }
-  if (qblock) free(qblock);
-  qblock=(double **)malloc(sizeof(double *)*nblocks);
-  for(int ib=0;ib<nblocks;ib++)
-    qblock[ib]=NULL;
+  // if (qblock) free(qblock);
+  // qblock=(double **)malloc(sizeof(double *)*nblocks);
+  // for(int ib=0;ib<nblocks;ib++)
+  //   qblock[ib]=NULL;
   //}
   //mb->writeOutput(myid);
   //tracei(myid);

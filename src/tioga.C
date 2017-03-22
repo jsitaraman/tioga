@@ -123,10 +123,10 @@ void tioga::performConnectivity(void)
     mb->getCellIblanks();
     // mb->writeGridFile(100*myid+mtags[ib]);
   }
-  // if (qblock) free(qblock);
-  // qblock=(double **)malloc(sizeof(double *)*nblocks);
-  // for(int ib=0;ib<nblocks;ib++)
-  //   qblock[ib]=NULL;
+  if (qblock) free(qblock);
+  qblock=(double **)malloc(sizeof(double *)*nblocks);
+  for(int ib=0;ib<nblocks;ib++)
+    qblock[ib]=NULL;
   //}
   //mb->writeOutput(myid);
   //tracei(myid);

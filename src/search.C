@@ -58,13 +58,13 @@ void MeshBlock::search(void)
     // the OBB
     std::vector<int> icell(ncells, -1);
 
-    if (rrot)
-    {
+//    if (rrot)
+//    {
       /// HACK - setting ADT bounds to total grid bounds case of moving grids
       ncells_adt = ncells;
       for (int i = 0; i < ncells; i++)
         icell[i] = i;
-    }
+/*    }
     else
     {
       ncells_adt = 0;
@@ -107,7 +107,7 @@ void MeshBlock::search(void)
           ic++;
         }
       }
-    }
+    }*/
 
     // now find the axis aligned bounding box of each cell in the list to
     // build the ADT

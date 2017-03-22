@@ -118,14 +118,19 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
   //int rootNode = 0;
   int cellID = -1;
 
-  double xsearch[3];
-  for (int d = 0; d < nDims; d++) /// TODO: templatize ndim
-    xsearch[d] = mb.xsearch[3*pt+d];
+  double xsearch[nDims];
+  for (int d = 0; d < nDims; d++)
+    xsearch[d] = mb.xsearch[nDims*pt+d];
 
   if (adt.rrot) // Transform back to ADT's coordinate system
   {
+    double x2[nDims] = {0.0};
+    for (int d1 = 0; d1 < nDims; d1++)
+      for (int d2 = 0; d2 < nDims; d2++)
+        x2[d1] += adt.Rmat[d1+nDims*d2]*(xsearch[d2]-adt.offset[d2]);
+
     for (int d = 0; d < nDims; d++)
-      xsearch[d] -= adt.offset[d];
+      xsearch[d] = x2[d];
   }
 
   bool flag = true;
@@ -138,11 +143,7 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
   // call recursive routine to check intersections with ADT nodes
   double rst[nDims] = {0.0};
   if (flag)
-  {
-    //double element[2*nDims];
-    //d_searchADTrecursion<0,nDims,nside>(adt,mb,cellID,rootNode,element,xsearch,rst,adt.nelem);
     d_searchADTstack<nDims,nside>(adt,mb,cellID,xsearch,rst);
-  }
 
   __syncthreads();
 

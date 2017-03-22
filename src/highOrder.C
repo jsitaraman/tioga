@@ -139,6 +139,8 @@ void MeshBlock::swapPointers(void)
   xtmp = x;
 //  x = x2.data();
 
+  ibc_0.assign(iblank_cell,iblank_cell+ncells);
+
   ibc_tmp = iblank_cell;
   iblank_cell = ibc_2.data();
 }
@@ -155,7 +157,7 @@ int MeshBlock::getIterIblanks(void)
 
   for (int ic = 0; ic < ncells; ic++)
   {
-    if (iblank_cell[ic] != NORMAL && ibc_2[ic] == NORMAL)
+    if ((iblank_cell[ic] != NORMAL || ibc_0[ic] != NORMAL) && ibc_2[ic] == NORMAL)
     {
       unblanks.insert(ic);
       iblank_cell[ic] = FRINGE;
@@ -1415,7 +1417,6 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
     buf_inds[i] = buf_disp[p] + ind;
     sndPack[p].intData[ind] = interpList2[i].receptorInfo[1];
   }
-
   buf_inds_d.assign(buf_inds.data(), buf_inds.size(), &stream_handle);
 }
 

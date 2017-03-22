@@ -80,7 +80,7 @@ private:
 
   //! Moving artbnd grid buffer variables
   std::vector<double> x2;
-  std::vector<int> ibc_2;
+  std::vector<int> ibc_2, ibc_0;
   double *xtmp;
   int *ibc_tmp;
   double *vg;

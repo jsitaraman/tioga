@@ -223,10 +223,13 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID, const double* __restr
 
   if (rrot) // Transform search point back to current physical location
   {
-    double x2[ndim] = {0.0};
+    double x2[ndim];
     for (int d1 = 0; d1 < ndim; d1++)
+    {
+      x2[d1] = offset[d1];
       for (int d2 = 0; d2 < ndim; d2++)
-        x2[d1] += Rmat[ndim*d1+d2] * (xyz[d2] - offset[d2]);
+        x2[d1] += Rmat[d1*ndim+d2] * xyz[d2];
+    }
 
     isInEle = getRefLoc<nside>(ecoord,bbox,x2,rst);
   }

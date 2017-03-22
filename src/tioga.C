@@ -194,7 +194,6 @@ void tioga::unblankPart1(void)
   // Switch iblank_cell to separate memory range
   mb->swapPointers();
 
-//  mb->preprocess();
   mb->updateOBB();
 
   doHoleCutting();
@@ -205,7 +204,6 @@ void tioga::unblankPart2(int nvar)
   // Swap iblank_cell pointer back
   mb->resetCurrentGrid();
 
-//  mb->preprocess();
   mb->updateOBB();
 
   doHoleCutting();
@@ -213,6 +211,7 @@ void tioga::unblankPart2(int nvar)
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
 
+  if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank);
   mb->calcFaceIblanks(meshcomm);
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);

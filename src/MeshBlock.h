@@ -25,6 +25,7 @@
  */
 
 #include <vector>
+#include <stdint.h>
 
 #include "codetypes.h"
 #include "ADT.h"
@@ -49,7 +50,7 @@ class MeshBlock
   int **vconn;        /** < connectivity of each kind of cell */
   int *wbcnode;     /** < wall boundary node indices */
   int *obcnode;     /** < overset boundary node indices */
-  unsigned long long *cellGID;     /**< Global ID of the cell */
+  uint64_t *cellGID;     /**< Global ID of the cell */
   //
   double *nodeRes;  /** < node resolution  */
   double *userSpecifiedNodeRes;
@@ -158,7 +159,7 @@ class MeshBlock
   void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 	       int *wbcnodei,int *obcnodei,
                int ntypesi, int *nvi, int *nci, int **vconni,
-               unsigned long long* cell_gid=NULL);
+               uint64_t* cell_gid=NULL);
 
 
   void setResolutions(double *nres,double *cres);    

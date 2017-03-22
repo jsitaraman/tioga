@@ -29,7 +29,7 @@ extern "C" {
 void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 			int *wbcnodei,int *obcnodei,
                         int ntypesi,int *nvi,int *nci,int **vconni,
-                        unsigned long long* cell_gid)
+                        uint64_t* cell_gid)
 {
   int i;
   //

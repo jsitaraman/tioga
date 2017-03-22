@@ -28,6 +28,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <stdint.h>
 #include "MeshBlock.h"
 #include "CartGrid.h"
 #include "CartBlock.h"
@@ -104,7 +105,7 @@ class tioga
 
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
                         int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
-                        unsigned long long* cell_gid=NULL);
+                        uint64_t* cell_gid=NULL);
 
   void registerSolution(int btag,double *q);
 

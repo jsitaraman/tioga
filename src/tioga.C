@@ -62,7 +62,7 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
  */
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
                              int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
-                             unsigned long long* cell_gid)
+                             uint64_t* cell_gid)
 {
   int iblk;
 

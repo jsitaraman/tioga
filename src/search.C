@@ -58,56 +58,46 @@ void MeshBlock::search(void)
     // the OBB
     std::vector<int> icell(ncells, -1);
 
-//    if (rrot)
-//    {
-      /// HACK - setting ADT bounds to total grid bounds case of moving grids
-      ncells_adt = ncells;
-      for (int i = 0; i < ncells; i++)
-        icell[i] = i;
-/*    }
-    else
+    ncells_adt = 0;
+    int ic = 0;
+    for (int n = 0; n < ntypes; n++)
     {
-      ncells_adt = 0;
-      int ic = 0;
-      for (int n = 0; n < ntypes; n++)
+      int nvert = nv[n];
+      for(int i = 0; i < nc[n]; i++)
       {
-        int nvert = nv[n];
-        for(int i = 0; i < nc[n]; i++)
+        // find each cell that has
+        // overlap with the bounding box
+        xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
+        xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
+        for (int m = 0; m < nvert; m++)
         {
-          // find each cell that has
-          // overlap with the bounding box
-          xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
-          xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
-          for (int m = 0; m < nvert; m++)
+          int i3 = 3*(vconn[n][nvert*i+m]-BASE);
+          for (int j = 0; j < 3; j++)
           {
-            int i3 = 3*(vconn[n][nvert*i+m]-BASE);
-            for (int j = 0; j < 3; j++)
-            {
-              xd[j] = 0;
-              for (int k = 0; k < 3; k++)
-                xd[j] += (x[i3+k]-obq.xc[k])*obq.vec[j][k];
-              xmin[j] = min(xmin[j],xd[j]);
-              xmax[j] = max(xmax[j],xd[j]);
-            }
-            for (int j = 0; j < 3; j++)
-            {
-              xd[j] = (xmax[j]+xmin[j])*0.5;
-              dxc[j] = (xmax[j]-xmin[j])*0.5;
-            }
+            xd[j] = 0;
+            for (int k = 0; k < 3; k++)
+              xd[j] += (x[i3+k]-obq.xc[k])*obq.vec[j][k];
+            xmin[j] = min(xmin[j],xd[j]);
+            xmax[j] = max(xmax[j],xd[j]);
           }
-          /// HACK - making this loop basically useless (ncells_adt will == ncells)
-          if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
-              fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
-              fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
+          for (int j = 0; j < 3; j++)
           {
-            // create a list of all the cells that have bounding box intersection
-            // with the QP bounding box
-            icell[ncells_adt++] = ic;
+            xd[j] = (xmax[j]+xmin[j])*0.5;
+            dxc[j] = (xmax[j]-xmin[j])*0.5;
           }
-          ic++;
         }
+        /// HACK - making this loop basically useless (ncells_adt will == ncells)
+        if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
+            fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
+            fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
+        {
+          // create a list of all the cells that have bounding box intersection
+          // with the QP bounding box
+          icell[ncells_adt++] = ic;
+        }
+        ic++;
       }
-    }*/
+    }
 
     // now find the axis aligned bounding box of each cell in the list to
     // build the ADT

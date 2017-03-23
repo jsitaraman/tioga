@@ -1,28 +1,33 @@
 #include "cuda_runtime.h"
 #include "error.hpp"
 
+template<unsigned int nVars>
 __global__
 void interp_u(const double* __restrict__ U_spts, double *U_out,
     const int* __restrict__ donors, const double* __restrict__ weights,
     const int* __restrict__ out_inds, int nFringe, int nSpts,
-    int nVars, int estride, int sstride, int vstride)
+    int estride, int sstride, int vstride)
 {
-  const int fpt = (blockDim.x * blockIdx.x + threadIdx.x) / nVars;
-  const int var = (blockDim.x * blockIdx.x + threadIdx.x) % nVars;
+  const int fpt = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (fpt >= nFringe)
     return;
 
-  int ind = nVars * out_inds[fpt] + var;
-  int u_ind = donors[fpt] * estride + var * vstride;
+  int ind = nVars * out_inds[fpt];
+  int u_ind = donors[fpt] * estride;
   int w_ind = nSpts * fpt;
 
-  double sum = 0;
+  double sum[nVars] = {0.0};
 
   for (int spt = 0; spt < nSpts; spt++)
-    sum += weights[w_ind+spt] * U_spts[u_ind + spt*sstride];
+  {
+    double wt = weights[w_ind+spt];
+    for (int var = 0; var < nVars; var++)
+      sum[var] += wt * U_spts[u_ind + spt*sstride + var*vstride];
+  }
 
-  U_out[ind] = sum;
+  for (int var = 0; var < nVars; var++)
+    U_out[ind+var] = sum[var];
 }
 
 void interp_u_wrapper(double *U_spts, double *U_out, int *donors,
@@ -30,10 +35,17 @@ void interp_u_wrapper(double *U_spts, double *U_out, int *donors,
     int sstride, int vstride, cudaStream_t stream_h)
 {
   unsigned int threads = 128;
-  unsigned int blocks = (nVars * nFringe + threads - 1) / threads;
+  unsigned int blocks = (nFringe + threads - 1) / threads;
 
-  interp_u<<<blocks, threads, 0, stream_h>>>(U_spts, U_out, donors, weights, out_inds,
-      nFringe, nSpts, nVars, estride, sstride, vstride);
+  if (nVars == 1)
+    interp_u<1><<<blocks, threads, 0, stream_h>>>(U_spts, U_out, donors, weights, out_inds,
+        nFringe, nSpts, estride, sstride, vstride);
+  else if (nVars == 4)
+    interp_u<4><<<blocks, threads, 0, stream_h>>>(U_spts, U_out, donors, weights, out_inds,
+        nFringe, nSpts, estride, sstride, vstride);
+  else if (nVars == 5)
+    interp_u<5><<<blocks, threads, 0, stream_h>>>(U_spts, U_out, donors, weights, out_inds,
+        nFringe, nSpts, estride, sstride, vstride);
 
   check_error();
 }

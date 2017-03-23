@@ -247,7 +247,7 @@ class tioga
   void unblankPart1(void);
   void unblankPart2(int nvar);
   void doHoleCutting(void);
-  void doPointConnectivity(void);
+  void doPointConnectivity(bool unblanking = false);
 
   void setTransform(double *mat, double *off, int nDims) { mb->setTransform(mat,off,nDims); }
 

@@ -155,9 +155,11 @@ int MeshBlock::getIterIblanks(void)
 {
   unblanks.clear();
 
+  // ibc_0 is the current blanking, iblank_cell is the new blanking,
+  // and ibc_2 is the estimate for the end of the time step
   for (int ic = 0; ic < ncells; ic++)
   {
-    if ((iblank_cell[ic] != NORMAL || ibc_0[ic] != NORMAL) && ibc_2[ic] == NORMAL)
+    if ((ibc_0[ic] != NORMAL) && (ibc_2[ic] == NORMAL || iblank_cell[ic] == NORMAL))
     {
       unblanks.insert(ic);
       iblank_cell[ic] = FRINGE;
@@ -1056,7 +1058,7 @@ void MeshBlock::getInternalNodes(void)
   }
 }
 
-void MeshBlock::getFringeNodes(void)
+void MeshBlock::getFringeNodes(bool unblanking)
 {
   nreceptorFaces = 0;
   nreceptorCells = 0;
@@ -1065,7 +1067,7 @@ void MeshBlock::getFringeNodes(void)
   nFacePoints = 0;
   nCellPoints = 0;
 
-  if (iartbnd)
+  if (iartbnd && !unblanking)
   {
     // Gather all Artificial Boundary face flux points into fringe-point list
     free(ftag);
@@ -1230,6 +1232,7 @@ void MeshBlock::processPointDonorsGPU(void)
 {
 #ifdef _GPU
   interp2ListSize = 0;
+  ninterp2 = 0;
   for (int i = 0; i < nsearch; i++)
     if (donorId[i] > -1 && iblank_cell[donorId[i]] == NORMAL)
       interp2ListSize++;
@@ -1245,7 +1248,6 @@ void MeshBlock::processPointDonorsGPU(void)
   donorId.resize(interp2ListSize);
 
   int nWeightsTotal = 0;
-  ninterp2 = 0;
   for (int i = 0; i < nsearch; i++)
   {
     if (donorId2[i] < 0 || iblank_cell[donorId2[i]] != NORMAL) continue;

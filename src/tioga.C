@@ -211,14 +211,14 @@ void tioga::unblankPart2(int nvar)
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
 
-  if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank);
+//  if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank); /// DEBUGGING
   mb->calcFaceIblanks(meshcomm);
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
 
   if (nunblank > 0)
   {
-    doPointConnectivity(); /// TODO: just do unblank cells only, no faces
+    doPointConnectivity(true); /// TODO: just do unblank cells only, no faces
 
     dataUpdate_artBnd(nvar, NULL, 0);
 
@@ -258,12 +258,12 @@ void tioga::doHoleCutting(void)
   }
 }
 
-void tioga::doPointConnectivity(void)
+void tioga::doPointConnectivity(bool unblanking)
 {
   if (!ihighGlobal) return;
 
   // Get all fringe point locations (high-order face/cell points + low-order vertices)
-  mb->getFringeNodes();
+  mb->getFringeNodes(unblanking);
 
   // Exchange new list of points, including high-order Artificial Boundary
   // face points or internal points (or fringe nodes for non-high order)
@@ -1096,9 +1096,9 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
       for (int i = 0; i < rcvVPack[k].nints; i++)
       {
         int ind = rcvVPack[k].intData[i];
+        recv_itmp[ind] = 1;
         for (int j = 0; j < stride; j++)
         {
-          recv_itmp[ind] = 1;          
           fringebuf_h[ind*stride+j] = rcvVPack[k].realData[i*stride+j];
         }
       }

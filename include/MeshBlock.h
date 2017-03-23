@@ -561,7 +561,7 @@ private:
 
   /*! Gather a list of all artificial boundary point locations (for high-order)
    * [Requires use of callback functions] */
-  void getFringeNodes(void);
+  void getFringeNodes(bool unblanking = false);
 
   void getExtraQueryPoints(OBB *obb, int &nints, int*& intData, int &nreals,
                            double*& realData);

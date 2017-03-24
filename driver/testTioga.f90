@@ -27,7 +27,7 @@ program testTioga
   integer :: ntypes
   integer :: nv1,nv2
   real*8 :: t1,t2
-  integer :: i,n,m,ib
+  integer :: i,n,m,ib,j
   real*8 :: xt(3),rnorm
   integer :: dcount,fcount
   integer, allocatable :: receptorInfo(:),inode(:)
@@ -110,6 +110,7 @@ program testTioga
    call tioga_getdonorcount(ib,dcount,fcount)
    allocate(receptorInfo(4*dcount))
    allocate(inode(fcount),frac(fcount))
+   write(6,*) dcount,fcount
    !
    ! use this API if you need to interpolate the field variables yourself
    !
@@ -120,6 +121,12 @@ program testTioga
    !> inode = indices for each receptor one group after the other
    !> frac  = weights for each receptor one group after the other
    !>
+   m=0
+   do i=1,dcount
+    write(1000+myid,"(20(1x,I6))") ib,(inode(m+j),j=1,receptorInfo(4*i)+1),receptorInfo(4*i-3:4*i)
+    m=m+(receptorInfo(4*i)+1)
+   enddo 
+   call flush(1000+myid)
    deallocate(receptorInfo,inode,frac)
   end do
 

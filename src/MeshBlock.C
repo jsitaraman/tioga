@@ -85,8 +85,8 @@ void MeshBlock::tagBoundary(void)
   FILE *fp;
   char intstring[7];
   char fname[80];  
-  
-
+  int *iextmp,*iextmp1; 
+  int iex,mexclude;
   //
   // do this only once
   // i.e. when the meshblock is first 
@@ -103,6 +103,8 @@ void MeshBlock::tagBoundary(void)
       // this is a local array
       //
       iflag=(int *)malloc(sizeof(int)*nnodes);
+      iextmp=(int *) malloc(sizeof(double)*nnodes);
+      iextmp1=(int *) malloc(sizeof(double)*nnodes);
       // 
       for(i=0;i<nnodes;i++) iflag[i]=0;
       //
@@ -156,6 +158,7 @@ void MeshBlock::tagBoundary(void)
 	{
           if (iflag[i]!=0)  nodeRes[i]/=iflag[i];
 	  iflag[i]=0;
+	  iextmp[i]=iextmp1[i]=0;
 	}
       //
       // now tag the boundary nodes
@@ -188,6 +191,7 @@ void MeshBlock::tagBoundary(void)
 		    {
 		      //iflag[inode[m]]=1;
 		      nodeRes[inode[m]]=BIGVALUE;
+                      iextmp[inode[m]]=iextmp1[inode[m]]=1;
 		    }
 		}
 	    }
@@ -208,25 +212,40 @@ void MeshBlock::tagBoundary(void)
       // now tag all the cells which have 
       // mandatory receptors as nodes as not acceptable
       // donors
-      k=0;
-      for(n=0;n<ntypes;n++)
-	{
-	  nvert=nv[n];
-	  for(i=0;i<nc[n];i++)
-	    {
-	      for(m=0;m<nvert;m++)
-		{
-		  inode[m]=vconn[n][nvert*i+m]-BASE;
-		  if (nodeRes[inode[m]]==BIGVALUE) //(iflag[inode[m]]) 
-		    {
-		      cellRes[k]=BIGVALUE;
-		      break;
-		    }
-		}
-	      k++;
-	    }
-	}
+      //
+      mexclude=3;
+      for(iex=0;iex<mexclude;iex++)
+      {
+	k=0;
+	for(n=0;n<ntypes;n++)
+	  {
+	    nvert=nv[n];
+	    for(i=0;i<nc[n];i++)
+	      {
+		for(m=0;m<nvert;m++)
+		  {
+		    inode[m]=vconn[n][nvert*i+m]-BASE;
+		    if (iextmp[inode[m]]==1) //(iflag[inode[m]]) 
+		      {
+			cellRes[k]=BIGVALUE;
+			break;
+		      }		    
+		  }
+		if (cellRes[k]==BIGVALUE) 
+		  {
+		    for(m=0;m<nvert;m++) {
+                      inode[m]=vconn[n][nvert*i+m]-BASE;
+                      if (iextmp[inode[m]]!=1) iextmp1[inode[m]]=1;
+                    }
+		  }
+		k++;
+	      }
+	  }
+	for(i=0;i<nnodes;i++) iextmp[i]=iextmp1[i];	
+      }
       free(iflag);
+      free(iextmp);
+      free(iextmp1);
 }
 
 void MeshBlock::writeGridFile(int bid)

@@ -28,8 +28,7 @@ extern "C" {
 
 void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 			int *wbcnodei,int *obcnodei,
-                        int ntypesi,int *nvi,int *nci,int **vconni,
-                        uint64_t* cell_gid)
+                        int ntypesi,int *nvi,int *nci,int **vconni)
 {
   int i;
   //
@@ -49,7 +48,7 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   nv=nvi;
   nc=nci;
   vconn=vconni;
-  cellGID = cell_gid;
+  // cellGID = cell_gid;
   //
   //tracei(nnodes);
   //for(i=0;i<ntypes;i++) tracei(nc[i]);

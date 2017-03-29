@@ -112,6 +112,8 @@ void tioga::exchangeSearchData(void)
       free(mb->xsearch);
     if (mb->isearch)
       free(mb->isearch);
+    if (mb->tagsearch)
+      free(mb->tagsearch);
     if (mb->donorId)
       free(mb->donorId);
   }
@@ -144,6 +146,7 @@ void tioga::exchangeSearchData(void)
     if (mb->nsearch < 1) continue;
     mb->xsearch = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
     mb->isearch = (int*)malloc(3 * sizeof(int) * mb->nsearch);
+    mb->tagsearch = (int*)malloc(sizeof(int) * mb->nsearch);
     mb->donorId = (int*)malloc(sizeof(int) * mb->nsearch);
   }
   //
@@ -169,6 +172,7 @@ void tioga::exchangeSearchData(void)
         mb->isearch[ioff++] = k;
         mb->isearch[ioff++] = rcvPack[k].intData[m++];
 	mb->isearch[ioff++] = obblist[ii].iblk_remote;
+        mb->tagsearch[ioff/3-1]=obblist[ii].tag_remote;
       }
 
       for (int j=0; j < nrealsRecv[ii]; j++) {

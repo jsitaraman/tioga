@@ -240,7 +240,7 @@ void tioga::exchangeBoxes(void)
 
   // Determine packet sizes and reallocate arrays
   for(int k=0; k < nsend; k++) {
-    sndPack[k].nints = 2 * obPerProc[sndMap[k]];
+    sndPack[k].nints = 3 * obPerProc[sndMap[k]];
     sndPack[k].nreals = sndPack[k].nints * 6;
     sndPack[k].intData = (int*) malloc(sizeof(int)*sndPack[k].nints);
     sndPack[k].realData = (double*) malloc(sizeof(double)*sndPack[k].nreals);
@@ -271,8 +271,9 @@ void tioga::exchangeBoxes(void)
     obblist[i].send_tag = key_send;
     obblist[i].recv_tag = key_recv;
 
-    sndPack[k].intData[2*ioff] = key_send; // mb->getMeshTag();
-    sndPack[k].intData[2*ioff+1] = ib;
+    sndPack[k].intData[3*ioff] = key_send; // mb->getMeshTag();
+    sndPack[k].intData[3*ioff+1] = ib;
+    sndPack[k].intData[3*ioff+2] = mb->getMeshTag();
     mb->getReducedOBB(&obbRecv[ob], &(sndPack[k].realData[roff]));
 
     for(int ii=0; ii<3; ii++)
@@ -291,10 +292,11 @@ void tioga::exchangeBoxes(void)
   for (int k=0; k<nrecv; k++) {
     int m=0;
 
-    for (int n=0; n< rcvPack[k].nints; n+=2) {
+    for (int n=0; n< rcvPack[k].nints; n+=3) {
       int key = rcvPack[k].intData[n];
       int ii = intBoxMap[key];
       obblist[ii].iblk_remote = rcvPack[k].intData[n+1];
+      obblist[ii].tag_remote = rcvPack[k].intData[n+2];
 
       for (int i=0; i<3; i++)
         obblist[ii].xc[i] = rcvPack[k].realData[m++];

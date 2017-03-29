@@ -43,7 +43,6 @@ class MeshBlock
   int nwbc;    /** < number of wall boundary nodes */
   //
   double *x;        /** < grid nodes x[3*nnodes] */
-  int *iblank;      /** < iblank value for each grid node */
   int *iblank_cell; /** < iblank value at each grid cell */
   //
   int **vconn;        /** < connectivity of each kind of cell */
@@ -89,6 +88,7 @@ class MeshBlock
   int *pickedCart;
  	
  public :
+  int *iblank;      /** < iblank value for each grid node */
   int ntotalPointsCart;
   double *rxyzCart;
   int *donorIdCart;
@@ -104,6 +104,7 @@ class MeshBlock
   //
   int nsearch;        /** < number of query points to search in this block */
   int *isearch;       /** < index of query points in the remote process */
+  int *tagsearch;       /** < index of query points in the remote process */
   double *xsearch;    /** < coordinates of the query points */
   double *rst;            /**  natrural coordinates */
   int *donorId;       /** < donor indices for those found */
@@ -131,7 +132,8 @@ class MeshBlock
   /** basic constructor */
   MeshBlock() { nv=NULL; nc=NULL; x=NULL;iblank=NULL;iblank_cell=NULL;vconn=NULL;wbcnode=NULL;
     obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
-    interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; xsearch=NULL; donorId=NULL;
+    interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; tagsearch=NULL;
+    xsearch=NULL; donorId=NULL;
     adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=2;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;

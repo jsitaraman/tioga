@@ -161,11 +161,10 @@ void searchADT(dADT &adt, dMeshBlock &mb)
   {
     case 8:
       searchADT_kernel<3,2><<<blocks, threads>>>(adt, mb); break;
-//      searchADT_kernel<3,2><<<blocks, threads, 0, mb.stream>>>(*this, mb); break;
-//    case 27:
-//      searchADT_kernel<3,3><<<blocks, threads, 0, mb.stream>>>(adt, mb); break;
-//    case 64:
-//      searchADT_kernel<3,4><<<blocks, threads, 0, mb.stream>>>(adt, mb); break;
+    case 27:
+      searchADT_kernel<3,3><<<blocks, threads>>>(adt, mb); break;
+    case 64:
+      searchADT_kernel<3,4><<<blocks, threads>>>(adt, mb); break;
     default:
       ThrowException("nvert case not implemented");
   }

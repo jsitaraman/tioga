@@ -25,7 +25,7 @@ extern "C"{
 
 using namespace tg_funcs;
 			   
-void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch)
+void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch, double *rst)
 {
   int icell = elementList[adtElement];
 
@@ -69,12 +69,11 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
       double refloc[3];
       bool isInEle = getRefLocNewton(xv2.data(), xsearch, &refloc[0], nvert, 3);
 
-      // if any of the nodal weights are not in between [-TOL 1+TOL] discard cell
       if (!isInEle)
-      {
-        *cellIndex=-1;
-        return;
-      }
+        *cellIndex = -1;
+      else
+        *cellIndex = icell;
+
       return;
     }
     else
@@ -110,7 +109,7 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
     int icell1 = icell+BASE;
     *cellIndex = -1;
     int passFlag;
-    donor_inclusion_test(&icell1,xsearch,&passFlag,&(rst[ipoint]));
+    donor_inclusion_test(&icell1,xsearch,&passFlag,rst);
     if (passFlag) *cellIndex = icell;
   }
 

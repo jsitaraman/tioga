@@ -72,7 +72,7 @@ public :
   void setTransform(double* mat, double* off, int ndims);
 
   //! Search the ADT for the element containint the point xsearch
-  void searchADT(MeshBlock *mb,int *cellIndex,double *xsearch);
+  void searchADT(MeshBlock *mb, int *cellIndex, double *xsearch, double* rst);
 
   //! Search the ADT for all elements overlapping with bounding-box bbox
   void searchADT_box(int *elementList, std::unordered_set<int>& icells, double *bbox);
@@ -80,7 +80,7 @@ public :
   /*! Search ADT for element containing a displaced point
    *  Apply linear transform to search point to avoid re-creating ADT during
    *  rigid-body motion */
-  void searchADT_rot(MeshBlock* mb, int* cellIndex, double* xsearch);
+  void searchADT_rot(MeshBlock* mb, int* cellIndex, double* xsearch, double* rst);
 };
 
 #endif

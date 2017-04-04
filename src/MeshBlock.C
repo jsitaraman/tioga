@@ -815,7 +815,8 @@ void MeshBlock::writeOBB(int bid)
 int MeshBlock::findPointDonor(double *x_pt)
 {
   int foundCell;
-  adt->searchADT(this,&foundCell,x_pt);
+  double rst[3] = {0.0};
+  adt->searchADT(this,&foundCell,x_pt,rst);
   return foundCell;
 }
 

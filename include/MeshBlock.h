@@ -120,8 +120,10 @@ private:
   std::vector<double> Rmat;
   double offset[3] = {0.0};
 
+#ifdef _GPU
   dADT adt_d;       /** GPU-based ADT */
   dMeshBlock mb_d;  /** GPU-based mesh data */
+#endif
 
   //
   // Alternating digital tree library
@@ -273,10 +275,16 @@ private:
   std::vector<double> xsearch;    /** < coordinates of the query points */
   //double *rst;            /**  natrural coordinates */
   //int *donorId;       /** < donor indices for those found */
+#ifdef _GPU
   hvec<double> rst;
   hvec<double> rst_h; //! Specificallly for donor_frac_gpu
   hvec<int> donorId; /// TODO: allow hvec to be used for non-GPU cases (use malloc vs. cudaMalloc)
   hvec<int> donorId_h; //! Specificallly for donor_frac_gpu
+#else
+  std::vector<double> rst; /// TODO: allow hvec to be used for non-GPU cases (use malloc vs. cudaMalloc)
+  std::vector<int> donorId;
+#endif
+
   int donorCount;
   int myid;
   std::vector<double> cellRes;  /** < resolution for each cell */
@@ -427,7 +435,7 @@ private:
 
   void getInterpolatedGradientArtBnd(int& nints, int& nreals, std::vector<int>& intData, std::vector<double>& realData, int nvar);
 
-  void checkContainment(int *cellIndex,int adtElement,double *xsearch);
+  void checkContainment(int *cellIndex,int adtElement,double *xsearch,double *rst);
 
   void getWallBounds(int *mtag,int *existWall, double wbox[6]);
   

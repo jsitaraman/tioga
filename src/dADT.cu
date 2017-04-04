@@ -102,8 +102,6 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, double* xsearch
   }
 }
 
-
-
 template<int nDims, int nside>
 __global__
 void searchADT_kernel(dADT adt, dMeshBlock mb)

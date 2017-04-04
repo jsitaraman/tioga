@@ -1154,23 +1154,27 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 #ifndef _GPU
 void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
 {
-  if (iartbnd && gpu)
-    mb->getDonorDataGPU(dataFlag);
+  dataUpdate_artBnd_send(nvar,q_spts,dataFlag);
 
+  dataUpdate_artBnd_recv(nvar,q_spts,dataFlag);
+}
+
+void tioga::dataUpdate_artBnd_send(int nvar, double *q_spts, int dataFlag)
+{
   // initialize send and recv packets
   int nsend,nrecv;
   int *sndMap,*rcvMap;
 
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
 
-  if (nsend+nrecv == 0) return;
+  sndVPack.resize(nsend);
+  rcvVPack.resize(nrecv);
 
-  PACKET *sndPack = new PACKET[nsend];
-  PACKET *rcvPack = new PACKET[nrecv];
+  if (nsend+nrecv == 0) return;
 
   std::vector<int> icount(nsend), dcount(nsend);
 
-  pc->initPackets(sndPack,rcvPack);
+  pc->initPacketsV(sndVPack,rcvVPack);
 
   // get the interpolated solution now
   int *integerRecords = NULL;  // procID & pointID
@@ -1212,44 +1216,58 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
   for (int i = 0; i < nints; i++)
   {
     int k = integerRecords[2*i]; // rank that interp point belongs to
-    sndPack[k].nints++;
-    sndPack[k].nreals += stride;
+    sndVPack[k].nints++;
+    sndVPack[k].nreals += stride;
   }
 
   for (int k = 0; k < nsend; k++)
   {
-    sndPack[k].intData = (int *)malloc(sizeof(int)*sndPack[k].nints);
-    sndPack[k].realData = (double *)malloc(sizeof(double)*sndPack[k].nreals);
+    sndVPack[k].intData.resize(sndVPack[k].nints);
+    sndVPack[k].realData.resize(sndVPack[k].nreals);
     icount[k] = dcount[k] = 0;
   }
 
   for (int i = 0; i < nints; i++)
   {
     int k = integerRecords[2*i];
-    sndPack[k].intData[icount[k]++] = integerRecords[2*i+1];
+    sndVPack[k].intData[icount[k]++] = integerRecords[2*i+1];
     for (int j = 0; j < stride; j++)
-      sndPack[k].realData[dcount[k]++] = realRecords[stride*i+j];
+      sndVPack[k].realData[dcount[k]++] = realRecords[stride*i+j];
   }
 
   // communicate the data across all partitions
-  pc->sendRecvPackets(sndPack,rcvPack);
+  pc->sendPacketsV(sndVPack,rcvVPack);
+
+  free(integerRecords);
+  free(realRecords);
+}
+
+void tioga::dataUpdate_artBnd_recv(int nvar, double* q_spts, int dataFlag)
+{
+  int nsend,nrecv;
+  int *sndMap,*rcvMap;
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+
+  pc->recvPacketsV();
+
+  int stride = nvar;
+  if (iartbnd && dataFlag == 1) stride = 3*nvar;
 
   // Decode the packets and update the values in the solver's data array
   if (ihigh)
   {
-    MPI_Pcontrol(1, "tioga_unpack_buffers");
     std::vector<double> qtmp(stride*mb->ntotalPoints);
     std::vector<int> itmp(mb->ntotalPoints);
 
     for (int k = 0; k < nrecv;k++)
     {
       int m = 0;
-      for (int i = 0; i < rcvPack[k].nints; i++)
+      for (int i = 0; i < rcvVPack[k].nints; i++)
       {
         for (int j = 0; j < stride; j++)
         {
-          itmp[rcvPack[k].intData[i]] = 1;
-          qtmp[rcvPack[k].intData[i]*stride+j] = rcvPack[k].realData[m];
+          itmp[rcvVPack[k].intData[i]] = 1;
+          qtmp[rcvVPack[k].intData[i]*stride+j] = rcvVPack[k].realData[m];
           m++;
         }
       }
@@ -1286,9 +1304,9 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
     {
       interpTime.startTimer();
       if (dataFlag == 0)
-        mb->updateFluxPointData(qtmp.data(),nvar);
+        mb->updateFringePointData(qtmp.data(),nvar);
       else
-        mb->updateFluxPointGradient(qtmp.data(),nvar);
+        mb->updateFringePointGradient(qtmp.data(),nvar);
       interpTime.startTimer();
     }
     else
@@ -1298,22 +1316,12 @@ void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
   {
     for (int k = 0; k < nrecv; k++)
     {
-      for (int i = 0; i < rcvPack[k].nints; i++)
+      for (int i = 0; i < rcvVPack[k].nints; i++)
       {
-        mb->updateSolnData(rcvPack[k].intData[i],&rcvPack[k].realData[nvar*i],q_spts,nvar,dataFlag);
+        mb->updateSolnData(rcvVPack[k].intData[i],&rcvVPack[k].realData[nvar*i],q_spts,nvar,dataFlag);
       }
     }
   }
-
-  // release all memory
-  pc->clearPackets2(sndPack,rcvPack);
-  delete[] sndPack;
-  delete[] rcvPack;
-  free(integerRecords);
-  free(realRecords);
-
-  if (iartbnd && gpu)
-    mb->sendFringeDataGPU(dataFlag);
 }
 #endif
 

@@ -166,8 +166,8 @@ void MeshBlock::search(void)
 
   donorId.resize(nsearch);
 
-  Timer dtime("Device ADT Time: ");
-  Timer htime("Host ADT Time: ");
+//  Timer dtime("Device ADT Time: ");
+//  Timer htime("Host ADT Time: ");
 #ifdef _GPU
   //cudaDeviceSynchronize();
   //dtime.startTimer();
@@ -178,22 +178,19 @@ void MeshBlock::search(void)
   rst.assign(mb_d.rst.data(), mb_d.rst.size());
   donorId.assign(mb_d.donorId.data(), mb_d.donorId.size());
 #else
-  htime.startTimer();
-  donorCount = 0;
-  ipoint = 0;
+//  htime.startTimer();
+//#pragma omp parallel for // CONTAINMENT CHECK MUST BE THREAD-SAFE
   for (int i = 0; i < nsearch; i++)
-  {
-    adt->searchADT(this, &(donorId[i]), &(xsearch[3*i]));
+    adt->searchADT(this, &donorId[i], &xsearch[3*i], &rst[3*i]);
 
+  donorCount = 0;
+  for (int i = 0; i < nsearch; i++)
     if (donorId[i] > -1)
       donorCount++;
 
-    ipoint += 3;
-  }
-  htime.stopTimer();
-
-  printf("%d: nsearch %d\n",myid,nsearch);
-  dtime.showTime(5);
-  htime.showTime(5);
+//  htime.stopTimer();
 #endif
+//  printf("%d: nsearch %d\n",myid,nsearch);
+//  dtime.showTime(5);
+//  htime.showTime(5);
 }

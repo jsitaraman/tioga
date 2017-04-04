@@ -1489,7 +1489,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints, int *nreals,
   {
     if (interpType==ROW)
     {
-      for (int i = 0; i < ninterp2;i++)
+      for (int i = 0; i < ninterp2; i++)
       {
         for (int k = 0; k < nvar;k++) qq[k]=0;
         for (int m = 0; m < interpList2[i].nweights;m++)
@@ -1732,8 +1732,6 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
   if (nreceptorCells > 0)
     cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
 #else
-  PUSH_NVTX_RANGE("tg_update_fringeU", 2);
-  MPI_Pcontrol(1, "tioga_update_U_fpts");
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
@@ -1750,8 +1748,6 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
     }
 //    fpt_start += (pointsPerFace[i]*nvar);
   }
-  MPI_Pcontrol(-1, "tioga_update_U_fpts");
-  POP_NVTX_RANGE;
 #endif
 }
 
@@ -1763,11 +1759,7 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
 #ifdef _GPU
   if (nreceptorFaces > 0)
     face_data_to_device(ftag, nreceptorFaces, 1, dqtmp);
-
-//  if (nreceptorCells > 0)
-//    cell_data_to_device(ctag, nreceptorCells, 1, dqtmp+3*nvar*nFacePoints);
 #else
-  MPI_Pcontrol(1, "tioga_update_grad_fpts");
 //  int fpt_start = 0;
 #pragma omp parallel for
   for (int i = 0; i < nreceptorFaces; i++)
@@ -1782,7 +1774,6 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
     }
 //    fpt_start += (pointsPerFace[i]*nvar*3);
   }
-  MPI_Pcontrol(-1, "tioga_update_grad_fpts");
 #endif
   POP_NVTX_RANGE;
 }

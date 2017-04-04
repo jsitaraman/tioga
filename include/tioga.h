@@ -262,8 +262,13 @@ class tioga
   /** Perform data interpolation for artificial boundary method */
   void dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag);
 
+#ifdef _GPU
   void dataUpdate_artBnd_send(int nvar, int dataFlag);
   void dataUpdate_artBnd_recv(int nvar, int dataFlag);
+#else
+  void dataUpdate_artBnd_send(int nvar, double* q_spts, int dataFlag);
+  void dataUpdate_artBnd_recv(int nvar, double* q_spts, int dataFlag);
+#endif
 
   /** get hole map for each mesh */
  

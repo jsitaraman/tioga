@@ -153,7 +153,15 @@ class tioga
   void setSymmetry(int syminput) { isym=syminput;};
   /** set resolutions for nodes and cells */
   void setResolutions(double *nres,double *cres)
-  { mb->setResolutions(nres,cres);}    
+  { mb->setResolutions(nres,cres);}
+
+  void setResolutions(int btag, double *nres,double *cres)
+  {
+    auto idxit = tag_iblk_map.find(btag);
+    int iblk = idxit->second;
+    auto& mb = mblocks[iblk];
+    mb->setResolutions(nres, cres);
+  }
 
   void set_cell_iblank(int *iblank_cell)
   {

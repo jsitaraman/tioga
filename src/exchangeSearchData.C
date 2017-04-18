@@ -22,7 +22,7 @@
 void tioga::exchangeSearchData(void)
 {
   int i,j,k,l,m;
-  int icount,dcount;
+  int icount,dcount,tcount;
   int nsend,nrecv;
   PACKET *sndPack,*rcvPack;
   int *sndMap;
@@ -77,17 +77,20 @@ void tioga::exchangeSearchData(void)
   if (mb->xsearch) free(mb->xsearch);
   if (mb->isearch) free(mb->isearch);
   if (mb->donorId) free(mb->donorId);
+  if (mb->tagsearch) free(mb->tagsearch);
   //
   // allocate query point storage
   //
   mb->xsearch=(double *)malloc(sizeof(double)*3*mb->nsearch);
   mb->isearch=(int *)malloc(2*sizeof(int)*mb->nsearch);
   mb->donorId=(int *)malloc(sizeof(int)*mb->nsearch);
+  mb->tagsearch=(int *)malloc(sizeof(int)*mb->nsearch);
   //
   // now fill the query point arrays
   //
   icount=0;
   dcount=0;
+  tcount=0;
   for(k=0;k<nrecv;k++)
     {
       l=0;
@@ -98,6 +101,7 @@ void tioga::exchangeSearchData(void)
 	  mb->xsearch[dcount++]=rcvPack[k].realData[l++];
 	  mb->xsearch[dcount++]=rcvPack[k].realData[l++];
 	  mb->xsearch[dcount++]=rcvPack[k].realData[l++];
+          mb->tagsearch[tcount++]=obblist[k].meshtag;
 	}
     }
   for(i=0;i<nsend;i++)

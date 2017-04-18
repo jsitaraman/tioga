@@ -146,6 +146,7 @@ void tioga::exchangeBoxes(void)
   for(k=0;k<nrecv;k++) {
    for(j=0;j<3;j++) obblist[k].xc[j]=rcvPack[k].realData[j];
    for(j=0;j<3;j++) obblist[k].dxc[j]=rcvPack[k].realData[j+3];
+   obblist[k].meshtag=alltags[rcvMap[k]];
    }  
   pc->clearPackets(sndPack,rcvPack);
   //

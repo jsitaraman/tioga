@@ -115,6 +115,7 @@ class MeshBlock
   int ninterpCart;
   int interpListCartSize;
   INTERPLIST *interpListCart; 
+  int *tagsearch;
 
   //
   // call back functions to use p4est to search
@@ -134,7 +135,7 @@ class MeshBlock
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
     interpList2=NULL;picked=NULL;ctag_cart=NULL;rxyzCart=NULL;donorIdCart=NULL;pickedCart=NULL;ntotalPointsCart=0;
-    nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;
+    nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;tagsearch=NULL;
     resolutionScale=1.0;
   };
 

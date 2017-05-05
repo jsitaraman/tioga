@@ -63,9 +63,9 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
 	}
       else if (nnodes==2)
 	{
-	  dxc[0]=max(1e-3,fabs(x[3]-x[0]))*0.5;
-	  dxc[1]=max(1e-3,fabs(x[4]-x[1]))*0.5;
-	  dxc[2]=max(1e-3,fabs(x[5]-x[2]))*0.5;
+	  dxc[0]=MAX(1e-3,fabs(x[3]-x[0]))*0.5;
+	  dxc[1]=MAX(1e-3,fabs(x[4]-x[1]))*0.5;
+	  dxc[2]=MAX(1e-3,fabs(x[5]-x[2]))*0.5;
           return;
 	}
       else
@@ -74,7 +74,7 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
           {
            i3=3*i;
            for(j=0;j<3;j++)
-            dxc[j]=max(1e-3,fabs(x[i3+j]-x[0]));
+            dxc[j]=MAX(1e-3,fabs(x[i3+j]-x[0]));
           }
 	 return;
         }
@@ -137,8 +137,8 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
       //
       for(j=0;j<3;j++)
 	{
-	  xmax[j]=max(xmax[j],xd[j]);
-	  xmin[j]=min(xmin[j],xd[j]);
+	  xmax[j]=MAX(xmax[j],xd[j]);
+	  xmin[j]=MIN(xmin[j],xd[j]);
 	}
     }
   //

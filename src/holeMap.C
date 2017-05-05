@@ -121,15 +121,15 @@ void tioga::getHoleMap(void)
        holeMap[i].extents[j + 3] = bboxGlobal[3 * i + j + 3 * maxtag];
        ds[j] = holeMap[i].extents[j + 3] - holeMap[i].extents[j];
      }
-     dsmax = max(ds[0], ds[1]);
-     dsmax = max(dsmax, ds[2]);
+     dsmax = MAX(ds[0], ds[1]);
+     dsmax = MAX(dsmax, ds[2]);
      dsbox = dsmax / 64;
 
      for (j = 0; j < 3; j++) {
        holeMap[i].extents[j] -= (2 * dsbox);
        holeMap[i].extents[j + 3] += (2 * dsbox);
        holeMap[i].nx[j] = floor(
-         max((holeMap[i].extents[j + 3] - holeMap[i].extents[j]) / dsbox, 1));
+         MAX((holeMap[i].extents[j + 3] - holeMap[i].extents[j]) / dsbox, 1));
      }
      bufferSize = holeMap[i].nx[0] * holeMap[i].nx[1] * holeMap[i].nx[2];
      holeMap[i].sam = (int*)malloc(sizeof(int) * bufferSize);

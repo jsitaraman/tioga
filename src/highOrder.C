@@ -56,9 +56,9 @@ void MeshBlock::getCellIblanks(void)
 	    {
 	      inode[m]=vconn[n][nvert*i+m]-BASE;
 	      if (verbose) {
-                tracei(m);
-                tracei(inode[m]);
-                tracei(iblank[inode[m]]);
+                TRACEI(m);
+                TRACEI(inode[m]);
+                TRACEI(iblank[inode[m]]);
               }
 	      if (iblank[inode[m]]==0) 
 		{
@@ -68,9 +68,9 @@ void MeshBlock::getCellIblanks(void)
 	      ncount=ncount+(iblank[inode[m]]==-1);
 	    }
 	  if (verbose) {
-	    tracei(icell);
-            tracei(ncount);
-            tracei(nvert);
+	    TRACEI(icell);
+            TRACEI(ncount);
+            TRACEI(nvert);
            } 
 	  if (flag) 
 	    {
@@ -163,7 +163,7 @@ void MeshBlock::getInternalNodes(void)
 	{
 	  get_nodes_per_cell(&(ctag[i]),&(pointsPerCell[i]));
 	  ntotalPoints+=pointsPerCell[i];
-	  maxPointsPerCell=max(maxPointsPerCell,pointsPerCell[i]);
+	  maxPointsPerCell=MAX(maxPointsPerCell,pointsPerCell[i]);
       }
       //
       if (rxyz !=NULL) free(rxyz);
@@ -385,7 +385,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		{
 		  weight=interpList2[i].weights[m];
 		  //if (weight < 0 || weight > 1.0) {
-		  //	traced(weight);
+		  //	TRACED(weight);
 		  //	printf("warning: weights are not convex\n");
 		  //    }
 		  for(k=0;k<nvar;k++)
@@ -410,7 +410,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		  inode=interpList2[i].inode[m];
 		  weight=interpList2[i].weights[m];
 		  if (weight < -TOL || weight > 1.0+TOL) {
-                    traced(weight);
+                    TRACED(weight);
                     printf("warning: weights are not convex 2\n");
                    }
 		  for(k=0;k<nvar;k++)

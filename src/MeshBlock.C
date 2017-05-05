@@ -51,8 +51,8 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   vconn=vconni;
   cellGID = cell_gid;
   //
-  //tracei(nnodes);
-  //for(i=0;i<ntypes;i++) tracei(nc[i]);
+  //TRACEI(nnodes);
+  //for(i=0;i<ntypes;i++) TRACEI(nc[i]);
   ncells=0;
   for(i=0;i<ntypes;i++) ncells+=nc[i];
 }
@@ -164,7 +164,7 @@ void MeshBlock::tagBoundary(void)
       // now tag the boundary nodes
       // reuse the iflag array
       //
-      //tracei(nobc);
+      //TRACEI(nobc);
       for(i=0;i<nobc;i++)
         { 
           ii=(obcnode[i]-BASE);
@@ -547,8 +547,8 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
       i3=3*inode;
       for(j=0;j<3;j++)
 	{
-	  wbox[j]=min(wbox[j],x[i3+j]);
-	  wbox[j+3]=max(wbox[j+3],x[i3+j]);
+	  wbox[j]=MIN(wbox[j],x[i3+j]);
+	  wbox[j+3]=MAX(wbox[j+3],x[i3+j]);
 	}
     }
   
@@ -635,14 +635,14 @@ void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
 		    {
 		      xv=x[i3+k];
 		      iv=floor((xv-extents[k])/ds[k]);
-		      imin[k]=min(imin[k],iv);
-		      imax[k]=max(imax[k],iv);
+		      imin[k]=MIN(imin[k],iv);
+		      imax[k]=MAX(imax[k],iv);
 		    }
 		}
 	     for(j=0;j<3;j++)
               {
-	       imin[j]=max(imin[j],0);
-               imax[j]=min(imax[j],nx[j]-1);
+	       imin[j]=MAX(imin[j],0);
+               imax[j]=MIN(imax[j],nx[j]-1);
               }
 	      //
 	      // mark sam to 1
@@ -689,8 +689,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 	      for(j=0;j<3;j++)
 		for(k=0;k<3;k++)
 		  xd[j]+=(x[i3+k]-obc->xc[k])*obc->vec[j][k];
-	      for(j=0;j<3;j++) bbox[j]=min(bbox[j],xd[j]);
-	      for(j=0;j<3;j++) bbox[j+3]=max(bbox[j+3],xd[j]);
+	      for(j=0;j<3;j++) bbox[j]=MIN(bbox[j],xd[j]);
+	      for(j=0;j<3;j++) bbox[j+3]=MAX(bbox[j+3],xd[j]);
 	    }
 	  iflag=0;
 	  for(j=0;j<3;j++) iflag=(iflag || (bbox[j] > obc->dxc[j]));
@@ -705,8 +705,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 	      for(j=0;j<3;j++)
 		for(k=0;k<3;k++)
 		  xd[j]+=(x[i3+k]-obb->xc[k])*obb->vec[j][k];
-	      for(j=0;j<3;j++) realData[j]=min(realData[j],xd[j]);
-	      for(j=0;j<3;j++) realData[j+3]=max(realData[j+3],xd[j]);
+	      for(j=0;j<3;j++) realData[j]=MIN(realData[j],xd[j]);
+	      for(j=0;j<3;j++) realData[j+3]=MAX(realData[j+3],xd[j]);
 	    }
 	}
     }

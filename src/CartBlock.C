@@ -190,23 +190,23 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
       ix[n]=(xtmp[n]-xlo[n])/dx[n];
       rst[n]=(xtmp[n]-xlo[n]-ix[n]*dx[n])/dx[n];
       // if (!(ix[n] >=0 && ix[n] < dims[n]) && myid==77) {
-      //  tracei(procid);
-      //  tracei(global_id);
-      //  tracei(local_id);
-      //  tracei(remoteid);
-      //  tracei(myid);
-      //  traced(xtmp[0]);
-      //  traced(xtmp[1]);
-      //  traced(xtmp[2]);
-      //  traced(xlo[0]);
-      //  traced(xlo[1]);
-      //  traced(xlo[2]);
-      //  traced(dx[0]);
-      //  traced(dx[1]);
-      //  traced(dx[2]);
-      //  tracei(ix[n]);
-      //  tracei(n);
-      //  tracei(dims[n]);
+      //  TRACEI(procid);
+      //  TRACEI(global_id);
+      //  TRACEI(local_id);
+      //  TRACEI(remoteid);
+      //  TRACEI(myid);
+      //  TRACED(xtmp[0]);
+      //  TRACED(xtmp[1]);
+      //  TRACED(xtmp[2]);
+      //  TRACED(xlo[0]);
+      //  TRACED(xlo[1]);
+      //  TRACED(xlo[2]);
+      //  TRACED(dx[0]);
+      //  TRACED(dx[1]);
+      //  TRACED(dx[2]);
+      //  TRACEI(ix[n]);
+      //  TRACEI(n);
+      //  TRACEI(dims[n]);
       //  printf("--------------------------\n");
       // }
      assert((ix[n] >=0 && ix[n] < dims[n]));
@@ -238,13 +238,13 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
            ijklmn[5]*(pdegree+1)*(pdegree+1)+
            ijklmn[4]*(pdegree+1)+ijklmn[3];
   if (!(pointid >= 0 && pointid < ndof)) {
-    tracei(index);
-    tracei(nf);
-    tracei(pdegree);
-    tracei(dims[0]);
-    tracei(dims[1]);
-    tracei(dims[2]);
-    tracei(qstride);
+    TRACEI(index);
+    TRACEI(nf);
+    TRACEI(pdegree);
+    TRACEI(dims[0]);
+    TRACEI(dims[1]);
+    TRACEI(dims[2]);
+    TRACEI(qstride);
     printf("%d %d %d %d %d %d\n",ijklmn[0],ijklmn[1],ijklmn[2],
 	   ijklmn[3],ijklmn[4],ijklmn[5]);
   }
@@ -542,8 +542,8 @@ void CartBlock::writeCellFile(int bid)
 	{
 	  ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+
 	    (j+nf)*(dims[0]+2*nf)+(i+nf);
-          ibmin=min(ibmin,ibl[ibindex]);
-          ibmax=max(ibmax,ibl[ibindex]);
+          ibmin=MIN(ibmin,ibl[ibindex]);
+          ibmax=MAX(ibmax,ibl[ibindex]);
 	  fprintf(fp,"%d\n", ibl[ibindex]);
 	}
 

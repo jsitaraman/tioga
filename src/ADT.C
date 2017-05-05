@@ -76,12 +76,12 @@ void ADT::buildADT(int d, int nelements,double *elementBbox)
      for(i=0;i<ndim/2;i++)
        {
 	 i2=2*i;
-	 adtExtents[i2]=min(adtExtents[i2],coord[j6+i]);
+	 adtExtents[i2]=MIN(adtExtents[i2],coord[j6+i]);
        }
        for(i=0;i<ndim/2;i++)
        {
 	 i2=2*i+1;
-	 adtExtents[i2]=max(adtExtents[i2],coord[j6+i+ndim/2]);
+	 adtExtents[i2]=MAX(adtExtents[i2],coord[j6+i+ndim/2]);
        }
    }
   //
@@ -111,7 +111,7 @@ void ADT::buildADT(int d, int nelements,double *elementBbox)
   //
   buildADTrecursion(coord,adtReals,adtWork,adtIntegers,elementsAvailable,
 		    &adtCount,side,parent,level,ndim,nelem,nav);
-  //tracei(adtCount);
+  //TRACEI(adtCount);
   //
   // create Inverse map
   //

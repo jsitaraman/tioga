@@ -129,7 +129,7 @@ void tioga::performConnectivity(void)
     qblock[ib]=NULL;
   //}
   //mb->writeOutput(myid);
-  //tracei(myid);
+  //TRACEI(myid);
 }
 
 void tioga::performConnectivityHighOrder(void)
@@ -214,10 +214,10 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
     {
       k=integerRecords[3*i];
       if (k <0 || k > nsend) {
-	tracei(nsend);
-	tracei(i);
-	tracei(nints);
-	tracei(k);
+	TRACEI(nsend);
+	TRACEI(i);
+	TRACEI(nints);
+	TRACEI(k);
       }
       assert(k < nsend);      
       sndPack[k].nints+=2;

@@ -17,13 +17,9 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-/**
- * Topology Indpendent Overset Grid Assembler (TIOGA)
- * Base class and dependencies
- * The methods of this class are invoked from tiogaInterface.C
- *
- *  Jay Sitaraman 02/24/2014 
- */
+
+#ifndef TIOGA_H
+#define TIOGA_H
 
 #include <vector>
 #include <map>
@@ -34,6 +30,13 @@
 #include "CartBlock.h"
 #include "parallelComm.h"
 
+/**
+ * Topology Indpendent Overset Grid Assembler (TIOGA)
+ * Base class and dependencies
+ * The methods of this class are invoked from tiogaInterface.C
+ *
+ *  Jay Sitaraman 02/24/2014
+ */
 class tioga
 {
  private :
@@ -214,3 +217,4 @@ class tioga
   
 
 
+#endif /* TIOGA_H */

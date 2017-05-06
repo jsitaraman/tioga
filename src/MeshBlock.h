@@ -17,12 +17,9 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-/**
- * MeshBlock class - container and functions for generic unstructured grid partition in 3D
- *         
- * Jay Sitaraman
- * 02/20/2014
- */
+
+#ifndef MESHBLOCK_H
+#define MESHBLOCK_H
 
 #include <vector>
 #include <stdint.h>
@@ -32,6 +29,13 @@
 // forward declare to instantiate one of the methods
 class parallelComm;
 class CartGrid;
+
+/**
+ * MeshBlock class - container and functions for generic unstructured grid partition in 3D
+ *
+ * Jay Sitaraman
+ * 02/20/2014
+ */
 class MeshBlock
 {
  private:
@@ -291,3 +295,5 @@ class MeshBlock
                          std::vector<int>&,
                          PACKET*);
 };
+
+#endif /* MESHBLOCK_H */

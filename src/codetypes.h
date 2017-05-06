@@ -17,6 +17,10 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+#ifndef CODETYPES_H
+#define CODETYPES_H
+
 #define MPICH_SKIP_MPICXX
 #include<stdio.h>
 #include<stdlib.h>
@@ -150,3 +154,5 @@ typedef struct INTEGERLIST2
   double *realData;
   struct INTEGERLIST2 *next;
 }INTEGERLIST2; 
+
+#endif /* CODETYPES_H */

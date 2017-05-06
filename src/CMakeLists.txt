@@ -1,14 +1,4 @@
 
-cmake_minimum_required(VERSION 2.8)
-
-project(TIOGA CXX C Fortran)
-
-option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" off)
-set(CMAKE_CXX_FLAGS "-std=c++11" ${CMAKE_CXX_FLAGS})
-#set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-
-find_package(MPI REQUIRED)
-include_directories(${MPI_INCLUDE_PATH})
 
 set(TIOGA_SOURCES
   # Fortran sources
@@ -46,6 +36,8 @@ set(TIOGA_SOURCES
   tiogaInterface.C
   )
 
+file(GLOB TIOGA_HEADERS *.h)
+
 add_library(tioga ${TIOGA_SOURCES})
 target_link_libraries(tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 
@@ -58,3 +50,12 @@ if(MPI_LINK_FLAGS)
   set_target_properties(tioga PROPERTIES
     LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif()
+
+install(TARGETS tioga
+  EXPORT "${CMAKE_PROJECT_NAME}Libraries"
+  RUNTIME DESTINATION bin
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib)
+
+install(FILES ${TIOGA_HEADERS}
+  DESTINATION include)

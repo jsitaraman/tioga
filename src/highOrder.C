@@ -313,33 +313,6 @@ void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList
   }
 }
 
-//void MeshBlock::directCut(std::vector<double> &faceBox, int nCutFaces, std::vector<int> &cutFlag)
-//{
-//  cutFlag.assign(ncells,0);
-
-//  std::unordered_set<int> cellList;
-//  for (int ff = 0; ff < nCutFaces; ff++)
-//  {
-//    cellList.clear();
-
-//    // Find all cells that the cutting face might pass through
-//    adt->searchADT_box(elementList, cellList, &faceBox[6*ff]);
-
-//    // Check each cell to determine if the face intersects it
-//    for (auto &ic : cellList)
-//    {
-//      //getRefLocNewton() // Galbratih says to use Nelder-Mead though...
-//      /*if (intersectionCheck())
-//      {
-//        cutFlag[ic] = 1;
-//      }*/
-//    }
-//  }
-//}
-
-//#define FILL_LOOP
-#define FILL_QUEUE
-
 void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
     CutMap &cutMap, int cutType)
 {
@@ -397,33 +370,11 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
           for (int d = 0; d < nDims; d++)
             xv[nDims*i+d] = x[nDims*vconn[0][ic*nvert+i]+d];
 
-
-        /// DEBUGGING
-//        double xc_check[3] = {.069, .027, 0.0};
-        double xc_check[3] = {.14, -.18, 0.0};
-        double xc[3] = {0,0,0};
-        double dr = 0;
-        getCentroid(xv.data(), nvert, 3, xc);
-        for (int d = 0; d < nDims; d++)
-          dr += (xc[d]-xc_check[d])*(xc[d]-xc_check[d]);
-        if (std::sqrt(dr) < .05)
-          printf("Cell ID to use for debugging: %d\n",ic); // 552
-
-
         // Find distance from face to cell
-        Vec3 vec = intersectionCheck2(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
-//        double dist1 = intersectionCheck2(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+        Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
         double dist1 = vec.norm();
-        if (ic == 552 && (ff == 128 || ff == 129)) // Faces 128, 129
-        {
-          for (int i = 0; i < nvertf; i++)
-            printf("Face %d: Node %d: %f %f %f\n",ff,i,cutFaces[ff*stride+i*nDims+0],
-                cutFaces[ff*stride+i*nDims+1],cutFaces[ff*stride+i*nDims+2]);
-          printf("\n");
-          printf("IC %d: ff %d: vec.norm() = %.4e\n",ic,ff,dist1);
-        }
 
-        if (vec.norm() == 0.) // They intersect
+        if (dist1 == 0.) // They intersect
         {
           cutMap.flag[ic] = DC_CUT;
           paintQueue.insert(ic);
@@ -445,30 +396,8 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
               for (int d = 0; d < nDims; d++)
                 xv[nDims*i+d] = x[nDims*vconn[0][ic2*nvert+i]+d];
 
-            /// DEBUGGING
-            double xc_check[3] = {.14, -.18, 0.0};
-            double xc[3] = {0,0,0};
-            double dr = 0;
-            getCentroid(xv.data(), nvert, 3, xc);
-            for (int d = 0; d < nDims; d++)
-              dr += (xc[d]-xc_check[d])*(xc[d]-xc_check[d]);
-            if (std::sqrt(dr) < .05)
-              printf("Cell ID-2 to use for debugging: %d\n",ic); // 552
-
-            Vec3 vec = intersectionCheck2(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+            Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
             double dist = vec.norm();
-//            double ptc[3], ptf[3];
-//            getCentroid(&cutFaces[ff*stride], nvertf, 3, ptf);
-//            getCentroid(xv.data(), nvert, 3, ptc);
-//            vec = point(ptc) - point(ptf);
-            if (ic2 == 552 && (ff == 128 || ff == 129)) // Faces 128, 129
-            {
-              for (int i = 0; i < nvertf; i++)
-                printf("Face %d: Node %d: %f %f %f\n",ff,i,cutFaces[ff*stride+i*nDims+0],
-                    cutFaces[ff*stride+i*nDims+1],cutFaces[ff*stride+i*nDims+2]);
-              printf("\n");
-              printf("IC2 %d: ff %d: vec.norm() = %.4e\n",ic2,ff,dist);
-            }
 
             if (dist == 0)
             {
@@ -512,57 +441,6 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
   }
 
   // Now paint-fill the remainder of the grid based upon the cutting boundary
-
-  // ----- Linear loop version -----
-#ifdef FILL_LOOP
-  int nUnassigned = 0;
-  for (auto &flag : cutMap.flag)
-    if (flag == DC_UNASSIGNED)
-      nUnassigned++;
-
-  std::vector<int> mark(ncells);
-
-  while (nUnassigned > 0)
-  {
-    for (int ic = 0; ic < ncells; ic++)
-    {
-      if (cutMap.flag[ic] == DC_UNASSIGNED or mark[ic])
-        continue;
-
-      if (cutMap.flag[ic] == DC_CUT)
-      {
-        if (cutType == 1) // Solid-boundary surface
-          cutMap.flag[ic] = DC_HOLE;
-        else              // Overset-boundary surface for background grid
-          cutMap.flag[ic] = DC_NORMAL;
-      }
-
-      for (int j = 0; j < nface; j++)
-      {
-        int ic2 = c2c[nface*ic+j];
-        if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
-        {
-          cutMap.flag[ic2] = cutMap.flag[ic];
-          mark[ic2] = 0;
-          nUnassigned--;
-        }
-      }
-
-      mark[ic] = 1;
-    }
-  }
-#endif
-
-  // ----- Queue version -----
-#ifdef FILL_QUEUE
-//  for (int ic = 0; ic < ncells; ic++)
-//  {
-//    if (cutMap.flag[ic] == DC_CUT)
-//      cutMap.flag[ic] = DC_HOLE;
-//    else
-//      cutMap.flag[ic] = DC_NORMAL;
-//  } /// DEBUGGING
-
   int nstack = 0;
   std::vector<int> icstack(ncells,-1);
   for (auto ic : paintQueue)
@@ -593,12 +471,10 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
       }
     }
   }
-#endif
 }
 
 void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
 {
-  int nhole = 0; /// DEBUGGING
   for (int ic = 0; ic < ncells; ic++)
   {
     iblank_cell[ic] = NORMAL;
@@ -609,12 +485,10 @@ void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
       if (cutMap[g].flag[ic] == DC_HOLE)
       {
         iblank_cell[ic] = HOLE;
-        nhole++;
         break;
       }
     }
   }
-  printf("%d: Final # of hole cells = %d\n",myid,nhole);
 }
 
 int get_cell_type(int* nc, int ntypes, int ic_in)

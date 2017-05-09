@@ -247,8 +247,8 @@ void tioga::doHoleCutting(void)
   if (ihighGlobal)
   {
     // Calculate cell iblank values from nodal iblank values
-//    mb->getCellIblanks(meshcomm);
-    directCut(); /// TODO: complete a working version
+    mb->getCellIblanks(meshcomm);
+//    directCut(); /// TODO: complete a working version
 
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {

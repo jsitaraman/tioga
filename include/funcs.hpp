@@ -110,7 +110,6 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 double computeVolume(double *xv, int nNodes, int nDims);
 
 /*! Determine whether a given face and cell intersect */
-Vec3 intersectionCheck2(double *fxv, int nfv, double *exv, int nev, int nDims);
 Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims);
 
 std::vector<int> get_int_list(int N, int start = 0);

@@ -1377,18 +1377,6 @@ static inline void cross(double v1[3], double v2[3], double vec[3])
   vec[2] = v1[0]*v2[1] - v1[1]*v2[0];
 }
 
-double constraintFunc(const std::vector<double> &refLoc)
-{
-  double maxVal = 0;
-  for (auto &coord : refLoc)
-    maxVal = std::max(maxVal,std::abs(coord));
-
-//  if (maxVal > 1.)
-//    return maxVal;
-//  else
-    return -1.;
-}
-
 double lineSegmentDistance(double *p1, double *p2, double *p3, double *p4, double *dx)
 {
   // Get the line equations
@@ -1587,7 +1575,7 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
   return 0.;
 }
 
-Vec3 intersectionCheck2(double *fxv, int nfv, double *exv, int nev, int nDims)
+Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
 {
   // TODO: replace with faster algo
 //  double minDist = 1e15;
@@ -1608,11 +1596,8 @@ Vec3 intersectionCheck2(double *fxv, int nfv, double *exv, int nev, int nDims)
 //  }
   double tol = 1e-9;
 
-  // Gmsh ordering
-//  int TriPts[12][3] = {{0,1,2},{0,2,3},{4,6,5},{4,7,6},{0,3,7},{0,7,4},
-//                       {1,2,6},{1,6,5},{0,4,5},{0,5,1},{3,2,6},{3,7,6}};
 
-  // Structured ordering (swap 2/3, 6/7)
+  // NOTE: Structured ordering
   int TriPts[12][3] = {{0,1,3},{0,3,2},{4,7,5},{4,6,7},{0,2,6},{0,6,4},
                        {1,3,7},{1,7,5},{0,4,5},{0,5,1},{2,3,7},{2,6,7}};
 
@@ -1692,118 +1677,7 @@ Vec3 intersectionCheck2(double *fxv, int nfv, double *exv, int nev, int nDims)
     }
   }
 
-
-  // Assuming fxv and exv hold a linearized quad and hex, respectively
-//  for (int i = 0; i < 12; i++)
-//  {
-//    for (int p = 0; p < 3; p++)
-//      for (int d = 0; d < 3; d++)
-//        TC[3*p+d] = exv[3*TriPts[i][p]+d];
-
-//    for (int j = 0; j < 2; j++)
-//    {
-//      // Intersection check between element face tris & cutting-face tris
-//      for (int p = 0; p < 3; p++)
-//        for (int d = 0; d < 3; d++)
-//          TF[3*p+d] = fxv[3*TriPts[j][p]+d];
-
-//      double vec[3];
-//      double dist = triTriDistance(TF, TC, vec, tol);
-
-//      if (dist < tol)
-//        return Vec3(0.,0.,0);
-
-//      if (dist < minDist)
-//      {
-//        for (int d = 0; d < 3; d++)
-//          minVec[d] = vec[d];
-//        minDist = dist;
-//      }
-//    }
-//  }
-
   return Vec3(minVec);
-}
-
-Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
-{
-  std::vector<double> shapeC(nev), shapeF(nfv);
-
-  int num_evals = 0;
-
-//  double eps = 2e-8;
-//  auto minFunc = [&](const std::vector<double> &X_IN) -> double
-//  {
-//    double rst[3];
-//    point pt = (nDims==2) ? CalcPos1D(shapeF, fxv, X_IN)
-//                          : CalcPos3D(shapeF, fxv, X_IN);
-//    double xyz[3] = {pt.x,pt.y,pt.z};
-//    getRefLocNewton(exv, xyz, rst, nev, nDims);
-
-//    double maxVal = 0;
-//    for (int i = 0; i < nDims; i++)
-//      maxVal = std::max(maxVal,std::abs(rst[i]));
-
-//    num_evals++;
-
-//    if (maxVal > 1. + eps)
-//      return maxVal - 1.;
-//    else
-//      return 0.;
-//  };
-//  NM_FVAL mini;
-//  if (nDims == 2)
-//    mini = NelderMead_constrained<1>({0}, minFunc, constraintFunc, .75);
-//  else
-//    mini = NelderMead_constrained<2>({0,0}, minFunc, constraintFunc, .3);
-
-  double eps = 5e-4;
-  auto minFunc = [&](const std::vector<double> &X_IN) -> double
-  {
-    // Point in face
-    std::vector<double> rstf = {X_IN[0], X_IN[1]};
-    point ptF = CalcPos3D(shapeF, fxv, rstf);
-
-    // Point in cell
-    std::vector<double> rstc = {X_IN[2], X_IN[3], X_IN[4]};
-    point ptC = CalcPos(shapeC, exv, rstc, 3);
-    // Distance
-    double dist = (ptF-ptC).norm();
-
-    double delta = 0;
-    double maxxi = 0;
-    for (auto &xi : X_IN)
-      if (std::abs(xi)-1. > 0)
-        maxxi = std::max(std::abs(xi), maxxi);
-        //delta = std::max(delta, std::abs(xi) - 1.);
-    if (maxxi > 0)
-      dist += 100*exp(maxxi);
-
-    return dist;
-  };
-
-  NM_FVAL mini;
-  mini = NelderMead_constrained<5>({0,0,0,0,0}, minFunc, constraintFunc, .95);
-
-  if (mini.f < eps)
-  {
-    return Vec3(0,0,0);
-  }
-  else
-  {
-    double rst[3];
-    point pt = (nDims==2) ? CalcPos1D(shapeF, fxv, mini.x)
-                          : CalcPos3D(shapeF, fxv, mini.x);
-    double xyz[3] = {pt.x,pt.y,pt.z};
-    getRefLocNewton(exv, xyz, rst, nev, nDims);
-
-    for (int i = 0; i < nDims; i++)
-      rst[i] = std::min(std::max(rst[i], -1.), 1.);
-
-    point ptC = CalcPos(shapeC, exv, {rst[0],rst[1],rst[2]}, 3);
-
-    return ptC - pt;
-  }
 }
 
 double quick_select(int* inds, double* arr, int n)
@@ -1874,160 +1748,6 @@ double quick_select(int* inds, double* arr, int n)
     if (hh >= median)
       high = hh - 1;
   }
-}
-
-
-
-double triTriNewton(double *T1, double *T2, double tol)
-{
-  // Initialize points at centers of triangles
-  double rs1[2] = {1./3., 1./3.};
-  double rs2[2] = {1./3., 1./3.};
-
-  // Shape function values
-  double N1[3] = {rs1[0], rs1[1], 1-rs1[0]-rs1[1]};
-  double N2[3] = {rs2[0], rs2[1], 1-rs2[0]-rs2[1]};
-
-  double pos1[3] = {0.};
-  double pos2[3] = {0.};
-
-  for (int d = 0; d < 3; d++)
-  {
-    for (int n = 0; n < 3; n++)
-    {
-      pos1[d] += T1[3*n+d] * N1[n];
-      pos2[d] += T2[3*n+d] * N2[n];
-    }
-  }
-
-  double dx[3];
-  for (int d = 0; d < 3; d++)
-    dx[d] = pos2[d] - pos1[d];
-
-  double dist = 0;
-  for (int d = 0; d < 3; d++)
-    dist += dx[d]*dx[d];
-  dist = sqrt(dist);
-
-  double x11, x21, x31, x12, x22, x32;
-  double y11, y21, z31, y12, y22, y32;
-  double z11, z21, y31, z12, z22, z32;
-  x11 = T1[0];  y11 = T1[1];  z11 = T1[2];
-  x21 = T1[3];  y21 = T1[4];  z21 = T1[5];
-  x31 = T1[6];  y31 = T1[7];  z31 = T1[8];
-
-  x12 = T2[0];  y12 = T2[1];  z12 = T2[2];
-  x22 = T2[3];  y22 = T2[4];  z22 = T2[5];
-  x32 = T2[6];  y32 = T2[7];  z32 = T2[8];
-
-  // Build (G^T G)^-1 for Triangle 1
-  double a1 = (x11-x31)*(x11-x31) + (y11-y31)*(y11-y31) + (z11-z31)*(z11-z31);
-  double b1 = (x11-x31)*(x21-x31) + (y11-y31)*(y21-y31) + (z11-z31)*(z21-z31);
-  double c1 = b1;
-  double d1 = (x21-x31)*(x21-x31) + (y21-y31)*(y21-y31) + (z21-z31)*(z21-z31);
-
-  double idet1 = 1. / (a1*d1 - b1*c1);
-
-  //double GTGinv1[4] = {d1*idet1, -b1*idet1, -c1*idet1, a1*idet1};
-  double e1 = d1*idet1;
-  double f1 = -b1*idet1;
-  double g1 = -c1*idet1;
-  double h1 = a1*idet1;
-
-  // J == (G^T*G)^-1 * G^T
-  double Jinv1[6];
-  Jinv1[0] = e1*(x11-x31) + f1*(x21-x31);
-  Jinv1[1] = e1*(y11-y31) + f1*(y21-y31);
-  Jinv1[2] = e1*(z11-z31) + f1*(z21-z31);
-
-  Jinv1[3] = g1*(x11-x31) + h1*(x21-x31);
-  Jinv1[4] = g1*(y11-y31) + h1*(y21-y31);
-  Jinv1[5] = g1*(z11-z31) + h1*(z21-z31);
-
-
-  // Build (G^T G)^-1 for Triangle 2
-  double a2 = (x12-x32)*(x12-x32) + (y12-y32)*(y12-y32) + (z12-z32)*(z12-z32);
-  double b2 = (x12-x32)*(x22-x32) + (y12-y32)*(y22-y32) + (z12-z32)*(z22-z32);
-  double c2 = b2;
-  double d2 = (x22-x32)*(x22-x32) + (y22-y32)*(y22-y32) + (z22-z32)*(z22-z32);
-
-  double idet2 = 1. / (a2*d2 - b2*c2);
-
-  //double GTGinv2[4] = {d2*idet2, -b2*det2, -c2*idet2, a2*idet2};
-  double e2 = d2*idet2;
-  double f2 = -b2*idet2;
-  double g2 = -c2*idet2;
-  double h2 = a2*idet2;
-
-  // J == (G^T*G)^-1 * G^T
-  double Jinv2[6];
-  Jinv2[0] = e2*(x12-x32) + f2*(x22-x32);
-  Jinv2[1] = e2*(y12-y32) + f2*(y22-y32);
-  Jinv2[2] = e2*(z12-z32) + f2*(z22-z32);
-
-  Jinv2[3] = g2*(x12-x32) + h2*(x22-x32);
-  Jinv2[4] = g2*(y12-y32) + h2*(y22-y32);
-  Jinv2[5] = g2*(z12-z32) + h2*(z22-z32);
-
-  int maxIter = 5;
-  int iter = 0;
-  while (dist > tol && iter < maxIter)
-  {
-    /* --- Perform Newton iterations --- */
-    double ds1[2] = {0.};
-    double ds2[2] = {0.};
-
-    // ds = J*dx
-    for (int k = 0; k < 2; k++)
-    {
-      for (int d = 0; d < 3; d++)
-      {
-        ds1[k] += Jinv1[3*k+d] * dx[d];
-        ds2[k] -= Jinv2[3*k+d] * dx[d]; // dx vector reversed
-      }
-    }
-
-    // Ensure the points do not leave the triangles (Allow to move 90% of distance to boundary)
-    double fac1 = 1, fac2 = 1;
-    for (int k = 0; k < 2; k++)
-    {
-      fac1 = rs1[k]+ds1[k] < 0 ? .9*rs1[k]/ds1[k] : fac1;
-      fac2 = rs2[k]+ds2[k] < 0 ? .9*rs2[k]/ds2[k] : fac2;
-    }
-
-    fac1 = (rs1[0]+rs1[1]+ds1[0]+ds1[1] > 1) ? std::min(.9*(1.-rs1[0]+rs1[1])/(ds1[0]+ds1[1]), fac1) : fac1;
-    fac2 = (rs2[0]+rs2[1]+ds2[0]+ds2[1] > 1) ? std::min(.9*(1.-rs2[0]+rs2[1])/(ds2[0]+ds2[1]), fac2) : fac2;
-
-    for (int k = 0; k < 2; k++)
-    {
-      rs1[k] += fac1*ds1[k];
-      rs2[k] += fac2*ds2[k];
-    }
-
-    // Calculate new positions
-    for (int d = 0; d < 3; d++)
-    {
-      pos1[d] = 0;
-      pos2[d] = 0;
-      for (int n = 0; n < 3; n++)
-      {
-        pos1[d] += T1[3*n+d] * N1[n];
-        pos2[d] += T2[3*n+d] * N2[n];
-      }
-    }
-
-    for (int d = 0; d < 3; d++)
-      dx[d] = pos2[d] - pos1[d];
-
-    dist = 0;
-    for (int d = 0; d < 3; d++)
-      dist += dx[d]*dx[d];
-    dist = sqrt(dist);
-
-    iter++;
-  }
-
-  return dist;
 }
 
 } // namespace tg_funcs

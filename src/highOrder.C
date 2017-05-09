@@ -397,8 +397,31 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
           for (int d = 0; d < nDims; d++)
             xv[nDims*i+d] = x[nDims*vconn[0][ic*nvert+i]+d];
 
+
+        /// DEBUGGING
+//        double xc_check[3] = {.069, .027, 0.0};
+        double xc_check[3] = {.14, -.18, 0.0};
+        double xc[3] = {0,0,0};
+        double dr = 0;
+        getCentroid(xv.data(), nvert, 3, xc);
+        for (int d = 0; d < nDims; d++)
+          dr += (xc[d]-xc_check[d])*(xc[d]-xc_check[d]);
+        if (std::sqrt(dr) < .05)
+          printf("Cell ID to use for debugging: %d\n",ic); // 552
+
+
         // Find distance from face to cell
-        Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+        Vec3 vec = intersectionCheck2(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+//        double dist1 = intersectionCheck2(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+        double dist1 = vec.norm();
+        if (ic == 552 && (ff == 128 || ff == 129)) // Faces 128, 129
+        {
+          for (int i = 0; i < nvertf; i++)
+            printf("Face %d: Node %d: %f %f %f\n",ff,i,cutFaces[ff*stride+i*nDims+0],
+                cutFaces[ff*stride+i*nDims+1],cutFaces[ff*stride+i*nDims+2]);
+          printf("\n");
+          printf("IC %d: ff %d: vec.norm() = %.4e\n",ic,ff,dist1);
+        }
 
         if (vec.norm() == 0.) // They intersect
         {
@@ -422,8 +445,30 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
               for (int d = 0; d < nDims; d++)
                 xv[nDims*i+d] = x[nDims*vconn[0][ic2*nvert+i]+d];
 
-            Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
+            /// DEBUGGING
+            double xc_check[3] = {.14, -.18, 0.0};
+            double xc[3] = {0,0,0};
+            double dr = 0;
+            getCentroid(xv.data(), nvert, 3, xc);
+            for (int d = 0; d < nDims; d++)
+              dr += (xc[d]-xc_check[d])*(xc[d]-xc_check[d]);
+            if (std::sqrt(dr) < .05)
+              printf("Cell ID-2 to use for debugging: %d\n",ic); // 552
+
+            Vec3 vec = intersectionCheck2(&cutFaces[ff*stride], nvertf, xv.data(), nvert, nDims);
             double dist = vec.norm();
+//            double ptc[3], ptf[3];
+//            getCentroid(&cutFaces[ff*stride], nvertf, 3, ptf);
+//            getCentroid(xv.data(), nvert, 3, ptc);
+//            vec = point(ptc) - point(ptf);
+            if (ic2 == 552 && (ff == 128 || ff == 129)) // Faces 128, 129
+            {
+              for (int i = 0; i < nvertf; i++)
+                printf("Face %d: Node %d: %f %f %f\n",ff,i,cutFaces[ff*stride+i*nDims+0],
+                    cutFaces[ff*stride+i*nDims+1],cutFaces[ff*stride+i*nDims+2]);
+              printf("\n");
+              printf("IC2 %d: ff %d: vec.norm() = %.4e\n",ic2,ff,dist);
+            }
 
             if (dist == 0)
             {
@@ -498,6 +543,7 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
         if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
         {
           cutMap.flag[ic2] = cutMap.flag[ic];
+          mark[ic2] = 0;
           nUnassigned--;
         }
       }
@@ -517,30 +563,33 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
 //      cutMap.flag[ic] = DC_NORMAL;
 //  } /// DEBUGGING
 
-  while (paintQueue.size() > 0)
+  int nstack = 0;
+  std::vector<int> icstack(ncells,-1);
+  for (auto ic : paintQueue)
+    icstack[nstack++] = ic; /// TODO: remove set-based version?
+
+  while (nstack > 0)
   {
-    for (auto ic : paintQueue)
+    nstack--;
+    int ic = icstack[nstack];
+
+    if (ic < 0) continue;
+
+    if (cutMap.flag[ic] == DC_CUT)
     {
-      paintQueue.erase(ic);
+      if (cutType == 1) // Solid-boundary surface
+        cutMap.flag[ic] = DC_HOLE;
+      else              // Overset-boundary surface for background grid
+        cutMap.flag[ic] = DC_NORMAL;
+    }
 
-      if (ic < 0) continue;
-
-      if (cutMap.flag[ic] == DC_CUT)
+    for (int j = 0; j < nface; j++)
+    {
+      int ic2 = c2c[nface*ic+j];
+      if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
       {
-        if (cutType == 1) // Solid-boundary surface
-          cutMap.flag[ic] = DC_HOLE;
-        else              // Overset-boundary surface for background grid
-          cutMap.flag[ic] = DC_NORMAL;
-      }
-
-      for (int j = 0; j < nface; j++)
-      {
-        int ic2 = c2c[nface*ic+j];
-        if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
-        {
-          cutMap.flag[ic2] = cutMap.flag[ic];
-          paintQueue.insert(ic2);
-        }
+        cutMap.flag[ic2] = cutMap.flag[ic];
+        icstack[nstack++] = ic2;
       }
     }
   }

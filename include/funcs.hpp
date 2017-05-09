@@ -65,6 +65,10 @@ double getDist(point a, point b);
 
 /* ------------------------ Mathematical Functions ------------------------- */
 
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 /*! Evaluate the 1D Lagrange polynomial mode based on points x_lag at point y */
 double Lagrange(std::vector<double> &x_lag, double y, uint mode);
 
@@ -93,6 +97,9 @@ void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
 /*! Return bounding box of a collection of points after applying linear transform */
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox, double *Smat);
 
+/*! Get the centroid of a collection of points */
+void getCentroid(double *pts, int nPts, int nDims, double *xc);
+
 /*! Create an N-dimensional simplex of size L centered at x0 */
 void getSimplex(int nDims, const std::vector<double> &x0, double L, std::vector<double> &X);
 
@@ -103,6 +110,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 double computeVolume(double *xv, int nNodes, int nDims);
 
 /*! Determine whether a given face and cell intersect */
+Vec3 intersectionCheck2(double *fxv, int nfv, double *exv, int nev, int nDims);
 Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims);
 
 std::vector<int> get_int_list(int N, int start = 0);
@@ -383,7 +391,7 @@ NM_FVAL NelderMead_constrained(const std::vector<double> &U0,
   // Starting location for search
   if (nVars == 5)
   {
-    double x1 = L*.5;
+    double x1 = L*.6;
     double x2 = L*std::sqrt(3.)/2.;
     double x3 = x1*cos(M_PI/3.);
     double x4 = x1*sin(M_PI/3.);
@@ -414,6 +422,49 @@ NM_FVAL NelderMead_constrained(const std::vector<double> &U0,
     FX[i].f = minFunc(FX[i].x);
     FX[i].g = G(FX[i].x);
     maxG = std::max(FX[i].g, maxG);
+  }
+
+  if (nVars == 5)
+  {
+    // Sort the repsective face & cell pts so that the closest are paired, then
+    // the next closest, etc.
+    std::vector<std::vector<double>> XI(nPts), XJ(nPts);
+    for (int i = 0; i < nPts; i++)
+    {
+      XI[i] = {FX[i].x[0], FX[i].x[1]};
+      XJ[i] = {FX[i].x[2], FX[i].x[3], FX[i].x[4]};
+    }
+
+    for (int k = 0; k < nPts; k++)
+    {
+      double minVal = 1e15;
+      int minIndI = -1;
+      int minIndJ = -1;
+      for (int i = 0; i < nPts-k; i++)
+      {
+        for (int j = 0; j < nPts-k; j++)
+        {
+          std::vector<double> xk = {XI[i][0], XI[i][1], XJ[j][0], XJ[j][1], XJ[j][2]};
+          double fk = minFunc(xk);
+          if (fk < minVal)
+          {
+            minVal = fk;
+            minIndJ = j;
+            minIndI = i;
+          }
+        }
+      }
+
+      for (int m = 0; m < 2; m++)
+        FX[k].x[m] = XI[minIndI][m];
+      for (int m = 0; m < 3; m++)
+        FX[k].x[m+2] = XJ[minIndJ][m];
+      FX[k].f = minVal;
+      FX[k].g = G(FX[k].x);
+
+      XI.erase(XI.begin()+minIndI);
+      XJ.erase(XJ.begin()+minIndJ);
+    }
   }
 
   std::sort(FX.begin(),FX.end());

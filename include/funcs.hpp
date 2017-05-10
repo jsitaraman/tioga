@@ -46,6 +46,10 @@
 { std::stringstream s; s << __FILE__ << ":" << __LINE__ << ":" << __func__ << ": " << msg; \
   throw std::runtime_error(s.str());}\
 
+extern std::vector<double> xlist;
+extern std::vector<int> ijk2gmsh;
+extern std::vector<int> ijk2gmsh_quad;
+
 namespace tg_funcs
 {
 
@@ -75,6 +79,10 @@ double Lagrange(std::vector<double> &x_lag, double y, uint mode);
 /*! Evaluate the first derivative of the 1D Lagrange polynomial mode based on points x_lag at point y */
 double dLagrange(std::vector<double> &x_lag, double y, uint mode);
 
+double Lagrange(double* xiGrid, unsigned int npts, double xi, unsigned int mode);
+
+double dLagrange(double* xiGrid, unsigned int npts, double xi, unsigned int mode);
+
 void adjoint_3x3(double *mat, double *adj);
 void adjoint_4x4(double *mat, double *adj);
 
@@ -87,6 +95,10 @@ void adjoint(const std::vector<double> &mat, std::vector<double> &adj, unsigned 
 /*! Calculate the determinant of a 'size x size' matrix stored row-major in 'mat' */
 double determinant(const std::vector<double> &mat, unsigned int size);
 
+double det_2x2(const double* mat);
+double det_3x3(const double* mat);
+double det_4x4(const double* mat);
+
 Vec3 faceNormal(double* xv, int nDims);
 
 /* ---------------------------- Misc. Functions ---------------------------- */
@@ -96,6 +108,9 @@ void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
 
 /*! Return bounding box of a collection of points after applying linear transform */
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox, double *Smat);
+
+/*! Check to see if two bounding boxes overlap */
+bool boundingBoxCheck(double *bbox1, double *bbox2, int nDims);
 
 /*! Get the centroid of a collection of points */
 void getCentroid(double *pts, int nPts, int nDims, double *xc);
@@ -673,6 +688,113 @@ double NelderMeadStep_constrained(std::vector<NM_FVAL> &FX, MinFunc minFunc,
   std::sort(FX.begin(),FX.end());
 
   return FX[0].f;
+}
+
+template<int nSide>
+void calcDShape(double* __restrict__ shape, double* __restrict__ dshape,
+                const double* loc)
+{
+  double xi = loc[0];
+  double eta = loc[1];
+  double mu = loc[2];
+
+  double lag_i[nSide];
+  double lag_j[nSide];
+  double lag_k[nSide];
+  double dlag_i[nSide];
+  double dlag_j[nSide];
+  double dlag_k[nSide];
+
+  for (int i = 0; i < nSide; i++)
+  {
+    lag_i[i] = Lagrange(xlist.data(), nSide,  xi, i);
+    lag_j[i] = Lagrange(xlist.data(), nSide, eta, i);
+    lag_k[i] = Lagrange(xlist.data(), nSide,  mu, i);
+    dlag_i[i] = dLagrange(xlist.data(), nSide,  xi, i);
+    dlag_j[i] = dLagrange(xlist.data(), nSide, eta, i);
+    dlag_k[i] = dLagrange(xlist.data(), nSide,  mu, i);
+  }
+
+  //int nd = 0;
+  for (int k = 0; k < nSide; k++)
+    for (int j = 0; j < nSide; j++)
+      for (int i = 0; i < nSide; i++)
+      {
+        int gnd = ijk2gmsh[i+nSide*(j+nSide*k)];
+        shape[gnd] = lag_i[i] * lag_j[j] * lag_k[k];
+        dshape[gnd*3+0] = dlag_i[i] *  lag_j[j] *  lag_k[k];
+        dshape[gnd*3+1] =  lag_i[i] * dlag_j[j] *  lag_k[k];
+        dshape[gnd*3+2] =  lag_i[i] *  lag_j[j] * dlag_k[k];
+      }
+}
+
+template<int nSide>
+bool checkPtInEle(const double* __restrict__ coords,
+    const double* __restrict__ bbox, const double* __restrict__ xyz,
+    double* __restrict__ rst)
+{
+  const int nNodes = nSide*nSide*nSide;
+
+  // Use a relative tolerance to handle extreme grids
+  double h = fmin(bbox[3]-bbox[0],bbox[4]-bbox[1]);
+  h = fmin(h,bbox[5]-bbox[2]);
+
+  double tol = 1e-12*h;
+
+  int iter = 0;
+  int iterMax = 10;
+  double norm = 1;
+  double norm_prev = 2;
+
+  double shape[nNodes];
+  double dshape[3*nNodes];
+
+  rst[0] = 0.;
+  rst[1] = 0.;
+  rst[2] = 0.;
+
+  while (norm > tol && iter < iterMax)
+  {
+    calcDShape<nSide>(shape, dshape, rst);
+
+    double dx[3] = {xyz[0], xyz[1], xyz[2]};
+    double grad[3][3] = {{0.0}};
+    double ginv[3][3];
+
+    for (int nd = 0; nd < nNodes; nd++)
+      for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+          grad[i][j] += coords[i+3*nd] * dshape[nd*3+j];
+
+    for (int nd = 0; nd < nNodes; nd++)
+      for (int i = 0; i < 3; i++)
+        dx[i] -= shape[nd] * coords[i+3*nd];
+
+    double detJ = det_3x3(&grad[0][0]);
+
+    adjoint_3x3(&grad[0][0], &ginv[0][0]);
+
+    double delta[3] = {0.0};
+    for (int i = 0; i < 3; i++)
+      for (int j = 0; j < 3; j++)
+        delta[i] += ginv[i][j]*dx[j]/detJ;
+
+    norm = sqrt(dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2]);
+    for (int i = 0; i < 3; i++)
+      rst[i] = std::max(std::min(rst[i]+delta[i],1.),-1.);
+
+    if (iter > 1 && norm > .99*norm_prev) // If it's clear we're not converging
+      break;
+
+    norm_prev = norm;
+
+    iter++;
+  }
+
+  if (norm <= tol)
+    return true;
+  else
+    return false;
 }
 
 } // namespace tg_funcs

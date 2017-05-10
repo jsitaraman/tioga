@@ -228,6 +228,10 @@ void tioga::unblankPart2(int nvar)
 
 void tioga::doHoleCutting(void)
 {
+  Timer dcTime("Direct Cut: ");
+  Timer tgTime("Normal Version: ");
+
+  tgTime.startTimer();
   // Generate structured map of solid boundary (hole) locations
   getHoleMap();
 
@@ -248,7 +252,6 @@ void tioga::doHoleCutting(void)
   {
     // Calculate cell iblank values from nodal iblank values
     mb->getCellIblanks(meshcomm);
-//    directCut(); /// TODO: complete a working version
 
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {
@@ -256,6 +259,44 @@ void tioga::doHoleCutting(void)
       mb->calcFaceIblanks(meshcomm);
     }
   }
+  tgTime.stopTimer();
+
+  dcTime.startTimer();
+  directCut();
+  mb->calcFaceIblanks(meshcomm);
+  dcTime.stopTimer();
+
+  dcTime.showTime(3);
+  tgTime.showTime(3);
+
+//  // Generate structured map of solid boundary (hole) locations
+//  getHoleMap();
+
+//  // Send/Recv the hole maps to/from all necessary ranks
+//  exchangeBoxes();
+
+//  // Find a list of all potential receptor points and send to all possible
+//  // donor ranks
+//  exchangeSearchData();
+
+//  // Find donors for all search points (other grids' possible receptor points)
+//  mb->search();
+
+//  // Exchange found donor data and do final iblank setting
+//  exchangeDonors();
+
+//  if (ihighGlobal)
+//  {
+//    // Calculate cell iblank values from nodal iblank values
+//    mb->getCellIblanks(meshcomm);
+////    directCut(); /// TODO: complete a working version
+
+//    if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
+//    {
+//      // Find artificial boundary faces
+//      mb->calcFaceIblanks(meshcomm);
+//    }
+//  }
 }
 
 void tioga::doPointConnectivity(bool unblanking)
@@ -334,11 +375,11 @@ void tioga::directCut(void)
   /// IDEA: restrict overset faces to linear face nodes? (ignore curvature, if present)
 
   // # nodes-per-face, and # of cutting faces, for each rank
-  std::vector<int> nvertf(nproc);
-  std::vector<int> nHoleFace(nproc), nOverFace(nproc);
-  MPI_Allgather(&nvert, 1, MPI_INT, nvertf.data(), 1, MPI_INT, scomm);
-  MPI_Allgather(&nCutHole, 1, MPI_INT, nHoleFace.data(), 1, MPI_INT, scomm);
-  MPI_Allgather(&nCutFringe, 1, MPI_INT, nOverFace.data(), 1, MPI_INT, scomm);
+  std::vector<int> nvertf_p(nproc);
+  std::vector<int> nHoleFace_p(nproc), nOverFace_p(nproc);
+  MPI_Allgather(&nvert, 1, MPI_INT, nvertf_p.data(), 1, MPI_INT, scomm);
+  MPI_Allgather(&nCutHole, 1, MPI_INT, nHoleFace_p.data(), 1, MPI_INT, scomm);
+  MPI_Allgather(&nCutFringe, 1, MPI_INT, nOverFace_p.data(), 1, MPI_INT, scomm);
 
   // Send / recv face nodes data
   std::vector<MPI_Request> sreqs, rreqs;
@@ -348,13 +389,13 @@ void tioga::directCut(void)
   {
     if (p != myid and mytag != gridIDs[p])
     {
-      if (nHoleFace[p] > 0)
+      if (nHoleFace_p[p] > 0)
       {
-        printf("%d, nhole[%d] = %d\n",myid,p,nHoleFace[p]);
+        printf("%d, nhole[%d] = %d\n",myid,p,nHoleFace_p[p]);
         // recv from rank
-        faceNodesW_g[p].resize(nHoleFace[p]*nvertf[p]*nDims);
+        faceNodesW_g[p].resize(nHoleFace_p[p]*nvertf_p[p]*nDims);
         rreqs.emplace_back();
-        MPI_Irecv(faceNodesW_g[p].data(), nHoleFace[p]*nvertf[p]*nDims, MPI_DOUBLE,
+        MPI_Irecv(faceNodesW_g[p].data(), nHoleFace_p[p]*nvertf_p[p]*nDims, MPI_DOUBLE,
             p, 0, scomm, &rreqs.back());
       }
 
@@ -367,13 +408,13 @@ void tioga::directCut(void)
             p, 0, scomm, &sreqs.back());
       }
 
-      if (gridType == 0 && nOverFace[p] > 0)
+      if (gridType == 0 && nOverFace_p[p] > 0)
       {
-        printf("%d, nover[%d] = %d\n",myid,p,nOverFace[p]);
+        printf("%d, nover[%d] = %d\n",myid,p,nOverFace_p[p]);
         // recv from rank
-        faceNodesO_g[p].resize(nOverFace[p]*nvertf[p]*nDims);
+        faceNodesO_g[p].resize(nOverFace_p[p]*nvertf_p[p]*nDims);
         rreqs.emplace_back();
-        MPI_Irecv(faceNodesO_g[p].data(), nOverFace[p]*nvertf[p]*nDims, MPI_DOUBLE,
+        MPI_Irecv(faceNodesO_g[p].data(), nOverFace_p[p]*nvertf_p[p]*nDims, MPI_DOUBLE,
             p, 1, scomm, &rreqs.back());
       }
 
@@ -413,12 +454,16 @@ void tioga::directCut(void)
   if (gridType == 0)
     cutMap.resize(2*nproc); // Bkgd grid - cut with both wall and overset faces
 
+  Timer cutTime("Cutting Time: ");
+
   int ncut = 0;
   for (int p = 0; p < nproc; p++)
   {
     if (gridIDs[p] == mytag) continue;
 
-    mb->directCut(faceNodesW_g[p], nHoleFace[p], nvertf[p], cutMap[ncut]);
+    cutTime.startTimer();
+    mb->directCut(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
+    cutTime.stopTimer();
     ncut++;
 
 //    if (gridType == 0)
@@ -428,11 +473,13 @@ void tioga::directCut(void)
 //    }
   }
 
+  cutTime.showTime(3);
+
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
 
   mb->writeCellFile(mytag); /// DEBUGGING
-  MPI_Barrier(scomm);
+//  MPI_Barrier(scomm);
 //  exit(0); /// DEBUGGING
 }
 

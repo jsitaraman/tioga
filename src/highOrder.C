@@ -446,6 +446,9 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
   for (auto ic : paintQueue)
     icstack[nstack++] = ic; /// TODO: remove set-based version?
 
+//  for (auto &iflag : cutMap.flag)
+//    iflag = (iflag == DC_CUT) ? DC_HOLE : DC_NORMAL;
+//  return;
   while (nstack > 0)
   {
     nstack--;
@@ -475,6 +478,7 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
 
 void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
 {
+  int nhole = 0; /// DEBUGGING
   for (int ic = 0; ic < ncells; ic++)
   {
     iblank_cell[ic] = NORMAL;
@@ -485,10 +489,12 @@ void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
       if (cutMap[g].flag[ic] == DC_HOLE)
       {
         iblank_cell[ic] = HOLE;
+        nhole++;
         break;
       }
     }
   }
+  printf("Rank %d: nHole = %d\n",myid,nhole);
 }
 
 int get_cell_type(int* nc, int ntypes, int ic_in)

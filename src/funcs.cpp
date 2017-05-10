@@ -51,6 +51,7 @@ std::vector<point> tmp_loc;
 int shape_order = 0;
 
 #define TOL 1e-10
+#define BIG_DOUBLE 1e15
 
 namespace tg_funcs
 {
@@ -1652,11 +1653,11 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
   /* --- Prerequisites --- */
 
   // NOTE: Structured ordering  |  btm,top,left,right,front,back
-//  int TriPts[12][3] = {{0,1,3},{0,3,2},{4,7,5},{4,6,7},{0,2,6},{0,6,4},
-//                       {1,3,7},{1,7,5},{0,4,5},{0,5,1},{2,3,7},{2,6,7}};
+  int TriPts[12][3] = {{0,1,3},{0,3,2},{4,7,5},{4,6,7},{0,2,6},{0,6,4},
+                       {1,3,7},{1,7,5},{0,4,5},{0,5,1},{2,3,7},{2,6,7}};
   // NOTE: Structured ordering  |  btm,left,front,right,back,top
-  int TriPts[12][3] = {{0,1,3},{0,3,2},{0,2,6},{0,6,4},{0,4,5},{0,5,1},
-                       {1,3,7},{1,7,5},{2,3,7},{2,6,7},{4,7,5},{4,6,7}};
+//  int TriPts[12][3] = {{0,1,3},{0,3,2},{0,2,6},{0,6,4},{0,4,5},{0,5,1},
+//                       {1,3,7},{1,7,5},{2,3,7},{2,6,7},{4,7,5},{4,6,7}};
 
   if (ijk2gmsh.size() != nev)
     ijk2gmsh = structured_to_gmsh_hex(nev);
@@ -1671,7 +1672,7 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
   int sorderF = nsideF-1;
 
   double TC[9], TF[9];
-  double minDist = 1e15;
+  double minDist = BIG_DOUBLE;
   double minVec[3] = {minDist,minDist,minDist};
   double bboxC[6], bboxF[6];
 
@@ -1710,12 +1711,45 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
 
   // 2) Check outer faces of element for intersection with face
 
-  // Left Side | I = 0
-  for (int J = 0; J < sorderC; J++)
+  for (int f = 0; f < 6; f++)
   {
-    int I = 0;
-    for (int K = 0; K < sorderC; K++)
+    for (int g = 0; g < sorderC*sorderC; g++)
     {
+      int I, J, K;
+      switch (f)
+      {
+        case 0: // Bottom
+          I = g / sorderC;
+          J = g % sorderC;
+          K = 0;
+          break;
+        case 1: // Top
+          I = g / sorderC;
+          J = g % sorderC;
+          K = sorderC - 1;
+          break;
+        case 2: // Left
+          I = 0;
+          J = g / sorderC;
+          K = g % sorderC;
+          break;
+        case 3: // Right
+          I = sorderC - 1;
+          J = g / sorderC;
+          K = g % sorderC;
+          break;
+        case 4: // Front
+          I = g / sorderC;
+          J = 0;
+          K = g % sorderC;
+          break;
+        case 5: // Back
+          I = g / sorderC;
+          J = sorderC - 1;
+          K = g % sorderC;
+          break;
+      }
+
       int i0 = I+nsideC*(J+nsideC*K);
       int j0 = i0 + nsideC*nsideC;
       int lin2curv[8] = {i0, i0+1, i0+nsideC, i0+nsideC+1, j0, j0+1, j0+nsideC, j0+nsideC+1};
@@ -1723,7 +1757,7 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
         lin2curv[i] = ijk2gmsh[lin2curv[i]];
 
       // Get triangles for the sub-hex of the larger curved hex
-      for (int i = 2; i < 4; i++)
+      for (int i = f; i < f+2; i++)
       {
         for (int p = 0; p < 3; p++)
         {
@@ -1767,319 +1801,16 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
             }
           }
         }
-
       }
     }
   }
 
-  // Front Side | J = 0
-  for (int I = 0; I < sorderC; I++)
+  if (minDist == BIG_DOUBLE) // Definitely no intersection; use centroids to get vector
   {
-    int J = 0;
-    for (int K = 0; K < sorderC; K++)
-    {
-      int i0 = I+nsideC*(J+nsideC*K);
-      int j0 = i0 + nsideC*nsideC;
-      int lin2curv[8] = {i0, i0+1, i0+nsideC, i0+nsideC+1, j0, j0+1, j0+nsideC, j0+nsideC+1};
-      for (int i = 0; i < 8; i++)
-        lin2curv[i] = ijk2gmsh[lin2curv[i]];
-
-      // Get triangles for the sub-hex of the larger curved hex
-      for (int i = 4; i < 6; i++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = lin2curv[TriPts[i][p]];
-          for (int d = 0; d < 3; d++)
-            TC[3*p+d] = exv[3*ipt+d];
-        }
-
-        getBoundingBox(TC, 8, 3, bboxC);
-        if (!boundingBoxCheck(bboxC,bboxF,3)) continue;
-
-        for (int M = 0; M < sorderF; M++)
-        {
-          for (int N = 0; N < sorderF; N++)
-          {
-            int m0 = M + nsideF*N;
-            int TriPtsF[2][3] = {{m0, m0+1, m0+nsideF+1}, {m0, m0+nsideF+1, m0+nsideF}};
-
-            // Intersection check between element face tris & cutting-face tris
-            for (int j = 0; j < 2; j++)
-            {
-              for (int p = 0; p < 3; p++)
-              {
-                int ipt = ijk2gmsh_quad[TriPtsF[j][p]];
-                for (int d = 0; d < 3; d++)
-                  TF[3*p+d] = fxv[3*ipt+d];
-              }
-            }
-
-            double vec[3];
-            double dist = triTriDistance(TF, TC, vec, tol);
-
-            if (dist < tol)
-              return Vec3(0.,0.,0);
-
-            if (dist < minDist)
-            {
-              for (int d = 0; d < 3; d++)
-                minVec[d] = vec[d];
-              minDist = dist;
-            }
-          }
-        }
-
-      }
-    }
-  }
-
-  // Btm Side | K = 0
-  for (int I = 0; I < sorderC; I++)
-  {
-    int K = 0;
-    for (int J = 0; J < sorderC; J++)
-    {
-      int i0 = I+nsideC*(J+nsideC*K);
-      int j0 = i0 + nsideC*nsideC;
-      int lin2curv[8] = {i0, i0+1, i0+nsideC, i0+nsideC+1, j0, j0+1, j0+nsideC, j0+nsideC+1};
-      for (int i = 0; i < 8; i++)
-        lin2curv[i] = ijk2gmsh[lin2curv[i]];
-
-      // Get triangles for the sub-hex of the larger curved hex
-      for (int i = 0; i < 2; i++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = lin2curv[TriPts[i][p]];
-          for (int d = 0; d < 3; d++)
-            TC[3*p+d] = exv[3*ipt+d];
-        }
-
-        getBoundingBox(TC, 8, 3, bboxC);
-        if (!boundingBoxCheck(bboxC,bboxF,3)) continue;
-
-        for (int M = 0; M < sorderF; M++)
-        {
-          for (int N = 0; N < sorderF; N++)
-          {
-            int m0 = M + nsideF*N;
-            int TriPtsF[2][3] = {{m0, m0+1, m0+nsideF+1}, {m0, m0+nsideF+1, m0+nsideF}};
-
-            // Intersection check between element face tris & cutting-face tris
-            for (int j = 0; j < 2; j++)
-            {
-              for (int p = 0; p < 3; p++)
-              {
-                int ipt = ijk2gmsh_quad[TriPtsF[j][p]];
-                for (int d = 0; d < 3; d++)
-                  TF[3*p+d] = fxv[3*ipt+d];
-              }
-            }
-
-            double vec[3];
-            double dist = triTriDistance(TF, TC, vec, tol);
-
-            if (dist < tol)
-              return Vec3(0.,0.,0);
-
-            if (dist < minDist)
-            {
-              for (int d = 0; d < 3; d++)
-                minVec[d] = vec[d];
-              minDist = dist;
-            }
-          }
-        }
-
-      }
-    }
-  }
-
-  // Right Side | I = sorderC
-  for (int J = 0; J < sorderC; J++)
-  {
-    int I = sorderC - 1;
-    for (int K = 0; K < sorderC; K++)
-    {
-      int i0 = I+nsideC*(J+nsideC*K);
-      int j0 = i0 + nsideC*nsideC;
-      int lin2curv[8] = {i0, i0+1, i0+nsideC, i0+nsideC+1, j0, j0+1, j0+nsideC, j0+nsideC+1};
-      for (int i = 0; i < 8; i++)
-        lin2curv[i] = ijk2gmsh[lin2curv[i]];
-
-      // Get triangles for the sub-hex of the larger curved hex
-      for (int i = 6; i < 8; i++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = lin2curv[TriPts[i][p]];
-          for (int d = 0; d < 3; d++)
-            TC[3*p+d] = exv[3*ipt+d];
-        }
-
-        getBoundingBox(TC, 8, 3, bboxC);
-        if (!boundingBoxCheck(bboxC,bboxF,3)) continue;
-
-        for (int M = 0; M < sorderF; M++)
-        {
-          for (int N = 0; N < sorderF; N++)
-          {
-            int m0 = M + nsideF*N;
-            int TriPtsF[2][3] = {{m0, m0+1, m0+nsideF+1}, {m0, m0+nsideF+1, m0+nsideF}};
-
-            // Intersection check between element face tris & cutting-face tris
-            for (int j = 0; j < 2; j++)
-            {
-              for (int p = 0; p < 3; p++)
-              {
-                int ipt = ijk2gmsh_quad[TriPtsF[j][p]];
-                for (int d = 0; d < 3; d++)
-                  TF[3*p+d] = fxv[3*ipt+d];
-              }
-            }
-
-            double vec[3];
-            double dist = triTriDistance(TF, TC, vec, tol);
-
-            if (dist < tol)
-              return Vec3(0.,0.,0);
-
-            if (dist < minDist)
-            {
-              for (int d = 0; d < 3; d++)
-                minVec[d] = vec[d];
-              minDist = dist;
-            }
-          }
-        }
-
-      }
-    }
-  }
-
-  // Back Side | J = sorderC
-  for (int I = 0; I < sorderC; I++)
-  {
-    int J = sorderC - 1;
-    for (int K = 0; K < sorderC; K++)
-    {
-      int i0 = I+nsideC*(J+nsideC*K);
-      int j0 = i0 + nsideC*nsideC;
-      int lin2curv[8] = {i0, i0+1, i0+nsideC, i0+nsideC+1, j0, j0+1, j0+nsideC, j0+nsideC+1};
-      for (int i = 0; i < 8; i++)
-        lin2curv[i] = ijk2gmsh[lin2curv[i]];
-
-      // Get triangles for the sub-hex of the larger curved hex
-      for (int i = 8; i < 10; i++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = lin2curv[TriPts[i][p]];
-          for (int d = 0; d < 3; d++)
-            TC[3*p+d] = exv[3*ipt+d];
-        }
-
-        getBoundingBox(TC, 8, 3, bboxC);
-        if (!boundingBoxCheck(bboxC,bboxF,3)) continue;
-
-        for (int M = 0; M < sorderF; M++)
-        {
-          for (int N = 0; N < sorderF; N++)
-          {
-            int m0 = M + nsideF*N;
-            int TriPtsF[2][3] = {{m0, m0+1, m0+nsideF+1}, {m0, m0+nsideF+1, m0+nsideF}};
-
-            // Intersection check between element face tris & cutting-face tris
-            for (int j = 0; j < 2; j++)
-            {
-              for (int p = 0; p < 3; p++)
-              {
-                int ipt = ijk2gmsh_quad[TriPtsF[j][p]];
-                for (int d = 0; d < 3; d++)
-                  TF[3*p+d] = fxv[3*ipt+d];
-              }
-            }
-
-            double vec[3];
-            double dist = triTriDistance(TF, TC, vec, tol);
-
-            if (dist < tol)
-              return Vec3(0.,0.,0);
-
-            if (dist < minDist)
-            {
-              for (int d = 0; d < 3; d++)
-                minVec[d] = vec[d];
-              minDist = dist;
-            }
-          }
-        }
-
-      }
-    }
-  }
-
-  // Top Side | K = sorderC
-  for (int I = 0; I < sorderC; I++)
-  {
-    int K = sorderC - 1;
-    for (int J = 0; J < sorderC; J++)
-    {
-      int i0 = I+nsideC*(J+nsideC*K);
-      int j0 = i0 + nsideC*nsideC;
-      int lin2curv[8] = {i0, i0+1, i0+nsideC, i0+nsideC+1, j0, j0+1, j0+nsideC, j0+nsideC+1};
-      for (int i = 0; i < 8; i++)
-        lin2curv[i] = ijk2gmsh[lin2curv[i]];
-
-      // Get triangles for the sub-hex of the larger curved hex
-      for (int i = 10; i < 12; i++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = lin2curv[TriPts[i][p]];
-          for (int d = 0; d < 3; d++)
-            TC[3*p+d] = exv[3*ipt+d];
-        }
-
-        getBoundingBox(TC, 8, 3, bboxC);
-        if (!boundingBoxCheck(bboxC,bboxF,3)) continue;
-
-        for (int M = 0; M < sorderF; M++)
-        {
-          for (int N = 0; N < sorderF; N++)
-          {
-            int m0 = M + nsideF*N;
-            int TriPtsF[2][3] = {{m0, m0+1, m0+nsideF+1}, {m0, m0+nsideF+1, m0+nsideF}};
-
-            // Intersection check between element face tris & cutting-face tris
-            for (int j = 0; j < 2; j++)
-            {
-              for (int p = 0; p < 3; p++)
-              {
-                int ipt = ijk2gmsh_quad[TriPtsF[j][p]];
-                for (int d = 0; d < 3; d++)
-                  TF[3*p+d] = fxv[3*ipt+d];
-              }
-            }
-
-            double vec[3];
-            double dist = triTriDistance(TF, TC, vec, tol);
-
-            if (dist < tol)
-              return Vec3(0.,0.,0);
-
-            if (dist < minDist)
-            {
-              for (int d = 0; d < 3; d++)
-                minVec[d] = vec[d];
-              minDist = dist;
-            }
-          }
-        }
-
-      }
-    }
+    getCentroid(exv,nev,3,minVec);
+    Vec3 vec = Vec3(minVec);
+    getCentroid(fxv,nfv,3,minVec);
+    return (vec - Vec3(minVec));
   }
 
   return Vec3(minVec);

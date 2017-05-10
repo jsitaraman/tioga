@@ -231,6 +231,7 @@ void tioga::doHoleCutting(void)
   Timer dcTime("Direct Cut: ");
   Timer tgTime("Normal Version: ");
 
+  MPI_Barrier(MPI_COMM_WORLD);
   tgTime.startTimer();
   // Generate structured map of solid boundary (hole) locations
   getHoleMap();
@@ -261,10 +262,14 @@ void tioga::doHoleCutting(void)
   }
   tgTime.stopTimer();
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
   dcTime.startTimer();
   directCut();
   mb->calcFaceIblanks(meshcomm);
   dcTime.stopTimer();
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   dcTime.showTime(3);
   tgTime.showTime(3);

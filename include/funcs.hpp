@@ -42,6 +42,12 @@
 #include "error.hpp"
 #include "points.hpp"
 
+#include <cuda_runtime.h>
+
+#ifndef BIG_DOUBLE
+#define BIG_DOUBLE 1.0e15
+#endif
+
 #define ThrowException(msg) \
 { std::stringstream s; s << __FILE__ << ":" << __LINE__ << ":" << __func__ << ": " << msg; \
   throw std::runtime_error(s.str());}\
@@ -49,6 +55,20 @@
 extern std::vector<double> xlist;
 extern std::vector<int> ijk2gmsh;
 extern std::vector<int> ijk2gmsh_quad;
+
+template <typename T>
+__host__ __device__ __host__
+int sgn(T val) {
+  return (T(0) < val) - (val < T(0));
+}
+
+template <typename T>
+__host__ __device__ __forceinline__
+void swap(T& a, T& b)
+{
+  T c(a);
+  a = b; b = c;
+}
 
 namespace tg_funcs
 {
@@ -68,10 +88,6 @@ std::ostream& operator<<(std::ostream &os, const std::vector<double> &vec);
 double getDist(point a, point b);
 
 /* ------------------------ Mathematical Functions ------------------------- */
-
-template <typename T> int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
 
 /*! Evaluate the 1D Lagrange polynomial mode based on points x_lag at point y */
 double Lagrange(std::vector<double> &x_lag, double y, uint mode);
@@ -110,7 +126,7 @@ void getBoundingBox(double *pts, int nPts, int nDims, double *bbox);
 void getBoundingBox(double *pts, int nPts, int nDims, double *bbox, double *Smat);
 
 /*! Check to see if two bounding boxes overlap */
-bool boundingBoxCheck(double *bbox1, double *bbox2, int nDims);
+bool boundingBoxCheck(double *bbox1, double *bbox2, int nDims, double tol = 1e-8);
 
 /*! Get the centroid of a collection of points */
 void getCentroid(double *pts, int nPts, int nDims, double *xc);

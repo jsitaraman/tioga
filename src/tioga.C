@@ -467,15 +467,23 @@ void tioga::directCut(void)
     if (gridIDs[p] == mytag) continue;
 
     cutTime.startTimer();
+#ifdef _GPU
+    mb->directCut_gpu(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
+#else
     mb->directCut(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
+#endif
     cutTime.stopTimer();
     ncut++;
 
-//    if (gridType == 0)
-//    {
-//      mb->directCut(faceNodesO_g[p], nOverFace[p], nvertf[p], cutMap[ncut], 0);
-//      ncut++;
-//    }
+    if (gridType == 0)
+    {
+#ifdef _GPU
+      mb->directCut_gpu(faceNodesO_g[p], nOverFace_p[p], nvertf_p[p], cutMap[ncut], 0);
+#else
+      mb->directCut(faceNodesO_g[p], nOverFace_p[p], nvertf_p[p], cutMap[ncut], 0);
+#endif
+      ncut++;
+    }
   }
 
   cutTime.showTime(3);
@@ -483,7 +491,8 @@ void tioga::directCut(void)
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
 
-  mb->writeCellFile(mytag); /// DEBUGGING
+//  if (gridType == 0)
+    mb->writeCellFile(mytag, cutMap.back()); /// DEBUGGING
 //  MPI_Barrier(scomm);
 //  exit(0); /// DEBUGGING
 }
@@ -647,7 +656,7 @@ void tioga::performConnectivityAMR(void)
   //checkComm();
   exchangeAMRDonors();
   mb->getCellIblanks(meshcomm);
-  mb->writeCellFile(myid);
+//  mb->writeCellFile(myid);
   for(i=0;i<ncart;i++)
 	cb[i].writeCellFile(i);
   //MPI_Barrier(scomm);

@@ -51,7 +51,6 @@ std::vector<point> tmp_loc;
 int shape_order = 0;
 
 #define TOL 1e-10
-#define BIG_DOUBLE 1e15
 
 namespace tg_funcs
 {
@@ -379,13 +378,13 @@ void getBoundingBox(double *pts, int nPts, int nDims, double *bbox, double *Smat
   }
 }
 
-bool boundingBoxCheck(double *bbox1, double *bbox2, int nDims)
+bool boundingBoxCheck(double *bbox1, double *bbox2, int nDims, double tol)
 {
   bool check = true;
   for (int i = 0; i < nDims; i++)
   {
-    check = check && (bbox1[i+nDims] >= bbox2[i] - 1e-10);
-    check = check && (bbox2[i+nDims] >= bbox1[i] - 1e-10);
+    check = check && (bbox1[i+nDims] >= bbox2[i] - tol);
+    check = check && (bbox2[i+nDims] >= bbox1[i] - tol);
   }
   return check;
 }
@@ -398,10 +397,6 @@ void getCentroid(double *pts, int nPts, int nDims, double *xc)
   for (int i = 0; i < nPts; i++)
     for (int d = 0; d < nDims; d++)
       xc[d] += pts[nDims*i+d]/nPts;
-
-//  double oon = 1./nPts;
-//  for (int d = 0; d < nDims; d++)
-//    xc[d] *= oon;
 }
 
 std::vector<int> gmsh_to_structured_quad(unsigned int nNodes)
@@ -1473,7 +1468,7 @@ double lineSegmentDistance(double *p1, double *p2, double *p3, double *p4, doubl
  *  distance between them otherwise */
 double triTriDistance(double* T1, double* T2, double* minVec, double tol)
 {
-  double dist = 1e15; // Square of the distance, actually
+  double dist = 1e15;
   double vec[3];
   for (int i = 0; i < 3; i++)
   {
@@ -1505,9 +1500,11 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
   point V22 = point(T2+6);
 
   point N2 = (V12-V02).cross(V22-V02);
+  N2 /= N2.norm();
   double d2 = -(N2*V02);
 
   point N1 = (V11-V01).cross(V21-V01);
+  N1 /= N1.norm();
   double d1 = -(N1*V01);
 
   // Signed distances of T1 points to T2's plane
@@ -1520,30 +1517,40 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
   double d12 = N1*V12 + d1;
   double d22 = N1*V22 + d1;
 
+  // Round values near 0 to 0
+  d01 = (std::abs(d01) < 1e-10) ? 0 : d01;
+  d11 = (std::abs(d11) < 1e-10) ? 0 : d11;
+  d21 = (std::abs(d21) < 1e-10) ? 0 : d21;
+
+  d02 = (std::abs(d02) < 1e-10) ? 0 : d02;
+  d12 = (std::abs(d12) < 1e-10) ? 0 : d12;
+  d22 = (std::abs(d22) < 1e-10) ? 0 : d22;
+
+  if (std::abs(d01) + std::abs(d11) + std::abs(d21) < 3*tol ||
+      std::abs(d02) + std::abs(d12) + std::abs(d22) < 3*tol)
+  {
+    /* Approximately coplanar; check if one triangle is inside the other */
+
+    // Check if a point in T1 is inside T2
+    bool inside = true;
+    inside = inside && N2*((V12-V02).cross(V01-V02)) > 0;
+    inside = inside && N2*((V02-V22).cross(V01-V22)) > 0;
+    inside = inside && N2*((V22-V12).cross(V01-V12)) > 0;
+
+    if (inside) return 0.;
+
+    // Check if a point in T2 is inside T1
+    inside = true;
+    inside = inside && N1*((V11-V01).cross(V02-V01)) > 0;
+    inside = inside && N1*((V01-V21).cross(V02-V21)) > 0;
+    inside = inside && N1*((V21-V11).cross(V02-V11)) > 0;
+
+    if (inside) return 0.;
+  }
+
   // Check for intersection with plane - one point should have opposite sign
   if (sgn(d01) == sgn(d11) && sgn(d01) == sgn(d21)) // && std::abs(d01) > tol)
   {
-    if (std::abs(d01) + std::abs(d11) + std::abs(d21) < 3e-8)
-    {
-      /* Approximately coplanar; check if one triangle is inside the other */
-
-      // Check if a point in T1 is inside T2
-      bool inside = true;
-      inside = inside && N2*((V12-V02).cross(V01-V02)) > 0;
-      inside = inside && N2*((V02-V22).cross(V01-V22)) > 0;
-      inside = inside && N2*((V22-V12).cross(V01-V12)) > 0;
-
-      if (inside) return 0.;
-
-      // Check if a point in T2 is inside T1
-      inside = true;
-      inside = inside && N1*((V11-V01).cross(V02-V01)) > 0;
-      inside = inside && N1*((V01-V21).cross(V02-V21)) > 0;
-      inside = inside && N1*((V21-V11).cross(V02-V11)) > 0;
-
-      if (inside) return 0.;
-    }
-
     // No intersection; return result from edge distances
     return dist;
   }
@@ -1553,7 +1560,8 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
     return dist;
 
   // Compute intersection line
-  point L = N1.cross(N2);
+  Vec3 L = N1.cross(N2);
+  L /= L.norm();
 
   double p0 = L*V01;
   double p1 = L*V11;
@@ -1615,15 +1623,12 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
 
     if (dl < dist)
     {
-      dist = 0;
+      dist = dl;
       for (int i = 0; i < 3; i++)
-      {
         minVec[i] = sgn(t1-s2)*dt*L[i]; // Ensure vec is T1 -> T2
-        dist += minVec[i]*minVec[i];
-      }
     }
 
-    return std::sqrt(dist);
+    return dist;
   }
 
   return 0.;
@@ -1631,33 +1636,13 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
 
 Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
 {
-  // TODO: replace with faster algo
-//  double minDist = 1e15;
-//  int minI = -1;
-//  int minJ = -1;
-//  for (int i = 0; i < nfv; i++)
-//  {
-//    for (int j = 0; j < nev; j++)
-//    {
-//      double dist = (point(&fxv[nDims*i],nDims) - point(&exv[nDims*j],nDims)).norm();
-//      if (dist < minDist)
-//      {
-//        minDist = dist;
-//        minI = i;
-//        minJ = j;
-//      }
-//    }
-//  }
-  double tol = 1e-9;
-
   /* --- Prerequisites --- */
 
   // NOTE: Structured ordering  |  btm,top,left,right,front,back
   int TriPts[12][3] = {{0,1,3},{0,3,2},{4,7,5},{4,6,7},{0,2,6},{0,6,4},
                        {1,3,7},{1,7,5},{0,4,5},{0,5,1},{2,3,7},{2,6,7}};
-  // NOTE: Structured ordering  |  btm,left,front,right,back,top
-//  int TriPts[12][3] = {{0,1,3},{0,3,2},{0,2,6},{0,6,4},{0,4,5},{0,5,1},
-//                       {1,3,7},{1,7,5},{2,3,7},{2,6,7},{4,7,5},{4,6,7}};
+
+  double tol = 1e-9;
 
   if (ijk2gmsh.size() != nev)
     ijk2gmsh = structured_to_gmsh_hex(nev);
@@ -1766,8 +1751,11 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
             TC[3*p+d] = exv[3*ipt+d];
         }
 
-        getBoundingBox(TC, 8, 3, bboxC);
-        if (!boundingBoxCheck(bboxC,bboxF,3)) continue;
+        getBoundingBox(TC, 3, 3, bboxC);
+        //double btol = .05*(bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]);
+        double btol = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]);
+        btol = std::min(btol, minDist);
+        if (!boundingBoxCheck(bboxC,bboxF,3, btol)) continue;
 
         for (int M = 0; M < sorderF; M++)
         {
@@ -1785,19 +1773,19 @@ Vec3 intersectionCheck(double *fxv, int nfv, double *exv, int nev, int nDims)
                 for (int d = 0; d < 3; d++)
                   TF[3*p+d] = fxv[3*ipt+d];
               }
-            }
 
-            double vec[3];
-            double dist = triTriDistance(TF, TC, vec, tol);
+              double vec[3];
+              double dist = triTriDistance(TF, TC, vec, tol);
 
-            if (dist < tol)
-              return Vec3(0.,0.,0);
+              if (dist < tol)
+                return Vec3(0.,0.,0);
 
-            if (dist < minDist)
-            {
-              for (int d = 0; d < 3; d++)
-                minVec[d] = vec[d];
-              minDist = dist;
+              if (dist < minDist)
+              {
+                for (int d = 0; d < 3; d++)
+                  minVec[d] = vec[d];
+                minDist = dist;
+              }
             }
           }
         }

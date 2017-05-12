@@ -4,6 +4,17 @@
 #include "cuda_runtime.h"
 #include "error.hpp"
 
+#ifndef BIG_DOUBLE
+#define BIG_DOUBLE 1.0e15
+#endif
+
+#ifndef DC_CUT
+#define DC_HOLE 0
+#define DC_UNASSIGNED 1
+#define DC_CUT 1
+#define DC_NORMAL 1
+#endif
+
 template<typename T>
 void cuda_malloc(T* &data_d, size_t size)
 {
@@ -278,6 +289,155 @@ void hvec<T>::free_data(void)
   allocated = false;
 }
 
+struct dPoint
+{
+private:
+  double _v[3];
+
+public:
+  __device__ dPoint(void) {}
+
+  __device__
+  dPoint(double x, double y, double z) {
+    _v[0] = x; _v[1] = y; _v[2] = z;
+  }
+
+  __device__
+  dPoint(const double* pt) {
+    _v[0] = pt[0]; _v[1] = pt[1]; _v[2] = pt[2];
+  }
+
+  __device__
+  double& operator[](int ind) {
+    return _v[ind];
+  }
+
+  __device__
+  dPoint operator=(double* a) {
+    struct dPoint pt;
+    for (int i = 0; i < 3; i++)
+      pt[i] = a[i];
+    return pt;
+  }
+
+  __device__
+  dPoint operator-(dPoint b) {
+    struct dPoint c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] - b[i];
+    return c;
+  }
+
+  __device__
+  dPoint operator+(dPoint b) {
+    struct dPoint c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] + b[i];
+    return c;
+  }
+
+  __device__
+  dPoint operator/(dPoint b) {
+    struct dPoint c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] / b[i];
+    return c;
+  }
+
+  __device__
+  dPoint& operator+=(dPoint b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] += b[i];
+    return *this;
+  }
+
+  __device__
+  dPoint& operator-=(dPoint b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] -= b[i];
+    return *this;
+  }
+
+  __device__
+  dPoint& operator+=(double* b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] += b[i];
+    return *this;
+  }
+
+  __device__
+  dPoint& operator-=(double* b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] -= b[i];
+    return *this;
+  }
+
+  __device__
+  dPoint& operator/=(double a) {
+    for (int i = 0; i < 3; i++)
+      _v[i] /= a;
+    return *this;
+  }
+
+  __device__
+  dPoint& operator*=(double a) {
+    for (int i = 0; i < 3; i++)
+      _v[i] *= a;
+    return *this;
+  }
+
+  __device__
+  double operator*(dPoint b) {
+    return _v[0]*b[0] + _v[1]*b[1] + _v[2]*b[2];
+  }
+
+  __device__
+  dPoint operator*(double b) {
+    struct dPoint c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] * b;
+    return c;
+  }
+
+  __device__
+  dPoint operator/(double b) {
+    struct dPoint c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] / b;
+    return c;
+  }
+
+  __device__
+  void abs(void) {
+    for (int i = 0; i < 3; i++)
+      _v[i] = fabs(_v[i]);
+  }
+
+  __device__
+  double norm(void) {
+    return sqrt(_v[0]*_v[0]+_v[1]*_v[1]+_v[2]*_v[2]);
+  }
+
+  __device__
+  dPoint cross(dPoint b) {
+    dPoint v;
+    _v[0] = _v[1]*b[2] - _v[2]*b[1];
+    _v[1] = _v[2]*b[0] - _v[0]*b[2];
+    _v[2] = _v[0]*b[1] - _v[1]*b[0];
+    return v;
+  }
+};
+
+static
+__device__
+dPoint operator*(double a, dPoint b)
+{
+  dPoint c;
+  for (int i = 0; i < 3; i++)
+    c[i] = a * b[i];
+  return c;
+}
+
 /* ------ Misc. Helper Functions ------ */
 
 namespace cuda_funcs
@@ -380,6 +540,51 @@ double dLagrange_gpu(double* xiGrid, unsigned int npts, double xi, unsigned int 
   }
 
   return val/den;
+}
+
+template<int nDims>
+__device__
+void getBoundingBox(double *pts, int nPts, double *bbox)
+{
+  for (int i = 0; i < nDims; i++)
+  {
+    bbox[i]       =  INFINITY;
+    bbox[nDims+i] = -INFINITY;
+  }
+
+  for (int i = 0; i < nPts; i++)
+  {
+    for (int dim = 0; dim < nDims; dim++)
+    {
+      bbox[dim]       = fmin(bbox[dim],      pts[i*nDims+dim]);
+      bbox[nDims+dim] = fmax(bbox[nDims+dim],pts[i*nDims+dim]);
+    }
+  }
+}
+
+template<int nDims>
+__device__ __forceinline__
+bool boundingBoxCheck(double *bbox1, double *bbox2, double tol)
+{
+  bool check = true;
+  for (int i = 0; i < nDims; i++)
+  {
+    check = check && (bbox1[i+nDims] >= bbox2[i] - tol);
+    check = check && (bbox2[i+nDims] >= bbox1[i] - tol);
+  }
+  return check;
+}
+
+template<int nDims>
+__device__
+void getCentroid(double *pts, int nPts, double *xc)
+{
+  for (int d = 0; d < nDims; d++)
+    xc[d] = 0;
+
+  for (int i = 0; i < nPts; i++)
+    for (int d = 0; d < nDims; d++)
+      xc[d] += pts[nDims*i+d]/nPts;
 }
 
 } // namespace cuda_funcs

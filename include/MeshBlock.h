@@ -48,13 +48,9 @@ typedef struct CutMap
   std::map<int,double> dist; //! Minimum distance to a cutting face
   std::map<int,int> nMin;    //! # of cut faces that are approx. 'dist' away
   std::map<int,Vec3> norm;   //! Normal vector of cutting face (or avg. of several)
+  std::map<int,double> dot;   //! Dot prodcut of Normal vector with separation vector
   //std::map<int,Vec3> vec;    //! Vector from face to cell (between closest points)
 } CutMap;
-
-enum DIRECT_CUT_FLAG
-{
-  DC_HOLE, DC_UNASSIGNED, DC_CUT, DC_NORMAL
-};
 
 // forward declare to instantiate one of the methods
 class parallelComm;
@@ -494,6 +490,10 @@ private:
   //! Determine blanking status based upon given set of wall and overset faces
   void directCut(std::vector<double> &cutFaces, int nCut, int nvertf, CutMap& cutMap, int cutType = 1);
 
+  //! Peform the Direct Cut alogorithm on the GPU
+  void directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvertf,
+      CutMap &cutMap, int cutType = 1);
+
   //! Take the union of all cut flags
   void unifyCutFlags(std::vector<CutMap> &cutMap);
 
@@ -562,7 +562,7 @@ private:
   }
 
 
-  void writeCellFile(int);
+  void writeCellFile(int, CutMap& cutMap);
 
   /*! Gather a list of all receptor point locations (including for high-order) */
   void getInternalNodes(void);

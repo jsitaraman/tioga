@@ -4,6 +4,18 @@
 #include "cuda_funcs.h"
 #include <vector>
 
+//! Helper struct for direct-cut method [Galbraith 2013]
+typedef struct dCutMap
+{
+  int type;                  //! Cut type: Solid wall (1) or overset bound (0)
+  dvec<int> flag;     //! Cut flag for all cells (essentially iblank)
+  dvec<double> dist;  //! Minimum distance to a cutting face
+  dvec<int> nMin;    //! # of cut faces that are approx. 'dist' away
+  dvec<double> norm;   //! Normal vector of cutting face (or avg. of several)
+  dvec<double> dot;   //! Dot prodcut of Normal vector with separation vector
+  //std::map<int,Vec3> vec;    //! Vector from face to cell (between closest points)
+} dCutMap;
+
 class dMeshBlock
 {
 public:
@@ -22,7 +34,7 @@ public:
   int nobc;    //! Number of overset boundary nodes
   int nwbc;    //! Number of wall boundary nodes
 
-  int** c2v;   //! Cell-to-vertex connectivity
+  dvec<int> c2v;   //! Cell-to-vertex connectivity
   int** f2v;   //! Face-to-vertex connectivity
   int* f2c;    //! Face-to-cell connectivity
   int* c2f;    //! Cell-to-face connectivity
@@ -57,6 +69,7 @@ public:
   cudaStream_t stream;
 
   dvec<int> ijk2gmsh;
+  dvec<int> ijk2gmsh_quad; // For Direct Cut method
   dvec<double> xlist;
 
   bool rrot = false;
@@ -69,6 +82,8 @@ public:
   void dataToDevice(int ndims, int nnodes, int ncells, int ncells_adt, int nsearch, int* nv,
       int* nc, int* eleList, double* eleBBox, int* isearch, double* xsearch);
 
+  void extraDataToDevice(int* vconn);
+
   void setDeviceData(double* vx, double* ex, int* ibc, int* ibf);
 
   void setTransform(double *mat, double *off, int ndim);
@@ -80,6 +95,10 @@ public:
   void checkContainment(int adtEle, int& cellID, const double* __restrict__ bbox,
       const double* __restrict__ xsearch, double* __restrict__ rst);
 
+//  template<int ndim, int nside>
+//  __device__
+//  void checkPtInEle(const double* __restrict__ exv, const double* __restrict__ bbox,
+//                    const double* __restrict__ xsearch);
   template<int nSide>
   __device__ __forceinline__
   void calcDShape(double* __restrict__ shape,
@@ -89,6 +108,9 @@ public:
   __device__ __forceinline__
   bool getRefLoc(const double* __restrict__ coords, const double* __restrict__ bbox,
                  const double* __restrict__ xyz, double* __restrict__ rst);
+
+  __host__
+  void directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFlag, int cutType);
 };
 
 template<int nSide>

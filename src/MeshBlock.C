@@ -323,6 +323,11 @@ void MeshBlock::setupADT(void)
                     elementBbox.data(),isearch.data(),xsearch.data());
 
   adt_d.copyADT(adt);
+
+  /* ---- Direct Cut Setup ---- */
+
+  mb_d.extraDataToDevice(vconn[0]);
+
 #endif
 }
 
@@ -409,7 +414,7 @@ void MeshBlock::writeGridFile(int bid)
   return;
 }
 
-void MeshBlock::writeCellFile(int bid)
+void MeshBlock::writeCellFile(int bid, CutMap &cutMap)
 {
   char fname[80];
   char qstr[2];
@@ -434,7 +439,7 @@ void MeshBlock::writeCellFile(int bid)
   for (int i = 0; i < nnodes; i++) fprintf(fp,"%lf\n",x[3*i+1]);
   for (int i = 0; i < nnodes; i++) fprintf(fp,"%lf\n",x[3*i+2]);
   for (int i = 0; i < nnodes; i++) fprintf(fp,"%d\n",iblank[i]);
-  for (int i = 0; i < ncells; i++) fprintf(fp,"%d\n",iblank_cell[i]);
+  for (int i = 0; i < ncells; i++) fprintf(fp,"%d\n",cutMap.flag[i]);
   ba=1-BASE;
   for (int n = 0; n < ntypes; n++)
     {

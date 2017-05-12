@@ -149,11 +149,11 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
   dPoint V12 = dPoint(T2+3);
   dPoint V22 = dPoint(T2+6);
 
-  dPoint N2 = (V12-V02).cross(V22-V02);
+  dPoint N2 = (V12-V02).cross(V22-V02); // Plane 2
   N2 /= N2.norm();
   double d2 = -(N2*V02);
 
-  dPoint N1 = (V11-V01).cross(V21-V01);
+  dPoint N1 = (V11-V01).cross(V21-V01); // Plane 1
   N1 /= N1.norm();
   double d1 = -(N1*V01);
 
@@ -198,15 +198,120 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
     if (inside) return 0.;
   }
 
+  bool noTouch = false;
+
   // Check for intersection with plane - one point should have opposite sign
   if (sgn(d01) == sgn(d11) && sgn(d01) == sgn(d21)) // && fabs(d01) > tol)
   {
-    // No intersection; return result from edge distances
-    return dist;
+    noTouch = true;
+
+    // No intersection; check if projection of points provides closer distance
+    if (fabs(d01) < dist)
+    {
+      dPoint P01 = V01 - N2*d01;
+      bool inside = true;
+      inside = inside && N2*((V12-V02).cross(P01-V02)) > 0;
+      inside = inside && N2*((V02-V22).cross(P01-V22)) > 0;
+      inside = inside && N2*((V22-V12).cross(P01-V12)) > 0;
+
+      if (inside)
+      {
+        for (int i = 0; i < 3; i++)
+          minVec[i] = N2[i]*sgn(d01);
+        dist = fabs(d01);
+      }
+    }
+
+    if (fabs(d11) < dist)
+    {
+      dPoint P11 = V11 - N2*d11;
+      bool inside = true;
+      inside = inside && N2*((V12-V02).cross(P11-V02)) > 0;
+      inside = inside && N2*((V02-V22).cross(P11-V22)) > 0;
+      inside = inside && N2*((V22-V12).cross(P11-V12)) > 0;
+
+      if (inside)
+      {
+        for (int i = 0; i < 3; i++)
+          minVec[i] = N2[i]*sgn(d11);
+        dist = fabs(d11);
+      }
+    }
+
+    if (fabs(d21) < dist)
+    {
+      dPoint P21 = V11 - N2*d21;
+      bool inside = true;
+      inside = inside && N2*((V12-V02).cross(P21-V02)) > 0;
+      inside = inside && N2*((V02-V22).cross(P21-V22)) > 0;
+      inside = inside && N2*((V22-V12).cross(P21-V12)) > 0;
+
+      if (inside)
+      {
+        for (int i = 0; i < 3; i++)
+          minVec[i] = N2[i]*sgn(d21);
+        dist = fabs(d21);
+      }
+    }
   }
 
   // Check for intersection with plane - one point should have opposite sign
   if (sgn(d02) == sgn(d12) && sgn(d02) == sgn(d22)) // && fabs(d02) > tol)
+  {
+    noTouch = true;
+
+    // No intersection; check if projection of points provides closer distance
+    if (fabs(d02) < dist)
+    {
+      dPoint P02 = V02 - N1*d02;
+      bool inside = true;
+      inside = inside && N1*((V11-V01).cross(P02-V01)) > 0;
+      inside = inside && N1*((V01-V21).cross(P02-V21)) > 0;
+      inside = inside && N1*((V21-V11).cross(P02-V11)) > 0;
+
+      if (inside)
+      {
+        for (int i = 0; i < 3; i++)
+          minVec[i] = N1[i]*sgn(d02);
+        dist = fabs(d02);
+      }
+    }
+
+    if (fabs(d12) < dist)
+    {
+      dPoint P12 = V12 - N1*d12;
+      bool inside = true;
+      inside = inside && N1*((V11-V01).cross(P12-V01)) > 0;
+      inside = inside && N1*((V01-V21).cross(P12-V21)) > 0;
+      inside = inside && N1*((V21-V11).cross(P12-V11)) > 0;
+
+      if (inside)
+      {
+        for (int i = 0; i < 3; i++)
+          minVec[i] = N1[i]*sgn(d12);
+        dist = fabs(d12);
+      }
+    }
+
+    if (fabs(d22) < dist)
+    {
+      dPoint P22 = V22 - N1*d22;
+      bool inside = true;
+      inside = inside && N1*((V11-V01).cross(P22-V01)) > 0;
+      inside = inside && N1*((V01-V21).cross(P22-V21)) > 0;
+      inside = inside && N1*((V21-V11).cross(P22-V11)) > 0;
+
+      if (inside)
+      {
+        for (int i = 0; i < 3; i++)
+          minVec[i] = N1[i]*sgn(d22);
+        dist = fabs(d22);
+      }
+    }
+  }
+
+  // No intersection; return result from edge intersections & plane projections
+  if (noTouch)
     return dist;
 
   // Compute intersection line
@@ -258,6 +363,11 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
       t2 = q1 + (q2-q1) * (d12 / (d12-d22));
       break;
   }
+
+  s1 = (fabs(s1) < 1e-10) ? 0 : s1;
+  s2 = (fabs(s2) < 1e-10) ? 0 : s2;
+  t1 = (fabs(t1) < 1e-10) ? 0 : t1;
+  t2 = (fabs(t2) < 1e-10) ? 0 : t2;
 
   if (s1 > s2)
     swap(s1,s2);
@@ -411,7 +521,7 @@ dPoint intersectionCheck(dMeshBlock &mb, double *fxv, int nfv, double *exv, int 
       int j0 = i0 + nsideC*nsideC;
       int lin2curv[8] = {i0, i0+1, i0+nsideC, i0+nsideC+1, j0, j0+1, j0+nsideC, j0+nsideC+1};
       for (int i = 0; i < 8; i++)
-        lin2curv[i] = mb.ijk2gmsh[lin2curv[i]]; /// TODO
+        lin2curv[i] = mb.ijk2gmsh[lin2curv[i]];
 
       // Get triangles for the sub-hex of the larger curved hex
       for (int i = f; i < f+2; i++)
@@ -479,38 +589,69 @@ dPoint intersectionCheck(dMeshBlock &mb, double *fxv, int nfv, double *exv, int 
 template<int nDims, int nvert>
 __global__
 void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut, int nvertf,
-                dCutMap cutMap, int cutType)
+                int* __restrict__ cutFlag, int cutType)
 {
   int ic = blockIdx.x * blockDim.x + threadIdx.x;
 
-//  if (ic >= mb.ncells) return;
-  if (ic != 0) return;
+  if (ic >= mb.ncells) return;
+//  if (ic >= 1) return;
+
+  // Figure out how many threads are left in this block after ic>ncells returns
+  int blockSize = min(blockDim.x, mb.ncells - blockIdx.x * blockDim.x);
+
+  int myFlag = DC_UNASSIGNED;
+  double myDist = BIG_DOUBLE;
+  double myNorm[3];
+  double myDot;
+  double nMin = 0;
 
   double xv[nDims*nvert];
   extern __shared__ double fxv[];
 
   // Load up the cell nodes into an array
   for (int i = 0; i < nvert; i++)
+  {
     for (int d = 0; d < nDims; d++)
-      xv[nDims*i+d] = mb.coord[nDims*(i+nvert*ic)+d];
+      xv[nDims*i+d] = mb.coord[ic+mb.ncells*(d+nDims*i)]; /// NOTE: 'row-major' ZEFR layout
+  }
 
   double bboxC[2*nDims], bboxF[2*nDims];
 
   cuda_funcs::getBoundingBox<nDims>(xv, nvert, bboxC);
 
+  double XC[3];
+  cuda_funcs::getCentroid<3>(xv,nvert,XC);
+  bool PRINT = (fabs(XC[0]-.7) < .08 && fabs(XC[1]) < .01 && fabs(XC[2]) < .01);
+
   // btol == 10 times the average side length of the cell's bounding box
-  double btol = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) * 3.3;
+  double btol = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) * 3.; // * 10.
 
   int stride = nDims*nvertf;
 
   for (int ff = 0; ff < nCut; ff++)
   {
-    for (int i = threadIdx.x; i < nvertf*nDims; i += blockDim.x)
+    __syncthreads();
+
+    for (int i = threadIdx.x; i < stride; i += blockSize)
     {
       fxv[i] = cutFaces[ff*stride+i];
     }
 
     __syncthreads();
+
+//    if (myFlag == DC_CUT) continue;
+
+//    if (cutType == 0 && PRINT)
+//    {
+//      //if (ff%20 == 0)
+//      {
+//        printf("Face(:,:,%d) = [",ff);
+//        for (int i = 0; i < nvertf-1; i++)
+//          printf("%f  %f  %f;\n",fxv[3*i+0],fxv[3*i+1],fxv[3*i+2]);
+//        int i = nvertf-1;
+//        printf("%f  %f  %f];\n",fxv[3*i+0],fxv[3*i+1],fxv[3*i+2]);
+//      }
+//    }
 
     /// TODO: read cutface into shared memory (cuz why not? They're all in sync!)
     /*if (mb.rrot)
@@ -518,20 +659,23 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut, int nvertf,
     else*/
     cuda_funcs::getBoundingBox<nDims>(fxv, nvertf, bboxF);
 
-    if (cuda_funcs::boundingBoxCheck<nDims>(bboxC, bboxF, btol))
+    if (myFlag != DC_CUT && cuda_funcs::boundingBoxCheck<nDims>(bboxC, bboxF, btol))
     {
       // Find distance from face to cell
       dPoint vec = intersectionCheck(mb, fxv, nvertf, xv, nvert);
       double dist = vec.norm();
       vec /= dist;
-      printf("(%d, %d): dist = %f\n",ic,ff,dist);
-      continue;
-      if (dist == 0.) // They intersect
+//if (cutType == 0 && PRINT)
+//{
+//  printf("(%d, %d) : dist = %.4e\n",ic,ff,dist);
+//}
+      if (dist < 1e-8) // They intersect
       {
-        cutMap.flag[ic] = DC_CUT;
-        cutMap.dist[ic] = 0.;
+        myFlag = DC_CUT;
+        myDist = 0.;
+        if (cutType == 0) printf("Cell %d cut by face %d\n",ic,ff);
       }
-      else if (cutMap.flag[ic] == DC_UNASSIGNED) // || dist < (cutMap.dist[ic] - tol))
+      else if (myFlag == DC_UNASSIGNED || dist < (myDist - 1e-6))
       {
         // Unflagged cell, or have a closer face to use
         dPoint norm = faceNormal(fxv);
@@ -539,18 +683,19 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut, int nvertf,
 
         double dot = norm*vec;
 
-        cutMap.dist[ic] = dist;
+        myDist = dist;
         for (int d = 0; d < 3; d++)
-          cutMap.norm[3*ic+d] = norm[d];
-        cutMap.dot[ic] = dot;
-        cutMap.nMin[ic] = 1;
+          myNorm[d] = norm[d];
+        myDot = dot;
+        nMin = 1;
 
         if (dot < 0) /// TODO: decide on standard orientation
-          cutMap.flag[ic] = DC_HOLE; // outwards normal = inside hole
+          myFlag = DC_HOLE; // outwards normal = inside hole
         else
-          cutMap.flag[ic] = DC_NORMAL;
+          myFlag = DC_NORMAL;
       }
-      else if (dist < 1.25*cutMap.dist[ic]) //if (fabs(dist-cutMap.dist[ic]) < 2e-3)
+      //else if (dist < 1.25*myDist) //if (fabs(dist-myDist) < 2e-3)
+      else if (dist < myDist)
       {
         // Approx. same dist. to two faces; avg. their normals to decide
         dPoint norm = faceNormal(fxv);
@@ -561,95 +706,96 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut, int nvertf,
         double dot = norm*vec;
         double adot = fabs(dot);
 
-        double dot0 = cutMap.dot[ic];
+        double dot0 = myDot;
         double adot0 = fabs(dot0);
 
-        if (dist < .9*cutMap.dist[ic] && adot > adot0)
-        {
+//        if (dist < .9*myDist && adot > adot0)
+//        {
           // Clearly better; use it
-          cutMap.dist[ic] = dist;
+          myDist = dist;
           for (int d = 0; d < 3; d++)
-            cutMap.norm[3*ic+d] = norm[d];
-          cutMap.dot[ic] = dot;
-          cutMap.nMin[ic] = 1;
+            myNorm[d] = norm[d];
+          myDot = dot;
+          nMin = 1;
 
           if (dot < 0) /// TODO: decide on standard orientation
-            cutMap.flag[ic] = DC_HOLE; // outwards normal = inside hole
+            myFlag = DC_HOLE; // outwards normal = inside hole
           else
-            cutMap.flag[ic] = DC_NORMAL;
-        }
-        else if (fabs(dist = cutMap.dist[ic]) < 1e-6)
-        {
-          // They're not that far apart; average them
-          cutMap.dist[ic] = fmin(cutMap.dist[ic], dist);
-          int N = cutMap.nMin[ic];
-          for (int d = 0; d < nDims; d++)
-            norm[d] = (N*cutMap.norm[3*ic+d] + norm[d]) / (N + 1.);
-          norm /= norm.norm();
-
-          for (int d = 0; d < 3; d++)
-            cutMap.norm[3*ic+d] = norm[d];
-          cutMap.dot[ic] = (adot0 > adot) ? dot0 : dot;
-          cutMap.nMin[ic]++;
-
-          if (cutMap.dot[ic] < 0)
-            cutMap.flag[ic] = DC_HOLE;
-          else
-            cutMap.flag[ic] = DC_NORMAL;
-        }
-        else if (.866*adot > adot0)
-        {
-          // This one's at least 30deg closer; use it instead
-          for (int d = 0; d < 3; d++)
-            cutMap.norm[3*ic+d] = norm[d];
-          cutMap.dist[ic] = dist;
-          cutMap.dot[ic] = dot;
-
-          if (dot < 0)
-            cutMap.flag[ic] = DC_HOLE;
-          else
-            cutMap.flag[ic] = DC_NORMAL;
-        }
-        else if (adot >= .866*adot0)
-        {
-          // They're not that far apart; average them
-          int N = cutMap.nMin[ic];
-          for (int i = 0; i < 3; i++)
-            norm[i] = cutMap.norm[3*ic+i]*adot0*N + norm[i]*adot;
+            myFlag = DC_NORMAL;
+//        }
+//        else if (fabs(dist = myDist) < 1e-6)
+//        {
+//          // They're not that far apart; average them
+//          myDist = fmin(myDist, dist);
+//          int N = nMin;
 //          for (int d = 0; d < nDims; d++)
-//            norm[d] = (N*cutMap.norm[ic][d] + norm[d]) / (N + 1.);
-          norm /= norm.norm();
+//            norm[d] = (N*myNorm[d] + norm[d]) / (N + 1.);
+//          norm /= norm.norm();
 
-          cutMap.dist[ic] = fmin(cutMap.dist[ic], dist);
-          for (int d = 0; d < 3; d++)
-            cutMap.norm[3*ic+d] = norm[d];
-          cutMap.dot[ic] = (adot0 > adot) ? dot0 : dot;
-          cutMap.nMin[ic]++;
+//          for (int d = 0; d < 3; d++)
+//            myNorm[d] = norm[d];
+//          myDot = (adot0 > adot) ? dot0 : dot;
+//          nMin++;
 
-          if (cutMap.dot[ic] < 0)
-            cutMap.flag[ic] = DC_HOLE;
-          else
-            cutMap.flag[ic] = DC_NORMAL;
-        }
-        else
-        {
-          // Face at least 30deg out of alignment; ignore it (probably perpendicular)
-        }
+//          if (myDot < 0)
+//            myFlag = DC_HOLE;
+//          else
+//            myFlag = DC_NORMAL;
+//        }
+//        else if (.866*adot > adot0)
+//        {
+//          // This one's at least 30deg closer; use it instead
+//          for (int d = 0; d < 3; d++)
+//            myNorm[d] = norm[d];
+//          myDist = dist;
+//          myDot = dot;
+
+//          if (dot < 0)
+//            myFlag = DC_HOLE;
+//          else
+//            myFlag = DC_NORMAL;
+//        }
+//        else if (adot >= .866*adot0)
+//        {
+//          // They're not that far apart; average them
+//          int N = nMin;
+//          for (int i = 0; i < 3; i++)
+//            norm[i] = myNorm[i]*adot0*N + norm[i]*adot;
+////          for (int d = 0; d < nDims; d++)
+////            norm[d] = (N*cutMap.norm[ic][d] + norm[d]) / (N + 1.);
+//          norm /= norm.norm();
+
+//          myDist = fmin(myDist, dist);
+//          for (int d = 0; d < 3; d++)
+//            myNorm[d] = norm[d];
+//          myDot = (adot0 > adot) ? dot0 : dot;
+//          nMin++;
+
+//          if (myDot < 0)
+//            myFlag = DC_HOLE;
+//          else
+//            myFlag = DC_NORMAL;
+//        }
+//        else
+//        {
+//          // Face at least 30deg out of alignment; ignore it (probably perpendicular)
+//        }
       }
     }
   }
+
+//  if (myFlag == DC_CUT)
+//    myFlag = (cutType == 1) ? DC_HOLE : DC_NORMAL;
+
+  cutFlag[ic] = myFlag;
 }
 
 //void dMeshBlock::directCut(dvec<double> &cutFaces, int nCut, int nvertf, dCutMap &cutMap, int cutType)
 void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFlag, int cutType)
 {
   // Setup cutMap TODO: create initialization elsewhere?
-  dCutMap cutMap;
-  cutMap.flag.resize(ncells);
-  cutMap.dist.resize(ncells);
-  cutMap.nMin.resize(ncells);
-  cutMap.norm.resize(nDims*ncells);
-  cutMap.dot.resize(ncells);
+  dvec<int> cutFlag_d;
+  cutFlag_d.resize(ncells);
 
   dvec<double> cutFaces;
   cutFaces.assign(cutFaces_h, nCut*nvertf*nDims);
@@ -668,7 +814,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFla
   switch(nvert)
   {
     case 8:
-      fillCutMap<3,8><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, nvertf, cutMap, cutType);
+      fillCutMap<3,8><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, nvertf, cutFlag_d.data(), cutType);
       break;
 //    case 27:
 //      fillCutMap<3,27><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, nvertf, cutMap, cutType);
@@ -687,5 +833,8 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFla
   cudaDeviceSynchronize();
   check_error();
 
-  cuda_copy_d2h(cutMap.flag.data(), cutFlag, ncells);
+  cuda_copy_d2h(cutFlag_d.data(), cutFlag, ncells);
+
+  cutFaces.free_data();
+  cutFlag_d.free_data();
 }

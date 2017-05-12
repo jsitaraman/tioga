@@ -11,8 +11,8 @@
 #ifndef DC_CUT
 #define DC_HOLE 0
 #define DC_UNASSIGNED 1
-#define DC_CUT 1
-#define DC_NORMAL 1
+#define DC_CUT 2
+#define DC_NORMAL 3
 #endif
 
 template<typename T>

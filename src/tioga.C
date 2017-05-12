@@ -492,7 +492,7 @@ void tioga::directCut(void)
   mb->unifyCutFlags(cutMap);
 
 //  if (gridType == 0)
-    mb->writeCellFile(mytag, cutMap.back()); /// DEBUGGING
+    mb->writeCellFile(mytag, cutMap[0]); /// DEBUGGING
 //  MPI_Barrier(scomm);
 //  exit(0); /// DEBUGGING
 }

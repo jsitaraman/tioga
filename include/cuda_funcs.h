@@ -292,7 +292,7 @@ void hvec<T>::free_data(void)
 struct dPoint
 {
 private:
-  double _v[3];
+  double _v[3] = {0.,0.,0.};
 
 public:
   __device__ dPoint(void) {}
@@ -420,11 +420,11 @@ public:
 
   __device__
   dPoint cross(dPoint b) {
-    dPoint v;
-    _v[0] = _v[1]*b[2] - _v[2]*b[1];
-    _v[1] = _v[2]*b[0] - _v[0]*b[2];
-    _v[2] = _v[0]*b[1] - _v[1]*b[0];
-    return v;
+    dPoint c;
+    c[0] = _v[1]*b[2] - _v[2]*b[1];
+    c[1] = _v[2]*b[0] - _v[0]*b[2];
+    c[2] = _v[0]*b[1] - _v[1]*b[0];
+    return c;
   }
 };
 
@@ -489,7 +489,8 @@ void adjoint_3x3(const double* __restrict__ mat, double* __restrict__ adj)
  * \return Value of Lagrange function at xi.
  */
 __device__ __forceinline__
-double Lagrange_gpu(double* xiGrid, unsigned int npts, double xi, unsigned int mode)
+double Lagrange_gpu(const double* __restrict__ xiGrid, unsigned int npts,
+                    double xi, unsigned int mode)
 {
   double val = 1.0;
 
@@ -513,7 +514,8 @@ double Lagrange_gpu(double* xiGrid, unsigned int npts, double xi, unsigned int m
  * \return Value of first derivative of the Lagrange function at xi.
  */
 __device__ __forceinline__
-double dLagrange_gpu(double* xiGrid, unsigned int npts, double xi, unsigned int mode)
+double dLagrange_gpu(const double* __restrict__ xiGrid, unsigned int npts,
+                     double xi, unsigned int mode)
 {
   double val = 0.0;
 
@@ -542,9 +544,9 @@ double dLagrange_gpu(double* xiGrid, unsigned int npts, double xi, unsigned int 
   return val/den;
 }
 
-template<int nDims>
-__device__
-void getBoundingBox(double *pts, int nPts, double *bbox)
+template<int nDims, int nPts>
+__device__ __forceinline__
+void getBoundingBox(const double* __restrict__ pts, double *bbox)
 {
   for (int i = 0; i < nDims; i++)
   {
@@ -564,7 +566,8 @@ void getBoundingBox(double *pts, int nPts, double *bbox)
 
 template<int nDims>
 __device__ __forceinline__
-bool boundingBoxCheck(double *bbox1, double *bbox2, double tol)
+bool boundingBoxCheck(const double* __restrict__ bbox1,
+                      const double* __restrict__ bbox2, double tol)
 {
   bool check = true;
   for (int i = 0; i < nDims; i++)
@@ -575,9 +578,9 @@ bool boundingBoxCheck(double *bbox1, double *bbox2, double tol)
   return check;
 }
 
-template<int nDims>
+template<int nDims, int nPts>
 __device__
-void getCentroid(double *pts, int nPts, double *xc)
+void getCentroid(const double* __restrict__ pts, double* __restrict__ xc)
 {
   for (int d = 0; d < nDims; d++)
     xc[d] = 0;

@@ -169,7 +169,7 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
   double tol = 1e-12*h;
 
   int iter = 0;
-  int iterMax = 10;
+  int iterMax = 8;
   double norm = 1;
   double norm_prev = 2;
 

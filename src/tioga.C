@@ -467,13 +467,15 @@ void tioga::directCut(void)
     if (gridIDs[p] == mytag) continue;
 
     cutTime.startTimer();
+    if (gridType != 0)
+    {
 #ifdef _GPU
-    mb->directCut_gpu(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
+      mb->directCut_gpu(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
 #else
-    mb->directCut(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
+      mb->directCut(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
 #endif
-    cutTime.stopTimer();
-    ncut++;
+      ncut++;
+    }
 
     if (gridType == 0)
     {
@@ -484,6 +486,7 @@ void tioga::directCut(void)
 #endif
       ncut++;
     }
+    cutTime.stopTimer();
   }
 
   cutTime.showTime(3);
@@ -492,7 +495,7 @@ void tioga::directCut(void)
   mb->unifyCutFlags(cutMap);
 
 //  if (gridType == 0)
-    mb->writeCellFile(mytag, cutMap[0]); /// DEBUGGING
+//    mb->writeCellFile(mytag, cutMap.back()); /// DEBUGGING
 //  MPI_Barrier(scomm);
 //  exit(0); /// DEBUGGING
 }

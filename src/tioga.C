@@ -272,6 +272,11 @@ void tioga::doHoleCutting(void)
   MPI_Barrier(MPI_COMM_WORLD);
 
   dcTime.showTime(3);
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  printf("\n");
+  MPI_Barrier(MPI_COMM_WORLD);
+
   tgTime.showTime(3);
 
 //  // Generate structured map of solid boundary (hole) locations

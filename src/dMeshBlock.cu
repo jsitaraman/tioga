@@ -244,7 +244,7 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*sgn(d01);
+          minVec[i] = N2[i]*(d01);
         dist = fabs(d01);
       }
     }
@@ -260,7 +260,7 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*sgn(d11);
+          minVec[i] = N2[i]*(d11);
         dist = fabs(d11);
       }
     }
@@ -276,7 +276,7 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*sgn(d21);
+          minVec[i] = N2[i]*(d21);
         dist = fabs(d21);
       }
     }
@@ -299,7 +299,7 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*sgn(d02);
+          minVec[i] = N1[i]*(d02);
         dist = fabs(d02);
       }
     }
@@ -315,7 +315,7 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*sgn(d12);
+          minVec[i] = N1[i]*(d12);
         dist = fabs(d12);
       }
     }
@@ -331,7 +331,7 @@ double triTriDistance(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*sgn(d22);
+          minVec[i] = N1[i]*(d22);
         dist = fabs(d22);
       }
     }
@@ -536,7 +536,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*sgn(d01);
+          minVec[i] = N2[i]*d01;
         dist = fabs(d01);
       }
     }
@@ -554,7 +554,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*sgn(d11);
+          minVec[i] = N2[i]*d11;
         dist = fabs(d11);
       }
     }
@@ -572,7 +572,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*sgn(d21);
+          minVec[i] = N2[i]*d21;
         dist = fabs(d21);
       }
     }
@@ -597,7 +597,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*sgn(d02);
+          minVec[i] = N1[i]*d02;
         dist = fabs(d02);
       }
     }
@@ -615,7 +615,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*sgn(d12);
+          minVec[i] = N1[i]*d12;
         dist = fabs(d12);
       }
     }
@@ -633,7 +633,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*sgn(d22);
+          minVec[i] = N1[i]*d22;
         dist = fabs(d22);
       }
     }
@@ -754,8 +754,8 @@ dPoint faceNormal(const double* xv)
 
 template<int nSideC, int nSideF>
 __device__
-dPoint intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
-    const double* __restrict__ exv)
+double intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
+    const double* __restrict__ exv, double* __restrict__ minVec)
 {
   /* --- Prerequisites --- */
 
@@ -772,9 +772,11 @@ dPoint intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
   double tol = 1e-9;
   double TC[9], TF[9];
   double minDist = BIG_DOUBLE;
-  double minVec[3] = {minDist,minDist,minDist};
-  double bboxC[6], bboxF[6];
+  minVec[0] = minDist;
+  minVec[1] = minDist;
+  minVec[2] = minDist;
 
+  double bboxC[6], bboxF[6];
   cuda_funcs::getBoundingBox<3,nvertf>(fxv, bboxF);
   cuda_funcs::getBoundingBox<3,nvert>(exv, bboxC);
 
@@ -789,7 +791,7 @@ dPoint intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
   {
     double rst[3];
     if (mb.getRefLoc<nSideC>(exv, bboxC, fxv, rst))
-      return dPoint(0., 0., 0.);
+      return 0.;
   }
 
   // 2) Check outer faces of element for intersection with face
@@ -879,7 +881,7 @@ dPoint intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
               double dist = triTriDistance2(TF, TC, vec, tol);
 
               if (dist < tol)
-                return dPoint(0.,0.,0);
+                return 0.;
 
               if (dist < minDist)
               {
@@ -896,14 +898,23 @@ dPoint intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
 
   if (minDist == BIG_DOUBLE) // Definitely no intersection; use centroids to get vector
   {
+    double tmp[3];
     cuda_funcs::getCentroid<3,nvert>(exv,minVec);
-    dPoint vec(minVec);
-    cuda_funcs::getCentroid<3,nvertf>(fxv,minVec);
-    return (vec - dPoint(minVec));
+    cuda_funcs::getCentroid<3,nvertf>(fxv,tmp);
+
+    minDist = 0;
+    for (int d = 0; d < 3; d++)
+    {
+      minVec[d] -= tmp[d];
+      minDist += minVec[d]*minVec[d];
+    }
+
+    return sqrt(minDist);
   }
 
-  return dPoint(minVec);
+  return minDist;
 }
+
 template<int nDims, int nSideC, int nSideF>
 __global__
 void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
@@ -942,6 +953,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
 
   // btol == 10 times the average side length of the cell's bounding box
   const double btol = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]); // / nDims * 10.
+  const double dtol = 1e-3*btol;
 
   int stride = nDims*nvertf;
 
@@ -957,8 +969,6 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     __syncthreads();
 
     if (myFlag == DC_CUT) continue;
-//    for (int i = 0; i < nDims*nvertf; i++)
-//      fxv[i] = cutFaces[ff*stride+i];
 
     /*if (mb.rrot)
       getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox, Rmat.data());
@@ -968,8 +978,8 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     if (myFlag != DC_CUT && cuda_funcs::boundingBoxCheck<nDims>(bboxC, bboxF, btol))
     {
       // Find distance from face to cell
-      dPoint vec = intersectionCheck<nSideC,nSideF>(mb, fxv, xv);
-      double dist = vec.norm();
+      dPoint vec;
+      double dist = intersectionCheck<nSideC,nSideF>(mb, fxv, xv, &vec[0]);
       vec /= dist;
 
       dPoint norm = faceNormal(fxv);
@@ -979,7 +989,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
         myFlag = DC_CUT;
         myDist = 0.;
       }
-      else if (myFlag == DC_UNASSIGNED || dist < (myDist - 1e-6))
+      else if (myFlag == DC_UNASSIGNED || dist < (myDist - dtol))
       {
         // Unflagged cell, or have a closer face to use
         if (cutType == 0) norm *= -1;
@@ -997,7 +1007,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
         else
           myFlag = DC_NORMAL;
       }
-      else if (fabs(dist - myDist) < 1e-3*btol)
+      else if (fabs(dist - myDist) <= dtol)
       {
         // Approx. same dist. to two faces; avg. their normals to decide
         if (cutType == 0) norm *= -1;
@@ -1014,19 +1024,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
           else
             myFlag = DC_NORMAL;
       }
-      else if (dist < myDist)
-      {
-        // This face is closer; use it
-        myDot = norm*vec;
-        myDist = dist;
-        for (int d = 0; d < 3; d++)
-          myNorm[d] = norm[d];
-
-        if (myDot < 0)
-          myFlag = DC_HOLE; // outwards normal = inside cutting surface
-        else
-          myFlag = DC_NORMAL;
-      }
+      // else dist > myDist, ignore
     }
   }
 

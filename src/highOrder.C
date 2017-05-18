@@ -350,14 +350,6 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
 
   for (int ff = 0; ff < nCut; ff++)
   {
-//    if (nvertf == 4 && cutType == 0)
-//    {
-//    printf("Face(:,:,%d) = [",ff);
-//    for (int i = 0; i < nvertf-1; i++)
-//      printf("%f,  %f,  %f;\n",cutFaces[ff*stride+3*i+0],cutFaces[ff*stride+3*i+1],cutFaces[ff*stride+3*i+2]);
-//    printf("%f,  %f,  %f];\n",cutFaces[ff*stride+3*(nvertf-1)+0],cutFaces[ff*stride+3*(nvertf-1)+1],cutFaces[ff*stride+3*(nvertf-1)+2]);
-//    }
-
     checked_cells.clear();
     boxCells.clear();
     std::queue<int> cellList;
@@ -407,19 +399,6 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
       for (int i = 0; i < nvert; i++)
         for (int d = 0; d < nDims; d++)
           xv[nDims*i+d] = x[nDims*vconn[0][ic*nvert+i]+d];
-
-//      if (ff == 1354 && nvertf == 4) cellList.push(54180);
-
-//      double xc[3];
-//      getCentroid(xv.data(), nvert, 3, xc);
-////      if (std::abs(xc[0] - .043397) < .005 && std::abs(xc[1]+.061428) < .005 && std::abs(xc[2] - .06621) < .005)
-//      if (ic == 35160 && nvertf == 4)
-//      {
-//        // ic = 54180
-//        printf("Face %d, cell %d\n",ff,ic);
-//        for (int i = 0; i < nvertf; i++)
-//          printf("%d  %f,  %f,  %f;\n",i,cutFaces[ff*stride+3*i+0],cutFaces[ff*stride+3*i+1],cutFaces[ff*stride+3*i+2]);
-//      }
 
       // Find distance from face to cell
       Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, ic); /// ic --> DEBUGGING
@@ -471,11 +450,6 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
         double dot0 = cutMap.dot[ic];
         double adot0 = std::abs(dot0);
 
-//        if (ic == 35160 && nvertf == 4)
-//        {
-//          printf("Face %d, cell %d, Flag %d, new dist %.4e, new dot %f\n",ff,ic,cutMap.flag[ic],dist,dot);
-//        }
-
         if (dist < .9*cutMap.dist[ic] && adot > adot0)
         {
           // Clearly better; use it
@@ -521,9 +495,6 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
         }
         else if (adot >= .866*adot0)
         {
-//          if (ic == 35160 && nvertf == 4)
-//            printf("dot0 %f, dot %f; merging vectors\n",dot0,dot);
-
           // They're not that far apart; average them
           int N = cutMap.nMin[ic];
           norm = cutMap.norm[ic]*adot0*N + norm*adot;
@@ -546,9 +517,6 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
           // Face at least 30deg out of alignment; ignore it (probably perpendicular)
         }
       }
-
-//      if (ic == 35160 && nvertf == 4)
-//        printf("Face %d, cell %d, Flag %d, dist %.4e, dot %f\n",ff,ic,cutMap.flag[ic],cutMap.dist[ic],cutMap.dot[ic]);
 
       paintQueue.insert(ic);
     }
@@ -603,7 +571,6 @@ void MeshBlock::directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvert
 
 void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
 {
-  int nhole = 0; /// DEBUGGING
   for (int ic = 0; ic < ncells; ic++)
   {
     iblank_cell[ic] = NORMAL;
@@ -614,12 +581,10 @@ void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
       if (cutMap[g].flag[ic] == DC_HOLE)
       {
         iblank_cell[ic] = HOLE;
-        nhole++;
         break;
       }
     }
   }
-  printf("Rank %d: nHole = %d\n",myid,nhole);
 }
 
 int get_cell_type(int* nc, int ntypes, int ic_in)

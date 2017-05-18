@@ -75,6 +75,11 @@ public:
   bool rrot = false;
   dvec<double> Rmat, offset;
 
+  /* ------ Direct Cut Variables ------ */
+
+  hvec<int> cutFlag_h;
+  dvec<int> cutFlag_d;
+
   /* ------ Member Functions ------ */
 
   dMeshBlock() { }
@@ -95,10 +100,6 @@ public:
   void checkContainment(int adtEle, int& cellID, const double* __restrict__ bbox,
       const double* __restrict__ xsearch, double* __restrict__ rst);
 
-//  template<int ndim, int nside>
-//  __device__
-//  void checkPtInEle(const double* __restrict__ exv, const double* __restrict__ bbox,
-//                    const double* __restrict__ xsearch);
   template<int nSide>
   __device__ __forceinline__
   void calcDShape(double* __restrict__ shape,

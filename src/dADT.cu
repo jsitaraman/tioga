@@ -13,7 +13,6 @@ dADT::~dADT()
 
 void dADT::clearData(void)
 {
-printf("Hey! You shouldn't be clearing my data!\n"); /// DEBUGGING
   adtInts.free_data();
   adtReals.free_data();
   adtBBox.free_data();
@@ -27,7 +26,7 @@ void dADT::copyADT(ADT *adt)
   adtInts.assign(adt->adtIntegers, nelem*4);
   adtReals.assign(adt->adtReals, nelem*ndim);
   adtBBox.assign(adt->adtExtents, ndim);
-  //coord.assign(adt->coord, ndim*nelem);
+  coord.assign(adt->coord, ndim*nelem);
   rrot = adt->rrot;
   if (rrot)
   {

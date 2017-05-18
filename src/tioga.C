@@ -472,7 +472,7 @@ void tioga::directCut(void)
     if (gridIDs[p] == mytag) continue;
 
     cutTime.startTimer();
-    if (gridType != 0)
+    if (gridType != 0 && nHoleFace_p[p] > 0)
     {
 #ifdef _GPU
       mb->directCut_gpu(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
@@ -482,7 +482,7 @@ void tioga::directCut(void)
       ncut++;
     }
 
-    if (gridType == 0)
+    if (gridType == 0 && nOverFace_p[p] > 0)
     {
 #ifdef _GPU
       mb->directCut_gpu(faceNodesO_g[p], nOverFace_p[p], nvertf_p[p], cutMap[ncut], 0);
@@ -500,148 +500,10 @@ void tioga::directCut(void)
   mb->unifyCutFlags(cutMap);
 
 //  if (gridType == 0)
-//    mb->writeCellFile(mytag, cutMap.back()); /// DEBUGGING
+//    mb->writeCellFile(myid, cutMap.back()); /// DEBUGGING
 //  MPI_Barrier(scomm);
 //  exit(0); /// DEBUGGING
 }
-
-//{
-//  /* --- Direct Cut Method [copied from highOrder.C] --- */
-//  int nDims = 3; /// TODO: add to MB.h ...
-
-//  /// TODO: pre-process groups on this rank vs. groups on ALL ranks/grids
-//  int maxID = 0;
-//  for (int g = 0; g < nGroups; g++)
-//    maxID = max(maxID, groupIDs[g]);
-
-//  int nGroups_glob = maxID;
-//  MPI_Allreduce(&maxId, &nGroups_glob, 1, MPI_INT, MPI_MAX, scomm);
-
-//  // Full list of group types, and list of group IDs for each grid
-//  std::vector<int> cutType_glob(nGroups_glob, -1);
-//  std::vector<int> gridGroups(nGrids*nGroups_glob);
-//  std::unordered_set<int> myGroups;
-
-//  for (int g = 0; g < nGroups; g++)
-//  {
-//    int G = groupIDs[g];
-//    cutType_glob[G] = cutType[g];
-//    gridGroups[gridID*nGroups_glob+G] = 1;
-//    myGroups.insert(G);
-//  }
-
-//  MPI_Allreduce(&cutType_glob[0], MPI_IN_PLACE, nGroups_glob, MPI_INT, MPI_MAX, scomm);
-//  MPI_Allreduce(&gridGroups[0], MPI_IN_PLACE, nGrids*nGroups_glob, MPI_INT, MPI_MAX, scomm);
-
-//  // Get the number of face nodes for each grid
-//  for (int g = 0; g < nGroups; g++)
-//  {
-//    if (meshRank == 0 && myGroups.count(g))
-//    {
-
-//    }
-//    else
-//    {
-
-//    }
-//  }
-//  std::vector<int> nvertf(numprocs);
-//  MPI_Allgather(&mb->nfv[0], 1, MPI_INT, nvertf.data(), 1, MPI_INT, scomm);
-
-//  // Get cutting-group bounding-box data for this rank
-//  std::vector<double> cutBox(6*nGroups_glob);
-//  std::vector<std::vector<double>> faceBox(nGroups);
-//  std::vector<std::vector<double>> faceNodes(nGroups);
-
-//  mb->getCutGroupBoxes(cutBox, faceBox, nGroups_glob);
-//  mb->getCutGroupFaces(faceNodes, nGroups_glob);
-
-//  // Get the global bounding box info across all the partitions for all meshes
-//  std::vector<double> cutBox_global(6*nGroups_glob);
-//  for (int G = 0; G < nGroups_glob; G++)
-//  {
-//    MPI_Allreduce(&cutBox[6*G],  &cutBox_global[6*G],  3,MPI_DOUBLE,MPI_MIN,scomm);
-//    MPI_Allreduce(&cutBox[6*G+3],&cutBox_global[6*G+3],3,MPI_DOUBLE,MPI_MAX,scomm);
-//  }
-
-//  // Figure out which cutting groups overlap with this rank
-//  // [use rank-local OBB?]
-//  // send/recv facebox data to/from ranks that need it
-//  std::vector<std::unordered_set<int>> cellList(nGroups_glob);
-//  mb->getDirectCutCells(cellList, cutBox_global, nGroups_global);
-
-//  std::vector<int> nGFaces(nGroups_glob);
-//  for (int g = 0; g < nGroups; g++)
-//  {
-//    nGFaces[groupIDs[g]] = nGf[g];
-//  }
-
-//  // Send all face box  data to all ranks?
-//  std::vector<std::vector<int>> nFaces_glob(nGroups_glob);
-//  std::vector<std::vector<double>> faceBox_glob(nGroups_glob);
-//  std::vector<std::vector<double>> faceNodes_glob(nGroups_glob);
-//  for (int G = 0; G < nGroups_glob; G++)
-//  {
-//    nFaces_glob[G].resize(numprocs);
-//    MPI_Allgather(&nGFaces[G], 1, MPI_INT, &nFaces_glob[G][0], 1, MPI_INT, scomm);
-
-//    std::vector<int> recvCnts(numprocs), recvCntsN(numprocs);
-//    std::vector<int> recvDisp(numprocs), recvDispN(numprocs);
-//    int nface_glob = 0;
-//    for (int p = 0; p < numprocs; p++)
-//    {
-//      recvCnts[p] = nFaces_glob[G][p]*6;
-//      recvDisp[p] += (p>0) ? nFaces_glob[G][p-1]*6 : 0;
-
-//      recvCntsN[p] = nFaces_glob[G][p]*nDims*nvertf[p];
-//      recvDispN[p] += (p>0) ? nFaces_glob[G][p-1]*nDims*nvertf[p] : 0;
-//      nface_glob += nFaces_glob[G][p];
-//    }
-
-//    faceBox_glob[G].resize(nface_glob*6);
-//    faceNodes_glob[G].resize(nface_glob*6);
-//    MPI_Allgatherv(&faceBox[G][0], nGFces[G], MPI_DOUBLE, &faceBox_glob[G][0], recvCnts.data(), recvDisp.data(), MPI_DOUBLE, scomm);
-//  }
-
-//  /// first try
-////  // use 'PC' object to send/recv faceBox data to correct ranks
-////  // Ranks for which cellList[G] != 0 must send data
-////  int nsend = 0;
-////  int nrecv = 0;
-////  std::vector<int> sendMap, sendInts, recvMap, recvGroups;
-////  for (int p = 0; p < numprocs; p++)
-////  {
-////    if (p == rank) continue;
-
-////    int grid = gridIds[p];
-////    for (int G = 0; G < nGroups_glob; G++)
-////    {
-////      if (gridGroups[grid*nGroups_glob+G]) // && cellList[G].size() > 0)
-////      {
-////        nrecv++;
-////        nsend++;
-////        recvMap.push_back(p);
-////        recvGroups.push_back(G);
-////        sendMap.push_back(p);
-////        sendInts.push_back(cellList[G].size());
-////      }
-////    }
-////  }
-  
-//  // Do the cutting
-//  for (int G = 0; G < nGroups_glob; G++)
-//  {
-//    mb->directCut(faceBox_glob[G]);
-
-//  }
-
-
-//  mb->getBoundaryNodes();  //! Get all AB face point locations
-//  exchangePointSearchData();
-//  mb->search();
-//  mb->processPointDonors();
-//  iorphanPrint=1;
-//}
 
 void tioga::performConnectivityAMR(void)
 {

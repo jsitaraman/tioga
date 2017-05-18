@@ -578,6 +578,26 @@ bool boundingBoxCheck(const double* __restrict__ bbox1,
   return check;
 }
 
+template<int nDims>
+__device__ __forceinline__
+double boundingBoxDist(const double* __restrict__ bbox1,
+                       const double* __restrict__ bbox2)
+{
+  bool check = true;
+  double dist =  BIG_DOUBLE;
+  for (int i = 0; i < nDims; i++)
+  {
+    dist = fmin(fabs(bbox2[i] - bbox1[i+nDims]), dist);
+    check = check && (bbox1[i+nDims] >= bbox2[i]);
+    check = check && (bbox2[i+nDims] >= bbox1[i]);
+  }
+
+  if (check)
+    return 0;
+  else
+    return dist;
+}
+
 template<int nDims, int nPts>
 __device__
 void getCentroid(const double* __restrict__ pts, double* __restrict__ xc)

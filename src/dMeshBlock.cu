@@ -3,6 +3,8 @@
 
 /* --- Handy Vector Operation Macros --- */
 
+#define NF 3 // 3-6 depending on unstructured-ness of grid & desire for robustness
+
 #define CROSS(a, b, c) { \
   c[0] = a[1]*b[2] - a[2]*b[1]; \
   c[1] = a[2]*b[0] - a[0]*b[2]; \
@@ -129,7 +131,7 @@ double lineSegmentDistance(double *p1, double *p2, double *p3, double *p4, doubl
 
   // vec = closest distance from segment 1 to segment 2
   for (int i = 0; i < 3; i++)
-    dx[i] = (p3[i] + t*V[i]) - (p1[i] + s*U[i]);
+    dx[i] = t*V[i] - s*U[i] - W[i];
 
   double dist = 0;
   for (int i = 0; i < 3; i++)
@@ -141,286 +143,6 @@ double lineSegmentDistance(double *p1, double *p2, double *p3, double *p4, doubl
 /*! Modified Moller triangle-triangle intersection algorithm
  *  Determines if triangles intersect, or returns an approximate minimum
  *  distance between them otherwise */
-static
-__device__
-double triTriDistance(double* T1, double* T2, double* minVec, double tol)
-{
-  double dist = 1e15;
-  double vec[3];
-  for (int i = 0; i < 3; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
-      int i2 = (i+1) % 3;
-      int j2 = (j+1) % 3;
-      double D = lineSegmentDistance(&T1[3*i], &T1[3*i2], &T2[3*j], &T2[3*j2], vec);
-
-      if (D < dist)
-      {
-        for (int d = 0; d < 3; d++)
-          minVec[d] = vec[d];
-        dist = D;
-      }
-    }
-  }
-
-  if (dist < tol) return 0.;
-
-  /// TODO: optimize (no use of point class)
-  // Compute pi2 - N2 * X + d2 = 0
-  dPoint V01 = dPoint(T1);
-  dPoint V11 = dPoint(T1+3);
-  dPoint V21 = dPoint(T1+6);
-
-  dPoint V02 = dPoint(T2);
-  dPoint V12 = dPoint(T2+3);
-  dPoint V22 = dPoint(T2+6);
-
-  dPoint N2 = (V12-V02).cross(V22-V02); // Plane 2
-  N2 /= N2.norm();
-  double d2 = -(N2*V02);
-
-  dPoint N1 = (V11-V01).cross(V21-V01); // Plane 1
-  N1 /= N1.norm();
-  double d1 = -(N1*V01);
-
-  // Signed distances of T1 points to T2's plane
-  double d01 = N2*V01 + d2;
-  double d11 = N2*V11 + d2;
-  double d21 = N2*V21 + d2;
-
-  // Signed distances of T2 points to T1's plane
-  double d02 = N1*V02 + d1;
-  double d12 = N1*V12 + d1;
-  double d22 = N1*V22 + d1;
-
-  // Round values near 0 to 0
-  d01 = (fabs(d01) < 1e-10) ? 0 : d01;
-  d11 = (fabs(d11) < 1e-10) ? 0 : d11;
-  d21 = (fabs(d21) < 1e-10) ? 0 : d21;
-
-  d02 = (fabs(d02) < 1e-10) ? 0 : d02;
-  d12 = (fabs(d12) < 1e-10) ? 0 : d12;
-  d22 = (fabs(d22) < 1e-10) ? 0 : d22;
-
-  if (fabs(d01) + fabs(d11) + fabs(d21) < 3*tol ||
-      fabs(d02) + fabs(d12) + fabs(d22) < 3*tol)
-  {
-    /* Approximately coplanar; check if one triangle is inside the other */
-
-    // Check if a point in T1 is inside T2
-    bool inside = true;
-    inside = inside && N2*((V12-V02).cross(V01-V02)) > 0;
-    inside = inside && N2*((V02-V22).cross(V01-V22)) > 0;
-    inside = inside && N2*((V22-V12).cross(V01-V12)) > 0;
-
-    if (inside) return 0.;
-
-    // Check if a point in T2 is inside T1
-    inside = true;
-    inside = inside && N1*((V11-V01).cross(V02-V01)) > 0;
-    inside = inside && N1*((V01-V21).cross(V02-V21)) > 0;
-    inside = inside && N1*((V21-V11).cross(V02-V11)) > 0;
-
-    if (inside) return 0.;
-  }
-
-  bool noTouch = false;
-
-  // Check for intersection with plane - one point should have opposite sign
-  if (sgn(d01) == sgn(d11) && sgn(d01) == sgn(d21)) // && fabs(d01) > tol)
-  {
-    noTouch = true;
-
-    // No intersection; check if projection of points provides closer distance
-    if (fabs(d01) < dist)
-    {
-      dPoint P01 = V01 - N2*d01;
-      bool inside = true;
-      inside = inside && N2*((V12-V02).cross(P01-V02)) > 0;
-      inside = inside && N2*((V02-V22).cross(P01-V22)) > 0;
-      inside = inside && N2*((V22-V12).cross(P01-V12)) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*(d01);
-        dist = fabs(d01);
-      }
-    }
-
-    if (fabs(d11) < dist)
-    {
-      dPoint P11 = V11 - N2*d11;
-      bool inside = true;
-      inside = inside && N2*((V12-V02).cross(P11-V02)) > 0;
-      inside = inside && N2*((V02-V22).cross(P11-V22)) > 0;
-      inside = inside && N2*((V22-V12).cross(P11-V12)) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*(d11);
-        dist = fabs(d11);
-      }
-    }
-
-    if (fabs(d21) < dist)
-    {
-      dPoint P21 = V21 - N2*d21;
-      bool inside = true;
-      inside = inside && N2*((V12-V02).cross(P21-V02)) > 0;
-      inside = inside && N2*((V02-V22).cross(P21-V22)) > 0;
-      inside = inside && N2*((V22-V12).cross(P21-V12)) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*(d21);
-        dist = fabs(d21);
-      }
-    }
-  }
-
-  // Check for intersection with plane - one point should have opposite sign
-  if (sgn(d02) == sgn(d12) && sgn(d02) == sgn(d22)) // && fabs(d02) > tol)
-  {
-    noTouch = true;
-
-    // No intersection; check if projection of points provides closer distance
-    if (fabs(d02) < dist)
-    {
-      dPoint P02 = V02 - N1*d02;
-      bool inside = true;
-      inside = inside && N1*((V11-V01).cross(P02-V01)) > 0;
-      inside = inside && N1*((V01-V21).cross(P02-V21)) > 0;
-      inside = inside && N1*((V21-V11).cross(P02-V11)) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*(d02);
-        dist = fabs(d02);
-      }
-    }
-
-    if (fabs(d12) < dist)
-    {
-      dPoint P12 = V12 - N1*d12;
-      bool inside = true;
-      inside = inside && N1*((V11-V01).cross(P12-V01)) > 0;
-      inside = inside && N1*((V01-V21).cross(P12-V21)) > 0;
-      inside = inside && N1*((V21-V11).cross(P12-V11)) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*(d12);
-        dist = fabs(d12);
-      }
-    }
-
-    if (fabs(d22) < dist)
-    {
-      dPoint P22 = V22 - N1*d22;
-      bool inside = true;
-      inside = inside && N1*((V11-V01).cross(P22-V01)) > 0;
-      inside = inside && N1*((V01-V21).cross(P22-V21)) > 0;
-      inside = inside && N1*((V21-V11).cross(P22-V11)) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*(d22);
-        dist = fabs(d22);
-      }
-    }
-  }
-
-  // No intersection; return result from edge intersections & plane projections
-  if (noTouch)
-    return dist;
-
-  // Compute intersection line
-  dPoint L = N1.cross(N2);
-  L /= L.norm();
-
-  double p0 = L*V01;
-  double p1 = L*V11;
-  double p2 = L*V21;
-
-  double q0 = L*V02;
-  double q1 = L*V12;
-  double q2 = L*V22;
-
-  // Figure out which point of each triangle is opposite the other two
-  int npt1 = (sgn(d01) != sgn(d11)) ? ( (sgn(d11) == sgn(d21)) ? 0 : 1 ) : 2;
-  int npt2 = (sgn(d02) != sgn(d12)) ? ( (sgn(d12) == sgn(d22)) ? 0 : 1 ) : 2;
-
-  double s1, s2;
-  switch (npt1)
-  {
-    case 0:
-      s1 = p1 + (p0-p1) * (d11 / (d11-d01));
-      s2 = p2 + (p0-p2) * (d21 / (d21-d01));
-      break;
-    case 1:
-      s1 = p0 + (p1-p0) * (d01 / (d01-d11));
-      s2 = p2 + (p1-p2) * (d21 / (d21-d11));
-      break;
-    case 2:
-      s1 = p0 + (p2-p0) * (d01 / (d01-d21));
-      s2 = p1 + (p2-p1) * (d11 / (d11-d21));
-      break;
-  }
-
-  double t1, t2;
-  switch (npt2)
-  {
-    case 0:
-      t1 = q1 + (q0-q1) * (d12 / (d12-d02));
-      t2 = q2 + (q0-q2) * (d22 / (d22-d02));
-      break;
-    case 1:
-      t1 = q0 + (q1-q0) * (d02 / (d02-d12));
-      t2 = q2 + (q1-q2) * (d22 / (d22-d12));
-      break;
-    case 2:
-      t1 = q0 + (q2-q0) * (d02 / (d02-d22));
-      t2 = q1 + (q2-q1) * (d12 / (d12-d22));
-      break;
-  }
-
-  s1 = (fabs(s1) < 1e-10) ? 0 : s1;
-  s2 = (fabs(s2) < 1e-10) ? 0 : s2;
-  t1 = (fabs(t1) < 1e-10) ? 0 : t1;
-  t2 = (fabs(t2) < 1e-10) ? 0 : t2;
-
-  if (s1 > s2)
-    swap(s1,s2);
-
-  if (t1 > t2)
-    swap(t1,t2);
-
-  if (s2 < t1 || t2 < s1)
-  {
-    // No overlap; return min of dt*L and minDist
-    double dt = fmin(fabs(t1-s2), fabs(s1-t2));
-    double dl = (L*dt).norm();
-
-    if (dl < dist)
-    {
-      dist = dl;
-      for (int i = 0; i < 3; i++)
-        minVec[i] = sgn(t1-s2)*dt*L[i]; // Ensure vec is T1 -> T2
-    }
-
-    return dist;
-  }
-
-  return 0.;
-}
-
 static
 __device__
 double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
@@ -536,7 +258,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*d01;
+          minVec[i] = -N2[i]*d01; // Vector from T1 to T2
         dist = fabs(d01);
       }
     }
@@ -554,7 +276,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*d11;
+          minVec[i] = -N2[i]*d11;
         dist = fabs(d11);
       }
     }
@@ -572,7 +294,7 @@ double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
       if (inside)
       {
         for (int i = 0; i < 3; i++)
-          minVec[i] = N2[i]*d21;
+          minVec[i] = -N2[i]*d21;
         dist = fabs(d21);
       }
     }
@@ -853,7 +575,7 @@ double intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
         }
 
         cuda_funcs::getBoundingBox<3,3>(TC, bboxC);
-        double btol = .05*(bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]);
+        double btol = .1*(bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]);
         btol = fmin(btol, minDist);
         if (!cuda_funcs::boundingBoxCheck<3>(bboxC,bboxF,btol)) continue;
 
@@ -896,14 +618,15 @@ double intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
     }
   }
 
-  if (minDist == BIG_DOUBLE) // Definitely no intersection; use centroids to get vector
+  // 3) Definitely no intersection; use centroids to get vector
+  if (minDist == BIG_DOUBLE)
   {
     double tmp[3];
     cuda_funcs::getCentroid<3,nvert>(exv,minVec);
     cuda_funcs::getCentroid<3,nvertf>(fxv,tmp);
 
     minDist = 0;
-    for (int d = 0; d < 3; d++)
+    for (int d = 0; d < 3; d++) // Vector is face -> cell
     {
       minVec[d] -= tmp[d];
       minDist += minVec[d]*minVec[d];
@@ -923,113 +646,150 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
   int ic = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (ic >= mb.ncells) return;
-//  if (ic >= 1) return;
 
   // Figure out how many threads are left in this block after ic>ncells returns
   int blockSize = min(blockDim.x, mb.ncells - blockIdx.x * blockDim.x);
 
   const int nvert = nSideC*nSideC*nSideC;
   const int nvertf = nSideF*nSideF;
-
-  int myFlag = DC_UNASSIGNED;
-  double myDist = BIG_DOUBLE;
-  double myNorm[3] = {0., 0., 0.};
-  double myDot;
-  double nMin = 0;
-
-  double xv[nDims*nvert];
-  __shared__ double fxv[nDims*nvertf];
+  const int stride = nDims*nvertf;
 
   // Load up the cell nodes into an array
+  double xv[nDims*nvert];
   for (int i = 0; i < nvert; i++)
-  {
     for (int d = 0; d < nDims; d++)
       xv[nDims*i+d] = mb.coord[ic+mb.ncells*(d+nDims*i)]; /// NOTE: 'row-major' ZEFR layout
-  }
 
-  double bboxC[2*nDims], bboxF[2*nDims];
-
+  double bboxC[2*nDims];
+  double xcC[3], xcF[3];
   cuda_funcs::getBoundingBox<nDims,nvert>(xv, bboxC);
+  cuda_funcs::getCentroid<nDims,nvert>(xv,xcC);
 
-  // btol == 10 times the average side length of the cell's bounding box
-  const double btol = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]); // / nDims * 10.
-  const double dtol = 1e-3*btol;
+  const double href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
+  const double dtol = 1e-3*href;
 
-  int stride = nDims*nvertf;
+  /* --- Pass 1: Coarse-Grained Distance Calculation Using Centroids --- */
+
+  double distList[NF];
+  int faceList[NF];
+  __shared__ double fxv_s[nDims*4];
+
+  for (int i = 0; i < NF; i++)
+  {
+    distList[i] = BIG_DOUBLE;
+    faceList[i] = -1;
+  }
 
   for (int ff = 0; ff < nCut; ff++)
   {
     __syncthreads();
 
-    for (int i = threadIdx.x; i < stride; i += blockSize)
-    {
-      fxv[i] = cutFaces[ff*stride+i];
-    }
+    for (int i = threadIdx.x; i < 12; i += blockSize)
+      fxv_s[i] = cutFaces[ff*stride+i];
 
     __syncthreads();
 
-    if (myFlag == DC_CUT) continue;
+    cuda_funcs::getCentroid<nDims,4>(fxv_s,xcF);
 
-    /*if (mb.rrot)
-      getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox, Rmat.data());
-    else*/
-    cuda_funcs::getBoundingBox<nDims,nvertf>(fxv, bboxF);
+    double dist2 = 0.;
+    for (int d = 0; d < 3; d++)
+      dist2 += (xcC[d] - xcF[d]) * (xcC[d] - xcF[d]);
 
-    if (myFlag != DC_CUT && cuda_funcs::boundingBoxCheck<nDims>(bboxC, bboxF, btol))
+    if (dist2 < distList[NF-1]) // Closer than the worst in our list, at least
     {
-      // Find distance from face to cell
-      dPoint vec;
-      double dist = intersectionCheck<nSideC,nSideF>(mb, fxv, xv, &vec[0]);
-      vec /= dist;
-
-      dPoint norm = faceNormal(fxv);
-
-      if (dist < 1e-8*btol) // They intersect
+      // Insert and sort
+      distList[NF-1] = dist2;
+      faceList[NF-1] = ff;
+      int ind = NF-1;
+      while (distList[ind] < distList[ind-1] && ind > 0)
       {
-        myFlag = DC_CUT;
-        myDist = 0.;
+        swap(distList[ind], distList[ind-1]);
+        swap(faceList[ind], faceList[ind-1]);
+        ind--;
       }
-      else if (myFlag == DC_UNASSIGNED || dist < (myDist - dtol))
-      {
-        // Unflagged cell, or have a closer face to use
-        if (cutType == 0) norm *= -1;
-
-        double dot = norm*vec;
-
-        myDist = dist;
-        for (int d = 0; d < 3; d++)
-          myNorm[d] = norm[d];
-        myDot = dot;
-        nMin = 1;
-
-        if (dot < 0) /// TODO: decide on standard orientation
-          myFlag = DC_HOLE; // outwards normal = inside cutting surface
-        else
-          myFlag = DC_NORMAL;
-      }
-      else if (fabs(dist - myDist) <= dtol)
-      {
-        // Approx. same dist. to two faces; avg. their normals to decide
-        if (cutType == 0) norm *= -1;
-
-          myDist = dist;
-          for (int d = 0; d < 3; d++)
-            myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
-          nMin++;
-
-          myDot = norm*vec;
-
-          if (myDot < 0)
-            myFlag = DC_HOLE; // outwards normal = inside cutting surface
-          else
-            myFlag = DC_NORMAL;
-      }
-      // else dist > myDist, ignore
     }
   }
 
-//  if (myFlag == DC_CUT)
-//    myFlag = (cutType == 1) ? DC_HOLE : DC_NORMAL;
+  /* --- Pass 2: More-Accurate Distace Calculate Using Triangles --- */
+
+  double fxv[nDims*nvertf];
+  double myNorm[3] = {0., 0., 0.};
+  double myDist = BIG_DOUBLE;
+  int myFlag = DC_UNASSIGNED;
+  int nMin = 0;
+
+  for (int F = 0; F < NF; F++)
+  {
+    if (myFlag == DC_CUT) continue;
+
+    int ff = faceList[F];
+    if (ff < 0)
+      continue;
+
+    // Load face vertices
+    for (int i = 0; i < stride; i++)
+      fxv[i] = cutFaces[ff*stride+i];
+
+    // Find distance from face to cell
+    dPoint vec;
+    double dist = intersectionCheck<nSideC,nSideF>(mb, fxv, xv, &vec[0]);
+    vec /= vec.norm();
+
+    dPoint norm = faceNormal(fxv);
+    if (cutType == 0) norm *= -1;
+
+    if (dist < 1e-8*href) // They intersect
+    {
+      myFlag = DC_CUT;
+      myDist = 0.;
+    }
+    else if (myFlag == DC_UNASSIGNED || dist < (myDist - dtol))
+    {
+      // Unflagged cell, or have a closer face to use
+      double dot = norm*vec;
+
+      myDist = dist;
+      for (int d = 0; d < 3; d++)
+        myNorm[d] = norm[d];
+
+      nMin = 1;
+
+      if (dot < 0)
+        myFlag = DC_HOLE; // outwards normal = inside cutting surface
+      else
+        myFlag = DC_NORMAL;
+    }
+    else if (fabs(dist - myDist) <= dtol)
+    {
+      // Approx. same dist. to two faces; avg. their normals to decide
+      myDist = dist;
+      for (int d = 0; d < 3; d++)
+        myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
+      nMin++;
+
+      //myDot = norm*vec;
+      double dot = 0.;
+      for (int d = 0; d < 3; d++)
+        dot += myNorm[d]*vec[d];
+
+      if (dot < 0)
+        myFlag = DC_HOLE; // outwards normal = inside cutting surface
+      else
+        myFlag = DC_NORMAL;
+    }
+    else if (myDist > 5*href)
+    {
+      // Clearly far from surface; cut our losses & return with what we have
+      break;
+    }
+    else
+    {
+      // dist > myDist, ignore
+    }
+  }
+
+  if (myFlag == DC_CUT)
+    myFlag = (cutType == 1) ? DC_HOLE : DC_NORMAL;
 
   cutFlag[ic] = myFlag;
 }
@@ -1038,7 +798,6 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
 void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFlag, int cutType)
 {
   // Setup cutMap TODO: create initialization elsewhere?
-  dvec<int> cutFlag_d;
   cutFlag_d.resize(ncells);
 
   dvec<double> cutFaces;
@@ -1047,7 +806,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFla
   int threads = 32;
   int blocks = (ncells + threads - 1) / threads;
 
-  int nbShare = sizeof(double)*nvertf*nDims;
+  int nbShare = sizeof(double)*4*nDims;
 
   if (ijk2gmsh_quad.size() != nvertf)
   {
@@ -1063,80 +822,83 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFla
         case 8:
           fillCutMap<3,2,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
           break;
-//        case 27:
-//          fillCutMap<3,3,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
+        case 27:
+          fillCutMap<3,3,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
         case 64:
           fillCutMap<3,4,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
           break;
-//        case 125:
-//          fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
+        case 125:
+          fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
         default:
           printf("nvert = %d\n",nvert);
           ThrowException("nvert case not implemented for directCut on device");
       }
       break;
-//    case 9:
-//      switch(nvert)
-//      {
-//        case 8:
-//          fillCutMap<3,2,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        case 27:
-//          fillCutMap<3,3,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        case 64:
-//          fillCutMap<3,4,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        case 125:
-//          fillCutMap<3,5,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        default:
-//          printf("nvert = %d\n",nvert);
-//          ThrowException("nvert case not implemented for directCut on device");
-//      }
-//      break;
+    case 9:
+      switch(nvert)
+      {
+        case 8:
+          fillCutMap<3,2,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        case 27:
+          fillCutMap<3,3,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        case 64:
+          fillCutMap<3,4,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        case 125:
+          fillCutMap<3,5,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        default:
+          printf("nvert = %d\n",nvert);
+          ThrowException("nvert case not implemented for directCut on device");
+      }
+      break;
     case 16:
       switch(nvert)
       {
         case 8:
           fillCutMap<3,2,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
           break;
-//        case 27:
-//          fillCutMap<3,3,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
+        case 27:
+          fillCutMap<3,3,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
         case 64:
           fillCutMap<3,4,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
           break;
-//        case 125:
-//          fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
+        case 125:
+          fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
         default:
           printf("nvert = %d\n",nvert);
           ThrowException("nvert case not implemented for directCut on device");
       }
       break;
-//    case 25:
-//      switch(nvert)
-//      {
-//        case 8:
-//          fillCutMap<3,2,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        case 27:
-//          fillCutMap<3,3,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        case 64:
-//          fillCutMap<3,4,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        case 125:
-//          fillCutMap<3,5,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-//          break;
-//        default:
-//          printf("nvert = %d\n",nvert);
-//          ThrowException("nvert case not implemented for directCut on device");
-//      }
-//      break;
+    case 25:
+      switch(nvert)
+      {
+        case 8:
+          fillCutMap<3,2,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        case 27:
+          fillCutMap<3,3,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        case 64:
+          fillCutMap<3,4,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        case 125:
+          fillCutMap<3,5,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
+          break;
+        default:
+          printf("nvert = %d\n",nvert);
+          ThrowException("nvert case not implemented for directCut on device");
+      }
+      break;
+    default:
+      printf("nvertFace = %d\n",nvertf);
+      ThrowException("nvertFace case not implemented for directCut on device");
   }
 
   check_error();
@@ -1144,5 +906,4 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFla
   cuda_copy_d2h(cutFlag_d.data(), cutFlag, ncells);
 
   cutFaces.free_data();
-  cutFlag_d.free_data();
 }

@@ -1,6 +1,9 @@
 #include "dMeshBlock.h"
 #include "funcs.hpp"
 
+#include "device_functions.h"
+#include "math.h"
+
 /* --- Handy Vector Operation Macros --- */
 
 #define NF 3 // 3-6 depending on unstructured-ness of grid & desire for robustness
@@ -28,6 +31,34 @@ double DOTCROSS4(const double* __restrict__ c,
   double d[3];
   CROSS4(a1,a2,b1,b2,d)
   return DOT(c,d);
+}
+
+/* --- Misc. Helpful CUDA kernels --- */
+
+#define WARP_SZ 32
+
+__device__
+inline int lane_id(void) { return threadIdx.x % WARP_SZ; }
+
+__device__
+int warp_bcast(int v, int leader) { return __shfl(v, leader); }
+
+/*! Warp-aggregated atomic increment
+ *  https://devblogs.nvidia.com/parallelforall/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/ */
+__device__
+int atomicAggInc(int *ctr)
+{
+  int mask = __ballot(1);
+  // select the leader
+  int leader = __ffs(mask) - 1;
+  // leader does the update
+  int res;
+  if (lane_id() == leader)
+    res = atomicAdd(ctr, __popc(mask));
+  // brodcast result
+  res = warp_bcast(res, leader);
+  // each thread computes its own value
+  return res + __popc(mask & ((1 << lane_id()) - 1));
 }
 
 /* ------ dMeshBlock Member Functions ------ */
@@ -641,11 +672,14 @@ double intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
 template<int nDims, int nSideC, int nSideF>
 __global__
 void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
-                int* __restrict__ cutFlag, int cutType)
+                int* __restrict__ cutFlag, int cutType, int* __restrict__ list, int ncells)
 {
   int ic = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (ic >= mb.ncells) return;
+  //if (ic >= mb.ncells) return;
+  if (ic >= ncells) return;
+
+  ic = list[ic];  // Get filtered cell ID
 
   // Figure out how many threads are left in this block after ic>ncells returns
   int blockSize = min(blockDim.x, mb.ncells - blockIdx.x * blockDim.x);
@@ -794,19 +828,45 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
   cutFlag[ic] = myFlag;
 }
 
+/*! Remove all elements which do not intersect with cut group's bbox from
+ *  consideration (obviously do not intersect) */
+__global__
+void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt, dvec<int> cutFlag, int* nfilt)
+{
+  int ic = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (ic >= mb.ncells) return;
+
+  // Set all cell flags initially to DC_NORMAL (filtered cells will remain 'NORMAL')
+  cutFlag[ic] = DC_NORMAL;
+
+  // Figure out how many threads are left in this block after ic>ncells returns
+  int blockSize = min(blockDim.x, mb.ncells - blockIdx.x * blockDim.x);
+
+  __shared__ double bboxF[6];
+  for (int i = threadIdx.x; i < 6; i += blockSize)
+    bboxF[i] = cut_bbox[i];
+
+  __syncthreads();
+
+  double href = .005/3.*(bboxF[3]-bboxF[0]+bboxF[4]-bboxF[1]+bboxF[5]-bboxF[2]);
+
+  if (cuda_funcs::boundingBoxCheck<3>(&mb.eleBBox[6*ic], bboxF, href))
+    filt[atomicAggInc(nfilt)] = ic;
+}
+
 //void dMeshBlock::directCut(dvec<double> &cutFaces, int nCut, int nvertf, dCutMap &cutMap, int cutType)
-void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFlag, int cutType)
+void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cutBbox_h, int* cutFlag, int cutType)
 {
   // Setup cutMap TODO: create initialization elsewhere?
   cutFlag_d.resize(ncells);
+  filt_list.resize(ncells);
 
   dvec<double> cutFaces;
   cutFaces.assign(cutFaces_h, nCut*nvertf*nDims);
 
-  int threads = 32;
-  int blocks = (ncells + threads - 1) / threads;
-
-  int nbShare = sizeof(double)*4*nDims;
+  dvec<double> cutBbox_d;
+  cutBbox_d.assign(cutBbox_h, 2*nDims);
 
   if (ijk2gmsh_quad.size() != nvertf)
   {
@@ -814,96 +874,125 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFla
     ijk2gmsh_quad.assign(ijk2gmsh_quad_h.data(), nvertf);
   }
 
-  switch(nvertf)
+  // Filter elements based upon cutting-surface bounding box
+
+  hvec<int> nfilt_h;
+  dvec<int> nfilt_d;
+  nfilt_h.resize(1);  nfilt_h[0] = 0;
+  nfilt_d.assign(nfilt_h.data(), 1);
+
+  int threads = 128;
+  int blocks = (ncells + threads - 1) / threads;
+
+  filterElements<<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d.data());
+
+  nfilt_h.assign(nfilt_d.data(), 1);
+
+  int nfilt = nfilt_h[0];
+
+  // Perform the Direct Cut algorithm on the filtered list of grid elements
+
+  threads = 32;
+  blocks = (nfilt + threads - 1) / threads;
+  int nbShare = sizeof(double)*4*nDims;
+
+  if (nfilt > 0)
   {
-    case 4:
-      switch(nvert)
-      {
-        case 8:
-          fillCutMap<3,2,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 27:
-          fillCutMap<3,3,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 64:
-          fillCutMap<3,4,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 125:
-          fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        default:
-          printf("nvert = %d\n",nvert);
-          ThrowException("nvert case not implemented for directCut on device");
-      }
-      break;
-    case 9:
-      switch(nvert)
-      {
-        case 8:
-          fillCutMap<3,2,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 27:
-          fillCutMap<3,3,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 64:
-          fillCutMap<3,4,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 125:
-          fillCutMap<3,5,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        default:
-          printf("nvert = %d\n",nvert);
-          ThrowException("nvert case not implemented for directCut on device");
-      }
-      break;
-    case 16:
-      switch(nvert)
-      {
-        case 8:
-          fillCutMap<3,2,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 27:
-          fillCutMap<3,3,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 64:
-          fillCutMap<3,4,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 125:
-          fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        default:
-          printf("nvert = %d\n",nvert);
-          ThrowException("nvert case not implemented for directCut on device");
-      }
-      break;
-    case 25:
-      switch(nvert)
-      {
-        case 8:
-          fillCutMap<3,2,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 27:
-          fillCutMap<3,3,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 64:
-          fillCutMap<3,4,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        case 125:
-          fillCutMap<3,5,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType);
-          break;
-        default:
-          printf("nvert = %d\n",nvert);
-          ThrowException("nvert case not implemented for directCut on device");
-      }
-      break;
-    default:
-      printf("nvertFace = %d\n",nvertf);
-      ThrowException("nvertFace case not implemented for directCut on device");
+    switch(nvertf)
+    {
+      case 4:
+        switch(nvert)
+        {
+          case 8:
+            fillCutMap<3,2,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 27:
+            fillCutMap<3,3,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 64:
+            fillCutMap<3,4,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 125:
+            fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          default:
+            printf("nvert = %d\n",nvert);
+            ThrowException("nvert case not implemented for directCut on device");
+        }
+        break;
+      case 9:
+        switch(nvert)
+        {
+          case 8:
+            fillCutMap<3,2,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 27:
+            fillCutMap<3,3,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 64:
+            fillCutMap<3,4,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 125:
+            fillCutMap<3,5,3><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          default:
+            printf("nvert = %d\n",nvert);
+            ThrowException("nvert case not implemented for directCut on device");
+        }
+        break;
+      case 16:
+        switch(nvert)
+        {
+          case 8:
+            fillCutMap<3,2,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 27:
+            fillCutMap<3,3,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 64:
+            fillCutMap<3,4,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 125:
+            fillCutMap<3,5,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          default:
+            printf("nvert = %d\n",nvert);
+            ThrowException("nvert case not implemented for directCut on device");
+        }
+        break;
+      case 25:
+        switch(nvert)
+        {
+          case 8:
+            fillCutMap<3,2,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 27:
+            fillCutMap<3,3,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 64:
+            fillCutMap<3,4,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          case 125:
+            fillCutMap<3,5,5><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            break;
+          default:
+            printf("nvert = %d\n",nvert);
+            ThrowException("nvert case not implemented for directCut on device");
+        }
+        break;
+      default:
+        printf("nvertFace = %d\n",nvertf);
+        ThrowException("nvertFace case not implemented for directCut on device");
+    }
   }
 
   check_error();
 
   cuda_copy_d2h(cutFlag_d.data(), cutFlag, ncells);
 
+  nfilt_d.free_data();
+  nfilt_h.free_data();
+
   cutFaces.free_data();
+  cutBbox_d.free_data();
 }

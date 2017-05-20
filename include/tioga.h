@@ -126,6 +126,7 @@ class tioga
 
   int nCutFringe, nCutHole;   //! # of fringe/hole-cutting faces on this rank
   int gridType;               //! Type of grid: background (0) or normal (1)
+  int nGrids;
   std::vector<int> gridIDs;   //! Grid ID for each rank
   std::vector<int> gridTypes; //! Grid type for each rank
 

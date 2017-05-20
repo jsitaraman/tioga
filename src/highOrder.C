@@ -267,11 +267,20 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
 //  }
 //}
 
-int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<double> &faceNodesO)
+int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<double> &faceNodesO,
+    std::vector<double> &bboxW, std::vector<double> &bboxO)
 {
   int nvert = nfv[0];
 
   // Generate bounding boxes for each cutting group and face
+
+  bboxW.resize(2*nDims);
+  for (int d = 0; d < nDims; d++)
+  {
+    bboxW[d]       =  BIG_DOUBLE;
+    bboxW[d+nDims] = -BIG_DOUBLE;
+  }
+
   faceNodesW.resize(nDims*nvert*nCutHole);
   for (int i = 0; i < nCutHole; i++)
   {
@@ -281,8 +290,20 @@ int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<doub
     {
       int iv = fconn[0][ff*nvert + n];
       for (int d = 0; d < nDims; d++)
-        faceNodesW[nDims*(nvert*i+n)+d] = x[3*iv+d];
+      {
+        double val = x[3*iv+d];
+        faceNodesW[nDims*(nvert*i+n)+d] = val;
+        bboxW[d] = std::min(bboxW[d], val);
+        bboxW[d+nDims] = std::max(bboxW[d+nDims], val);
+      }
     }
+  }
+
+  bboxO.resize(2*nDims);
+  for (int d = 0; d < nDims; d++)
+  {
+    bboxO[d]       =  BIG_DOUBLE;
+    bboxO[d+nDims] = -BIG_DOUBLE;
   }
 
   faceNodesO.resize(nDims*nvert*nCutFringe);
@@ -294,7 +315,12 @@ int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<doub
     {
       int iv = fconn[0][ff*nvert + n];
       for (int d = 0; d < nDims; d++)
-        faceNodesO[nDims*(nvert*i+n)+d] = x[3*iv+d];
+      {
+        double val = x[3*iv+d];
+        faceNodesO[nDims*(nvert*i+n)+d] = val;
+        bboxO[d] = std::min(bboxO[d], val);
+        bboxO[d+nDims] = std::max(bboxO[d+nDims], val);
+      }
     }
   }
 
@@ -561,12 +587,14 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
 }
 
 void MeshBlock::directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvertf,
-    CutMap &cutMap, int cutType)
+    std::vector<double> &cutBbox, CutMap &cutMap, int cutType)
 {
   cutMap.flag.resize(ncells);
 
   // Call out to the device to perform the cutting
-  mb_d.directCut(cutFaces.data(), nCut, nvertf, cutMap.flag.data(), cutType);
+  PUSH_NVTX_RANGE("DC-GPU",4);
+  mb_d.directCut(cutFaces.data(), nCut, nvertf, cutBbox.data(), cutMap.flag.data(), cutType);
+  POP_NVTX_RANGE;
 }
 
 void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)

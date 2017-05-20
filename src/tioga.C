@@ -121,6 +121,11 @@ void tioga::profile(void)
     MPI_Allgather(&mytag, 1, MPI_INT, gridIDs.data(), 1, MPI_INT, scomm);
     MPI_Allgather(&gridType, 1, MPI_INT, gridTypes.data(), 1, MPI_INT, scomm);
 
+    nGrids = 0;
+    for (auto g : gridIDs)
+      nGrids = std::max(nGrids, g);
+    nGrids++; // 0-index to size
+
     // Setup send/recv map based on grid ID
     std::vector<int> ptags(nproc);
     MPI_Allgather(&mytag, 1, MPI_INT, ptags.data(), 1, MPI_INT, scomm);
@@ -233,6 +238,7 @@ void tioga::doHoleCutting(void)
 
   MPI_Barrier(MPI_COMM_WORLD);
   tgTime.startTimer();
+  PUSH_NVTX_RANGE("TIOGA",2);
   // Generate structured map of solid boundary (hole) locations
   getHoleMap();
 
@@ -261,7 +267,7 @@ void tioga::doHoleCutting(void)
     }
   }
   tgTime.stopTimer();
-
+  POP_NVTX_RANGE;
   MPI_Barrier(MPI_COMM_WORLD);
 
   dcTime.startTimer();
@@ -367,7 +373,6 @@ void tioga::performConnectivityHighOrder(void)
 
 void tioga::directCut(void)
 {
-  /* --- Direct Cut Method [copied from highOrder.C] --- */
   int nDims = mb->nDims;
 
   /// TODO: Callbacks
@@ -375,14 +380,11 @@ void tioga::directCut(void)
   nCutHole = mb->nCutHole;
 
   // Get cutting-group bounding-box data for this rank
-//  std::vector<double> cutBox(6*nproc);             // implement more involved algorithm later
-//  std::vector<std::vector<double>> faceBox(nproc); // keep it simple for now
   std::vector<double> faceNodesW; // wall face nodes
   std::vector<double> faceNodesO; // overset face nodes
 
-  //mb->getCutGroupBoxes(cutBox, faceBox, nGroups_glob); // implement later
-  int nvert = mb->getCuttingFaces(faceNodesW, faceNodesO);
-  /// IDEA: restrict overset faces to linear face nodes? (ignore curvature, if present)
+  std::vector<double> bboxW, bboxO;
+  int nvert = mb->getCuttingFaces(faceNodesW, faceNodesO, bboxW, bboxO);
 
   // # nodes-per-face, and # of cutting faces, for each rank
   std::vector<int> nvertf_p(nproc);
@@ -391,103 +393,137 @@ void tioga::directCut(void)
   MPI_Allgather(&nCutHole, 1, MPI_INT, nHoleFace_p.data(), 1, MPI_INT, scomm);
   MPI_Allgather(&nCutFringe, 1, MPI_INT, nOverFace_p.data(), 1, MPI_INT, scomm);
 
-  // Send / recv face nodes data
-  std::vector<MPI_Request> sreqs, rreqs;
-  sreqs.reserve(nproc); rreqs.reserve(nproc);
-  std::vector<std::vector<double>> faceNodesW_g(nproc), faceNodesO_g(nproc);
+  // Figure out displacements into per-grid storage (rather than per-rank)
+  std::vector<int> nFace_g(nGrids), nFace_p(nproc);
+  std::vector<int> faceDisp_p(nproc);
+  std::vector<int> nProc_g(nGrids), nVertf_g(nGrids);
   for (int p = 0; p < nproc; p++)
   {
-    if (p != myid and mytag != gridIDs[p])
+    int g = gridIDs[p];
+    if (g == mytag) continue;
+
+    faceDisp_p[p] = nFace_g[g];
+    if (gridType > 0)
+      nFace_p[p] += nHoleFace_p[p];
+    else
+      nFace_p[p] += nOverFace_p[p];
+
+    nFace_g[g] += nFace_p[p];
+    nVertf_g[g] = nvertf_p[p];  // Assuming same for each rank of every grid
+    nProc_g[g]++;
+  }
+
+  // Setup buffers for receiving cutting surfaces from each grid
+
+  std::vector<MPI_Request> sreqs, rreqs;
+  sreqs.reserve(2*nproc); rreqs.reserve(2*nproc);
+  std::vector<std::vector<double>> faceNodes_g(nGrids);
+  std::vector<std::vector<double>> bbox_g(nGrids);
+  std::vector<double> bbox_tmp(2*nDims*nproc);
+
+
+  for (int g = 0; g < nGrids; g++)
+  {
+    if (g == mytag) continue;
+
+    faceNodes_g[g].resize(nFace_g[g] * nVertf_g[g] * nDims);
+    bbox_g[g].resize(nProc_g[g] * 2 * nDims);
+
+    for (int p = 0; p < nProc_g[g]; p++)
     {
-      if (nHoleFace_p[p] > 0)
+      for (int d = 0; d < nDims; d++)
       {
-        printf("%d, nhole[%d] = %d\n",myid,p,nHoleFace_p[p]);
-        // recv from rank
-        faceNodesW_g[p].resize(nHoleFace_p[p]*nvertf_p[p]*nDims);
-        rreqs.emplace_back();
-        MPI_Irecv(faceNodesW_g[p].data(), nHoleFace_p[p]*nvertf_p[p]*nDims, MPI_DOUBLE,
-            p, 0, scomm, &rreqs.back());
-      }
-
-      if (nCutHole > 0)
-      {
-        printf("%d, nCutHole = %d\n",myid,nCutHole);
-        // send to rank
-        sreqs.emplace_back();
-        MPI_Isend(faceNodesW.data(), nCutHole*nvert*nDims, MPI_DOUBLE,
-            p, 0, scomm, &sreqs.back());
-      }
-
-      if (gridType == 0 && nOverFace_p[p] > 0)
-      {
-        printf("%d, nover[%d] = %d\n",myid,p,nOverFace_p[p]);
-        // recv from rank
-        faceNodesO_g[p].resize(nOverFace_p[p]*nvertf_p[p]*nDims);
-        rreqs.emplace_back();
-        MPI_Irecv(faceNodesO_g[p].data(), nOverFace_p[p]*nvertf_p[p]*nDims, MPI_DOUBLE,
-            p, 1, scomm, &rreqs.back());
-      }
-
-      if (gridTypes[p] == 0 && nCutFringe > 0)
-      {
-        printf("%d, nCutFringe = %d\n",myid,nCutFringe);
-        // Send our overset faces to the background grid
-        sreqs.emplace_back();
-        MPI_Isend(faceNodesO.data(), nCutFringe*nvert*nDims, MPI_DOUBLE,
-            p, 1, scomm, &sreqs.back());
+        bbox_g[g][2*nDims*p+d]       =  BIG_DOUBLE;
+        bbox_g[g][2*nDims*p+d+nDims] = -BIG_DOUBLE;
       }
     }
   }
+
+  // Send / recv face nodes data
+
+  for (int p = 0; p < nproc; p++)
+  {
+    int g = gridIDs[p];
+    if (g == mytag) continue;
+
+    if (nFace_p[p] > 0)
+    {
+      // Receive the cutting faces
+      rreqs.emplace_back();
+      MPI_Irecv(faceNodes_g[g].data() + faceDisp_p[p]*nVertf_g[g]*nDims,
+          nFace_p[p]*nvertf_p[p]*nDims, MPI_DOUBLE, p, 0, scomm, &rreqs.back());
+
+      // Receive the rank's cutting-face bounding box
+      rreqs.emplace_back();
+      MPI_Irecv(&bbox_tmp[2*nDims*p], 2*nDims, MPI_DOUBLE, p, 1, scomm, &rreqs.back());
+    }
+
+    double *Fptr, *Bptr;
+    int size = 0;
+    if (nCutHole > 0 && gridTypes[p] > 0)
+    {
+      Fptr = faceNodesW.data();
+      Bptr = bboxW.data();
+      size = nCutHole*nvert*nDims;
+    }
+    else if (nCutFringe > 0 && gridTypes[p] == 0)
+    {
+      Fptr = faceNodesO.data();
+      Bptr = bboxO.data();
+      size = nCutFringe*nvert*nDims;
+    }
+
+    if (size > 0)
+    {
+      // Send face nodes
+      sreqs.emplace_back();
+      MPI_Isend(Fptr, size, MPI_DOUBLE, p, 0, scomm, &sreqs.back());
+
+      // Send bounding box
+      sreqs.emplace_back();
+      MPI_Isend(Bptr, 2*nDims, MPI_DOUBLE, p, 1, scomm, &sreqs.back());
+    }
+  }
+
+  printf("%d: nFace_g = %d %d %d\n",myid,nFace_g[0],nFace_g[1],nFace_g[2]);
+  printf("%d: nFace_p = %d %d %d\n",myid,nFace_p[0],nFace_p[1],nFace_p[2]);
+  printf("%d: sizeof(faceNodes_g) = %d %d %d\n",myid,faceNodes_g[0].size(),faceNodes_g[1].size(),faceNodes_g[2].size());
+  printf("%d: nCut = %d %d \n",myid,nCutHole,nCutFringe);
 
   // Complete the communication
   MPI_Waitall((int)sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
   MPI_Waitall((int)rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
 
-  //  // Get the global bounding box info across all the partitions for all meshes
-//  std::vector<double> cutBox_global(6*nGroups_glob);
-//  for (int G = 0; G < nGroups_glob; G++)
-//  {
-//    MPI_Allreduce(&cutBox[6*G],  &cutBox_global[6*G],  3,MPI_DOUBLE,MPI_MIN,scomm);
-//    MPI_Allreduce(&cutBox[6*G+3],&cutBox_global[6*G+3],3,MPI_DOUBLE,MPI_MAX,scomm);
-//  }
+  // Reduce the bounding box data to one box per grid
+  for (int p = 0; p < nproc; p++)
+  {
+    int g = gridIDs[g];
+    if (g == mytag) continue;
 
-//  // Figure out which cutting groups overlap with this rank
-//  // [use rank-local OBB?]
-//  // send/recv facebox data to/from ranks that need it
-//  std::vector<std::unordered_set<int>> cellList(nGroups_glob);
-//  mb->getDirectCutCells(cellList, cutBox_global, nGroups_global);
-
+    for (int d = 0; d < nDims; d++)
+    {
+      bbox_g[g][d] = std::min(bbox_g[g][d], bbox_tmp[2*nDims*p+d]);
+      bbox_g[g][d+nDims] = std::max(bbox_g[g][d+nDims], bbox_tmp[2*nDims*p+d+nDims]);
+    }
+  }
 
   // Do the cutting
-  std::vector<CutMap> cutMap(nproc);
-
-  if (gridType == 0)
-    cutMap.resize(2*nproc); // Bkgd grid - cut with both wall and overset faces
+  std::vector<CutMap> cutMap(nGrids);
 
   Timer cutTime("Cutting Time: ");
 
   int ncut = 0;
-  for (int p = 0; p < nproc; p++)
+  for (int g = 0; g < nGrids; g++)
   {
-    if (gridIDs[p] == mytag) continue;
+    if (g == mytag) continue;
 
     cutTime.startTimer();
-    if (gridType != 0 && nHoleFace_p[p] > 0)
+    if (nFace_g[g] > 0)
     {
 #ifdef _GPU
-      mb->directCut_gpu(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
+      mb->directCut_gpu(faceNodes_g[g], nFace_g[g], nVertf_g[g], bbox_g[g], cutMap[ncut], gridType);
 #else
-      mb->directCut(faceNodesW_g[p], nHoleFace_p[p], nvertf_p[p], cutMap[ncut]);
-#endif
-      ncut++;
-    }
-
-    if (gridType == 0 && nOverFace_p[p] > 0)
-    {
-#ifdef _GPU
-      mb->directCut_gpu(faceNodesO_g[p], nOverFace_p[p], nvertf_p[p], cutMap[ncut], 0);
-#else
-      mb->directCut(faceNodesO_g[p], nOverFace_p[p], nvertf_p[p], cutMap[ncut], 0);
+      mb->directCut(faceNodes_g[g], nFace_p[g], nVertf_g[g], bbox_g[g], cutMap[ncut], gridType);
 #endif
       ncut++;
     }

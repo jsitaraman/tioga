@@ -79,6 +79,7 @@ public:
 
   hvec<int> cutFlag_h;
   dvec<int> cutFlag_d;
+  dvec<int> filt_list;
 
   /* ------ Member Functions ------ */
 
@@ -111,7 +112,7 @@ public:
                  const double* __restrict__ xyz, double* __restrict__ rst);
 
   __host__
-  void directCut(double* cutFaces_h, int nCut, int nvertf, int* cutFlag, int cutType);
+  void directCut(double* cutFaces_h, int nCut, int nvertf, double* cutBbox, int* cutFlag, int cutType);
 };
 
 template<int nSide>

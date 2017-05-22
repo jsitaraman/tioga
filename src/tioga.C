@@ -113,7 +113,7 @@ void tioga::profile(void)
     MPI_Comm_size(meshcomm, &nprocMesh);
 
     /// TODO: put into callback function somewhere
-    gridType = mytag;
+    gridType = (mytag > 0);
 
     // For the direct-cut method
     gridIDs.resize(nproc);
@@ -485,11 +485,6 @@ void tioga::directCut(void)
     }
   }
 
-  printf("%d: nFace_g = %d %d %d\n",myid,nFace_g[0],nFace_g[1],nFace_g[2]);
-  printf("%d: nFace_p = %d %d %d\n",myid,nFace_p[0],nFace_p[1],nFace_p[2]);
-  printf("%d: sizeof(faceNodes_g) = %d %d %d\n",myid,faceNodes_g[0].size(),faceNodes_g[1].size(),faceNodes_g[2].size());
-  printf("%d: nCut = %d %d \n",myid,nCutHole,nCutFringe);
-
   // Complete the communication
   MPI_Waitall((int)sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
   MPI_Waitall((int)rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
@@ -497,7 +492,8 @@ void tioga::directCut(void)
   // Reduce the bounding box data to one box per grid
   for (int p = 0; p < nproc; p++)
   {
-    int g = gridIDs[g];
+    int g = gridIDs[p];
+
     if (g == mytag) continue;
 
     for (int d = 0; d < nDims; d++)

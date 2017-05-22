@@ -676,7 +676,6 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
 {
   int ic = blockIdx.x * blockDim.x + threadIdx.x;
 
-  //if (ic >= mb.ncells) return;
   if (ic >= ncells) return;
 
   ic = list[ic];  // Get filtered cell ID
@@ -823,7 +822,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
   }
 
   if (myFlag == DC_CUT)
-    myFlag = (cutType == 1) ? DC_HOLE : DC_NORMAL;
+    myFlag = (cutType != 0) ? DC_HOLE : DC_NORMAL;
 
   cutFlag[ic] = myFlag;
 }
@@ -855,7 +854,6 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt, dvec<i
     filt[atomicAggInc(nfilt)] = ic;
 }
 
-//void dMeshBlock::directCut(dvec<double> &cutFaces, int nCut, int nvertf, dCutMap &cutMap, int cutType)
 void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cutBbox_h, int* cutFlag, int cutType)
 {
   // Setup cutMap TODO: create initialization elsewhere?

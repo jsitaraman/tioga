@@ -681,7 +681,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
   ic = list[ic];  // Get filtered cell ID
 
   // Figure out how many threads are left in this block after ic>ncells returns
-  int blockSize = min(blockDim.x, mb.ncells - blockIdx.x * blockDim.x);
+  int blockSize = min(blockDim.x, ncells - blockIdx.x * blockDim.x);
 
   const int nvert = nSideC*nSideC*nSideC;
   const int nvertf = nSideF*nSideF;
@@ -712,7 +712,6 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     distList[i] = BIG_DOUBLE;
     faceList[i] = -1;
   }
-
   for (int ff = 0; ff < nCut; ff++)
   {
     __syncthreads();

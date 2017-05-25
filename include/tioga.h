@@ -352,6 +352,7 @@ class tioga
 
   void set_stream_handle(cudaStream_t handle, cudaEvent_t event);
 
+  //! Set pointers to storage of geometry data on device
   void registerDeviceGridData(double *xyz, double* coords, int *ibc, int *ibf);
 #endif
 };

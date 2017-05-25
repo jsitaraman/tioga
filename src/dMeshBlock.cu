@@ -699,7 +699,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
   cuda_funcs::getCentroid<nDims,nvert>(xv,xcC);
 
   const double href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
-  const double dtol = 1e-3*href;
+  const double dtol = 2e-1*href;
 
   /* --- Pass 1: Coarse-Grained Distance Calculation Using Centroids --- */
 
@@ -770,7 +770,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     dPoint norm = faceNormal(fxv);
     if (cutType == 0) norm *= -1;
 
-    if (dist < 1e-8*href) // They intersect
+    if (dist < dtol) // They intersect 1e-8*href
     {
       myFlag = DC_CUT;
       myDist = 0.;
@@ -828,6 +828,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
 
 /*! Remove all elements which do not intersect with cut group's bbox from
  *  consideration (obviously do not intersect) */
+template<int nvert>
 __global__
 void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt, dvec<int> cutFlag, int* nfilt)
 {
@@ -849,7 +850,21 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt, dvec<i
 
   double href = .005/3.*(bboxF[3]-bboxF[0]+bboxF[4]-bboxF[1]+bboxF[5]-bboxF[2]);
 
-  if (cuda_funcs::boundingBoxCheck<3>(&mb.eleBBox[6*ic], bboxF, href))
+  // Get element nodes
+  double xv[nvert*3];
+  for (int i = 0; i < nvert; i++)
+    for (int d = 0; d < 3; d++)
+      xv[3*i+d] = mb.coord[ic+mb.ncells*(d+3*i)];
+
+  // Get element bounding box
+  double bboxC[3];
+  cuda_funcs::getBoundingBox<3,nvert>(xv, bboxC);
+
+  /// For later use...? Otherwise, if never used, never allocate in dataToDevice
+  // for (int i = 0; i < 6; i++)
+  //   mb.eleBBox[6*ic+i] = bboxC[i];
+
+  if (cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, href))
     filt[atomicAggInc(nfilt)] = ic;
 }
 
@@ -881,7 +896,24 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   int threads = 128;
   int blocks = (ncells + threads - 1) / threads;
 
-  filterElements<<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d.data());
+  switch(nvert)
+  {
+    case 8:
+      filterElements<8><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d.data());
+      break;
+    case 27:
+      filterElements<27><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d.data());
+      break;
+    case 64:
+      filterElements<64><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d.data());
+      break;
+    case 125:
+      filterElements<125><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d.data());
+      break;
+    default:
+      printf("nvert = %d\n",nvert);
+      ThrowException("nvert case not implemented for directCut on device");
+  }
 
   nfilt_h.assign(nfilt_d.data(), 1);
 

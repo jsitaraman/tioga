@@ -231,12 +231,13 @@ void tioga::unblankPart2(int nvar)
   }
 }
 
+//#define TG_NORMAL
+#define TG_DIRECTCUT
 void tioga::doHoleCutting(void)
 {
-  Timer dcTime("Direct Cut: ");
+//  MPI_Barrier(MPI_COMM_WORLD);
+#ifdef TG_NORMAL
   Timer tgTime("Normal Version: ");
-
-  MPI_Barrier(MPI_COMM_WORLD);
   tgTime.startTimer();
   PUSH_NVTX_RANGE("TIOGA",2);
   // Generate structured map of solid boundary (hole) locations
@@ -268,22 +269,27 @@ void tioga::doHoleCutting(void)
   }
   tgTime.stopTimer();
   POP_NVTX_RANGE;
-  MPI_Barrier(MPI_COMM_WORLD);
+#endif
+//  MPI_Barrier(MPI_COMM_WORLD);
 
+#ifdef TG_DIRECTCUT
+  PUSH_NVTX_RANGE("DirectCut", 2);
+  Timer dcTime("Direct Cut: ");
   dcTime.startTimer();
+  exchangeBoxes();
   directCut();
   mb->calcFaceIblanks(meshcomm);
   dcTime.stopTimer();
+  POP_NVTX_RANGE;
+#endif
+//  MPI_Barrier(MPI_COMM_WORLD);
 
-  MPI_Barrier(MPI_COMM_WORLD);
+//  dcTime.showTime(3);
+//  MPI_Barrier(MPI_COMM_WORLD);
+//  printf("\n");
+//  MPI_Barrier(MPI_COMM_WORLD);
 
-  dcTime.showTime(3);
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  printf("\n");
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  tgTime.showTime(3);
+//  tgTime.showTime(3);
 
 //  // Generate structured map of solid boundary (hole) locations
 //  getHoleMap();
@@ -526,7 +532,7 @@ void tioga::directCut(void)
     cutTime.stopTimer();
   }
 
-  cutTime.showTime(3);
+//  cutTime.showTime(3);
 
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);

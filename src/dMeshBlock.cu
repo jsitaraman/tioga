@@ -6,7 +6,7 @@
 
 /* --- Handy Vector Operation Macros --- */
 
-#define NF 3 // 3-6 depending on unstructured-ness of grid & desire for robustness
+#define NF 4 // 3-6 depending on unstructured-ness of grid & desire for robustness
 
 #define CROSS(a, b, c) { \
   c[0] = a[1]*b[2] - a[2]*b[1]; \
@@ -672,7 +672,7 @@ double intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
 template<int nDims, int nSideC, int nSideF>
 __global__
 void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
-                int* __restrict__ cutFlag, int cutType, int* __restrict__ list, int ncells)
+    int* __restrict__ cutFlag, int cutType, int* __restrict__ list, int ncells)
 {
   int ic = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -775,7 +775,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
       myFlag = DC_CUT;
       myDist = 0.;
     }
-    else if (myFlag == DC_UNASSIGNED || dist < (myDist - dtol))
+    else if (myFlag == DC_UNASSIGNED || dist < (myDist - .1*dtol))
     {
       // Unflagged cell, or have a closer face to use
       double dot = norm*vec;
@@ -791,7 +791,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
       else
         myFlag = DC_NORMAL;
     }
-    else if (fabs(dist - myDist) <= dtol)
+    else if (fabs(dist - myDist) <= .1*dtol)
     {
       // Approx. same dist. to two faces; avg. their normals to decide
       myDist = dist;

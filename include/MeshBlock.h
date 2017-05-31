@@ -378,9 +378,9 @@ private:
 	       int *wbcnodei,int *obcnodei,
 	       int ntypesi, int *nvi, int *nci, int **vconni);
 
-  void setFaceData(int _nftype, int* _nf, int* _nfv, int** _f2v, int *_f2c,
-                   int *_c2f, int* _ib_face, int nOver, int nMpi, int* oFaces,
-                   int* mFaces, int* procR, int* idR);
+  void setFaceData(int _gtype, int _nftype, int* _nf, int* _nfv, int** _f2v,
+      int *_f2c, int *_c2f, int* _ib_face, int nOver, int nMpi, int* oFaces,
+      int* mFaces, int* procR, int* idR);
 
   void setResolutions(double *nres,double *cres);    
 
@@ -562,7 +562,7 @@ private:
   }
 
 
-  void writeCellFile(int, CutMap& cutMap);
+  void writeCellFile(int, int* flag);
 
   /*! Gather a list of all receptor point locations (including for high-order) */
   void getInternalNodes(void);

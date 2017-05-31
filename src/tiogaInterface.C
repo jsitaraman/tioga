@@ -87,7 +87,7 @@ extern "C" {
     tg->registerGridData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
   }
 
-  void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nOverFaces,
+  void tioga_register_face_data_(int gtype, int *f2c, int *c2f, int *fibl, int nOverFaces,
                                  int nMpiFaces, int *overFaces, int *mpiFaces,
                                  int* mpiProcR, int* mpiFidR, int nftype,
                                  int _nfv, int _nf, int *_fconn)
@@ -103,7 +103,7 @@ extern "C" {
     nf[0] = _nf;
     fconn[0] = _fconn;
 
-    tg->registerFaceConnectivity(nftype, nf, nfv, fconn, f2c, c2f, fibl,
+    tg->registerFaceConnectivity(gtype, nftype, nf, nfv, fconn, f2c, c2f, fibl,
                                  nOverFaces, nMpiFaces, overFaces, mpiFaces,
                                  mpiProcR, mpiFidR);
   }

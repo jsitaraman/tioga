@@ -40,7 +40,7 @@ void tioga_registergrid_data_(int btag, int nnodes, double *xyz, int *ibl,
                               int nwbc, int nobc, int *wbcnode, int *obcnode,
                               int ntypes, int _nv, int _nc, int *_vconn);
 
-void tioga_register_face_data_(int *f2c, int *c2f, int *fibl, int nOverFaces,
+void tioga_register_face_data_(int gtype, int *f2c, int *c2f, int *fibl, int nOverFaces,
                                int nMpiFaces, int *overFaces, int *mpiFaces,
                                int* mpiProcR, int* mpiFidR, int nftype,
                                int _nfv, int _nf, int *_fconn);

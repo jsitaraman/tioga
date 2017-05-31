@@ -80,13 +80,11 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   mytag=btag;
 }
 
-void tioga::registerFaceConnectivity(int nftype, int *nf, int *nfv, int **fconn,
-                                     int *f2c, int *c2f, int *iblank_face,
-                                     int nOverFaces, int nMpiFaces,
-                                     int *overFaces, int *mpiFaces,
-                                     int *mpiProcR, int *mpiFidR)
+void tioga::registerFaceConnectivity(int gtype, int nftype, int *nf, int *nfv,
+    int **fconn, int *f2c, int *c2f, int *iblank_face, int nOverFaces,
+    int nMpiFaces, int *overFaces, int *mpiFaces, int *mpiProcR, int *mpiFidR)
 {
-  mb->setFaceData(nftype, nf, nfv, fconn, f2c, c2f, iblank_face, nOverFaces,
+  mb->setFaceData(gtype, nftype, nf, nfv, fconn, f2c, c2f, iblank_face, nOverFaces,
                   nMpiFaces, overFaces, mpiFaces, mpiProcR, mpiFidR);
 }
 
@@ -112,8 +110,7 @@ void tioga::profile(void)
     MPI_Comm_rank(meshcomm, &meshRank);
     MPI_Comm_size(meshcomm, &nprocMesh);
 
-    /// TODO: put into callback function somewhere
-    gridType = (mytag > 0);
+    gridType = mb->gridType;
 
     // For the direct-cut method
     gridIDs.resize(nproc);
@@ -179,7 +176,7 @@ void tioga::setIterIblanks(double dt, int nvar)
 
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
-
+if (nunblank > 0) printf("Rank %d unblanking %d elements\n",myid,nunblank);
   mb->calcFaceIblanks(meshcomm);
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
@@ -537,8 +534,10 @@ void tioga::directCut(void)
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
 
-//  if (gridType == 0)
-//    mb->writeCellFile(myid, cutMap.back()); /// DEBUGGING
+//  if (cutMap.size() > 0)
+//    mb->writeCellFile(myid, cutMap.back().flag.data()); /// DEBUGGING
+//  else
+//    mb->writeCellFile(myid, NULL); /// DEBUGGING
 //  MPI_Barrier(scomm);
 //  exit(0); /// DEBUGGING
 }

@@ -57,11 +57,11 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   for (int i = 0; i < ntypes; i++) ncells+=nc[i];
 }
 
-void MeshBlock::setFaceData(int _nftype, int *_nf, int *_nfv, int **_f2v,
-                            int *_f2c, int *_c2f, int *_ib_face, int nOver,
-                            int nMpi, int *oFaces, int *mFaces, int *procR,
-                            int *idR)
+void MeshBlock::setFaceData(int _gtype, int _nftype, int *_nf, int *_nfv,
+    int **_f2v, int *_f2c, int *_c2f, int *_ib_face, int nOver, int nMpi,
+    int *oFaces, int *mFaces, int *procR, int *idR)
 {
+  gridType = _gtype;
   nftype = _nftype;
   nf = _nf;
   nfv = _nfv;
@@ -414,7 +414,7 @@ void MeshBlock::writeGridFile(int bid)
   return;
 }
 
-void MeshBlock::writeCellFile(int bid, CutMap &cutMap)
+void MeshBlock::writeCellFile(int bid, int* flag)
 {
   char fname[80];
   char qstr[2];
@@ -439,7 +439,10 @@ void MeshBlock::writeCellFile(int bid, CutMap &cutMap)
   for (int i = 0; i < nnodes; i++) fprintf(fp,"%lf\n",x[3*i+1]);
   for (int i = 0; i < nnodes; i++) fprintf(fp,"%lf\n",x[3*i+2]);
   for (int i = 0; i < nnodes; i++) fprintf(fp,"%d\n",iblank[i]);
-  for (int i = 0; i < ncells; i++) fprintf(fp,"%d\n",cutMap.flag[i]);
+  if (flag != NULL)
+    for (int i = 0; i < ncells; i++) fprintf(fp,"%d\n",flag[i]);
+  else
+    for (int i = 0; i < ncells; i++) fprintf(fp,"%d\n",iblank_cell[i]);
   ba=1-BASE;
   for (int n = 0; n < ntypes; n++)
     {

@@ -212,7 +212,7 @@ class tioga
 
     if (offset != NULL)
     {
-      mb->setTransform(offset, Rmat, 3);
+      mb->setTransform(Rmat, offset, 3);
     }
   }
 

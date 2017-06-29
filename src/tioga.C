@@ -82,10 +82,11 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
 
 void tioga::registerFaceConnectivity(int gtype, int nftype, int *nf, int *nfv,
     int **fconn, int *f2c, int *c2f, int *iblank_face, int nOverFaces,
-    int nMpiFaces, int *overFaces, int *mpiFaces, int *mpiProcR, int *mpiFidR)
+    int nWallFaces, int nMpiFaces, int *overFaces, int *wallFaces, int *mpiFaces, 
+    int *mpiProcR, int *mpiFidR)
 {
   mb->setFaceData(gtype, nftype, nf, nfv, fconn, f2c, c2f, iblank_face, nOverFaces,
-                  nMpiFaces, overFaces, mpiFaces, mpiProcR, mpiFidR);
+                  nWallFaces, nMpiFaces, overFaces, wallFaces, mpiFaces, mpiProcR, mpiFidR);
 }
 
 #ifdef _GPU

@@ -101,8 +101,10 @@ private:
   int ncells_adt;  //! Number of cells within ADT
 
   int nOverFaces;
+  int nWallFaces;
   int nMpiFaces;
   int *overFaces; /** < List of explicitly-defined (by solver) overset faces */
+  int *wallFaces; /** < List of explicitly-defined (by solver) solid wall faces */
   int *mpiFaces;  /** < List of MPI face IDs on rank */
   int *mpiFidR;   /** < Matching MPI face IDs on opposite rank */
   int *mpiProcR;  /** < Opposite rank for MPI face */
@@ -379,8 +381,8 @@ private:
 	       int ntypesi, int *nvi, int *nci, int **vconni);
 
   void setFaceData(int _gtype, int _nftype, int* _nf, int* _nfv, int** _f2v,
-      int *_f2c, int *_c2f, int* _ib_face, int nOver, int nMpi, int* oFaces,
-      int* mFaces, int* procR, int* idR);
+      int *_f2c, int *_c2f, int* _ib_face, int nOver, int nWall, int nMpi, int* oFaces,
+      int* wFaces, int* mFaces, int* procR, int* idR);
 
   void setResolutions(double *nres,double *cres);    
 

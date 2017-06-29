@@ -204,7 +204,8 @@ class tioga
   /** Register additional face-connectivity arrays for Artificial Boundadry method */
   void registerFaceConnectivity(int gtype, int nftype, int* nf, int *nfv,
       int** fconn, int *f2c, int *c2f, int* iblank_face, int nOverFaces,
-      int nMpi, int* overFaces, int* mpiFaces, int *procR, int *idR);
+      int nWallFaces, int nMpi, int* overFaces, int* wallFaces, int* mpiFaces, 
+      int *procR, int *idR);
 
   void registerMovingGridData(double *grid_vel, double* offset, double *Rmat)
   {

@@ -88,9 +88,8 @@ extern "C" {
   }
 
   void tioga_register_face_data_(int gtype, int *f2c, int *c2f, int *fibl, int nOverFaces,
-                                 int nMpiFaces, int *overFaces, int *mpiFaces,
-                                 int* mpiProcR, int* mpiFidR, int nftype,
-                                 int _nfv, int _nf, int *_fconn)
+      int nWallFaces, int nMpiFaces, int *overFaces, int *wallFaces, int *mpiFaces,
+      int* mpiProcR, int* mpiFidR, int nftype, int _nfv, int _nf, int *_fconn)
   {
     free(nfv);
     free(nf);
@@ -104,8 +103,8 @@ extern "C" {
     fconn[0] = _fconn;
 
     tg->registerFaceConnectivity(gtype, nftype, nf, nfv, fconn, f2c, c2f, fibl,
-                                 nOverFaces, nMpiFaces, overFaces, mpiFaces,
-                                 mpiProcR, mpiFidR);
+        nOverFaces, nWallFaces, nMpiFaces, overFaces, wallFaces, mpiFaces,
+        mpiProcR, mpiFidR);
   }
 
   void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,

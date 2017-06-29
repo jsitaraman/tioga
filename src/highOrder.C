@@ -69,50 +69,18 @@ void MeshBlock::extraConn(void)
         c2c[nface*ic+j] = ic1;
     }
   }
-
+  
   // List of all solid wall-boundary faces
-  std::set<int> cut_faces;
-  for (int ff = 0; ff < nfaces; ff++)
-  {
-    int count = 0;
-    for (int j = 0; j < nfv[0]; j++)
-    {
-      int iv = fconn[0][ff*nfv[0] + j];
-      for (int k = 0; k < nwbc; k++)
-        if (iv == wbcnode[k])
-          count++;
-    }
-
-    if (count == nfv[0])
-      cut_faces.insert(ff);
-  }
-
-  nCutHole = cut_faces.size();
+  nCutHole = nWallFaces;
   cutFacesW.reserve(nCutHole);
-  for (auto &ff : cut_faces)
-    cutFacesW.push_back(ff);
+  for (int i = 0; i < nWallFaces; i++)
+    cutFacesW.push_back(wallFaces[i]);
 
   // List of all overset-boundary faces
-  cut_faces.clear();
-  for (int ff = 0; ff < nfaces; ff++)
-  {
-    int count = 0;
-    for (int j = 0; j < nfv[0]; j++)
-    {
-      int iv = fconn[0][ff*nfv[0] + j];
-      for (int k = 0; k < nobc; k++)
-        if (iv == obcnode[k])
-          count++;
-    }
-
-    if (count == nfv[0])
-      cut_faces.insert(ff);
-  }
-
-  nCutFringe = cut_faces.size();
+  nCutFringe = nOverFaces;
   cutFacesO.reserve(nCutFringe);
-  for (auto &ff : cut_faces)
-    cutFacesO.push_back(ff);
+  for (int i = 0; i < nOverFaces; i++)
+    cutFacesO.push_back(overFaces[i]);
 }
 
 void MeshBlock::setGridVelocity(double *grid_vel)

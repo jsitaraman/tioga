@@ -58,8 +58,8 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
 }
 
 void MeshBlock::setFaceData(int _gtype, int _nftype, int *_nf, int *_nfv,
-    int **_f2v, int *_f2c, int *_c2f, int *_ib_face, int nOver, int nMpi,
-    int *oFaces, int *mFaces, int *procR, int *idR)
+    int **_f2v, int *_f2c, int *_c2f, int *_ib_face, int nOver, int nWall, int nMpi,
+    int *oFaces, int *wFaces, int *mFaces, int *procR, int *idR)
 {
   gridType = _gtype;
   nftype = _nftype;
@@ -70,8 +70,10 @@ void MeshBlock::setFaceData(int _gtype, int _nftype, int *_nf, int *_nfv,
   c2f = _c2f;
   iblank_face = _ib_face;
   nOverFaces = nOver;
+  nWallFaces = nWall;
   nMpiFaces = nMpi;
   overFaces = oFaces;
+  wallFaces = wFaces;
   mpiFaces = mFaces;
   mpiProcR = procR;
   mpiFidR = idR;

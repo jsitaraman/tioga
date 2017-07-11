@@ -103,7 +103,6 @@ typedef struct HOLEMAP
 {
   int existWall;
   int nx[3];
-  int *samLocal;
   int *sam;
   double extents[6];
 } HOLEMAP;

@@ -30,144 +30,129 @@ extern void kaiser_wrap_(double *,int *,int *,double *,double *,double *,int *);
 */
 void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
 {
-  int i,j,k,m,i3;
-  double *aa;
-  double *eigenv;
   double trace,sume;
   int ier;
   double xd[3];
   double xmin[3],xmax[3];
-  int nrows,ncols;
-  //
+  
   xc[0]=xc[1]=xc[2]=0;
-  //
+  
   // find centroid coordinates (not true centroid)
-  //
-  for(i=0;i<nnodes;i++)
+  for (int i = 0; i < nnodes; i++)
+  {
+    int i3 = 3*i;
+    xc[0] += x[i3];
+    xc[1] += x[i3+1];
+    xc[2] += x[i3+2];
+  }
+  
+  xc[0] /= nnodes;
+  xc[1] /= nnodes;
+  xc[2] /= nnodes;
+
+  if (nnodes < 4) 
+  {
+    vec[0][0] = vec[1][1] = vec[2][2] = 1;
+    vec[0][1] = vec[1][0] = vec[1][2] = vec[2][1] = 0;
+    vec[0][2] = vec[2][0] = 0;
+
+    if (nnodes == 1) 
     {
-      i3=3*i;
-      xc[0]+=x[i3];
-      xc[1]+=x[i3+1];
-      xc[2]+=x[i3+2];
+      dxc[0] = 1e-3;	
+      dxc[1] = 1e-3;
+      dxc[2] = 1e-3;
+      return;
     }
-  //
-  xc[0]/=nnodes;
-  xc[1]/=nnodes;
-  xc[2]/=nnodes;
-  if (nnodes <4) 
+    else if (nnodes == 2)
     {
-      vec[0][0]=vec[1][1]=vec[2][2]=1;
-      vec[0][1]=vec[1][0]=vec[1][2]=vec[2][1]=0;
-      vec[0][2]=vec[2][0]=0;
-      if (nnodes==1) 
-	{
-	  dxc[0]=1e-3;	
-	  dxc[1]=1e-3;
-	  dxc[2]=1e-3;
-	  return;
-	}
-      else if (nnodes==2)
-	{
-	  dxc[0]=max(1e-3,fabs(x[3]-x[0]))*0.5;
-	  dxc[1]=max(1e-3,fabs(x[4]-x[1]))*0.5;
-	  dxc[2]=max(1e-3,fabs(x[5]-x[2]))*0.5;
-          return;
-	}
-      else
-        {
-         for(i=0;i<nnodes;i++)
-          {
-           i3=3*i;
-           for(j=0;j<3;j++)
-            dxc[j]=max(1e-3,fabs(x[i3+j]-x[0]));
-          }
-	 return;
-        }
-    }     
-  //
+      dxc[0] = max(1e-3, fabs(x[3]-x[0])) * 0.5;
+      dxc[1] = max(1e-3, fabs(x[4]-x[1])) * 0.5;
+      dxc[2] = max(1e-3, fabs(x[5]-x[2])) * 0.5;
+      return;
+    }
+    else
+    {
+      for(int i = 0; i < nnodes; i++)
+      {
+        int i3 = 3*i;
+        for (int j = 0; j < 3; j++)
+          dxc[j] = max(1e-3,fabs(x[i3+j]-x[0]));
+      }
+      return;
+    }
+  }     
+  
   // find co-variance matrix
   // aa = [I11 I12 I13;I21 I22 I23;I31 I32 I33]
-  //
-  aa=(double *) malloc(sizeof(double)*9);
-  eigenv=(double *)malloc(sizeof(double)*3);
-  //
-  for(i=0;i<9;i++) aa[i]=0;
-  //
-  for(i=0;i<nnodes;i++)
-    {
-      i3=3*i;
-      aa[0]+=((x[i3]-xc[0])*(x[i3]-xc[0]));
-      aa[4]+=((x[i3+1]-xc[1])*(x[i3+1]-xc[1]));
-      aa[8]+=((x[i3+2]-xc[2])*(x[i3+2]-xc[2]));
-      aa[3]+=((x[i3]-xc[0])*(x[i3+1]-xc[1]));
-      aa[6]+=((x[i3]-xc[0])*(x[i3+2]-xc[2]));
-      aa[7]+=((x[i3+1]-xc[1])*(x[i3+2]-xc[2]));
-    }
-  aa[1]=aa[3];
-  aa[2]=aa[6];
-  aa[5]=aa[7];
-  //
+  double aa[9], eigenv[3];
+  
+  for (int i = 0; i < 9; i++) aa[i] = 0;
+  
+  for (int i = 0; i < nnodes; i++)
+  {
+    int i3 = 3*i;
+    aa[0] += ((x[i3]-xc[0]) * (x[i3]-xc[0]));
+    aa[4] += ((x[i3+1]-xc[1]) * (x[i3+1]-xc[1]));
+    aa[8] += ((x[i3+2]-xc[2]) * (x[i3+2]-xc[2]));
+    aa[3] += ((x[i3]-xc[0]) * (x[i3+1]-xc[1]));
+    aa[6] += ((x[i3]-xc[0]) * (x[i3+2]-xc[2]));
+    aa[7] += ((x[i3+1]-xc[1]) * (x[i3+2]-xc[2]));
+  }
+  aa[1] = aa[3];
+  aa[2] = aa[6];
+  aa[5] = aa[7];
+
   // use kaisers method to estimate
   // eigen values and vectors of the covariance matrix
-  //
-  nrows=3;
-  ncols=3;  
-  kaiser_wrap_(aa,&nrows,&ncols,eigenv,&trace,&sume,&ier);
-  //
+  int nrows = 3;
+  int ncols = 3;  
+  kaiser_wrap_(&aa[0],&nrows,&ncols,&eigenv[0],&trace,&sume,&ier);
+
   // copy the eigen vector basis on to vec
-  //
-  m=0;
-  for(i=0;i<3;i++)
-    for(j=0;j<3;j++)
-      {
-       vec[i][j]=aa[m++];
-      }
-  //
+  int m = 0;
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++)
+    {
+      vec[i][j] = aa[m++];
+    }
+  
   // find min and max bounds in the bounding box
   // vector basis
-  //
-  for(j=0;j<3;j++)
-    {
-      xmax[j]=-BIGVALUE;
-      xmin[j]=BIGVALUE;
-    }
-  for(i=0;i<nnodes;i++)
-    {
-      i3=3*i;
-      for(j=0;j<3;j++) xd[j]=0;
-      //
-      for(j=0;j<3;j++)
-	for(k=0;k<3;k++)
-	  xd[j]+=(x[i3+k]-xc[k])*vec[j][k];
-      //
-      for(j=0;j<3;j++)
-	{
-	  xmax[j]=max(xmax[j],xd[j]);
-	  xmin[j]=min(xmin[j],xd[j]);
-	}
-    }
-  //
+  for (int j = 0; j < 3; j++)
+  {
+    xmax[j] = -BIGVALUE;
+    xmin[j] =  BIGVALUE;
+  }
+  for (int i = 0; i < nnodes; i++)
+  {
+    int i3 = 3*i;
+    for(int j = 0; j < 3; j++) xd[j] = 0;
+
+    for (int j = 0; j < 3; j++)
+    	for (int k = 0; k < 3; k++)
+	      xd[j]+=(x[i3+k]-xc[k])*vec[j][k];
+      
+    for (int j = 0; j < 3; j++)
+	  {
+	    xmax[j] = max(xmax[j],xd[j]);
+	    xmin[j] = min(xmin[j],xd[j]);
+	  }
+  }
+
   // find the extents of the box
   // and coordinates of the center w.r.t. xc
   // increase extents by 1% for tolerance
-  //
-  for(j=0;j<3;j++)
-    {
-      dxc[j]=(xmax[j]-xmin[j])*0.5*1.01;
-      xd[j]=(xmax[j]+xmin[j])*0.5;
-    }
-  //
+  for (int j = 0; j < 3; j++)
+  {
+    dxc[j] = (xmax[j] - xmin[j]) * 0.5 * 1.01;
+    xd[j] = (xmax[j] + xmin[j]) * 0.5;
+  }
+  
   // find the center of the box in 
   // actual cartesian coordinates
-  //
-  for(j=0;j<3;j++)
-    {
-    for(k=0;k<3;k++)
-      xc[j]+=(xd[k]*vec[k][j]);
-    }
-  //
-  free(aa);
-  free(eigenv);
+  for (int j = 0; j < 3; j++)
+    for (int k = 0; k < 3; k++)
+      xc[j] += (xd[k]*vec[k][j]);
 }
 
 /** Check if a point is inside the provided hole map (return hole status) */
@@ -196,107 +181,98 @@ int checkHoleMap(double *x,int *nx,int *sam,double *extents)
 */      
 void fillHoleMap(int *holeMap, int ix[3],int isym)
 {
-  int m;
-  int ii,jj,kk,mm;
-  int ns2;
-  int i,j,k;
-  int ipaint,npaint,nneig;
   int mk[6];
-  //
+
   // now start from outside and paint the
   // the exterior
-  //
-  ns2=ix[0]*ix[1];
-  //
-  for(kk=0;kk<ix[2];kk+=(ix[2]-1))
-    for(jj=0;jj<ix[1];jj++)
-      for(ii=0;ii<ix[0];ii++)
+  int ns2 = ix[0]*ix[1];
+
+  for (int k = 0; k < ix[2]; k += (ix[2]-1))
+    for (int j = 0; j < ix[1]; j++)
+      for (int i = 0; i < ix[0]; i++)
+        holeMap[k*ns2+j*ix[0]+i] = 1;
+
+  for(int k = 0; k < ix[2]; k++)
+    for(int j = 0; j < ix[1]; j += (ix[1]-1))
+      for(int i = 0; i < ix[0]; i++)
+        holeMap[k*ns2+j*ix[0]+i] = 1;
+
+  for(int k = 0; k < ix[2]; k++)
+    for(int j = 0; j < ix[1]; j++)
+      for(int i = 0; i < ix[0]; i += (ix[0]-1))
+        holeMap[k*ns2+j*ix[0]+i] = 1;
+
+  int npaint = ns2*ix[2];
+  while (npaint > 0)
+  {
+    npaint = 0;
+    for(int k = 1; k < ix[2]-1; k++)
+      for(int j = 1; j < ix[1]-1; j++)
+        for(int i = 1; i < ix[0]-1; i++)
         {
-	  mm=kk*ns2+jj*ix[0]+ii;
-	  holeMap[mm]=1;
-	}
-  for(kk=0;kk<ix[2];kk++)
-    for(jj=0;jj<ix[1];jj+=(ix[1]-1))
-      for(ii=0;ii<ix[0];ii++)
-        {
-  	  mm=kk*ns2+jj*ix[0]+ii;
-         holeMap[mm]=1;
-  	}
-  for(kk=0;kk<ix[2];kk++)
-    for(jj=0;jj<ix[1];jj++)
-      for(ii=0;ii<ix[0];ii+=(ix[0]-1))
-        {
-	  mm=kk*ns2+jj*ix[0]+ii;
-	  holeMap[mm]=1;
-	}  
-  npaint=ns2*ix[2];
-  while(npaint > 0) 
-    {
-      npaint=0;
-      for(k=1;k<ix[2]-1;k++)
-        for(j=1;j<ix[1]-1;j++)
-          for(i=1;i<ix[0]-1;i++)
+          int ipaint = 1;
+          int nneig = 0;
+          int m = (k*ix[1]+j)*ix[0]+i;
+          if (holeMap[m] == 0)
+          {
+            ipaint = 0;
+            if (isym == 1)
             {
-              m=k*ns2+j*ix[0]+i;
-              if (holeMap[m]==0)
-                {
-                  ipaint=0;
-                  if (isym==1) 
-                   {
-		     mk[0]=m-ns2;
-		     mk[1]=m+ns2;
-		     mk[2]=m-ix[0];
-		     mk[3]=m+ix[0];
-		     mk[4]=m-1;
-		     mk[5]=m+1;
-		     nneig=4;
-		   }
-		  else if (isym==2)
-		    {
-		     mk[0]=m-ns2;
-		     mk[1]=m+ns2;
-		     mk[4]=m-ix[0];
-		     mk[5]=m+ix[0];
-		     mk[2]=m-1;
-		     mk[3]=m+1;
-		     nneig=4;
-		    }
-		  else if (isym==3)
-		    {
-		     mk[4]=m-ns2;
-		     mk[5]=m+ns2;
-		     mk[0]=m-ix[0];
-		     mk[1]=m+ix[0];
-		     mk[2]=m-1;
-		     mk[3]=m+1;
-		     nneig=4;
-		    }
-		  else
-		    {
-		      mk[0]=m-ns2;
-		      mk[1]=m+ns2;
-		      mk[2]=m-ix[0];
-		      mk[3]=m+ix[0];
-		      mk[4]=m-1;
-		      mk[5]=m+1;
-		      nneig=6;
-		    }		 
-                  for (kk=0;kk<nneig && ipaint==0;kk++)
-		    {
-		      ipaint=(ipaint || holeMap[mk[kk]]==1);
-		    }
-                  if (ipaint > 0)
-                    {
-                      holeMap[m]=1;
-                      npaint++;
-                    }
-                }
+              mk[0]=m-ns2;
+              mk[1]=m+ns2;
+              mk[2]=m-ix[0];
+              mk[3]=m+ix[0];
+              mk[4]=m-1;
+              mk[5]=m+1;
+              nneig=4;
             }
-    }
-  for(i=0;i<ix[2]*ix[1]*ix[0];i++) 
-   { 
-    holeMap[i]=(holeMap[i] ==0 || holeMap[i]==2);
-   }
+            else if (isym==2)
+            {
+              mk[0]=m-ns2;
+              mk[1]=m+ns2;
+              mk[4]=m-ix[0];
+              mk[5]=m+ix[0];
+              mk[2]=m-1;
+              mk[3]=m+1;
+              nneig=4;
+            }
+            else if (isym==3)
+            {
+              mk[4]=m-ns2;
+              mk[5]=m+ns2;
+              mk[0]=m-ix[0];
+              mk[1]=m+ix[0];
+              mk[2]=m-1;
+              mk[3]=m+1;
+              nneig=4;
+            }
+            else
+            {
+              mk[0]=m-ns2;
+              mk[1]=m+ns2;
+              mk[2]=m-ix[0];
+              mk[3]=m+ix[0];
+              mk[4]=m-1;
+              mk[5]=m+1;
+              nneig=6;
+            }
+            for (int kk = 0; (kk < nneig && ipaint == 0); kk++)
+            {
+              ipaint = (ipaint || holeMap[mk[kk]] == 1);
+            }
+            if (ipaint > 0)
+            {
+              holeMap[m] = 1;
+              npaint++;
+            }
+          }
+        }
+  }
+
+  for(int i = 0; i < ix[2]*ix[1]*ix[0]; i++)
+  {
+    holeMap[i] = (holeMap[i] == 0 || holeMap[i] == 2);
+  }
 }
 
 int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],

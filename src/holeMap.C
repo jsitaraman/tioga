@@ -42,7 +42,6 @@ void tioga::getHoleMap(void)
       if (holeMap[i].existWall)
       {
         free(holeMap[i].sam);
-        free(holeMap[i].samLocal);
       }
     delete [] holeMap;
   }
@@ -106,23 +105,22 @@ void tioga::getHoleMap(void)
         // Extend bounding box by 2/NX_HOLEMAP of max dimension in each direction
         holeMap[i].extents[j]   -= (2*dsbox);
         holeMap[i].extents[j+3] += (2*dsbox);
-        // nx should end up equal to 68 for maximum dimension
+        // nx should end up ~= to NX_HOLEMAP for maximum dimension
         holeMap[i].nx[j] = floor(max((ds[j]+4*dsbox)/dsbox, 1.));
       }
 
       int bufferSize = holeMap[i].nx[0] * holeMap[i].nx[1] * holeMap[i].nx[2];
       holeMap[i].sam = (int *)malloc(sizeof(int)*bufferSize);
-      holeMap[i].samLocal = (int *)malloc(sizeof(int)*bufferSize);
 
       for (int j = 0; j < bufferSize; j++)
-        holeMap[i].sam[j] = holeMap[i].samLocal[j] = 0;
+        holeMap[i].sam[j] = 0;
     }
   }
 
   // mark the wall boundary cells in the holeMap
   if (holeMap[meshtag].existWall)
   {
-    mb->markWallBoundary(holeMap[meshtag].samLocal,holeMap[meshtag].nx,holeMap[meshtag].extents);
+    mb->markWallBoundary(holeMap[meshtag].sam,holeMap[meshtag].nx,holeMap[meshtag].extents);
   }
 
   // allreduce the holeMap of each mesh
@@ -131,7 +129,7 @@ void tioga::getHoleMap(void)
     if (holeMap[i].existWall)
     {
       int bufferSize = holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
-      MPI_Allreduce(holeMap[i].samLocal,holeMap[i].sam,bufferSize,MPI_INT,MPI_MAX,scomm);
+      MPI_Allreduce(MPI_IN_PLACE,holeMap[i].sam,bufferSize,MPI_INT,MPI_MAX,scomm);
     }
   }
 

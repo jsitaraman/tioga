@@ -425,21 +425,17 @@ void tioga::directCut(void)
   std::vector<std::vector<double>> bbox_g(nGrids);
   std::vector<double> bbox_tmp(2*nDims*nproc);
 
-
   for (int g = 0; g < nGrids; g++)
   {
     if (g == mytag) continue;
 
     faceNodes_g[g].resize(nFace_g[g] * nVertf_g[g] * nDims);
-    bbox_g[g].resize(nProc_g[g] * 2 * nDims);
+    bbox_g[g].resize(2 * nDims);
 
-    for (int p = 0; p < nProc_g[g]; p++)
+    for (int d = 0; d < nDims; d++)
     {
-      for (int d = 0; d < nDims; d++)
-      {
-        bbox_g[g][2*nDims*p+d]       =  BIG_DOUBLE;
-        bbox_g[g][2*nDims*p+d+nDims] = -BIG_DOUBLE;
-      }
+      bbox_g[g][d]       =  BIG_DOUBLE;
+      bbox_g[g][d+nDims] = -BIG_DOUBLE;
     }
   }
 
@@ -462,6 +458,7 @@ void tioga::directCut(void)
       MPI_Irecv(&bbox_tmp[2*nDims*p], 2*nDims, MPI_DOUBLE, p, 1, scomm, &rreqs.back());
     }
 
+    // Get pointers to face node & bounding-box data based on grid type
     double *Fptr, *Bptr;
     int size = 0;
     if (nCutHole > 0 && gridTypes[p] > 0)

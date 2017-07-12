@@ -76,6 +76,14 @@ void cuda_free_pinned(T* &data_h)
   check_error();
 }
 
+template <typename T>
+__host__ __device__ __forceinline__
+void swap_d(T& a, T& b)
+{
+  T c(a);
+  a = b; b = c;
+}
+
 template<typename T>
 class dvec
 {
@@ -546,6 +554,26 @@ double dLagrange_gpu(const double* __restrict__ xiGrid, unsigned int npts,
 
 template<int nDims, int nPts>
 __device__ __forceinline__
+void getBoundingBox(const float* __restrict__ pts, float *bbox)
+{
+  for (int i = 0; i < nDims; i++)
+  {
+    bbox[i]       =  BIG_DOUBLE;
+    bbox[nDims+i] = -BIG_DOUBLE;
+  }
+
+  for (int i = 0; i < nPts; i++)
+  {
+    for (int dim = 0; dim < nDims; dim++)
+    {
+      bbox[dim]       = fmin(bbox[dim],      pts[i*nDims+dim]);
+      bbox[nDims+dim] = fmax(bbox[nDims+dim],pts[i*nDims+dim]);
+    }
+  }
+}
+
+template<int nDims, int nPts>
+__device__ __forceinline__
 void getBoundingBox(const double* __restrict__ pts, double *bbox)
 {
   for (int i = 0; i < nDims; i++)
@@ -566,6 +594,20 @@ void getBoundingBox(const double* __restrict__ pts, double *bbox)
 
 template<int nDims>
 __device__ __forceinline__
+bool boundingBoxCheck(const float* __restrict__ bbox1,
+                      const float* __restrict__ bbox2, float tol)
+{
+  bool check = true;
+  for (int i = 0; i < nDims; i++)
+  {
+    check = check && (bbox1[i+nDims] >= bbox2[i] - tol);
+    check = check && (bbox2[i+nDims] >= bbox1[i] - tol);
+  }
+  return check;
+}
+
+template<int nDims>
+__device__ __forceinline__
 bool boundingBoxCheck(const double* __restrict__ bbox1,
                       const double* __restrict__ bbox2, double tol)
 {
@@ -580,22 +622,50 @@ bool boundingBoxCheck(const double* __restrict__ bbox1,
 
 template<int nDims>
 __device__ __forceinline__
+float boundingBoxDist(const float* __restrict__ bbox1,
+                      const float* __restrict__ bbox2)
+{
+  float dist = 0.f;
+  for (int i = 0; i < nDims; i++)
+  {
+    if ( (bbox1[i+nDims] < bbox2[i]) || (bbox2[i+nDims] < bbox1[i]) )
+    {
+      float d = fmax(bbox2[i]-bbox1[i+nDims], bbox1[i]-bbox2[i+nDims]);
+      dist += d*d;
+    }
+  }
+
+  return sqrt(dist);
+}
+
+template<int nDims>
+__device__ __forceinline__
 double boundingBoxDist(const double* __restrict__ bbox1,
                        const double* __restrict__ bbox2)
 {
-  bool check = true;
-  double dist =  BIG_DOUBLE;
+  double dist = 0.;
   for (int i = 0; i < nDims; i++)
   {
-    dist = fmin(fabs(bbox2[i] - bbox1[i+nDims]), dist);
-    check = check && (bbox1[i+nDims] >= bbox2[i]);
-    check = check && (bbox2[i+nDims] >= bbox1[i]);
+    if ( (bbox1[i+nDims] < bbox2[i]) || (bbox2[i+nDims] < bbox1[i]) )
+    {
+      double d = fmax(bbox2[i]-bbox1[i+nDims], bbox1[i]-bbox2[i+nDims]);
+      dist += d*d;
+    }
   }
 
-  if (check)
-    return 0;
-  else
-    return dist;
+  return sqrt(dist);
+}
+
+template<int nDims, int nPts>
+__device__
+void getCentroid(const float* __restrict__ pts, float* __restrict__ xc)
+{
+  for (int d = 0; d < nDims; d++)
+    xc[d] = 0.f;
+
+  for (int i = 0; i < nPts; i++)
+    for (int d = 0; d < nDims; d++)
+      xc[d] += pts[nDims*i+d]/nPts;
 }
 
 template<int nDims, int nPts>
@@ -608,6 +678,139 @@ void getCentroid(const double* __restrict__ pts, double* __restrict__ xc)
   for (int i = 0; i < nPts; i++)
     for (int d = 0; d < nDims; d++)
       xc[d] += pts[nDims*i+d]/nPts;
+}
+
+/*! Generate an approximate Object-Oriented Bounding Box for a hexahedron 
+ *  OOBB stored as body axes, and min/max points of box in body frame (15 floats) */
+template<int nDims, int nPts>
+__device__
+void getOOBB(const double* __restrict__ pts, float* __restrict__ oobb, bool PRINT)
+{
+  // List of edges in 8-node hex: xi-edges, eta-edges, zeta-edges
+  const char edges[12][2] = { {0,1}, {3,2}, {4,5}, {7,6}, {0,3}, {1,2}, {4,7}, {5,6}, {0,4}, {1,5}, {3,7}, {2,6} };
+
+  // 1) Find the longest edge in each quasi-reference direction
+  int maxE[3];
+  //char maxE[3];
+  float length[3] = {0.f,0.f,0.f}; /// TODO: Use floats in more places throughout Direct Cut
+  for (int j = 0; j < 3; j++)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      float dist = 0.f;
+      int P0 = (int)edges[4*j+i][0];
+      int P1 = (int)edges[4*j+i][1];
+      for (int d = 0; d < nDims; d++)
+        dist += (pts[3*P1+d] - pts[3*P0+d]) * (pts[3*P1+d] - pts[3*P0+d]);
+
+      if (dist > length[j])
+      {
+        length[j] = dist;
+        //maxE[j] = (char)i;
+        maxE[j] = i;
+      }
+    }
+  }
+
+  // 1.5) Sort directions by length [descending]
+  int Dims[3] = {0,1,2};
+  if (length[1] > length[0])
+  {
+    swap_d(length[1], length[0]);
+    swap_d(maxE[1], maxE[0]);
+    swap_d(Dims[1], Dims[0]);
+  }
+
+  if (length[2] > length[1])
+  {
+    swap_d(length[1], length[2]);
+    swap_d(maxE[1], maxE[2]);
+    swap_d(Dims[1], Dims[2]);
+
+    if (length[1] > length[0])
+    {
+      swap_d(length[1], length[0]);
+      swap_d(maxE[1], maxE[0]);
+      swap_d(Dims[1], Dims[0]);
+    }
+  }
+   
+  for (int d = 0; d < 3; d++)
+    length[d] = sqrt(length[d]);
+
+  // 2) Setup new coordinate axes
+  float R[9];
+  for (int m = 0; m < 3; m++)
+  {
+    int D = (int)Dims[m];
+    int I = (int)maxE[m];
+    int P0 = edges[4*D+I][0];
+    int P1 = edges[4*D+I][1];
+    for (int d = 0; d < 3; d++)
+      R[3*m+d] = (pts[3*P1+d] - pts[3*P0+d]) / length[D];
+  }
+
+  // 2.5) Orthoganlize & normalize our approxmiate basis
+  
+  // Direction 2
+  float dot = 0.f;
+  for (int d = 0; d < 3; d++)
+    dot += R[d]*R[3+d];
+  for (int d = 0; d < 3; d++)
+    R[3+d] -= dot*R[d];
+
+  dot = 0.f;
+  for (int d = 0; d < 3; d++)
+    dot += R[3+d]*R[3+d];
+  dot = sqrt(dot);
+  for (int d = 0; d < 3; d++)
+    R[3+d] /= dot;
+
+
+  // Direction 3
+  dot = 0.f;
+  for (int d = 0; d < 3; d++)
+    dot += R[d]*R[6+d];
+  for (int d = 0; d < 3; d++)
+    R[6+d] -= dot*R[d];
+
+  dot = 0.f;
+  for (int d = 0; d < 3; d++)
+    dot += R[3+d]*R[6+d];
+  for (int d = 0; d < 3; d++)
+    R[6+d] -= dot*R[3+d];
+
+  dot = 0.f;
+  for (int d = 0; d < 3; d++)
+    dot += R[6+d]*R[6+d];
+  dot = sqrt(dot);
+  for (int d = 0; d < 3; d++)
+    R[6+d] /= dot;
+
+  // 3) Find min/max pts in new axes
+  float minPt[3] = { BIG_DOUBLE,  BIG_DOUBLE,  BIG_DOUBLE};
+  float maxPt[3] = {-BIG_DOUBLE, -BIG_DOUBLE, -BIG_DOUBLE};
+  for (int i = 0; i < nPts; i++)
+  {
+    float pt[3] = {0.f, 0.f, 0.f};
+    for (int m = 0; m < 3; m++)
+      for (int n = 0; n < 3; n++)
+        pt[m] += R[3*m+n] * pts[3*i+n];
+
+    for (int d = 0; d < 3; d++)
+    {
+      minPt[d] = fmin(minPt[d], pt[d]);
+      maxPt[d] = fmax(maxPt[d], pt[d]);
+    }
+  }
+
+  // 4) Store the OOBB
+  for (int i = 0; i < 9; i++)
+    oobb[i] = R[i];
+  for (int i = 0; i < 3; i++)
+    oobb[9+i] = minPt[i];
+  for (int i = 0; i < 3; i++)
+    oobb[12+i] = maxPt[i];
 }
 
 } // namespace cuda_funcs

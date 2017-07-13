@@ -265,6 +265,12 @@ void MeshBlock::tagBoundary(void)
 
 void MeshBlock::setupADT(void)
 {
+  for (int d = 0; d < 3; d++)
+  {
+    aabb[d]   =  BIG_DOUBLE;
+    aabb[d+3] = -BIG_DOUBLE;
+  }
+
   /// TODO: take in a bounding box of the region we're interested in searching (search.c)
   elementBbox.resize(ncells*6);
   elementList.resize(ncells);
@@ -295,6 +301,9 @@ void MeshBlock::setupADT(void)
       {
         xmin[j] = min(xmin[j], x[i3+j]);
         xmax[j] = max(xmax[j], x[i3+j]);
+        // Overall partition bounding box
+        aabb[j]   = min(aabb[j], x[i3+j]);
+        aabb[j+3] = max(aabb[j], x[i3+j]);
       }
     }
 
@@ -329,7 +338,6 @@ void MeshBlock::setupADT(void)
   /* ---- Direct Cut Setup ---- */
 
   mb_d.extraDataToDevice(vconn[0]);
-
 #endif
 }
 
@@ -619,7 +627,7 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   int inode;
 
   *mtag = meshtag - BASE;
-  if (nwbc <=0) {
+  if (nwbc <=0) { /// TESTING
     *existWall=0;
     for (int i = 0; i < 3; i++)
     {
@@ -645,6 +653,35 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
     }
   
 }
+
+void MeshBlock::getOversetBounds(int *mtag, int *existOver, double obox[6])
+{
+  *mtag = meshtag - BASE;
+  if (nobc <= 0)
+  {
+    *existOver=0;
+    for (int i = 0; i < 3; i++)
+    {
+      obox[i]   =  BIGVALUE;
+      obox[3+i] = -BIGVALUE;
+    }
+    return;
+  }
+
+  *existOver = 1;
+  obox[0] = obox[1] = obox[2] =  BIGVALUE;
+  obox[3] = obox[4] = obox[5] = -BIGVALUE;
+
+  for (int i = 0; i < nobc; i++)
+  {
+    int ind = 3*obcnode[i]-BASE;
+    for (int j = 0; j < 3; j++)
+    {
+      obox[j]   = min(obox[j],   x[ind+j]);
+      obox[j+3] = max(obox[j+3], x[ind+j]);
+    }
+  }
+}
   
 void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
 {
@@ -655,6 +692,92 @@ void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
   for (int i = 0; i < nwbc; i++)
   {
     int ii = wbcnode[i]-BASE;
+    inode[ii] = 1;
+  }
+
+  // Mark all wall boundary cells (Any cell with wall-boundary node)
+  int m = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    for (int i = 0; i < nc[n]; i++)
+    {
+      for (int j = 0; j < nvert; j++)
+      {
+        int ii = vconn[n][nvert*i+j]-BASE;
+        if (inode[ii] == 1)
+        {
+          iflag[m] = 1;
+          break;
+        }
+      }
+      m++;
+    }
+  }
+
+  // find delta's in each directions
+  double ds[3];
+  for (int k = 0; k < 3; k++) ds[k] = (extents[k+3]-extents[k])/nx[k];
+
+  // mark sam cells with wall boundary cells now
+  int imin[3];
+  int imax[3];
+  m = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    int nvert = nv[n];
+    for (int i = 0; i < nc[n]; i++)
+    {
+      if (iflag[m] == 1)
+      {
+        // find the index bounds of each wall boundary cell bounding box
+        imin[0] = imin[1] = imin[2] =  BIGINT;
+        imax[0] = imax[1] = imax[2] = -BIGINT;
+        for (int j = 0; j < nvert; j++)
+        {
+          int i3 = 3*(vconn[n][nvert*i+j]-BASE);
+          for (int k = 0; k < 3; k++)
+          {
+            double xv = x[i3+k];
+            int iv = floor((xv-extents[k])/ds[k]);
+            imin[k] = min(imin[k],iv);
+            imax[k] = max(imax[k],iv);
+          }
+        }
+
+        for (int j = 0; j < 3; j++)
+        {
+          imin[j] = max(imin[j],0);
+          imax[j] = min(imax[j],nx[j]-1);
+        }
+
+        // mark sam to 2
+        for (int kk = imin[2]; kk < imax[2]+1; kk++)
+        {
+          for (int jj = imin[1]; jj < imax[1]+1; jj++)
+          {
+            for (int ii = imin[0]; ii < imax[0]+1; ii++)
+            {
+              int mm = (kk*nx[1] + jj)*nx[0] + ii;
+              sam[mm] = 2;
+            }
+          }
+        }
+      }
+      m++;
+    }
+  }
+}
+
+void MeshBlock::markOversetBoundary(int *sam,int nx[3],double extents[6])
+{
+  std::vector<int> iflag(ncells);
+  std::vector<int> inode(nnodes);
+
+  // Mark all wall boundary nodes
+  for (int i = 0; i < nobc; i++) /// TESTING
+  {
+    int ii = obcnode[i]-BASE; /// TESTING
     inode[ii] = 1;
   }
 

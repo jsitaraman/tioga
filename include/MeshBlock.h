@@ -263,11 +263,13 @@ private:
 
   int nfringe;
   int meshtag; /** < tag of the mesh that this block belongs to */
-  //
-  // oriented bounding box of this partition
-  // 
+
+  //! Oriented bounding box of this partition
   OBB *obb;
-  //
+
+  //! Axis-aligned bounding box for this partition
+  double aabb[6];
+
   int nsearch;        /** < number of query points to search in this block */
   std::vector<int> isearch;       /** < index of query points in the remote process */
   std::vector<double> xsearch;    /** < coordinates of the query points */
@@ -436,8 +438,12 @@ private:
   void checkContainment(int *cellIndex,int adtElement,double *xsearch,double *rst);
 
   void getWallBounds(int *mtag,int *existWall, double wbox[6]);
+
+  void getOversetBounds(int *mtag,int *existOver, double obox[6]);
   
   void markWallBoundary(int *sam,int nx[3],double extents[6]);
+
+  void markOversetBoundary(int *sam,int nx[3],double extents[6]);
 
   void getQueryPoints(OBB *obb,int *nints,int **intData,int *nreals,
 		      double **realData);
@@ -494,7 +500,7 @@ private:
 
   //! Peform the Direct Cut alogorithm on the GPU
   void directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvertf, std::vector<double>& cutBbox,
-      CutMap &cutMap, int cutType = 1);
+      HOLEMAP &holeMap, CutMap &cutMap, int cutType = 1);
 
   //! Take the union of all cut flags
   void unifyCutFlags(std::vector<CutMap> &cutMap);

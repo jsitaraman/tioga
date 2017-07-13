@@ -121,7 +121,9 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
 
   if (adt.rrot) // Transform back to ADT's coordinate system
   {
-    double x2[nDims] = {0.0};
+    double x2[nDims];// = {0.0}; /// TODO: figure out when/if this works?
+    for (int d = 0; d < nDims; d++)
+      x2[d] = 0.0;
     for (int d1 = 0; d1 < nDims; d1++)
       for (int d2 = 0; d2 < nDims; d2++)
         x2[d1] += adt.Rmat[d1+nDims*d2]*(xsearch[d2]-adt.offset[d2]);

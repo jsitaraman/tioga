@@ -114,6 +114,7 @@ void tioga::profile(void)
     gridType = mb->gridType;
 
     // For the direct-cut method
+    // gridType == 0: background;  gridType == 1: body grid
     gridIDs.resize(nproc);
     gridTypes.resize(nproc);
     MPI_Allgather(&mytag, 1, MPI_INT, gridIDs.data(), 1, MPI_INT, scomm);
@@ -241,7 +242,7 @@ void tioga::doHoleCutting(void)
   // Generate structured map of solid boundary (hole) locations
   getHoleMap();
 
-  // Send/Recv the hole maps to/from all necessary ranks
+  // Send/Recv oriented bounding boxes to/from all ranks and setup sndMap / rcvMap
   exchangeBoxes();
 
   // Find a list of all potential receptor points and send to all possible
@@ -274,6 +275,12 @@ void tioga::doHoleCutting(void)
   PUSH_NVTX_RANGE("DirectCut", 2);
   Timer dcTime("Direct Cut: ");
   dcTime.startTimer();
+  // Generate structured map of solid boundary (hole) locations
+  if (holeMap == NULL || overMap.size() == 0)
+  {
+    getHoleMap();
+    getOversetMap();
+  }
   exchangeBoxes();
   directCut();
   mb->calcFaceIblanks(meshcomm);
@@ -388,34 +395,14 @@ void tioga::directCut(void)
   std::vector<double> faceNodesO; // overset face nodes
 
   std::vector<double> bboxW, bboxO;
-  int nvert = mb->getCuttingFaces(faceNodesW, faceNodesO, bboxW, bboxO);
+  int nvertf = mb->getCuttingFaces(faceNodesW, faceNodesO, bboxW, bboxO);
 
   // # nodes-per-face, and # of cutting faces, for each rank
   std::vector<int> nvertf_p(nproc);
   std::vector<int> nHoleFace_p(nproc), nOverFace_p(nproc);
-  MPI_Allgather(&nvert, 1, MPI_INT, nvertf_p.data(), 1, MPI_INT, scomm);
+  MPI_Allgather(&nvertf, 1, MPI_INT, nvertf_p.data(), 1, MPI_INT, scomm);
   MPI_Allgather(&nCutHole, 1, MPI_INT, nHoleFace_p.data(), 1, MPI_INT, scomm);
   MPI_Allgather(&nCutFringe, 1, MPI_INT, nOverFace_p.data(), 1, MPI_INT, scomm);
-
-  // Figure out displacements into per-grid storage (rather than per-rank)
-  std::vector<int> nFace_g(nGrids), nFace_p(nproc);
-  std::vector<int> faceDisp_p(nproc);
-  std::vector<int> nProc_g(nGrids), nVertf_g(nGrids);
-  for (int p = 0; p < nproc; p++)
-  {
-    int g = gridIDs[p];
-    if (g == mytag) continue;
-
-    faceDisp_p[p] = nFace_g[g];
-    if (gridType > 0)
-      nFace_p[p] += nHoleFace_p[p];
-    else
-      nFace_p[p] += nOverFace_p[p];
-
-    nFace_g[g] += nFace_p[p];
-    nVertf_g[g] = nvertf_p[p];  // Assuming same for each rank of every grid
-    nProc_g[g]++;
-  }
 
   // Setup buffers for receiving cutting surfaces from each grid
 
@@ -423,13 +410,14 @@ void tioga::directCut(void)
   sreqs.reserve(2*nproc); rreqs.reserve(2*nproc);
   std::vector<std::vector<double>> faceNodes_g(nGrids);
   std::vector<std::vector<double>> bbox_g(nGrids);
+  std::vector<int> nFace_p(nproc), nFaceTot_g(nGrids);
   std::vector<double> bbox_tmp(2*nDims*nproc);
+  std::vector<double> aabb_tmp(2*nDims*nproc);
 
   for (int g = 0; g < nGrids; g++)
   {
     if (g == mytag) continue;
 
-    faceNodes_g[g].resize(nFace_g[g] * nVertf_g[g] * nDims);
     bbox_g[g].resize(2 * nDims);
 
     for (int d = 0; d < nDims; d++)
@@ -439,39 +427,149 @@ void tioga::directCut(void)
     }
   }
 
-  // Send / recv face nodes data
+  // Send / recv cutting group bounding-box data
 
   for (int p = 0; p < nproc; p++)
   {
     int g = gridIDs[p];
     if (g == mytag) continue;
 
+    nFace_p[p] = (gridType == 0) ? nOverFace_p[p] : nHoleFace_p[p];
+    nFaceTot_g[g] += nFace_p[p];
+
     if (nFace_p[p] > 0)
     {
-      // Receive the cutting faces
-      rreqs.emplace_back();
-      MPI_Irecv(faceNodes_g[g].data() + faceDisp_p[p]*nVertf_g[g]*nDims,
-          nFace_p[p]*nvertf_p[p]*nDims, MPI_DOUBLE, p, 0, scomm, &rreqs.back());
-
       // Receive the rank's cutting-face bounding box
       rreqs.emplace_back();
       MPI_Irecv(&bbox_tmp[2*nDims*p], 2*nDims, MPI_DOUBLE, p, 1, scomm, &rreqs.back());
+      MPI_Irecv(&aabb_tmp[2*nDims*p], 2*nDims, MPI_DOUBLE, p, 2, scomm, &rreqs.back());
+    }
+    
+    // Get pointers to face node & bounding-box data based on grid type
+    double *Bptr;
+    int size = 0;
+    if (nCutHole > 0 && gridTypes[p] > 0)
+    {
+      Bptr = bboxW.data();
+      size = nCutHole;
+    }
+    else if (nCutFringe > 0 && gridTypes[p] == 0)
+    {
+      Bptr = bboxO.data();
+      size = nCutFringe;
     }
 
+    if (size > 0)
+    {
+      // Send bounding box
+      sreqs.emplace_back();
+      MPI_Isend(Bptr, 2*nDims, MPI_DOUBLE, p, 1, scomm, &sreqs.back());
+      MPI_Isend(mb->aabb, 2*nDims, MPI_DOUBLE, p, 2, scomm, &sreqs.back());
+    }
+  }
+
+  // Complete the communication
+  MPI_Waitall((int)sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
+  MPI_Waitall((int)rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
+
+  // Figure out which ranks cut faces must be sent/received from
+
+  std::vector<int> dcSndMap;  // List of ranks to send cut faces to
+  std::vector<int> dcRcvMap;  // List of ranks to recv cut faces from
+
+  for (int p = 0; p < nproc; p++)
+  {
+    int g = gridIDs[p];
+    if (g == mytag) continue;
+
+    int nface = 0;
+    if (nCutHole > 0 && gridTypes[p] > 0)
+      nface = nCutHole;
+    else if (nCutFringe > 0 && gridTypes[p] == 0)
+      nface = nCutFringe;
+
+    // Check if our bbox overlaps with other rank's cut-group bbox
+    if (nFace_p[p] > 0 && tg_funcs::boundingBoxCheck(mb->aabb, &bbox_tmp[2*nDims*p], 3))
+      dcRcvMap.push_back(p);
+
+    double *Bptr = NULL;
+    if (nCutHole > 0 && gridTypes[p] > 0)
+      Bptr = bboxW.data();
+    else if (nCutFringe > 0 && gridTypes[p] == 0)
+      Bptr = bboxO.data();
+
+    // Check if other rank's bbox overlaps with our cut-group bbox
+    if (Bptr != NULL && tg_funcs::boundingBoxCheck(Bptr, &aabb_tmp[2*nDims*p], 3))
+      dcSndMap.push_back(p);
+  }
+
+  int nrecv = dcRcvMap.size();
+  int nsend = dcSndMap.size();
+
+  // Figure out displacements into per-grid storage (rather than per-rank)
+
+  std::vector<int> nFace_g(nGrids), nFace_r(nrecv);
+  std::vector<int> faceDisp_r(nrecv);
+  std::vector<int> nProc_g(nGrids), nVertf_g(nGrids);
+
+  for (int i = 0; i < nrecv; i++)
+  {
+    int p = dcRcvMap[i];
+    int g = gridIDs[p];
+
+    faceDisp_r[i] = nFace_g[g];
+    if (gridType > 0)
+      nFace_r[i] += nHoleFace_p[p];
+    else
+      nFace_r[i] += nOverFace_p[p];
+
+    nFace_g[g] += nFace_r[i];
+    nVertf_g[g] = nvertf_p[p];  // Assuming same for each rank of every grid
+    nProc_g[g]++;
+  }
+
+  for (int g = 0; g < nGrids; g++)
+  {
+    faceNodes_g[g].resize(nFace_g[g] * nVertf_g[g] * nDims);
+  }
+
+  // Reset the request buffers
+  sreqs.resize(0); sreqs.reserve(nsend);
+  rreqs.resize(0); rreqs.reserve(nrecv);
+
+  // Send / recv face nodes data - only to required ranks
+
+  for (int i = 0; i < nrecv; i++)
+  {
+    int p = dcRcvMap[i];
+    int g = gridIDs[p];
+
+    if (nFace_r[i] > 0)
+    {
+      // Receive the cutting faces
+      /// TODO: update faceDisp AFTER setting rcvMap
+      rreqs.emplace_back();
+      MPI_Irecv(faceNodes_g[g].data() + faceDisp_r[i]*nVertf_g[g]*nDims,
+          nFace_r[i]*nvertf_p[p]*nDims, MPI_DOUBLE, p, 0, scomm, &rreqs.back());
+    }
+  }
+
+  for (int i = 0; i < nsend; i++)
+  {
+    int p = dcSndMap[i];
+
     // Get pointers to face node & bounding-box data based on grid type
-    double *Fptr, *Bptr;
+    double *Fptr;
     int size = 0;
     if (nCutHole > 0 && gridTypes[p] > 0)
     {
       Fptr = faceNodesW.data();
-      Bptr = bboxW.data();
-      size = nCutHole*nvert*nDims;
+      size = nCutHole*nvertf*nDims;
     }
     else if (nCutFringe > 0 && gridTypes[p] == 0)
     {
       Fptr = faceNodesO.data();
-      Bptr = bboxO.data();
-      size = nCutFringe*nvert*nDims;
+      size = nCutFringe*nvertf*nDims;
     }
 
     if (size > 0)
@@ -479,10 +577,6 @@ void tioga::directCut(void)
       // Send face nodes
       sreqs.emplace_back();
       MPI_Isend(Fptr, size, MPI_DOUBLE, p, 0, scomm, &sreqs.back());
-
-      // Send bounding box
-      sreqs.emplace_back();
-      MPI_Isend(Bptr, 2*nDims, MPI_DOUBLE, p, 1, scomm, &sreqs.back());
     }
   }
 
@@ -491,11 +585,11 @@ void tioga::directCut(void)
   MPI_Waitall((int)rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
 
   // Reduce the bounding box data to one box per grid
-  for (int p = 0; p < nproc; p++)
+  //for (int p = 0; p < nproc; p++)
+  for (int i = 0; i < nrecv; i++)
   {
+    int p = dcRcvMap[i];
     int g = gridIDs[p];
-
-    if (g == mytag) continue;
 
     for (int d = 0; d < nDims; d++)
     {
@@ -515,10 +609,11 @@ void tioga::directCut(void)
     if (g == mytag) continue;
 
     cutTime.startTimer();
-    if (nFace_g[g] > 0)
+    if (nFaceTot_g[g] > 0)
     {
+      HOLEMAP hm = (gridType == 0) ? overMap[g] : holeMap[g];
 #ifdef _GPU
-      mb->directCut_gpu(faceNodes_g[g], nFace_g[g], nVertf_g[g], bbox_g[g], cutMap[ncut], gridType);
+      mb->directCut_gpu(faceNodes_g[g], nFace_g[g], nVertf_g[g], bbox_g[g], hm, cutMap[ncut], gridType);
 #else
       mb->directCut(faceNodes_g[g], nFace_p[g], nVertf_g[g], bbox_g[g], cutMap[ncut], gridType);
 #endif

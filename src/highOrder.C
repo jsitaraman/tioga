@@ -555,12 +555,13 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
 }
 
 void MeshBlock::directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvertf,
-    std::vector<double> &cutBbox, CutMap &cutMap, int cutType)
+    std::vector<double> &cutBbox, HOLEMAP &holeMap, CutMap &cutMap, int cutType)
 {
   cutMap.flag.resize(ncells);
 
   // Call out to the device to perform the cutting
   PUSH_NVTX_RANGE("DC-GPU",4);
+  mb_d.assignHoleMap(holeMap.existWall, holeMap.nx, holeMap.sam, holeMap.extents);
   mb_d.directCut(cutFaces.data(), nCut, nvertf, cutBbox.data(), cutMap.flag.data(), cutType);
   POP_NVTX_RANGE;
 }

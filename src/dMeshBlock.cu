@@ -6,8 +6,8 @@
 
 /* --- Handy Vector Operation Macros --- */
 
-#define NF1 16 // 20-32 depending on unstructured-ness of grid & desire for robustness
-#define NF2  4 // 3-6 depending on unstructured-ness of grid & desire for robustness
+#define NF1  8 // 20-32 depending on unstructured-ness of grid & desire for robustness
+#define NF2  3 // 3-6 depending on unstructured-ness of grid & desire for robustness
 
 #define CROSS(a, b, c) { \
   c[0] = a[1]*b[2] - a[2]*b[1]; \
@@ -102,6 +102,44 @@ void dMeshBlock::dataToDevice(int ndims, int nnodes, int ncells, int ncells_adt,
 void dMeshBlock::extraDataToDevice(int* vconn)
 {
 //  c2v.assign(vconn, nvert*ncells);
+}
+
+void dMeshBlock::assignHoleMap(bool hasWall, int* nx, int* sam, double* extents)
+{
+  if (hasWall)
+  {
+    int size = nx[0]*nx[1]*nx[2];
+
+    std::vector<char> tmp_sam(size);
+    for (int i = 0; i < size; i++)
+      tmp_sam[i] = (char)sam[i];
+
+    double dx[3];
+    for (int d = 0; d < 3; d++)
+      dx[d] = (extents[d+3] - extents[d]) / nx[d];
+
+    hm_sam.assign(tmp_sam.data(), size);
+    hm_extents.assign(extents, 6);
+    hm_nx.assign(nx, 3);
+    hm_dx.assign(dx, 3);
+  }
+  else
+  {
+    clearHoleMap();
+  }
+}
+
+void dMeshBlock::clearHoleMap(void)
+{
+  int nx[3] = {0,0,0};
+  double dx[3] = {0,0,0};
+  double extents[6] = {0,0,0,0,0,0};
+
+  hm_sam.resize(0);
+
+  hm_nx.assign(nx, 3);
+  hm_dx.assign(dx, 3);
+  hm_extents.assign(extents, 6);
 }
 
 void dMeshBlock::updateSearchPoints(int nsearch, int *isearch, double *xsearch)
@@ -510,7 +548,7 @@ dPoint faceNormal(const double* xv)
 template<int nSideC, int nSideF>
 __device__
 double intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
-    const double* __restrict__ exv, double* __restrict__ minVec, bool PRINT)
+    const double* __restrict__ exv, double* __restrict__ minVec)
 {
   /* --- Prerequisites --- */
 
@@ -783,14 +821,15 @@ double intersectionCheckLinear(dMeshBlock &mb, const double* __restrict__ fxv,
 
 template<int nDims, int nSideC, int nSideF>
 __global__
-void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
-    int* __restrict__ cutFlag, int cutType, int* __restrict__ list, int ncells)
+void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut, int nFiltF,
+    dvec<int> filt_faces, int* __restrict__ cutFlag, int cutType,
+    int* __restrict__ list, int ncells)
 {
-  int ic = blockIdx.x * blockDim.x + threadIdx.x;
+  int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (ic >= ncells) return;
+  if (tid >= ncells) return;
 
-  ic = list[ic];  // Get filtered cell ID
+  int ic = list[tid];  // Get filtered cell ID
 
   // Figure out how many threads are left in this block after ic>=ncells returns
   int blockSize = min(blockDim.x, ncells - blockIdx.x * blockDim.x);
@@ -820,31 +859,9 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
 
   cuda_funcs::getOOBB<nDims,nvert>(xv,oobb,PRINT);
 
-  /// DEBUGGING
-  if (PRINT)
-  {
-    printf("%d: Nodes 0/6 = %f, %f, %f;  %f, %f, %f\n",ic,xv[0],xv[1],xv[2],xv[18],xv[19],xv[20]);
-    printf("%d: OOBB axes = %f, %f, %f;  %f, %f, %f;  %f, %f, %f\n",ic,oobb[0],oobb[1],oobb[2],oobb[3],oobb[4],oobb[5],oobb[6],oobb[7],oobb[8]);
-    printf("%d: OOBB min/max pt = %f, %f, %f;  %f, %f, %f\n",ic,oobb[9],oobb[10],oobb[11],oobb[12],oobb[13],oobb[14]);
-  }
-
   /*float xcRc[3];
   for (int d = 0; d < 3; d++)
     xcRc[d] = 0.5f * (oobb[9+d] + oobb[12+d]);*/
-
-  /// DEBUGGING
-  /*double RAD1 = .061;
-  bool PRINT = (ic == 23776) && (nSideC==2) && (fabs(xcC[0]+.0131) < .02*RAD1) && (fabs(xcC[1]-.0271) < .02*RAD1) && (fabs(xcC[2]-.0016) < .015*RAD1);
-  PRINT = false;
-  if (PRINT)
-  {
-    printf("Found cell = %d/%d, filtered ID %d, XC %.4e %.4e %.4e\n",ic,ncells,blockIdx.x * blockDim.x + threadIdx.x,xcC[0],xcC[1],xcC[2]);
-
-    for (int i =0; i<8; i++)
-    {
-      printf("node %d = %f, %f, %f\n",i,xv[i*3+0],xv[i*3+1],xv[i*3+2]);
-    }
-  }*/
 
   const double href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
   const double dtol = 2e-1*href;
@@ -863,8 +880,10 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     faceList[i] = -1;
   }
 
-  for (int ff = 0; ff < nCut; ff++)
+  for (int i = 0; i < nFiltF; i++)
   {
+    int ff = filt_faces[i];
+
     __syncthreads();
 
     // Stick to just linear component of face [4 corners]
@@ -934,83 +953,6 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
         ind--;
       }
     }
-
-    /*if (nHit == 0)
-    {
-      if (check)
-      {
-        distList[0] = dist2;
-        faceList[1] = ff;
-        nHit = 1;
-      }
-      if (dist2 < distList[NF1-1]) // Closer than the worst in our list, at least
-      {
-        // Insert and sort
-        distList[NF1-1] = dist2;
-        faceList[NF1-1] = ff;
-        int ind = NF1 - 1;
-        while (distList[ind] < distList[ind-1] && ind > 0)
-        {
-          swap(distList[ind], distList[ind-1]);
-          swap(faceList[ind], faceList[ind-1]);
-          ind--;
-        }
-      }
-    }
-    else if (check)
-    {
-      nHit++;
-
-      int ind = min(NF1 - 1, nHit);
-      distList[ind] = dist2;
-      faceList[ind] = ff;
-      while (distList[ind] < distList[ind-1] && ind > 0)
-      {
-        swap(distList[ind], distList[ind-1]);
-        swap(faceList[ind], faceList[ind-1]);
-        ind--;
-      }
-
-      /*int ind = 0;
-      for (ind = 0; ind < nHit; ind++)
-      {
-        if (dist2 < distList[ind])
-        {
-          for (int j = nHit; j > ind; j--)
-          {
-            distList[j] = distList[j-1];
-            faceList[j] = faceList[j-1];
-          }
-          break;
-        }
-      }
-      distList[ind] = dist2;
-      faceList[ind] = ff;
-      nHit++;* /
-    }*/
-
-    if (PRINT && dist2 < 0.3f)
-    {
-      for (int i = 0; i < 4; i++)
-        printf("Cell %d: Face[%d][%d] = %f %f %f\n",ic,ff,i,fxv_s[3*i+0],fxv_s[3*i+1],fxv_s[3*i+2]);
-      for (int i = 0; i < 4; i++)
-        printf("Cell %d: FaceR[%d][%d] = %f %f %f\n",ic,ff,i,fxv_r[3*i+0],fxv_r[3*i+1],fxv_r[3*i+2]);
-      printf("Cell %d face %d distance estimate %.4e\n",ic,ff,dist2);
-    }
-
-    /*if (dist2 < distList[NF-1]) // Closer than the worst in our list, at least
-    {
-      // Insert and sort
-      distList[NF-1] = dist2;
-      faceList[NF-1] = ff;
-      int ind = NF-1;
-      while (distList[ind] < distList[ind-1] && ind > 0)
-      {
-        swap(distList[ind], distList[ind-1]);
-        swap(faceList[ind], faceList[ind-1]);
-        ind--;
-      }
-    }*/
   }
 
   /* --- Pass 2: Coarse-Grained Intersection Check using linear portion of cell/face --- */
@@ -1043,8 +985,8 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
       fxv[i] = cutFaces[ff*stride+i];
 
     dPoint vec;
-    double dist = intersectionCheck<2,2>(mb, fxv, xv, &vec[0], PRINT);
-    //double dist = intersectionCheckLinear(mb, fxv, xv, &vec[0], PRINT);
+    double dist = intersectionCheck<2,2>(mb, fxv, xv, &vec[0]);
+    //double dist = intersectionCheckLinear(mb, fxv, xv, &vec[0]);
     vec /= vec.norm();
 
     dPoint norm = faceNormal(fxv);
@@ -1118,17 +1060,6 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     }
   }
 
-  /*if (nHit == 0) /// dunno... use method above to avoid too much divergence...
-  {
-    // Definitely no intersection; just stick with top NF2 faces
-    for (int i = 0; i < NF2; i++)
-      faces[i] = faceList[i];
-  }
-  else
-  {
-
-  }*/
-
   /* --- 6/24/17
      + Do 'intersectionCheck()' on linear component of cell/face only
      ++ Do for all ncheck faces
@@ -1166,22 +1097,10 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     for (int i = 0; i < stride; i++)
       fxv[i] = cutFaces[ff*stride+i];
 
-    /// DEBUGGING
-    if (PRINT)
-    {
-      for (int i = 0; i < nvertf; i++)
-        printf("Cell %d: Face[%d][%d] = %f %f %f\n",ic,ff,i,fxv[3*i+0],fxv[3*i+1],fxv[3*i+2]);
-    }
-
     // Find distance from face to cell
     dPoint vec;
-    double dist = intersectionCheck<nSideC,nSideF>(mb, fxv, xv, &vec[0], PRINT);
+    double dist = intersectionCheck<nSideC,nSideF>(mb, fxv, xv, &vec[0]);
     vec /= vec.norm();
-
-    if (PRINT)
-    {
-      printf("Face %d: dist = %.4e, vec = %f, %f, %f\n",ff,dist,vec[0],vec[1],vec[2]);
-    }
 
     dPoint norm = faceNormal(fxv);
     if (cutType == 0) norm *= -1;
@@ -1234,7 +1153,7 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
     {
       // dist > myDist, ignore
     }
-    if (PRINT) printf("After face %d-%d: Cut Flag = %d\n",F,ff,myFlag);
+    //if (PRINT) printf("After face %d-%d: Cut Flag = %d\n",F,ff,myFlag);
   }
 
   if (myFlag == DC_CUT)
@@ -1243,56 +1162,205 @@ void fillCutMap(dMeshBlock mb, dvec<double> cutFaces, int nCut,
   cutFlag[ic] = myFlag;
 }
 
+__device__
+int floatToOrderedInt(float floatVal)
+{
+  int intVal = __float_as_int(floatVal);
+
+  return (intVal >= 0 ) ? intVal : intVal ^ 0x8FFFFFFF;
+}
+
+__device__
+unsigned int floatToUint(float fval)
+{
+  unsigned int ival = __float_as_uint(fval);
+  unsigned int mask = -int(ival >> 31) | 0x80000000;
+  return ival ^ mask;
+}
+
+__device__
+float uintToFloat(unsigned int ival)
+{
+  unsigned int mask = ((ival >> 31) - 1) | 0x80000000;
+  return __uint_as_float(ival ^ mask);
+}
+
+__device__
+float orderedIntToFloat(int intVal)
+{
+  return __int_as_float( (intVal >= 0) ? intVal : intVal ^ 0x8FFFFFFF );
+}
+
+__device__ float atomicMaxf(float* address, float val)
+{
+  //int *iaddr = (int*)address;
+  int old = __float_as_int(*address);
+  int assumed;
+  while (val > __int_as_float(old))
+  {
+    assumed = old;
+    old = atomicCAS((int*)address, assumed, __float_as_int(val));
+  }
+  return __int_as_float(old);
+}
+
+__device__ float atomicMinf(float* address, float val)
+{
+  int old = __float_as_int(*address);
+  int assumed;
+  while (val < __int_as_float(old))
+  {
+    assumed = old;
+    old = atomicCAS((int*)address, assumed, __float_as_int(val));
+  }
+  return __int_as_float(old);
+}
+
 /*! Remove all elements which do not intersect with cut group's bbox from
  *  consideration (obviously do not intersect) */
 template<int nvert>
 __global__
-void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt, dvec<int> cutFlag, dvec<int> nfilt)
+void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
+    dvec<int> cutFlag, dvec<int> nfilt, dvec<float> bboxOut)
 {
   const unsigned int ic = blockIdx.x * blockDim.x + threadIdx.x;
 
-  if (ic >= mb.ncells) return;
+  // Initialize nfilt to 0; will be atomically added to at end
+  if (ic == 0)
+  {
+    nfilt[0] = 0;
+    for (int d = 0; d < 3; d++)
+    {
+      bboxOut[d]   =  1.e10f;
+      bboxOut[d+3] = -1.e10f;
+    }
+  }
 
-  nfilt[0] = 0; // Race condition, but all same value... whatever...
-  // Set all cell flags initially to DC_NORMAL (filtered cells will remain 'NORMAL')
-  cutFlag[ic] = DC_NORMAL;
+  __shared__ float bboxF[6];
 
-  // Figure out how many threads are left in this block after ic>ncells returns
-  int blockSize = min(blockDim.x, mb.ncells - blockIdx.x * blockDim.x);
-
-  __shared__ double bboxF[6];
-  for (int i = threadIdx.x; i < 6; i += blockSize)
-    bboxF[i] = cut_bbox[i];
+  for (int i = threadIdx.x; i < 6; i += blockDim.x)
+    bboxF[i] = (float)cut_bbox[i];
 
   __syncthreads();
 
-  double href = .005/3.*(bboxF[3]-bboxF[0]+bboxF[4]-bboxF[1]+bboxF[5]-bboxF[2]);
+  if (ic >= mb.ncells) return;
+
+  // Set all cell flags initially to DC_NORMAL (filtered cells will remain 'NORMAL')
+  cutFlag[ic] = DC_NORMAL;
+
+  float href = .005/3.*(bboxF[3]-bboxF[0]+bboxF[4]-bboxF[1]+bboxF[5]-bboxF[2]);
 
   // Get element nodes
-  double xv[nvert*3];
+  float xv[nvert*3];
   for (int i = 0; i < nvert; i++)
     for (int d = 0; d < 3; d++)
-      xv[3*i+d] = mb.coord[ic+mb.ncells*(d+3*i)];
+      xv[3*i+d] = (float)mb.coord[ic+mb.ncells*(d+3*i)];
 
   // Get element bounding box
-  double bboxC[3];
+  float bboxC[6], xc[3];
   cuda_funcs::getBoundingBox<3,nvert>(xv, bboxC);
+  cuda_funcs::getCentroid<3,nvert>(xv, xc);
 
-  if (cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, href))
-    filt[atomicAggInc(&nfilt[0])] = ic;
+  if (mb.rrot) // Transform xc to hole map's coordinate system
+  {
+    double x2[3] = {0.,0.,0.};
+    for (int d1 = 0; d1 < 3; d1++)
+      for (int d2 = 0; d2 < 3; d2++)
+        x2[d1] += mb.Rmat[d1+3*d2]*(xc[d2]-mb.offset[d2]);
+
+    for (int d = 0; d < 3; d++)
+      xc[d] = x2[d];
+  }
+
+  char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
+  bool checkH = (tag != 1);
+  bool checkB = cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, href);
+
+  // If filtering element due to being completely inside hole region, tag as hole
+  if (tag == 1)
+    cutFlag[ic] = DC_HOLE;
+
+  if (checkH && checkB)
+  {
+    int ind = atomicAggInc(&nfilt[0]);
+    filt[ind] = ic;
+    for (int d = 0; d < 3; d++)
+    {
+      atomicMinf(&bboxOut[d], bboxC[d]);
+      atomicMaxf(&bboxOut[d+3], bboxC[d+3]);
+    }
+  }
+}
+
+/*! Remove all cutting faces which do not intersect this rank's reduced bbox
+ *  from consideration (obviously do not intersect) */
+template<int nvertf>
+__global__
+void filterFaces(dMeshBlock mb, dvec<float> ele_bbox, int nCut,
+    dvec<double> cutFaces, dvec<int> filt, dvec<int> nfilt, dvec<float> bboxOut)
+{
+  const unsigned int ff = blockIdx.x * blockDim.x + threadIdx.x;
+
+  // Initialize nfilt to 0; will be atomically added to at end
+  if (ff == 0)
+  {
+    nfilt[1] = 0;
+    for (int d = 0; d < 3; d++)
+    {
+      bboxOut[d]   =  1e10f;
+      bboxOut[d+3] = -1e10f;
+    }
+  }
+
+  __shared__ float bboxE[6];
+
+  for (int i = threadIdx.x; i < 6; i += blockDim.x)
+    bboxE[i] = ele_bbox[i];
+
+  __syncthreads();
+
+  if (ff >= nCut) return;
+
+  float href = .01f/3.f*(bboxE[3]-bboxE[0]+bboxE[4]-bboxE[1]+bboxE[5]-bboxE[2]);
+
+  // Get face nodes
+  float fxv[nvertf*3];
+  for (int i = 0; i < nvertf; i++)
+    for (int d = 0; d < 3; d++)
+      fxv[3*i+d] = (float)cutFaces[(ff*nvertf+i)*3+d];
+
+  // Get face bounding box
+  float bboxF[6];
+  cuda_funcs::getBoundingBox<3,nvertf>(fxv, bboxF);
+
+  /// TODO: apply Rmat, offset to xc!
+  bool checkB = cuda_funcs::boundingBoxCheck<3>(bboxF, bboxE, href);
+
+  if (checkB)
+  {
+    int ind = atomicAggInc(&nfilt[1]);
+    filt[ind] = ff;
+    for (int d = 0; d < 3; d++)
+    {
+       atomicMinf(&bboxOut[d], bboxF[d]);
+       atomicMaxf(&bboxOut[d+3], bboxF[d+3]);
+    }
+  }
 }
 
 void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cutBbox_h, int* cutFlag, int cutType)
 {
   // Setup cutMap TODO: create initialization elsewhere?
   cutFlag_d.resize(ncells);
-  filt_list.resize(ncells);
+  filt_eles.resize(ncells);
+  filt_faces.resize(nCut);
 
   dvec<double> cutFaces;
   cutFaces.assign(cutFaces_h, nCut*nvertf*nDims);
 
   dvec<double> cutBbox_d;
   cutBbox_d.assign(cutBbox_h, 2*nDims);
+  if (nDims != 3) printf("Bad nDims!!!! nDims = %d\n",nDims); /// DEBUGGING
 
   if (ijk2gmsh_quad.size() != nvertf)
   {
@@ -1304,8 +1372,12 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
   hvec<int> nfilt_h;
   dvec<int> nfilt_d;
-  nfilt_h.resize(1);  nfilt_h[0] = 0;
-  nfilt_d.assign(nfilt_h.data(), 1);
+  nfilt_h.resize(2);
+  nfilt_h[0] = 0;  nfilt_h[1] = 0;
+  nfilt_d.assign(nfilt_h.data(), nfilt_h.size());
+
+  ele_bbox.resize(6);
+  face_bbox.resize(6);
 
   int threads = 128;
   int blocks = (ncells + threads - 1) / threads;
@@ -1313,7 +1385,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   switch(nvert)
   {
     case 8:
-      filterElements<8><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d);
+      filterElements<8><<<blocks, threads, 6*sizeof(float)>>>(*this, cutBbox_d, filt_eles, cutFlag_d, nfilt_d, ele_bbox);
       break;
 //    case 27:
 //      filterElements<27><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d);
@@ -1326,18 +1398,36 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 //      break;
     default:
       printf("nvert = %d\n",nvert);
-      ThrowException("nvert case not implemented for directCut on device");
+      ThrowException("nvert case not implemented for filterElements on device");
   }
-cudaDeviceSynchronize();
-check_error();
-  nfilt_h.assign(nfilt_d.data(), 1);
 
+  check_error();
+
+  blocks = (nCut + threads - 1) / threads;
+
+  switch(nvertf)
+  {
+    case 4:
+      filterFaces<4><<<blocks, threads, 6*sizeof(float)>>>(*this, ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      break;
+    case 16:
+      filterFaces<16><<<blocks, threads, 6*sizeof(float)>>>(*this, ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      break;
+    default:
+      printf("nvertf = %d\n",nvertf);
+      ThrowException("nvertf case not implemented for filterFaces on device");
+  }
+
+  cudaDeviceSynchronize();
+  check_error();
+
+  nfilt_h.assign(nfilt_d.data(), 2);
   int nfilt = nfilt_h[0];
+  printf("nfilt = %d, %d\n",nfilt_h[0], nfilt_h[1]);
 
   // Perform the Direct Cut algorithm on the filtered list of grid elements
-cudaDeviceSynchronize();
-check_error();
-  threads = 32;
+
+  threads = 64;
   blocks = (nfilt + threads - 1) / threads;
   int nbShare = sizeof(double)*4*nDims;
 
@@ -1345,12 +1435,12 @@ check_error();
   {
     switch(nvertf)
     {
-//      case 4:
-//        switch(nvert)
-//        {
-//          case 8:
-//            fillCutMap<3,2,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
-//            break;
+      case 4:
+        switch(nvert)
+        {
+          case 8:
+            fillCutMap<3,2,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, nfilt_h[1], filt_faces, cutFlag_d.data(), cutType, filt_eles.data(), nfilt);
+            break;
 //          case 27:
 //            fillCutMap<3,3,2><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
 //            break;
@@ -1363,8 +1453,8 @@ check_error();
 //          default:
 //            printf("nvert = %d\n",nvert);
 //            ThrowException("nvert case not implemented for directCut on device");
-//        }
-//        break;
+        }
+        break;
 //      case 9:
 //        switch(nvert)
 //        {
@@ -1389,7 +1479,7 @@ check_error();
         switch(nvert)
         {
           case 8:
-            fillCutMap<3,2,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
+            fillCutMap<3,2,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, nfilt_h[1], filt_faces, cutFlag_d.data(), cutType, filt_eles.data(), nfilt);
             break;
 //          case 27:
 //            fillCutMap<3,3,4><<<blocks, threads, nbShare>>>(*this, cutFaces, nCut, cutFlag_d.data(), cutType, filt_list.data(), nfilt);
@@ -1430,7 +1520,8 @@ check_error();
         ThrowException("nvertFace case not implemented for directCut on device");
     }
   }
-cudaDeviceSynchronize();
+
+  cudaDeviceSynchronize();
   check_error();
 
   cuda_copy_d2h(cutFlag_d.data(), cutFlag, ncells);

@@ -66,6 +66,16 @@ public:
   dvec<double> rst;
   dvec<int> donorId;
 
+  /* ------ Auxiliary Geometry Representation Variables ------ */
+
+  dvec<char> hm_sam;        //! Structured Auxiliary Map [hole map]
+  dvec<int> hm_nx;          //! # of Cartesian cells in each direction of map
+  dvec<double> hm_dx;       //! Size of Cartesian cells (extents / nx)
+  dvec<double> hm_extents;  //! Hole map bounding extents [bounding box]
+  /// TODO: float?
+
+  /* ------ Misc. Variables ------ */
+
   cudaStream_t stream;
 
   dvec<int> ijk2gmsh;
@@ -75,11 +85,15 @@ public:
   bool rrot = false;
   dvec<double> Rmat, offset;
 
+
   /* ------ Direct Cut Variables ------ */
 
   hvec<int> cutFlag_h;
   dvec<int> cutFlag_d;
-  dvec<int> filt_list;
+  dvec<int> filt_eles;
+  dvec<int> filt_faces;
+  dvec<float> ele_bbox;
+  dvec<float> face_bbox;
 
   /* ------ Member Functions ------ */
 
@@ -89,6 +103,10 @@ public:
       int* nc, int* eleList, double* eleBBox, int* isearch, double* xsearch);
 
   void extraDataToDevice(int* vconn);
+
+  void assignHoleMap(bool hasWall, int* nx, int* sam, double* extents);
+
+  void clearHoleMap(void);
 
   void setDeviceData(double* vx, double* ex, int* ibc, int* ibf);
 

@@ -108,6 +108,7 @@ class tioga
   CartBlock *cb;
   int nmesh;
   HOLEMAP *holeMap;
+  std::vector<HOLEMAP> overMap;
   MPI_Comm scomm;
   MPI_Comm meshcomm;
   parallelComm *pc;
@@ -274,6 +275,8 @@ class tioga
   /** get hole map for each mesh */
  
   void getHoleMap(void);
+
+  void getOversetMap(void);
 
   /** output HoleMaps */
   

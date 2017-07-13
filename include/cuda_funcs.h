@@ -552,6 +552,45 @@ double dLagrange_gpu(const double* __restrict__ xiGrid, unsigned int npts,
   return val/den;
 }
 
+__device__ __forceinline__
+char checkHoleMap(const double* __restrict__ pt, const char* __restrict__ sam,
+    const int* __restrict__ nx, const double* __restrict__ extents)
+{
+  double dx[3];
+  int ix[3];
+
+  for (int i = 0; i < 3; i++)
+    dx[i] = (extents[i+3]-extents[i]) / nx[i];
+
+  for (int i = 0; i < 3; i++)
+  {
+    ix[i] = (pt[i]-extents[i])/dx[i];
+    if (ix[i] < 0 || ix[i] > nx[i]-1) return 0;
+  }
+
+  return sam[ix[0] + nx[0]*(ix[1] + nx[1]*ix[2])];
+}
+
+
+__device__ __forceinline__
+char checkHoleMap(const float* __restrict__ pt, const char* __restrict__ sam,
+    const int* __restrict__ nx, const double* __restrict__ extents)
+{
+  double dx[3];
+  int ix[3];
+
+  for (int i = 0; i < 3; i++)
+    dx[i] = (extents[i+3]-extents[i]) / nx[i];
+
+  for (int i = 0; i < 3; i++)
+  {
+    ix[i] = (pt[i]-extents[i])/dx[i];
+    if (ix[i] < 0 || ix[i] > nx[i]-1) return 0;
+  }
+
+  return sam[ix[0] + nx[0]*(ix[1] + nx[1]*ix[2])];
+}
+
 template<int nDims, int nPts>
 __device__ __forceinline__
 void getBoundingBox(const float* __restrict__ pts, float *bbox)
@@ -566,8 +605,8 @@ void getBoundingBox(const float* __restrict__ pts, float *bbox)
   {
     for (int dim = 0; dim < nDims; dim++)
     {
-      bbox[dim]       = fmin(bbox[dim],      pts[i*nDims+dim]);
-      bbox[nDims+dim] = fmax(bbox[nDims+dim],pts[i*nDims+dim]);
+      bbox[dim]       = fminf(bbox[dim],      pts[i*nDims+dim]);
+      bbox[nDims+dim] = fmaxf(bbox[nDims+dim],pts[i*nDims+dim]);
     }
   }
 }
@@ -630,7 +669,7 @@ float boundingBoxDist(const float* __restrict__ bbox1,
   {
     if ( (bbox1[i+nDims] < bbox2[i]) || (bbox2[i+nDims] < bbox1[i]) )
     {
-      float d = fmax(bbox2[i]-bbox1[i+nDims], bbox1[i]-bbox2[i+nDims]);
+      float d = fmaxf(bbox2[i]-bbox1[i+nDims], bbox1[i]-bbox2[i+nDims]);
       dist += d*d;
     }
   }
@@ -799,8 +838,8 @@ void getOOBB(const double* __restrict__ pts, float* __restrict__ oobb, bool PRIN
 
     for (int d = 0; d < 3; d++)
     {
-      minPt[d] = fmin(minPt[d], pt[d]);
-      maxPt[d] = fmax(maxPt[d], pt[d]);
+      minPt[d] = fminf(minPt[d], pt[d]);
+      maxPt[d] = fmaxf(maxPt[d], pt[d]);
     }
   }
 

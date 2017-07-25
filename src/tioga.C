@@ -439,10 +439,11 @@ void tioga::directCut(void)
 
     if (nFace_p[p] > 0)
     {
-      // Receive the rank's cutting-face bounding box
+      // Receive the rank's cutting-face and overall bounding box
       rreqs.emplace_back();
       MPI_Irecv(&bbox_tmp[2*nDims*p], 2*nDims, MPI_DOUBLE, p, 1, scomm, &rreqs.back());
-      MPI_Irecv(&aabb_tmp[2*nDims*p], 2*nDims, MPI_DOUBLE, p, 2, scomm, &rreqs.back());
+      sreqs.emplace_back();
+      MPI_Isend(mb->aabb, 2*nDims, MPI_DOUBLE, p, 2, scomm, &sreqs.back());
     }
     
     // Get pointers to face node & bounding-box data based on grid type
@@ -464,7 +465,8 @@ void tioga::directCut(void)
       // Send bounding box
       sreqs.emplace_back();
       MPI_Isend(Bptr, 2*nDims, MPI_DOUBLE, p, 1, scomm, &sreqs.back());
-      MPI_Isend(mb->aabb, 2*nDims, MPI_DOUBLE, p, 2, scomm, &sreqs.back());
+      rreqs.emplace_back();
+      MPI_Irecv(&aabb_tmp[2*nDims*p], 2*nDims, MPI_DOUBLE, p, 2, scomm, &rreqs.back());
     }
   }
 
@@ -477,29 +479,33 @@ void tioga::directCut(void)
   std::vector<int> dcSndMap;  // List of ranks to send cut faces to
   std::vector<int> dcRcvMap;  // List of ranks to recv cut faces from
 
+  dcSndMap.resize(0);
+  dcRcvMap.resize(0);
+
   for (int p = 0; p < nproc; p++)
   {
     int g = gridIDs[p];
     if (g == mytag) continue;
 
-    int nface = 0;
-    if (nCutHole > 0 && gridTypes[p] > 0)
-      nface = nCutHole;
-    else if (nCutFringe > 0 && gridTypes[p] == 0)
-      nface = nCutFringe;
-
     // Check if our bbox overlaps with other rank's cut-group bbox
     if (nFace_p[p] > 0 && tg_funcs::boundingBoxCheck(mb->aabb, &bbox_tmp[2*nDims*p], 3))
       dcRcvMap.push_back(p);
 
-    double *Bptr = NULL;
+    double *Bptr;
+    int size = 0;
     if (nCutHole > 0 && gridTypes[p] > 0)
+    {
       Bptr = bboxW.data();
+      size = nCutHole;
+    }
     else if (nCutFringe > 0 && gridTypes[p] == 0)
+    {
       Bptr = bboxO.data();
+      size = nCutFringe;
+    }
 
     // Check if other rank's bbox overlaps with our cut-group bbox
-    if (Bptr != NULL && tg_funcs::boundingBoxCheck(Bptr, &aabb_tmp[2*nDims*p], 3))
+    if (size > 0 && tg_funcs::boundingBoxCheck(Bptr, &aabb_tmp[2*nDims*p], 3))
       dcSndMap.push_back(p);
   }
 
@@ -524,7 +530,7 @@ void tioga::directCut(void)
       nFace_r[i] += nOverFace_p[p];
 
     nFace_g[g] += nFace_r[i];
-    nVertf_g[g] = nvertf_p[p];  // Assuming same for each rank of every grid
+    nVertf_g[g] = nvertf_p[p];
     nProc_g[g]++;
   }
 
@@ -547,7 +553,6 @@ void tioga::directCut(void)
     if (nFace_r[i] > 0)
     {
       // Receive the cutting faces
-      /// TODO: update faceDisp AFTER setting rcvMap
       rreqs.emplace_back();
       MPI_Irecv(faceNodes_g[g].data() + faceDisp_r[i]*nVertf_g[g]*nDims,
           nFace_r[i]*nvertf_p[p]*nDims, MPI_DOUBLE, p, 0, scomm, &rreqs.back());

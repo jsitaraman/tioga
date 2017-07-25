@@ -303,7 +303,7 @@ void MeshBlock::setupADT(void)
         xmax[j] = max(xmax[j], x[i3+j]);
         // Overall partition bounding box
         aabb[j]   = min(aabb[j], x[i3+j]);
-        aabb[j+3] = max(aabb[j], x[i3+j]);
+        aabb[j+3] = max(aabb[j+3], x[i3+j]);
       }
     }
 

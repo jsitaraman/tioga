@@ -827,8 +827,6 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 {
   nreceptorFaces = 0;
 
-  std::set<int> artBndFaces;
-
   for (int ff = 0; ff < nfaces; ff++)
   {
     iblank_face[ff] = NORMAL;
@@ -848,7 +846,6 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
       if (isum == HOLE+NORMAL)  // Artificial Boundary
       {
         iblank_face[ff] = FRINGE;
-        artBndFaces.insert(ff);
       }
       else if (isum == HOLE+HOLE)  // Blanked face
       {
@@ -858,7 +855,7 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   }
 
   // Now, ensure consistency of MPI face blanking across processes
-
+/// TODO: optimize this [reduce communication by only communicating with neighbors; only communicate hole MPI faces...]
   int meshRank, nProcMesh;
   MPI_Comm_rank(meshComm, &meshRank);
   MPI_Comm_size(meshComm, &nProcMesh);
@@ -899,7 +896,6 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
           else
           {
             iblank_face[ff] = FRINGE;
-            artBndFaces.insert(ff);
           }
         }
       }
@@ -913,34 +909,44 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
     if (iblank_face[ff] != HOLE)
     {
       iblank_face[ff] = FRINGE;
-      artBndFaces.insert(ff);
     }
   }
-
-  // Setup final Artificial Boundary face list
-  free(ftag);
-  ftag = (int*)malloc(sizeof(int)*artBndFaces.size());
-
-  for (auto &ff: artBndFaces) ftag[nreceptorFaces++] = ff;
-}
-
-void MeshBlock::setArtificialBoundaries(void)
-{
-  std::set<int> overFaces;
 
   for (int ff = 0; ff < nfaces; ff++)
   {
     if (iblank_face[ff] == FRINGE)
-      overFaces.insert(ff);
+      nreceptorFaces++;
   }
-  nreceptorFaces = overFaces.size();
+
+  // Setup final Artificial Boundary face list
+  free(ftag);
+  ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
+
+  nreceptorFaces = 0;
+  for (int ff = 0; ff < nfaces; ff++)
+    if (iblank_face[ff] == FRINGE)
+      ftag[nreceptorFaces++] = ff;
+}
+
+void MeshBlock::setArtificialBoundaries(void)
+{
+  nreceptorFaces = 0;
+  for (int ff = 0; ff < nfaces; ff++)
+  {
+    if (iblank_face[ff] == FRINGE)
+      nreceptorFaces++;
+  }
 
   // Setup final storage of A.B. face indices
   free(ftag);
   ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
 
-  int ind = 0;
-  for (auto &ff: overFaces) ftag[ind++] = ff;
+  nreceptorFaces = 0;
+  for (int ff = 0; ff < nfaces; ff++)
+  {
+    if (iblank_face[ff] == FRINGE)
+      ftag[nreceptorFaces++] = ff;
+  }
 }
 
 void MeshBlock::clearOrphans(int *itmp)

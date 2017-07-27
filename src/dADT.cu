@@ -4,7 +4,7 @@
 #include "MeshBlock.h"
 #include "funcs.hpp"
 
-#define MAX_LEVEL 32
+#define MAX_LEVEL 20
 
 dADT::~dADT()
 {
@@ -28,6 +28,8 @@ void dADT::copyADT(ADT *adt)
   adtBBox.assign(adt->adtExtents, ndim);
   coord.assign(adt->coord, ndim*nelem);
   rrot = adt->rrot;
+  //rrot = false; //adt->rrot;
+  /// ^ WORKING ON REBUILD-ADT VERSION
   if (rrot)
   {
     offset.assign(adt->offset.data(), adt->offset.size());
@@ -47,7 +49,8 @@ void dADT::setTransform(double *mat, double *off, int nDims)
 
 template<int nDims, int nside>
 __device__
-void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, double* xsearch, double* rst)
+void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
+    float* rst)
 {
   const int ndim = 2*nDims;
   int stack[MAX_LEVEL] = {0};
@@ -59,7 +62,7 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, double* xsearch
     size--;
 
     int ele = adt.adtInts[4*node];
-    double bbox[ndim];
+    float bbox[ndim];
     for (int i = 0; i < ndim; i++)
       bbox[i] = mb.eleBBox[ndim*ele+i];
 
@@ -115,13 +118,13 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
   //int rootNode = 0;
   int cellID = -1;
 
-  double xsearch[nDims];
+  float xsearch[nDims];
   for (int d = 0; d < nDims; d++)
     xsearch[d] = mb.xsearch[nDims*pt+d];
 
   if (adt.rrot) // Transform back to ADT's coordinate system
   {
-    double x2[nDims];// = {0.0}; /// TODO: figure out when/if this works?
+    float x2[nDims];// = {0.0}; /// TODO: figure out when/if this works?
     for (int d = 0; d < nDims; d++)
       x2[d] = 0.0;
     for (int d1 = 0; d1 < nDims; d1++)
@@ -140,7 +143,7 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
   }
 
   // call recursive routine to check intersections with ADT nodes
-  double rst[nDims] = {0.0};
+  float rst[nDims] = {0.0};
   if (flag)
     d_searchADTstack<nDims,nside>(adt,mb,cellID,xsearch,rst);
 
@@ -155,6 +158,10 @@ void searchADT(dADT &adt, dMeshBlock &mb)
 {
   int threads = 32;
   int blocks = (mb.nsearch + threads - 1) / threads;
+
+  cudaFuncSetCacheConfig(searchADT_kernel<3,2>, cudaFuncCachePreferL1);
+  cudaFuncSetCacheConfig(searchADT_kernel<3,3>, cudaFuncCachePreferL1);
+  cudaFuncSetCacheConfig(searchADT_kernel<3,4>, cudaFuncCachePreferL1);
 
   switch (mb.nvert)
   {

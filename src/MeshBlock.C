@@ -265,6 +265,7 @@ void MeshBlock::tagBoundary(void)
 
 void MeshBlock::setupADT(void)
 {
+  PUSH_NVTX_RANGE("BuildADT", 2);
   for (int d = 0; d < 3; d++)
   {
     aabb[d]   =  BIG_DOUBLE;
@@ -327,6 +328,7 @@ void MeshBlock::setupADT(void)
   }
 
   adt->buildADT(2*nDims, ncells, elementBbox.data());
+  POP_NVTX_RANGE;
 
 #ifdef _GPU
   ncells_adt = ncells;
@@ -339,6 +341,173 @@ void MeshBlock::setupADT(void)
 
   mb_d.extraDataToDevice(vconn[0]);
 #endif
+}
+
+
+void MeshBlock::rebuildADT(void)
+{
+  /// TODO: make sure we're including all possible future donors at boundaries where other grids may move in
+  /// [Include any elements assigned to 'DC_CUT' from hole cutting]?
+  PUSH_NVTX_RANGE("ReBuildADT", 1);
+
+  std::set<int> donorEles, adtEles;
+
+  if (haveDonors)
+  {
+    // Collect all current donor elements & their nearest neighbors
+    for (int i = 0; i < donorId.size(); i++)
+    {
+      int ic = donorId[i];
+      donorEles.insert(ic);
+    }
+
+    for (auto ic : donorEles)
+    {
+      if (ic < 0) continue;
+
+      int N = 2*nDims;
+      adtEles.insert(ic);
+      for (int j = 0; j < N; j++)
+      {
+        adtEles.insert(c2c[N*ic+j]);
+      }
+    }
+
+    // Also add in elements from boundaries [incl. overset/cut boundaries]
+    for (int i = 0; i < nreceptorFaces; i++)
+    {
+      int ff = ftag[i];
+      int ic1 = f2c[2*ff+0];
+      int ic2 = f2c[2*ff+1];
+      adtEles.insert(ic1);
+      adtEles.insert(ic2);
+    }
+
+    for (int i = 0; i < nMpiFaces; i++)
+    {
+      int ff = mpiFaces[i];
+      int ic = f2c[2*ff+0];
+      adtEles.insert(ic);
+    }
+  }
+  else
+  {
+    // We're probably still in initialization - just add all elements [Need to search full grid at least once]
+    for (int i = 0; i < ncells; i++)
+      adtEles.insert(i);
+  }
+
+  adtEles.erase(-1);
+
+  // Remove eles which don't overlap with the search point oriented bounding box
+
+  OBB obq;
+  findOBB(xsearch.data(),obq.xc,obq.dxc,obq.vec,nsearch);
+
+  std::set<int> newAdtEles; // = adtEles;
+
+  for (auto ic : adtEles)
+  {
+    int nvert = nv[0];
+
+    double xmin[3];
+    double xmax[3];
+    double xd[3], dxc[3];
+    xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
+    xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
+    for (int m = 0; m < nvert; m++)
+    {
+      int i3 = 3*(vconn[0][nvert*ic+m]-BASE);
+      for (int j = 0; j < 3; j++)
+      {
+        xd[j] = 0;
+        for (int k = 0; k < 3; k++)
+          xd[j] += (x[i3+k]-obq.xc[k])*obq.vec[j][k];
+        xmin[j] = min(xmin[j],xd[j]);
+        xmax[j] = max(xmax[j],xd[j]);
+      }
+      for (int j = 0; j < 3; j++)
+      {
+        xd[j] = (xmax[j]+xmin[j])*0.5;
+        dxc[j] = (xmax[j]-xmin[j])*0.5;
+      }
+    }
+
+    if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
+        fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
+        fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
+    {
+      newAdtEles.insert(ic);
+    }
+  }
+
+  adtEles = newAdtEles;
+  ncells_adt = adtEles.size();
+//printf("Rank %d - ncells_adt %d\n",myid,ncells_adt); /// DEBUGGING
+  elementList.resize(ncells_adt);
+  elementBbox.resize(ncells_adt*6);
+
+  int I = 0;
+  for (auto ic : adtEles)
+  {
+    elementList[I] = ic;
+    I++;
+  }
+
+  double xmin[3], xmax[3];
+  for (int i = 0; i < ncells_adt; i++)
+  {
+    int isum = 0;
+    int ic = elementList[i];
+    int n;
+    for (n = 0; n < ntypes; n++)
+    {
+      isum += nc[n];
+      if (ic < isum)
+      {
+        ic = ic - (isum - nc[n]);
+        break;
+      }
+    }
+
+    int nvert = nv[n];
+    xmin[0] = xmin[1] = xmin[2] =  BIGVALUE;
+    xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
+    for (int m = 0; m < nvert; m++)
+    {
+      int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+      for (int j = 0; j < 3; j++)
+      {
+        xmin[j] = min(xmin[j], x[i3+j]);
+        xmax[j] = max(xmax[j], x[i3+j]);
+      }
+    }
+
+    elementBbox[6*i] = xmin[0];
+    elementBbox[6*i+1] = xmin[1];
+    elementBbox[6*i+2] = xmin[2];
+    elementBbox[6*i+3] = xmax[0];
+    elementBbox[6*i+4] = xmax[1];
+    elementBbox[6*i+5] = xmax[2];
+  }
+
+  if (adt)
+  {
+    adt->clearData();
+  }
+  else
+  {
+    adt=new ADT[1];
+  }
+
+  adt->buildADT(2*nDims, ncells_adt, elementBbox.data());
+
+#ifdef _GPU
+  mb_d.updateADTData(ncells_adt,elementList.data(),elementBbox.data());
+
+  adt_d.copyADT(adt);
+#endif
+  POP_NVTX_RANGE;
 }
 
 void MeshBlock::writeGridFile(int bid)

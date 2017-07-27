@@ -34,6 +34,7 @@ void MeshBlock::search(void)
 
   if (rrot && adt)
   {
+    //rebuildADT();
     /// TODO: worry about updating ADT based on changing OBB of search points
     adt->setTransform(Rmat.data(), offset, nDims);
 #ifdef _GPU
@@ -86,7 +87,7 @@ void MeshBlock::search(void)
             dxc[j] = (xmax[j]-xmin[j])*0.5;
           }
         }
-        /// HACK - making this loop basically useless (ncells_adt will == ncells)
+        /// HACK - commenting out this if statement makes this loop basically useless (ncells_adt will == ncells)
         if (fabs(xd[0]) <= (dxc[0]+obq.dxc[0]) &&
             fabs(xd[1]) <= (dxc[1]+obq.dxc[1]) &&
             fabs(xd[2]) <= (dxc[2]+obq.dxc[2]))
@@ -177,6 +178,15 @@ void MeshBlock::search(void)
 
   rst.assign(mb_d.rst.data(), mb_d.rst.size());
   donorId.assign(mb_d.donorId.data(), mb_d.donorId.size());
+
+  for (int i = 0; i < nsearch; i++)
+  {
+    if (donorId[i] > -1)
+    {
+      haveDonors = true;
+      break;
+    }
+  }
 #else
 //  htime.startTimer();
 //#pragma omp parallel for // CONTAINMENT CHECK MUST BE THREAD-SAFE

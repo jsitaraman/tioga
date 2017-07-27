@@ -284,6 +284,7 @@ private:
   std::vector<double> rst; /// TODO: allow hvec to be used for non-GPU cases (use malloc vs. cudaMalloc)
   std::vector<int> donorId;
 #endif
+  bool haveDonors = false;
 
   int donorCount;
   int myid;
@@ -622,6 +623,9 @@ private:
   void setCartIblanks(void);
 
   void setupADT(void);
+
+  //! Rebuild the ADT using knowledge of current donor elements
+  void rebuildADT(void);
 
   /*! Apply blanking algorithm (to nodal iblank?) to get cell & face iblanks */
   void setArtificialBoundaries(void);

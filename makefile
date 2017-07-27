@@ -42,8 +42,8 @@ ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CUFLAGS += -O3 -use_fast_math
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),1)
-	CFLAGS += -g -O3 #-D_NVTX
-	CUFLAGS += -g -O3 #-D_NVTX
+	CFLAGS += -g -O2 -D_NVTX
+	CUFLAGS += -g -O2 -D_NVTX
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),2)
 	CFLAGS += -g -O0 #-D_NVTX
@@ -96,8 +96,7 @@ lib:	$(OBJECTS) $(OBJF90)
 	$(AR) $(BINDIR)/lib$(MODULENAME).a $(OBJECTS) $(OBJF90)
 
 shared:	$(OBJECTS) $(OBJF90)
-	echo $(OBJECTS)
-	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o $(BINDIR)/lib$(MODULENAME).so -lc $(LIBS)
+	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o $(BINDIR)/lib$(MODULENAME)-debug.so -lc $(LIBS)
 
 swig: CFLAGS += $(SFLAGS)
 swig: $(OBJECTS) $(OBJF90) $(OBJSWIG)

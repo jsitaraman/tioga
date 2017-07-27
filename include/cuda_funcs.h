@@ -558,11 +558,47 @@ double det_3x3(const double* mat)
 
 static
 __device__ __forceinline__
+float det_3x3_part(const float* mat, int a, int b, int c)
+{
+  return mat[a] * (mat[3+b] * mat[6+c] - mat[3+c] * mat[6+b]);
+}
+
+static
+__device__ __forceinline__
+float det_3x3(const float* mat)
+{
+  return det_3x3_part(mat,0,1,2) - det_3x3_part(mat,1,0,2)
+      + det_3x3_part(mat,2,0,1);
+}
+
+static
+__device__ __forceinline__
 void adjoint_3x3(const double* __restrict__ mat, double* __restrict__ adj)
 {
   double a11 = mat[0], a12 = mat[1], a13 = mat[2];
   double a21 = mat[3], a22 = mat[4], a23 = mat[5];
   double a31 = mat[6], a32 = mat[7], a33 = mat[8];
+
+  adj[0] = a22*a33 - a23*a32;
+  adj[1] = a13*a32 - a12*a33;
+  adj[2] = a12*a23 - a13*a22;
+
+  adj[3] = a23*a31 - a21*a33;
+  adj[4] = a11*a33 - a13*a31;
+  adj[5] = a13*a21 - a11*a23;
+
+  adj[6] = a21*a32 - a22*a31;
+  adj[7] = a12*a31 - a11*a32;
+  adj[8] = a11*a22 - a12*a21;
+}
+
+static
+__device__ __forceinline__
+void adjoint_3x3(const float* __restrict__ mat, float* __restrict__ adj)
+{
+  float a11 = mat[0], a12 = mat[1], a13 = mat[2];
+  float a21 = mat[3], a22 = mat[4], a23 = mat[5];
+  float a31 = mat[6], a32 = mat[7], a33 = mat[8];
 
   adj[0] = a22*a33 - a23*a32;
   adj[1] = a13*a32 - a12*a33;
@@ -591,6 +627,21 @@ double Lagrange_gpu(const double* __restrict__ xiGrid, unsigned int npts,
                     double xi, unsigned int mode)
 {
   double val = 1.0;
+
+  for (unsigned int i = 0; i < mode; i++)
+    val *= (xi - xiGrid[i])/(xiGrid[mode] - xiGrid[i]);
+
+  for (unsigned int i = mode + 1; i < npts; i++)
+    val *= (xi - xiGrid[i])/(xiGrid[mode] - xiGrid[i]);
+
+  return val;
+}
+
+__device__ __forceinline__
+float Lagrange_gpu(const float* __restrict__ xiGrid, unsigned int npts,
+                    float xi, unsigned int mode)
+{
+  float val = 1.0;
 
   for (unsigned int i = 0; i < mode; i++)
     val *= (xi - xiGrid[i])/(xiGrid[mode] - xiGrid[i]);
@@ -632,6 +683,37 @@ double dLagrange_gpu(const double* __restrict__ xiGrid, unsigned int npts,
       continue;
 
     double term = 1.0;
+    for (unsigned int i = 0; i < npts; i++)
+      if (i != mode and i != j)
+        term *= (xi - xiGrid[i]);
+
+    val += term;
+  }
+
+  return val/den;
+}
+
+__device__ __forceinline__
+float dLagrange_gpu(const float* __restrict__ xiGrid, unsigned int npts,
+                     float xi, unsigned int mode)
+{
+  float val = 0.0f;
+
+  /* Compute normalization constant */
+  float den = 1.0f;
+  for (unsigned int i = 0; i < mode; i++)
+    den *= (xiGrid[mode] - xiGrid[i]);
+
+  for (unsigned int i = mode+1; i < npts; i++)
+    den *= (xiGrid[mode] - xiGrid[i]);
+
+  /* Compute sum of products */
+  for (unsigned int j = 0; j < npts; j++)
+  {
+    if (j == mode)
+      continue;
+
+    float term = 1.0f;
     for (unsigned int i = 0; i < npts; i++)
       if (i != mode and i != j)
         term *= (xi - xiGrid[i]);
@@ -813,7 +895,7 @@ void getCentroid(const double* __restrict__ pts, double* __restrict__ xc)
  *  OOBB stored as body axes, and min/max points of box in body frame (15 floats) */
 template<int nDims, int nPts>
 __device__
-void getOOBB(const double* __restrict__ pts, float* __restrict__ oobb, bool PRINT)
+void getOOBB(const double* __restrict__ pts, float* __restrict__ oobb)
 {
   // List of edges in 8-node hex: xi-edges, eta-edges, zeta-edges
   const char edges[12][2] = { {0,1}, {3,2}, {4,5}, {7,6}, {0,3}, {1,2}, {4,7}, {5,6}, {0,4}, {1,5}, {3,7}, {2,6} };

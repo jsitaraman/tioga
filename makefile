@@ -42,12 +42,12 @@ ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CUFLAGS += -O3 -use_fast_math
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),1)
-	CFLAGS += -g -O2 -D_NVTX
-	CUFLAGS += -g -O2 -D_NVTX
+	CFLAGS += -g -O2 #-D_NVTX
+	CUFLAGS += -g -O2 #-D_NVTX
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),2)
-	CFLAGS += -g -O0 #-D_NVTX
-	CUFLAGS += -g -G -O0 #-D_NVTX
+	CFLAGS += -g -O0 -D_NVTX
+	CUFLAGS += -g -G -O0 -D_NVTX
 endif
 
 WARN_ON = -Wall -Wextra -Wconversion

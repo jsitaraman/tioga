@@ -34,6 +34,8 @@ public:
   int nobc;    //! Number of overset boundary nodes
   int nwbc;    //! Number of wall boundary nodes
 
+  int rank;
+
   dvec<int> c2v;   //! Cell-to-vertex connectivity
   int** f2v;   //! Face-to-vertex connectivity
   int* f2c;    //! Face-to-cell connectivity
@@ -101,7 +103,7 @@ public:
   dMeshBlock() { }
 
   void dataToDevice(int ndims, int nnodes, int ncells, int ncells_adt, int nsearch, int* nv,
-      int* nc, int* eleList, double* eleBBox, int* isearch, double* xsearch);
+      int* nc, int* eleList, double* eleBBox, int* isearch, double* xsearch, int rank);
 
   void extraDataToDevice(int* vconn);
 

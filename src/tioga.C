@@ -215,7 +215,7 @@ void tioga::unblankPart2(int nvar)
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
 
-//  if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank); /// DEBUGGING
+  if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank); /// DEBUGGING
   mb->calcFaceIblanks(meshcomm);
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);

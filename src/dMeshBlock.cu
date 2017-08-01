@@ -148,7 +148,7 @@ int atomicAggInc(int *ctr)
 
 void dMeshBlock::dataToDevice(int ndims, int nnodes, int ncells, int ncells_adt,
     int nsearch, int* nv, int* nc, int* eleList, double* eleBBox, int* isearch,
-    double* xsearch)
+    double* xsearch, int rank)
 {
   this->nnodes = nnodes;
   this->ncells = ncells;
@@ -158,6 +158,8 @@ void dMeshBlock::dataToDevice(int ndims, int nnodes, int ncells, int ncells_adt,
   this->nc = nc;
 
   nvert = nv[0];
+
+  this->rank = rank;
 
   this->eleBBox.assign(eleBBox, ncells_adt*ndims*2);
   this->eleList.assign(eleList, ncells_adt);
@@ -1017,7 +1019,6 @@ void cuttingPass1(dMeshBlock mb, dvec<double> cutFaces, int nvertf, int nFiltF,
   float oobb[15];
   cuda_funcs::getBoundingBox<nDims,8>(xv, bboxC);
   cuda_funcs::getCentroid<nDims,8>(xv, xcC);
-
   cuda_funcs::getOOBB<nDims,8>(xv,oobb);
 
   const double href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
@@ -1537,7 +1538,7 @@ void cuttingPass3(dMeshBlock mb, dvec<double> cutFaces, dvec<int> checkFaces,
 template<int nvert>
 __global__
 void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
-    dvec<int> cutFlag, dvec<int> nfilt, dvec<float> bboxOut)
+    dvec<int> cutFlag, dvec<int> nfilt, dvec<float> bboxOut, int cutType)
 {
   const unsigned int ic = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -1575,25 +1576,44 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
   // Get element bounding box
   float bboxC[6], xc[3];
   cuda_funcs::getBoundingBox<3,nvert>(xv, bboxC);
-  cuda_funcs::getCentroid<3,nvert>(xv, xc);
 
-  if (mb.rrot) // Transform xc to hole map's coordinate system
+  bool checkH = false;
+
+  if (cutType == 1)
   {
-    double x2[3] = {0.,0.,0.};
-    for (int d1 = 0; d1 < 3; d1++)
-      for (int d2 = 0; d2 < 3; d2++)
-        x2[d1] += mb.Rmat[d1+3*d2]*(xc[d2]-mb.offset[d2]);
+    // Wall boundary - set as hole if centroid inside wall
+    cuda_funcs::getCentroid<3,nvert>(xv, xc);
+    char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
+    checkH = (tag != 1);
+  }
+  else
+  {
+    // Overset boundary - only set as hole if entirely inside hole map
+    for (int i = 0; i < 8; i++)
+    {
+      for (int d = 0; d < 3; d++)
+        xc[d] = xv[3*i+d];
 
-    for (int d = 0; d < 3; d++)
-      xc[d] = x2[d];
+      if (mb.rrot) // Transform xc to hole map's coordinate system
+      {
+        double x2[3] = {0.,0.,0.};
+        for (int d1 = 0; d1 < 3; d1++)
+          for (int d2 = 0; d2 < 3; d2++)
+            x2[d1] += mb.Rmat[d1+3*d2]*(xc[d2]-mb.offset[d2]);
+
+        for (int d = 0; d < 3; d++)
+          xc[d] = x2[d];
+      }
+
+      char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
+      checkH = checkH || (tag != 1);
+    }
   }
 
-  char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
-  bool checkH = (tag != 1);
   bool checkB = cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, href);
 
   // If filtering element due to being completely inside hole region, tag as hole
-  if (tag == 1)
+  if (!checkH)
     cutFlag[ic] = DC_HOLE;
 
   if (checkH && checkB)
@@ -1612,7 +1632,7 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
  *  from consideration (obviously do not intersect) */
 template<int nvertf>
 __global__
-void filterFaces(dMeshBlock mb, dvec<float> ele_bbox, int nCut,
+void filterFaces(dvec<float> ele_bbox, int nCut,
     dvec<double> cutFaces, dvec<int> filt, dvec<int> nfilt, dvec<float> bboxOut)
 {
   const unsigned int ff = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1649,7 +1669,6 @@ void filterFaces(dMeshBlock mb, dvec<float> ele_bbox, int nCut,
   float bboxF[6];
   cuda_funcs::getBoundingBox<3,nvertf>(fxv, bboxF);
 
-  /// TODO: apply Rmat, offset to xc!
   bool checkB = cuda_funcs::boundingBoxCheck<3>(bboxF, bboxE, href);
 
   if (checkB)
@@ -1676,7 +1695,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
   dvec<double> cutBbox_d;
   cutBbox_d.assign(cutBbox_h, 2*nDims);
-  if (nDims != 3) printf("Bad nDims!!!! nDims = %d\n",nDims); /// DEBUGGING
 
   if (ijk2gmsh_quad.size() != nvertf)
   {
@@ -1701,17 +1719,14 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   switch(nvert)
   {
     case 8:
-      filterElements<8><<<blocks, threads, 6*sizeof(float)>>>(*this, cutBbox_d, filt_eles, cutFlag_d, nfilt_d, ele_bbox);
+      filterElements<8><<<blocks, threads, 6*sizeof(float)>>>(*this, cutBbox_d, filt_eles, cutFlag_d, nfilt_d, ele_bbox, cutType);
       break;
-//    case 27:
-//      filterElements<27><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d);
-//      break;
+    case 27:
+      filterElements<27><<<blocks, threads, 6*sizeof(float)>>>(*this, cutBbox_d, filt_eles, cutFlag_d, nfilt_d, ele_bbox, cutType);
+      break;
     case 64:
-      filterElements<64><<<blocks, threads, 6*sizeof(float)>>>(*this, cutBbox_d, filt_eles, cutFlag_d, nfilt_d, ele_bbox);
+      filterElements<64><<<blocks, threads, 6*sizeof(float)>>>(*this, cutBbox_d, filt_eles, cutFlag_d, nfilt_d, ele_bbox, cutType);
       break;
-//    case 125:
-//      filterElements<125><<<blocks, threads, 6*sizeof(double)>>>(*this, cutBbox_d, filt_list, cutFlag_d, nfilt_d);
-//      break;
     default:
       printf("nvert = %d\n",nvert);
       ThrowException("nvert case not implemented for filterElements on device");
@@ -1738,23 +1753,22 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   switch(nvertf)
   {
     case 4:
-      filterFaces<4><<<blocks, threads, 6*sizeof(float)>>>(*this, ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      filterFaces<4><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
       break;
     case 16:
-      filterFaces<16><<<blocks, threads, 6*sizeof(float)>>>(*this, ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      filterFaces<16><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
       break;
     default:
       printf("nvertf = %d\n",nvertf);
       ThrowException("nvertf case not implemented for filterFaces on device");
   }
 
-  cudaDeviceSynchronize();
   check_error();
 
   nfilt_h.assign(nfilt_d.data(), 2);
   int nfiltC = nfilt_h[0];
   int nfiltF = nfilt_h[1];
-  printf("nfilt = %d/%d, %d/%d; cutType = %d\n",nfilt_h[0], ncells, nfilt_h[1], nCut, cutType);
+//  printf("nfilt = %d/%d, %d/%d; cutType = %d\n",nfilt_h[0], ncells, nfilt_h[1], nCut, cutType);
 
   /* Perform the Direct Cut algorithm on the filtered list of elements & faces */
 

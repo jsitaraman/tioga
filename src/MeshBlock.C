@@ -333,7 +333,7 @@ void MeshBlock::setupADT(void)
 #ifdef _GPU
   ncells_adt = ncells;
   mb_d.dataToDevice(nDims,nnodes,ncells,ncells_adt,nsearch,nv,nc,elementList.data(),
-                    elementBbox.data(),isearch.data(),xsearch.data());
+                    elementBbox.data(),isearch.data(),xsearch.data(),myid);
 
   adt_d.copyADT(adt);
 

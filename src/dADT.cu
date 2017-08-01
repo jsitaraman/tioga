@@ -28,7 +28,7 @@ void dADT::copyADT(ADT *adt)
   adtBBox.assign(adt->adtExtents, ndim);
   coord.assign(adt->coord, ndim*nelem);
   rrot = adt->rrot;
-  //rrot = false; //adt->rrot;
+  //rrot = false;
   /// ^ WORKING ON REBUILD-ADT VERSION
   if (rrot)
   {

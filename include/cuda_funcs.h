@@ -536,6 +536,155 @@ dPoint operator*(double a, dPoint b)
   return c;
 }
 
+struct dPointf
+{
+private:
+  float _v[3] = {0.,0.,0.};
+
+public:
+  __device__ dPointf(void) {}
+
+  __device__
+  dPointf(float x, float y, float z) {
+    _v[0] = x; _v[1] = y; _v[2] = z;
+  }
+
+  __device__
+  dPointf(const float* pt) {
+    _v[0] = pt[0]; _v[1] = pt[1]; _v[2] = pt[2];
+  }
+
+  __device__
+  float& operator[](int ind) {
+    return _v[ind];
+  }
+
+  __device__
+  dPointf operator=(float* a) {
+    struct dPointf pt;
+    for (int i = 0; i < 3; i++)
+      pt[i] = a[i];
+    return pt;
+  }
+
+  __device__
+  dPointf operator-(dPointf b) {
+    struct dPointf c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] - b[i];
+    return c;
+  }
+
+  __device__
+  dPointf operator+(dPointf b) {
+    struct dPointf c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] + b[i];
+    return c;
+  }
+
+  __device__
+  dPointf operator/(dPointf b) {
+    struct dPointf c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] / b[i];
+    return c;
+  }
+
+  __device__
+  dPointf& operator+=(dPointf b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] += b[i];
+    return *this;
+  }
+
+  __device__
+  dPointf& operator-=(dPointf b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] -= b[i];
+    return *this;
+  }
+
+  __device__
+  dPointf& operator+=(float* b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] += b[i];
+    return *this;
+  }
+
+  __device__
+  dPointf& operator-=(float* b) {
+    for (int i = 0; i < 3; i++)
+      _v[i] -= b[i];
+    return *this;
+  }
+
+  __device__
+  dPointf& operator/=(float a) {
+    for (int i = 0; i < 3; i++)
+      _v[i] /= a;
+    return *this;
+  }
+
+  __device__
+  dPointf& operator*=(float a) {
+    for (int i = 0; i < 3; i++)
+      _v[i] *= a;
+    return *this;
+  }
+
+  __device__
+  float operator*(dPointf b) {
+    return _v[0]*b[0] + _v[1]*b[1] + _v[2]*b[2];
+  }
+
+  __device__
+  dPointf operator*(float b) {
+    struct dPointf c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] * b;
+    return c;
+  }
+
+  __device__
+  dPointf operator/(float b) {
+    struct dPointf c;
+    for (int i = 0; i < 3; i++)
+      c[i] = _v[i] / b;
+    return c;
+  }
+
+  __device__
+  void abs(void) {
+    for (int i = 0; i < 3; i++)
+      _v[i] = fabs(_v[i]);
+  }
+
+  __device__
+  float norm(void) {
+    return sqrt(_v[0]*_v[0]+_v[1]*_v[1]+_v[2]*_v[2]);
+  }
+
+  __device__
+  dPointf cross(dPointf b) {
+    dPointf c;
+    c[0] = _v[1]*b[2] - _v[2]*b[1];
+    c[1] = _v[2]*b[0] - _v[0]*b[2];
+    c[2] = _v[0]*b[1] - _v[1]*b[0];
+    return c;
+  }
+};
+
+static
+__device__
+dPointf operator*(float a, dPointf b)
+{
+  dPointf c;
+  for (int i = 0; i < 3; i++)
+    c[i] = a * b[i];
+  return c;
+}
+
 /* ------ Misc. Helper Functions ------ */
 
 namespace cuda_funcs
@@ -895,7 +1044,7 @@ void getCentroid(const double* __restrict__ pts, double* __restrict__ xc)
  *  OOBB stored as body axes, and min/max points of box in body frame (15 floats) */
 template<int nDims, int nPts>
 __device__
-void getOOBB(const double* __restrict__ pts, float* __restrict__ oobb)
+void getOOBB(const float* __restrict__ pts, float* __restrict__ oobb)
 {
   // List of edges in 8-node hex: xi-edges, eta-edges, zeta-edges
   const char edges[12][2] = { {0,1}, {3,2}, {4,5}, {7,6}, {0,3}, {1,2}, {4,7}, {5,6}, {0,4}, {1,5}, {3,7}, {2,6} };

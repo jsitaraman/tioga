@@ -8,7 +8,7 @@
 
 /* --- Handy Vector Operation Macros --- */
 
-#define NF1 32 // 20-32 depending on unstructured-ness of grid & desire for robustness
+#define NF1 16 // 20-32 depending on unstructured-ness of grid & desire for robustness
 #define NF2  4 // 3-6 depending on unstructured-ness of grid & desire for robustness
 
 #define CROSS(a, b, c) { \
@@ -24,17 +24,6 @@
 #define DOT(a, b) (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
 
 #define NORM(a) sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2])
-
-static
-__device__ __forceinline__
-double DOTCROSS4(const double* __restrict__ c,
-                 const double* __restrict__ a1, const double* __restrict__ a2,
-                 const double* __restrict__ b1, const double* __restrict__ b2)
-{
-  double d[3];
-  CROSS4(a1,a2,b1,b2,d)
-  return DOT(c,d);
-}
 
 static
 __device__ __forceinline__
@@ -280,45 +269,6 @@ void dMeshBlock::setTransform(double* mat, double* off, int ndim)
 
 static
 __device__
-double lineSegmentDistance(double *p1, double *p2, double *p3, double *p4, double *dx)
-{
-  // Get the line equations
-  double U[3] = {p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]};
-  double V[3] = {p4[0]-p3[0], p4[1]-p3[1], p4[2]-p3[2]};
-  double W[3] = {p1[0]-p3[0], p1[1]-p3[1], p1[2]-p3[2]};
-  double uu = U[0]*U[0] + U[1]*U[1] + U[2]*U[2];
-  double vv = V[0]*V[0] + V[1]*V[1] + V[2]*V[2];
-  double uv = U[0]*V[0] + U[1]*V[1] + U[2]*V[2];
-
-  double uw = U[0]*W[0] + U[1]*W[1] + U[2]*W[2];
-  double vw = V[0]*W[0] + V[1]*W[1] + V[2]*W[2];
-
-  double den = uu*vv - uv*uv;
-
-  // NOTE: not finding exact minimum distance between the line segments in all
-  // cases; plenty close enough for our purposes
-  // (see http://geomalgorithms.com/a07-_distance.html for full algo)
-
-  // Calculate line parameters (if nearly parallel, set one & calculate other)
-  double s = (den < 1e-10) ? 0 : (uv*vw - vv*uw) / den;
-  double t = (den < 1e-10) ? uw / uv: (uu*vw - uv*uw) / den;
-
-  s = fmin(fmax(s, 0.), 1.);
-  t = fmin(fmax(t, 0.), 1.);
-
-  // vec = closest distance from segment 1 to segment 2
-  for (int i = 0; i < 3; i++)
-    dx[i] = t*V[i] - s*U[i] - W[i];
-
-  double dist = 0;
-  for (int i = 0; i < 3; i++)
-    dist += dx[i]*dx[i];
-
-  return sqrt(dist);
-}
-
-static
-__device__
 float lineSegmentDistance(float *p1, float *p2, float *p3, float *p4, float *dx)
 {
   // Get the line equations
@@ -354,318 +304,6 @@ float lineSegmentDistance(float *p1, float *p2, float *p3, float *p4, float *dx)
     dist += dx[i]*dx[i];
 
   return sqrt(dist);
-}
-
-/*! Modified Moller triangle-triangle intersection algorithm
- *  Determines if triangles intersect, or returns an approximate minimum
- *  distance between them otherwise 
- *  Also returns vector of minimum distance from T1 to T2 */
-static
-__device__
-double triTriDistance2(double* T1, double* T2, double* minVec, double tol)
-{
-  double dist = 1e15;
-  double vec[3];
-  for (int i = 0; i < 3; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
-      int i2 = (i+1) % 3;
-      int j2 = (j+1) % 3;
-      double D = lineSegmentDistance(&T1[3*i], &T1[3*i2], &T2[3*j], &T2[3*j2], vec);
-
-      if (D < dist)
-      {
-        for (int d = 0; d < 3; d++)
-          minVec[d] = vec[d];
-        dist = D;
-      }
-    }
-  }
-
-  // Pointers to points
-  const double* V01 = T1;
-  const double* V11 = T1+3;
-  const double* V21 = T1+6;
-
-  const double* V02 = T2;
-  const double* V12 = T2+3;
-  const double* V22 = T2+6;
-
-  double N1[3], N2[3];
-
-  // Plane for Triangle 1
-  CROSS4(V11,V01, V21,V01, N1);
-
-  double norm = NORM(N1);
-
-  // Plane for Triangle 2
-  for (int d = 0; d < 3; d++)
-    N1[d] /= norm;
-
-  double d1 = -DOT(N1,V01);
-
-  CROSS4(V12,V02, V22,V02, N2);
-
-  norm = NORM(N2);
-
-  for (int d = 0; d < 3; d++)
-    N2[d] /= norm;
-
-  double d2 = -DOT(N2,V02);
-
-  // Signed distances of T1's vertices to T2's plane
-  double d01 = DOT(N2,V01) + d2;
-  double d11 = DOT(N2,V11) + d2;
-  double d21 = DOT(N2,V21) + d2;
-
-  double d02 = DOT(N1,V02) + d1;
-  double d12 = DOT(N1,V12) + d1;
-  double d22 = DOT(N1,V22) + d1;
-
-  // Round values near 0 to 0
-  d01 = (fabs(d01) < 1e-10) ? 0 : d01;
-  d11 = (fabs(d11) < 1e-10) ? 0 : d11;
-  d21 = (fabs(d21) < 1e-10) ? 0 : d21;
-
-  d02 = (fabs(d02) < 1e-10) ? 0 : d02;
-  d12 = (fabs(d12) < 1e-10) ? 0 : d12;
-  d22 = (fabs(d22) < 1e-10) ? 0 : d22;
-
-  if (fabs(d01) + fabs(d11) + fabs(d21) < 3*tol ||
-      fabs(d02) + fabs(d12) + fabs(d22) < 3*tol)
-  {
-    // Approximately coplanar; check if one triangle is inside the other /
-
-    // Check if a point in T1 is inside T2
-    bool inside = true;
-    inside = inside && DOTCROSS4(N2, V12,V02, V01,V02) > 0;
-    inside = inside && DOTCROSS4(N2, V02,V22, V01,V22) > 0;
-    inside = inside && DOTCROSS4(N2, V22,V12, V01,V12) > 0;
-
-    if (inside) return 0.;
-
-    // Check if a point in T2 is inside T1
-    inside = true;
-    inside = inside && DOTCROSS4(N1, V11,V01, V02,V01) > 0;
-    inside = inside && DOTCROSS4(N1, V01,V21, V02,V21) > 0;
-    inside = inside && DOTCROSS4(N1, V21,V11, V02,V11) > 0;
-
-    if (inside) return 0.;
-  }
-
-  bool noTouch = false;
-
-  // Check for intersection with plane - one point should have opposite sign
-  if (sgn(d01) == sgn(d11) && sgn(d01) == sgn(d21)) // && fabs(d01) > tol)
-  {
-    noTouch = true;
-
-    // No intersection; check if projection of points provides closer distance
-    if (fabs(d01) < dist)
-    {
-      double P01[3];
-      for (int d = 0; d < 3; d++)
-        P01[d] = V01[d] - N2[d]*d01;
-      bool inside = true;
-      inside = inside && DOTCROSS4(N2, V12,V02, P01,V02) > 0;
-      inside = inside && DOTCROSS4(N2, V02,V22, P01,V22) > 0;
-      inside = inside && DOTCROSS4(N2, V22,V12, P01,V12) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = -N2[i]*d01; // Vector from T1 to T2
-        dist = fabs(d01);
-      }
-    }
-
-    if (fabs(d11) < dist)
-    {
-      double P11[3];
-      for (int d = 0; d < 3; d++)
-        P11[d] = V11[d] - N2[d]*d11;
-      bool inside = true;
-      inside = inside && DOTCROSS4(N2, V12,V02, P11,V02) > 0;
-      inside = inside && DOTCROSS4(N2, V02,V22, P11,V22) > 0;
-      inside = inside && DOTCROSS4(N2, V22,V12, P11,V12) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = -N2[i]*d11;
-        dist = fabs(d11);
-      }
-    }
-
-    if (fabs(d21) < dist)
-    {
-      double P21[3];
-      for (int d = 0; d < 3; d++)
-        P21[d] = V21[d] - N2[d]*d21;
-      bool inside = true;
-      inside = inside && DOTCROSS4(N2, V12,V02, P21,V02) > 0;
-      inside = inside && DOTCROSS4(N2, V02,V22, P21,V22) > 0;
-      inside = inside && DOTCROSS4(N2, V22,V12, P21,V12) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = -N2[i]*d21;
-        dist = fabs(d21);
-      }
-    }
-  }
-
-  // Check for intersection with plane - one point should have opposite sign
-  if (sgn(d02) == sgn(d12) && sgn(d02) == sgn(d22)) // && fabs(d02) > tol)
-  {
-    noTouch = true;
-
-    // No intersection; check if projection of points provides closer distance
-    if (fabs(d02) < dist)
-    {
-      double P02[3];
-      for (int d = 0; d < 3; d++)
-        P02[d] = V02[d] - N1[d]*d02;
-      bool inside = true;
-      inside = inside && DOTCROSS4(N1, V11,V01, P02,V01) > 0;
-      inside = inside && DOTCROSS4(N1, V01,V21, P02,V21) > 0;
-      inside = inside && DOTCROSS4(N1, V21,V11, P02,V11) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*d02;
-        dist = fabs(d02);
-      }
-    }
-
-    if (fabs(d12) < dist)
-    {
-      double P12[3];
-      for (int d = 0; d < 3; d++)
-        P12[d] = V12[d] - N1[d]*d12;
-      bool inside = true;
-      inside = inside && DOTCROSS4(N1, V11,V01, P12,V01) > 0;
-      inside = inside && DOTCROSS4(N1, V01,V21, P12,V21) > 0;
-      inside = inside && DOTCROSS4(N1, V21,V11, P12,V11) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*d12;
-        dist = fabs(d12);
-      }
-    }
-
-    if (fabs(d22) < dist)
-    {
-      double P22[3];
-      for (int d = 0; d < 3; d++)
-        P22[d] = V22[d] - N1[d]*d22;
-      bool inside = true;
-      inside = inside && DOTCROSS4(N1, V11,V01, P22,V01) > 0;
-      inside = inside && DOTCROSS4(N1, V01,V21, P22,V21) > 0;
-      inside = inside && DOTCROSS4(N1, V21,V11, P22,V11) > 0;
-
-      if (inside)
-      {
-        for (int i = 0; i < 3; i++)
-          minVec[i] = N1[i]*d22;
-        dist = fabs(d22);
-      }
-    }
-  }
-
-  // No intersection; return result from edge intersections & plane projections
-  if (noTouch)
-    return dist;
-
-  // Compute intersection line
-  double L[3];
-  CROSS(N1, N2, L);
-  norm = NORM(L);
-  for (int d = 0; d < 3; d++)
-    L[d] /= norm;
-
-  double p0 = DOT(L,V01);
-  double p1 = DOT(L,V11);
-  double p2 = DOT(L,V21);
-
-  double q0 = DOT(L,V02);
-  double q1 = DOT(L,V12);
-  double q2 = DOT(L,V22);
-
-  // Figure out which point of each triangle is opposite the other two
-  int npt1 = (sgn(d01) != sgn(d11)) ? ( (sgn(d11) == sgn(d21)) ? 0 : 1 ) : 2;
-  int npt2 = (sgn(d02) != sgn(d12)) ? ( (sgn(d12) == sgn(d22)) ? 0 : 1 ) : 2;
-
-  double s1, s2;
-  switch (npt1)
-  {
-    case 0:
-      s1 = p1 + (p0-p1) * (d11 / (d11-d01));
-      s2 = p2 + (p0-p2) * (d21 / (d21-d01));
-      break;
-    case 1:
-      s1 = p0 + (p1-p0) * (d01 / (d01-d11));
-      s2 = p2 + (p1-p2) * (d21 / (d21-d11));
-      break;
-    case 2:
-      s1 = p0 + (p2-p0) * (d01 / (d01-d21));
-      s2 = p1 + (p2-p1) * (d11 / (d11-d21));
-      break;
-  }
-
-  double t1, t2;
-  switch (npt2)
-  {
-    case 0:
-      t1 = q1 + (q0-q1) * (d12 / (d12-d02));
-      t2 = q2 + (q0-q2) * (d22 / (d22-d02));
-      break;
-    case 1:
-      t1 = q0 + (q1-q0) * (d02 / (d02-d12));
-      t2 = q2 + (q1-q2) * (d22 / (d22-d12));
-      break;
-    case 2:
-      t1 = q0 + (q2-q0) * (d02 / (d02-d22));
-      t2 = q1 + (q2-q1) * (d12 / (d12-d22));
-      break;
-  }
-
-  s1 = (fabs(s1) < 1e-10) ? 0 : s1;
-  s2 = (fabs(s2) < 1e-10) ? 0 : s2;
-  t1 = (fabs(t1) < 1e-10) ? 0 : t1;
-  t2 = (fabs(t2) < 1e-10) ? 0 : t2;
-
-  if (s1 > s2)
-    swap(s1,s2);
-
-  if (t1 > t2)
-    swap(t1,t2);
-
-  if (s2 < t1 || t2 < s1)
-  {
-    // No overlap; return min of dt*L and minDist
-    double dt = fmin(fabs(t1-s2), fabs(s1-t2));
-    double dl = 0;
-    for (int d = 0; d < 3; d++)
-      dl += (dt*L[d])*(dt*L[d]);
-    dl = sqrt(dl);
-
-    if (dl < dist)
-    {
-      dist = dl;
-      for (int i = 0; i < 3; i++)
-        minVec[i] = sgn(t1-s2)*dt*L[i]; // Ensure vec is T1 -> T2
-    }
-
-    return dist;
-  }
-
-  return 0.;
 }
 
 /*! Modified Moller triangle-triangle intersection algorithm
@@ -1321,68 +959,7 @@ dPointf faceNormal(const float* xv)
   return (norm / norm.norm());
 }
 
-template<int nSideC, int nSideF>
-__device__
-double intersectionCheckOne(dMeshBlock &mb, const double* __restrict__ fxv,
-    double* __restrict__ minVec, double* TC)
-{
-  /* --- Prerequisites --- */
-
-  const int sorderF = nSideF-1;
-
-  double tol = 1e-9;
-  double TF[9];
-  double minDist = BIG_DOUBLE;
-  minVec[0] = minDist;
-  minVec[1] = minDist;
-  minVec[2] = minDist;
-
-  /* Only 3 cases possible:
-   * 1) Face entirely contained within element
-   * 2) Face intersects with element's boundary
-   * 3) Face and element do not intersect
-   */
-
-  for (int M = 0; M < sorderF; M++)
-  {
-    for (int N = 0; N < sorderF; N++)
-    {
-      int m0 = M + nSideF*N;
-      int TriPtsF[2][3] = {{m0, m0+1, m0+nSideF+1}, {m0, m0+nSideF+1, m0+nSideF}};
-      for (int m = 0; m < 2; m++)
-        for (int n = 0; n < 3; n++)
-          TriPtsF[m][n] = mb.ijk2gmsh_quad[TriPtsF[m][n]];
-
-      // Intersection check between element face tris & cutting-face tris
-      for (int j = 0; j < 2; j++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = TriPtsF[j][p];
-          for (int d = 0; d < 3; d++)
-            TF[3*p+d] = fxv[3*ipt+d];
-        }
-
-        double vec[3];
-        double dist = triTriDistance2(TF, TC, vec, tol);
-
-        if (dist < tol)
-          return 0.;
-
-        if (dist < minDist)
-        {
-          for (int d = 0; d < 3; d++)
-            minVec[d] = vec[d];
-          minDist = dist;
-        }
-      }
-    }
-  }
-
-  return minDist;
-}
-
-template<int nSideC, int nSideF>
+template<int nSideF>
 __device__
 float intersectionCheckOne(dMeshBlock &mb, const float* __restrict__ fxv,
     float* __restrict__ minVec, float* TC)
@@ -1413,366 +990,6 @@ float intersectionCheckOne(dMeshBlock &mb, const float* __restrict__ fxv,
       for (int m = 0; m < 2; m++)
         for (int n = 0; n < 3; n++)
           TriPtsF[m][n] = mb.ijk2gmsh_quad[TriPtsF[m][n]];
-
-      // Intersection check between element face tris & cutting-face tris
-      for (int j = 0; j < 2; j++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = TriPtsF[j][p];
-          for (int d = 0; d < 3; d++)
-            TF[3*p+d] = fxv[3*ipt+d];
-        }
-
-        float vec[3];
-        float dist = triTriDistance2(TF, TC, vec, tol);
-
-        if (dist < tol)
-          return 0.;
-
-        if (dist < minDist)
-        {
-          for (int d = 0; d < 3; d++)
-            minVec[d] = vec[d];
-          minDist = dist;
-        }
-      }
-    }
-  }
-
-  return minDist;
-}
-
-
-template<int nSideC, int nSideF>
-__device__
-double intersectionCheck(dMeshBlock &mb, const double* __restrict__ fxv,
-    const double* __restrict__ exv, double* __restrict__ minVec)
-{
-  /* --- Prerequisites --- */
-
-  const int nvert = nSideC*nSideC*nSideC;
-  const int nvertf = nSideF*nSideF;
-
-  const int sorderC = nSideC-1;
-  const int sorderF = nSideF-1;
-
-  // NOTE: Structured ordering  |  btm,top,left,right,front,back
-  const unsigned char TriPts[12][3] = {{0,1,3},{0,3,2},{4,7,5},{4,6,7},{0,2,6},{0,6,4},
-                       {1,3,7},{1,7,5},{0,4,5},{0,5,1},{2,3,7},{2,6,7}};
-
-  double tol = 1e-9;
-  double TC[9], TF[9];
-  double minDist = BIG_DOUBLE;
-  minVec[0] = minDist;
-  minVec[1] = minDist;
-  minVec[2] = minDist;
-
-  double bboxC[6], bboxF[6];
-  cuda_funcs::getBoundingBox<3,nvertf>(fxv, bboxF);
-  cuda_funcs::getBoundingBox<3,nvert>(exv, bboxC);
-
-  /* Only 3 cases possible:
-   * 1) Face entirely contained within element
-   * 2) Face intersects with element's boundary
-   * 3) Face and element do not intersect
-   */
-
-  // 1) In case of face entirely inside element, check if a pt is inside ele
-  if (cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, 0))
-  {
-    double rst[3];
-    if (mb.getRefLoc<nSideC>(exv, bboxC, fxv, rst))
-      return 0.;
-  }
-
-  // 2) Check outer faces of element for intersection with face
-#pragma unroll
-  for (int f = 0; f < 6; f++)
-  {
-#pragma unroll
-    for (int g = 0; g < sorderC*sorderC; g++)
-    {
-      int I, J, K;
-      switch (f)
-      {
-        case 0: // Bottom
-          I = g / sorderC;
-          J = g % sorderC;
-          K = 0;
-          break;
-        case 1: // Top
-          I = g / sorderC;
-          J = g % sorderC;
-          K = sorderC - 1;
-          break;
-        case 2: // Left
-          I = 0;
-          J = g / sorderC;
-          K = g % sorderC;
-          break;
-        case 3: // Right
-          I = sorderC - 1;
-          J = g / sorderC;
-          K = g % sorderC;
-          break;
-        case 4: // Front
-          I = g / sorderC;
-          J = 0;
-          K = g % sorderC;
-          break;
-        case 5: // Back
-          I = g / sorderC;
-          J = sorderC - 1;
-          K = g % sorderC;
-          break;
-      }
-
-      int i0 = I+nSideC*(J+nSideC*K);
-      int j0 = i0 + nSideC*nSideC;
-      int lin2curv[8] = {i0, i0+1, i0+nSideC, i0+nSideC+1, j0, j0+1, j0+nSideC, j0+nSideC+1};
-      for (int i = 0; i < 8; i++)
-        lin2curv[i] = mb.ijk2gmsh[lin2curv[i]];
-
-      // Get triangles for the sub-hex of the larger curved hex
-      for (int i = f; i < f+2; i++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = lin2curv[TriPts[i][p]];
-          for (int d = 0; d < 3; d++)
-            TC[3*p+d] = exv[3*ipt+d];
-        }
-
-        cuda_funcs::getBoundingBox<3,3>(TC, bboxC);
-        double btol = .1*(bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]);
-        btol = fmin(btol, minDist);
-        if (!cuda_funcs::boundingBoxCheck<3>(bboxC,bboxF,btol)) continue;
-
-        for (int M = 0; M < sorderF; M++)
-        {
-          for (int N = 0; N < sorderF; N++)
-          {
-            int m0 = M + nSideF*N;
-            int TriPtsF[2][3] = {{m0, m0+1, m0+nSideF+1}, {m0, m0+nSideF+1, m0+nSideF}};
-            for (int m = 0; m < 2; m++)
-              for (int n = 0; n < 3; n++)
-                TriPtsF[m][n] = mb.ijk2gmsh_quad[TriPtsF[m][n]];
-
-            // Intersection check between element face tris & cutting-face tris
-            for (int j = 0; j < 2; j++)
-            {
-              for (int p = 0; p < 3; p++)
-              {
-                int ipt = TriPtsF[j][p];
-                for (int d = 0; d < 3; d++)
-                  TF[3*p+d] = fxv[3*ipt+d];
-              }
-
-              double vec[3];
-              double dist = triTriDistance2(TF, TC, vec, tol);
-
-              if (dist < tol)
-                return 0.;
-
-              if (dist < minDist)
-              {
-                for (int d = 0; d < 3; d++)
-                  minVec[d] = vec[d];
-                minDist = dist;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // 3) Definitely no intersection; use centroids to get vector
-  if (minDist == BIG_DOUBLE)
-  {
-    double tmp[3];
-    cuda_funcs::getCentroid<3,nvert>(exv,minVec);
-    cuda_funcs::getCentroid<3,nvertf>(fxv,tmp);
-
-    minDist = 0;
-    for (int d = 0; d < 3; d++) // Vector is face -> cell
-    {
-      minVec[d] -= tmp[d];
-      minDist += minVec[d]*minVec[d];
-    }
-
-    return sqrt(minDist);
-  }
-
-  return minDist;
-}
-
-__device__ __forceinline__
-double intersectionCheckLinear(dMeshBlock &mb, const double* __restrict__ fxv,
-    const double* __restrict__ exv, const double* __restrict__ bboxC,
-    double* __restrict__ minVec, char &cornerOut)
-{
-  /* --- Prerequisites --- */
-
-  // NOTE: Gmsh ordering  |  btm,top,left,right,front,back
-  const unsigned char TriPts[12][3] = {{0,1,2},{0,2,3},{4,6,5},{4,7,6},{0,3,7},{0,7,4},
-                       {1,2,6},{1,6,5},{0,4,5},{0,5,1},{3,2,6},{3,7,6}};
-
-  double tol = 1e-8f;
-  double TC[9], TF[9];
-  double minDist = 1e15;
-  minVec[0] = minDist;
-  minVec[1] = minDist;
-  minVec[2] = minDist;
-
-  double bboxF[6];
-  cuda_funcs::getBoundingBox<3,4>(fxv, bboxF);
-
-  double xcf[3];
-  cuda_funcs::getCentroid<3,4>(fxv,xcf);
-
-  /* Only 3 cases possible:
-   * 1) Face entirely contained within element (Checked outside this func)
-   * 2) Face intersects with element's boundary
-   * 3) Face and element do not intersect
-   */
-
-  // 2) Find nearest corner of element to face; check only that half of element
-
-  int corner = -1;
-  for (int i = 0; i < 8; i++)
-  {
-    double dist = 0.;
-    for (int d = 0; d < 3; d++)
-      dist += (exv[3*i+d] - xcf[d]) * (exv[3*i+d] - xcf[d]);
-
-    if (dist < minDist)
-    {
-      minDist = dist;
-      for (int d = 0; d < 3; d++)
-        minVec[d] = exv[3*i+d] - xcf[d];
-      corner = i;
-    }
-  }
-
-  cornerOut = corner;
-
-  // Faces 0 or 1, 2 or 3, and 4 or 5 (btm or top, L or R, etc.)
-  const int fList[3] = {corner / 4, ((corner + 1)%4) / 2 + 2, ((corner%4) / 2) + 4};
-
-  // 3) Check those faces of element for intersection with face
-#pragma unroll
-  for (int F = 0; F < 3; F++)
-  {
-    int f = fList[F];
-    // Get triangles for the sub-hex of the larger curved hex
-    for (int i = f; i < f+2; i++)
-    {
-      for (int p = 0; p < 3; p++)
-      {
-        int ipt = TriPts[i][p];
-        for (int d = 0; d < 3; d++)
-          TC[3*p+d] = exv[3*ipt+d];
-      }
-
-      const int TriPtsF[2][3] = {{0, 1, 3}, {1, 2, 3}};
-
-      // Intersection check between element face tris & cutting-face tris
-      for (int j = 0; j < 2; j++)
-      {
-        for (int p = 0; p < 3; p++)
-        {
-          int ipt = TriPtsF[j][p];
-          for (int d = 0; d < 3; d++)
-            TF[3*p+d] = fxv[3*ipt+d];
-        }
-
-        double vec[3];
-        double dist = triTriDistance2(TF, TC, vec, tol);
-
-        if (dist < tol)
-          return 0.;
-
-        if (dist < minDist)
-        {
-          for (int d = 0; d < 3; d++)
-            minVec[d] = vec[d];
-          minDist = dist;
-        }
-      }
-    }
-  }
-
-  return minDist;
-}
-
-__device__ __forceinline__
-float intersectionCheckLinear(dMeshBlock &mb, const float* __restrict__ fxv,
-    const float* __restrict__ exv, const float* __restrict__ bboxC,
-    float* __restrict__ minVec, char &cornerOut)
-{
-  /* --- Prerequisites --- */
-
-  // NOTE: Gmsh ordering  |  btm,top,left,right,front,back
-  const unsigned char TriPts[12][3] = {{0,1,2},{0,2,3},{4,6,5},{4,7,6},{0,3,7},{0,7,4},
-                       {1,2,6},{1,6,5},{0,4,5},{0,5,1},{3,2,6},{3,7,6}};
-
-  float tol = 1e-8f;
-  float TC[9], TF[9];
-  float minDist = 1e15f;
-  minVec[0] = minDist;
-  minVec[1] = minDist;
-  minVec[2] = minDist;
-
-  float xcf[3];
-  cuda_funcs::getCentroid<3,4>(fxv,xcf);
-
-  /* Only 3 cases possible:
-   * 1) Face entirely contained within element (Checked outside this func)
-   * 2) Face intersects with element's boundary
-   * 3) Face and element do not intersect
-   */
-
-  // 2) Find nearest corner of element to face; check only that half of element
-
-  int corner = -1;
-  for (int i = 0; i < 8; i++)
-  {
-    float dist = 0.f;
-    for (int d = 0; d < 3; d++)
-      dist += (exv[3*i+d] - xcf[d]) * (exv[3*i+d] - xcf[d]);
-
-    if (dist < minDist)
-    {
-      minDist = dist;
-      for (int d = 0; d < 3; d++)
-        minVec[d] = exv[3*i+d] - xcf[d];
-      corner = i;
-    }
-  }
-
-  cornerOut = corner;
-
-  // Faces 0 or 1, 2 or 3, and 4 or 5 (btm or top, L or R, etc.)
-  const int fList[3] = {corner / 4, ((corner + 1)%4) / 2 + 2, ((corner%4) / 2) + 4};
-
-  // 3) Check those faces of element for intersection with face
-#pragma unroll
-  for (int F = 0; F < 3; F++)
-  {
-    int f = fList[F];
-    // Get triangles for the sub-hex of the larger curved hex
-    for (int i = f; i < f+2; i++)
-    {
-      for (int p = 0; p < 3; p++)
-      {
-        int ipt = TriPts[i][p];
-        for (int d = 0; d < 3; d++)
-          TC[3*p+d] = exv[3*ipt+d];
-      }
-
-      const int TriPtsF[2][3] = {{0, 1, 3}, {1, 2, 3}};
 
       // Intersection check between element face tris & cutting-face tris
       for (int j = 0; j < 2; j++)
@@ -1880,325 +1097,68 @@ float intersectionCheckLinear2(const float* __restrict__ fxv,
 }
 
 __global__
-void cuttingPass1(dMeshBlock mb, dvec<float> cutFaces, int nvertf, int nFiltF,
-    dvec<int> filt_faces, int* __restrict__ cutFlag, int cutType,
-    int* __restrict__ list, int ncells, dvec<int> faceListOut, dvec<char> cornerOut)
+void cuttingPass0(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
+    int nFaces, int nvertf, dvec<int> filt_faces, dvec<float> outDist)
 {
-  const int tid = blockIdx.x;
-  const int idx = threadIdx.x;
-  /// USING 32 THREADS PER BLOCK - 1 CELL PER BLOCK
+  const int IC = blockIdx.x * blockDim.x + threadIdx.x;
+  const int F = blockIdx.y * blockDim.y + threadIdx.y;
 
-  if (tid >= ncells) return;
+  if (IC >= nEles || F >= nFaces) return;
 
   const int nDims = 3;
 
-  const int ic = list[tid];  // Get filtered cell ID
+  const int ff = filt_faces[F];
   const int stride = nDims*nvertf;
-  const bool LINEAR = (nvertf == 4);
 
-  //bool PRINT = threadIdx.x == 0 && blockIdx.x == 0;
+  float bboxF[6];
+  cuda_funcs::getBoundingBox<3,4>(&cutFaces[ff*stride], bboxF);
 
-  __shared__ float xv[nDims*8];
-  __shared__ float dists[32];
-  __shared__ int faces[32];
-  __shared__ int nHit[1];
-  __shared__ char corners[32];
+  outDist[nEles*F+IC] = cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[6*IC]);
+}
 
-  __syncthreads();
+__global__
+void sortFaces0(dvec<int> faceList, int nEles, int nFaces, dvec<float> distList,
+    dvec<int> outFaces)
+{
+  const int IC = blockDim.x * blockIdx.x + threadIdx.x;
 
-  // Load up the cell nodes into an array
-  for (int i = idx; i < 8*nDims; i += blockDim.x)
+  if (IC >= nEles) return;
+
+  float dists[NF1];
+  int faces[NF1];
+
+  for (int i = 0; i < NF1; i++)
   {
-    int d = i % 3;
-    int v = i / 3;
-    xv[i] = mb.coord[ic+mb.ncells*(d+nDims*v)]; /// NOTE: 'row-major' ZEFR layout
+    dists[i] = BIG_FLOAT;
+    faces[i] = -1;
   }
 
-  __syncthreads();
-
-  int myFaces[32];  
-  float myDists[32];
-  char myCorners[32];
-
-  for (int i = 0; i < 32; i++)
+  for (int F = 0; F < nFaces; F++)
   {
-    myFaces[i] = -1;
-    myDists[i] = BIG_FLOAT;
-    myCorners[i] = -1;
-  }
+    int ind = NF1-1;
 
-  float bboxC[2*nDims];
-  float xcC[3];
-  float oobb[15];
-  cuda_funcs::getBoundingBox<nDims,8>(xv, bboxC);
-  cuda_funcs::getCentroid<nDims,8>(xv, xcC);
-  cuda_funcs::getOOBB<nDims,8>(xv,oobb);
+    float Dist = distList[nEles*F+IC];
+    if (Dist > dists[ind]) continue;
 
-  const float href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
-  const float dtol = 2e-1f*href;
-
-  /* --- Pass 1: Coarse-Grained Distance Calculation Using Bounding Boxes --- */
-
-  nHit[0] = 0;
-  int myHit = 0;
-  float fxv[nDims*4];
-
-  int nFace = (idx == 31) ? (nFiltF - 31*(nFiltF/31)) : nFiltF/31;
-
-  int startF = (nFiltF/31) * idx;
-
-  for (int i = 0; i < nFace; i++)
-  {
-    int ff = filt_faces[startF + i];
-
-    for (int i = 0; i < nDims*4; i++)
-      fxv[i] = cutFaces[ff*stride+i];
-
-    // Transform face points to element OOBB axes
-    float fxv_r[nDims*4];
-    for (int i = 0; i < 12; i++)
-      fxv_r[i] = 0.f;
-
-    for (int k = 0; k < 4; k++)
-      for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-          fxv_r[3*k+i] += oobb[3*i+j] * fxv[3*k+j];
-
-    // Get OBB of face in element's axes
-    float obbF[6];
-    cuda_funcs::getBoundingBox<nDims,4>(fxv_r,obbF);
-
-    float xcFf[3];
-    cuda_funcs::getCentroid<nDims,4>(fxv,xcFf);
-
-    float dist1 = cuda_funcs::boundingBoxDist<3>(&oobb[9], &obbF[0]);
-    bool check = (dist1 <= .01f*dtol);
-
-    float dist2 = 0.f;
-    for (int d = 0; d < 3; d++)
-      dist2 += (xcFf[d] - xcC[d]) * (xcFf[d] - xcC[d]);
-    dist2 = 0.5f*(sqrt(dist2) + dist1);
-
-    if (check)
+    dists[ind] = Dist;
+    faces[ind] = faceList[F];
+    while (ind > 0 && dists[ind] < dists[ind-1])
     {
-      // Build up list of faces with bbox intersect from the front
-      myHit++;
-//      atomicAdd(nHit, 1);
-
-      int ind = min(NF1 - 1, myHit);
-
-      if (dist2 > myDists[ind]) continue;
-
-      myDists[ind] = dist2;
-      myFaces[ind] = ff;
-      while (ind > 0 && myDists[ind] < myDists[ind-1])
-      {
-        swap(myDists[ind], myDists[ind-1]);
-        swap(myFaces[ind], myFaces[ind-1]);
-        ind--;
-      }
-    }
-    else
-    {
-      int ind = NF1 - 1;
-
-      if (dist2 > myDists[ind]) continue;
-
-      myDists[ind] = dist2;
-      myFaces[ind] = ff;
-      while (ind > myHit && myDists[ind] < myDists[ind-1])
-      {
-        swap(myDists[ind], myDists[ind-1]);
-        swap(myFaces[ind], myFaces[ind-1]);
-        ind--;
-      }
+      swap(dists[ind], dists[ind-1]);
+      swap(faces[ind], faces[ind-1]);
+      ind--;
     }
   }
 
-  // Warp-reduce our sorted lists so each thread has final list of the min values
-  for (int mask = warpSize/2; mask > 0; mask /= 2)
+  for (int i = 0; i < NF1; i++)
   {
-    float tmpDist[32];
-    int tmpFace[32];
-    for (int j = 0; j < 32; j++)
-    {
-      tmpDist[j] = myDists[j];
-      tmpFace[j] = myFaces[j];
-    }
-
-    for (int j = 0; j < 32; j++)
-    {
-      float d2 = __shfl_xor(tmpDist[j], mask);
-      int f2 = __shfl_xor(tmpFace[j], mask);
-
-      // Insertion sort into our list
-      int ind = NF1 - 1;
-
-      if (d2 > myDists[ind]) continue;
-
-      myDists[ind] = d2;
-      myFaces[ind] = f2;
-      while (ind > 0 && myDists[ind] < myDists[ind-1])
-      {
-        swap(myDists[ind], myDists[ind-1]);
-        swap(myFaces[ind], myFaces[ind-1]);
-        ind--;
-      }
-    }
-  }
-
-  /* --- Pass 2: Coarse-Grained Intersection Check using linear portion of cell/face --- */
-
-//  float myNorm[3] = {0., 0., 0.};
-  float Dist = BIG_FLOAT;
-  int myFlag = DC_UNASSIGNED;
-  int nMin = 0;
-  char myCorner = -1;
-
-  // Each thread will check against 1 face
-
-  int ff = myFaces[idx];
-
-  if (ff >= 0)
-  {
-    // Load face vertices
-    for (int i = 0; i < 4*nDims; i++)
-      fxv[i] = cutFaces[ff*stride+i];
-
-    float bboxF[6];
-    cuda_funcs::getBoundingBox<3,4>(fxv,bboxF);
-    /// Why does this not work with shared memory (xv) in a function...?
-    if (cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, 0))
-    {
-      float rst[3];
-      if (mb.getRefLoc<2>(xv, bboxC, fxv, rst)) ///
-        Dist = 0.;
-    }
-
-    dPointf vec;
-    vec[0] = BIG_DOUBLE; vec[1] = BIG_DOUBLE; vec[2] = BIG_DOUBLE;
-    if (Dist > 0.)
-    {
-      Dist = intersectionCheckLinear(mb, fxv, xv, bboxC, &vec[0], myCorner); /// GIVES ISSUE ON XV ('invalid __shared__ read of size 8') ON CALL TO mb.getRefLoc<2>()
-      vec /= vec.norm();
-    }
-
-    dPointf norm = faceNormal(fxv);
-    if (cutType == 0) norm *= -1;
-
-    if (Dist < dtol) // They intersect
-    {
-      myFlag = DC_CUT;
-      Dist = 0.;
-    }
-    else if (myFlag == DC_UNASSIGNED)
-    {
-      // Unflagged cell, or have a closer face to use
-      float dot = norm*vec;
-
-//      for (int d = 0; d < 3; d++)
-//        myNorm[d] = norm[d];
-
-      nMin = 1;
-
-      if (dot < 0)
-        myFlag = DC_HOLE; // outwards normal = inside cutting surface
-      else
-        myFlag = DC_NORMAL;
-    }
-
-    if (LINEAR)
-    {
-      if (myFlag == DC_CUT) myFlag = (cutType != 0) ? DC_HOLE : DC_NORMAL;
-
-      // have 'final answer' to put into global memory
-      float minDist = warpAllReduceMin(Dist);
-      if (Dist == minDist)
-        cutFlag[ic] = myFlag;
-      /// TODO
-      //  if (fabs(myDist - myDist) <= .1*dtol)
-      //  {
-      //    // Approx. same dist. to two faces; avg. their normals to decide
-      //    myDist = myDist;
-      //    for (int d = 0; d < 3; d++)
-      //      myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
-      //    nMin++;
-
-      //    //myDot = norm*vec;
-      //    double dot = 0.;
-      //    for (int d = 0; d < 3; d++)
-      //      dot += myNorm[d]*vec[d];
-
-      //    if (dot < 0)
-      //      myFlag = DC_HOLE; // outwards normal = inside cutting surface
-      //    else
-      //      myFlag = DC_NORMAL;
-
-      return;
-    }
-  }
-
-  dists[idx] = Dist;
-  faces[idx] = ff;
-  corners[idx] = myCorner;
-
-  __syncthreads();
-
-  // Parallel merge sort within block
-  for (int width = 2; width <= blockDim.x; width *= 2)
-  {
-    if (idx%width == 0)
-    {
-      int iBegin = idx;
-      int iMiddle = iBegin + width/2;
-      int iEnd = idx + width;
-      int i = iBegin, j = iMiddle;
-
-      // Copy into local array for sorting out of
-      for (int k = iBegin; k < iEnd; k++)
-      {
-        myDists[k] = dists[k];
-        myFaces[k] = faces[k];
-        myCorners[k] = corners[k];
-      }
-
-      __syncthreads();
-
-      // While there are elements in the left or right runs...
-      for (int k = iBegin; k < iEnd; k++)
-      {
-        // If left run head exists and is <= existing right run head.
-        if (i < iMiddle && (j >= iEnd || myDists[i] <= myDists[j]))
-        {
-          dists[k] = myDists[i];
-          faces[k] = myFaces[i];
-          corners[k] = myCorners[i];
-          i++;
-        }
-        else
-        {
-          dists[k] = myDists[j];
-          faces[k] = myFaces[j];
-          corners[k] = myCorners[j];
-          j++;
-        }
-      }
-    }
-
-    __syncthreads();
-  }
-
-  if (idx < NF2)
-  {
-    faceListOut[NF2*tid + idx] = faces[idx];
-    cornerOut[NF2*tid + idx] = corners[idx];
+    outFaces[nEles*i+IC] = faces[i];
   }
 }
 
-
 __global__
-void cuttingPass1New(dMeshBlock mb, dvec<int> filt_eles, int nEles,
-    dvec<float> cutFaces, int nvertf, int nFaces, dvec<int> filt_faces,
+void cuttingPass1(dMeshBlock mb, dvec<int> filt_eles, int nEles,
+    dvec<float> cutFaces, int nvertf, int nFaces, dvec<int> checkFaces,
     dvec<char> outCorner, dvec<float> outDist)
 {
   const int IC = blockIdx.x * blockDim.x + threadIdx.x;
@@ -2209,9 +1169,8 @@ void cuttingPass1New(dMeshBlock mb, dvec<int> filt_eles, int nEles,
   const int nDims = 3;
 
   const int ic = filt_eles[IC];  // Get filtered cell ID
-  const int ff = filt_faces[F];
+  const int ff = checkFaces[nEles*F+IC];
   const int stride = nDims*nvertf;
-//  const bool LINEAR = (nvertf == 4); /// TODO...?
 
   // Load up the cell nodes into an array
   float xv[8*nDims];
@@ -2222,14 +1181,12 @@ void cuttingPass1New(dMeshBlock mb, dvec<int> filt_eles, int nEles,
     xv[i] = mb.coord[ic+mb.ncells*(d+nDims*v)]; /// NOTE: 'row-major' ZEFR layout
   }
 
-  /* --- Pass 2: Coarse-Grained Intersection Check using linear portion of cell/face --- */
-
   // Each thread will check against 1 face
   outDist[nEles*F+IC] = intersectionCheckLinear2(&cutFaces[ff*stride], xv, outCorner[nEles*F+IC]);
 }
 
 __global__
-void sortFaces(dvec<int> faceList, int nEles, int nFaces, dvec<float> distList,
+void sortFaces(int nEles, int nFaces, dvec<float> distList,
     dvec<char> cornerList, dvec<int> outFaces, dvec<char> outCorners)
 {
   const int IC = blockDim.x * blockIdx.x + threadIdx.x;
@@ -2255,7 +1212,7 @@ void sortFaces(dvec<int> faceList, int nEles, int nFaces, dvec<float> distList,
     if (Dist > dists[ind]) continue;
 
     dists[ind] = Dist;
-    faces[ind] = faceList[F];
+    faces[ind] = outFaces[nEles*F+IC];
     corners[ind] = cornerList[nEles*F+IC];
     while (ind > 0 && dists[ind] < dists[ind-1])
     {
@@ -2271,258 +1228,6 @@ void sortFaces(dvec<int> faceList, int nEles, int nFaces, dvec<float> distList,
     outFaces[nEles*i+IC] = faces[i];
     outCorners[nEles*i+IC] = corners[i];
   }
-}
-
-template<int nSideC, int nSideF>
-__global__
-void cuttingPass3(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
-    int* __restrict__ cutFlag, int cutType, dvec<int> list, int ncells, dvec<char> corners)
-{
-  // Note: blockDim.x == 2 * 3 * nQuadFace
-  const int fic = blockIdx.x;
-  const int idx = threadIdx.x;
-/// TODO: have each thread be a single triangle + face check combo [use global-mem atomics for final element dist/flag]
-  if (fic >= ncells) return;
-
-  const int nDims = 3;
-  const int nvert = nSideC*nSideC*nSideC;
-  const int nvertf = nSideF*nSideF;
-  const int stride = nDims*nvertf;
-  const int sOrderC = nSideC - 1;
-
-  const int nQuadFace = sOrderC*sOrderC;
-  const int nTriFace = 2*nQuadFace;
-
-  const unsigned char qid = (idx % (nTriFace)) / 2;
-  const unsigned char tid = (idx % (nTriFace)) % 2;
-
-  const int ic = list[fic];  // Get filtered cell ID
-
-  // Load up the cell nodes into shared memory
-
-  __shared__ double xv[nDims*nvert];
-  __shared__ unsigned char sflag[1];
-  __shared__ float dist[7]; // For final min-reduction across block (max sOrderC = 6)
-
-  if (idx == 0)
-    sflag[0] = 0;
-
-  for (int i = idx; i < nvert*nDims; i += blockDim.x)
-  {
-    int d = i % nDims;
-    int v = i / nDims;
-    xv[i] = mb.coord[ic+mb.ncells*(d+nDims*v)]; /// NOTE: 'row-major' ZEFR layout
-  }
-
-  __syncthreads();
-
-  if (idx >= 3*nTriFace) return;
-
-  double bboxC[2*nDims];
-  double xcC[3];
-  cuda_funcs::getBoundingBox<nDims,nvert>(xv, bboxC);
-  cuda_funcs::getCentroid<nDims,nvert>(xv,xcC);
-
-  /* ---- Check against our reduced list of faces ---- */
-
-  const double href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
-  const double dtol = 1e-2*href;
-
-  float myDist = BIG_DOUBLE;
-  double myNorm[3];
-  int myFlag = DC_UNASSIGNED;
-  int nMin = 0;
-
-  double fxv[nvertf*nDims];
-
-  for (int F = 0; F < NF2; F++)
-  {    
-    if (myFlag == DC_CUT) continue;
-
-    int ff = checkFaces[ncells*F+fic];
-    if (ff < 0)
-      continue;
-
-    // Only checking half the element's faces; figure out which ones
-    const char corner = corners[ncells*F+fic];
-    const char fList[3] = {(char)(corner / 4), (char)(((corner + 1)%4) / 2 + 2), (char)(((corner%4) / 2) + 4)};
-
-    // Get the specific sub-quadrilateral-triangle we're checking here
-    const unsigned char fid = fList[idx / (nTriFace)];
-
-    /* ---- Get our specific triangle ---- */
-
-    double TC[9];
-
-    // NOTE: Structured ordering  |  btm,top,left,right,front,back
-    const unsigned char TriPts[12][3] = {{0,1,3},{0,3,2},{4,7,5},{4,6,7},{0,2,6},{0,6,4},
-                         {1,3,7},{1,7,5},{0,4,5},{0,5,1},{2,3,7},{2,6,7}};
-
-    int I, J, K;
-    switch (fid)
-    {
-      case 0: // Bottom
-        I = qid / sOrderC;
-        J = qid % sOrderC;
-        K = 0;
-        break;
-      case 1: // Top
-        I = qid / sOrderC;
-        J = qid % sOrderC;
-        K = sOrderC - 1;
-        break;
-      case 2: // Left
-        I = 0;
-        J = qid / sOrderC;
-        K = qid % sOrderC;
-        break;
-      case 3: // Right
-        I = sOrderC - 1;
-        J = qid / sOrderC;
-        K = qid % sOrderC;
-        break;
-      case 4: // Front
-        I = qid / sOrderC;
-        J = 0;
-        K = qid % sOrderC;
-        break;
-      case 5: // Back
-        I = qid / sOrderC;
-        J = sOrderC - 1;
-        K = qid % sOrderC;
-        break;
-    }
-
-    int i0 = I+nSideC*(J+nSideC*K);
-    int j0 = i0 + nSideC*nSideC;
-    int lin2curv[8] = {i0, i0+1, i0+nSideC, i0+nSideC+1, j0, j0+1, j0+nSideC, j0+nSideC+1};
-    for (int i = 0; i < 8; i++)
-      lin2curv[i] = mb.ijk2gmsh[lin2curv[i]];
-
-    for (int p = 0; p < 3; p++)
-    {
-      int ipt = lin2curv[TriPts[fid+tid][p]];
-      for (int d = 0; d < 3; d++)
-        TC[3*p+d] = xv[3*ipt+d];
-    }
-
-    // Load face vertices
-    for (int i = 0; i < stride; i++)
-      fxv[i] = cutFaces[ff*stride+i];
-
-    // 1) In case of face entirely inside element, check if a pt is inside ele
-    if (idx == 0)
-    {
-      double bboxF[6];
-      cuda_funcs::getBoundingBox<3,nvertf>(fxv, bboxF);
-
-      if (cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, 0))
-      {
-        double rst[3];
-        if (mb.getRefLoc<nSideC>(xv, bboxC, fxv, rst))
-          sflag[0] = DC_CUT;
-      }
-    }
-
-    __syncthreads();
-
-    if (sflag[0] == DC_CUT)
-    {
-      if (idx == 0)
-        cutFlag[ic] = (cutType != 0) ? DC_HOLE : DC_NORMAL;
-
-      return;
-    }
-
-    // Find distance from face to cell
-    dPoint vec;
-    double dist = intersectionCheckOne<nSideC,nSideF>(mb, fxv, &vec[0], TC);
-    vec /= vec.norm();
-
-    dPoint norm = faceNormal(fxv);
-    if (cutType == 0) norm *= -1;
-
-    if (dist < dtol) // They intersect 1e-8*href
-    {
-      myFlag = DC_CUT;
-      myDist = 0.;
-    }
-    else if (myFlag == DC_UNASSIGNED || dist < (myDist - .02*dtol))
-    {
-      // Unflagged cell, or have a closer face to use
-      double dot = norm*vec;
-
-      myDist = dist;
-      for (int d = 0; d < 3; d++)
-        myNorm[d] = norm[d];
-
-      nMin = 1;
-
-      if (dot < 0)
-        myFlag = DC_HOLE; // outwards normal = inside cutting surface
-      else
-        myFlag = DC_NORMAL;
-    }
-    else if (fabs(dist - myDist) <= .02*dtol)
-    {
-      // Approx. same dist. to two faces; avg. their normals to decide
-      myDist = dist;
-      for (int d = 0; d < 3; d++)
-        myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
-      nMin++;
-
-      //myDot = norm*vec;
-      double dot = 0.;
-      for (int d = 0; d < 3; d++)
-        dot += myNorm[d]*vec[d];
-
-      if (dot < 0)
-        myFlag = DC_HOLE; // outwards normal = inside cutting surface
-      else
-        myFlag = DC_NORMAL;
-    }
-    else if (myDist > 5*href)
-    {
-      // Clearly far from our element; cut our losses & return with what we have
-      break;
-    }
-    else
-    {
-      // dist > myDist, ignore
-    }
-  }
-
-  if (myFlag == DC_CUT)
-    myFlag = (cutType != 0) ? DC_HOLE : DC_NORMAL;
-
-  /* ---- Synchronize within element ---- */
-
-  float minDist = warpAllReduceMin(myDist);
-
-  int lane = idx % warpSize;
-  int wid = idx / warpSize;
-
-  if (lane == 0) dist[wid] = minDist;
-
-  __syncthreads();
-
-  minDist = (idx < blockDim.x / warpSize) ? dist[lane] : 0;
-
-  if (wid == 0)
-  {
-    minDist = warpAllReduceMin(minDist);
-    dist[0] = minDist;
-  }
-
-  __syncthreads();
-
-  minDist = dist[0];
-
-  // Thread with minimum ('best') distance sets final cutting flag
-  // Race condition if multiple threads have dist 0, but then all will be
-  // setting the same value ('DC_CUT') anyways
-  if (myDist == minDist)
-    cutFlag[ic] = myFlag;
 }
 
 __global__
@@ -2543,10 +1248,10 @@ void getElementBoundingBoxes(dMeshBlock mb, dvec<int> eleList, int nEles,
   cuda_funcs::getBoundingBox<3,8>(xv,&eleBbox[6*IC]);
 }
 
-template<int nSideC, int nSideF>
+template<int nSideF>
 __global__
-void cuttingPass3One(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
-    dvec<int> list, int nEles, dvec<float> eleBbox,
+void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
+    dvec<int> list, int nEles, int nSideC, dvec<float> eleBbox,
     dvec<char> corners, dvec<float> outDist, dvec<float> outVec)
 {
   const int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -2580,7 +1285,7 @@ void cuttingPass3One(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
 
   float bboxC[2*nDims];
   for (int i = 0; i < 2*nDims; i++)
-    bboxC[i] = eleBbox[6*ic+i];
+    bboxC[i] = eleBbox[6*IC+i];
 
   /* ---- Check against our reduced list of faces ---- */
 
@@ -2663,7 +1368,7 @@ void cuttingPass3One(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
   /// NOTE: ignoring case of face entirely inside cell, since any valid grid
   /// will also have a different face which intersects its boundary
   dPointf vec;
-  double myDist = intersectionCheckOne<nSideC,nSideF>(mb, &cutFaces[ff*stride], &vec[0], TC);
+  float myDist = intersectionCheckOne<nSideF>(mb, &cutFaces[ff*stride], &vec[0], TC);
   vec /= vec.norm();
 
   if (myDist < dtol) // They intersect
@@ -2784,8 +1489,6 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
   // Write out final result
   cutFlag[ic] = myFlag;
 }
-
-/// TODO: write kernel to do final sort & flag assignment for each element
 
 /*! Remove all elements which do not intersect with cut group's bbox from
  *  consideration (obviously do not intersect) */
@@ -2944,8 +1647,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   filt_eles.resize(ncells);
   filt_faces.resize(nCut);
 
-//  dvec<double> cutFaces;
-//  cutFaces.assign(cutFaces_h, nCut*nvertf*nDims);
   std::vector<float> cutFaces_hf(nCut*nvertf*nDims);
   for (int i = 0; i < nvertf*nDims*nCut; i++)
     cutFaces_hf[i] = (float)cutFaces_h[i];
@@ -3028,80 +1729,81 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   nfilt_h.assign(nfilt_d.data(), 2);
   int nfiltC = nfilt_h[0];
   int nfiltF = nfilt_h[1];
-  printf("%d: nfilt = %d/%d, %d/%d; cutType = %d\n",rank,nfilt_h[0], ncells, nfilt_h[1], nCut, cutType);
+  //printf("%d: nfilt = %d/%d, %d/%d; cutType = %d\n",rank,nfilt_h[0], ncells, nfilt_h[1], nCut, cutType);
 
   /* Perform the Direct Cut algorithm on the filtered list of elements & faces */
 
-  dvec<int> checkFaces;
-  dvec<char> corners;
-  checkFaces.resize(NF2*nfiltC);
-  corners.resize(NF2*nfiltC);
-
-  int blocks1 = nfiltC;
-  int threads1 = 32;
-  int nbShare1 = (8*nDims)*sizeof(double) + 32*sizeof(float) + (32+1)*sizeof(int) + 32*sizeof(char);
-
   int nSideC = std::cbrt(nvert);
   int nTri = 3*2*(nSideC-1)*(nSideC-1);
-  int nbShare3 = nDims*nvert*sizeof(double) + 7*sizeof(float) + 1;
   
-  /// TODO: new approach...
-  dvec<float> cfDist;
+  int nCheck1 = min(NF1, nfiltF);
+
+  dvec<float> eleBbox, cfDist, cfNorm, cfVec;
   dvec<char> cfCorner;
   cfDist.resize(nfiltC*nfiltF);
-  cfCorner.resize(nfiltC*nfiltF);
+  cfCorner.resize(nfiltC*NF1);
 
-  // Sort the distance lists for each element [down to NF2 faces to check in detail]
-
-//  dim3 threads0(32,4);
-//  dim3 blocks0( (nfiltC + threads0.x - 1) / threads0.x, (nfiltF + threads0.y - 1) / threads0.y );
-
-//  dim3 threads3(32,NF2);
-//  blocks = (nfiltC*3*nTri + threads3.x - 1) / threads3.x;
-//  cuttingPass3One<<<blocks0,threads3>>>(*this, cutFaces, nvertf, nfiltF, filt_faces,
-//      nfiltF, cutFlag_d.data(), cutType, filt_eles.data(), nfiltC, checkFaces,
-//      corners, cfDist, cfNorm);
-
-  /* Pass 1: 'Coarse-Grained' Check using Bounding Boxes
-   * Pass 2: 'Medium-Grained' Check using Linear Parts of Elements/Faces
-   * Pass 3: 'Finest-Grained' Direct Cut Check
-   */
+  dvec<int> checkFaces;
+  dvec<char> corners;
+  checkFaces.resize(NF1*nfiltC);
+  corners.resize(NF2*nfiltC);
 
   if (nfiltC > 0)
   {
-//    cuttingPass1<<<blocks1, threads1, nbShare1>>>(*this, cutFaces, nvertf, nfiltF,
-//        filt_faces, cutFlag_d.data(), cutType, filt_eles.data(), nfiltC, checkFaces, corners);
-//    check_error();
+    /* Pass 0: 'Coarse-Grained' Check using Bounding Boxes
+     * Pass 1: 'Medium-Grained' Check using Linear Parts of Elements/Faces
+     * Pass 2: 'Finest-Grained' Direct Cut Check
+     */
 
-
-    dim3 Threads1(32,4);
-    dim3 Blocks1( (nfiltC + Threads1.x - 1) / Threads1.x,
-                  (nfiltF + Threads1.y - 1) / Threads1.y );
-
+    // Tell CUDA to offer more space for registers over shared memory
     cudaFuncSetCacheConfig(getElementBoundingBoxes, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(cuttingPass1New, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(sortFaces, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(cuttingPass0, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(cuttingPass1, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(cuttingPass2<2>, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(cuttingPass2<3>, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(cuttingPass2<4>, cudaFuncCachePreferL1);
 
-    dvec<float> eleBbox;
     eleBbox.resize(6*nfiltC);
 
     int ThreadsB = 128;
     int BlocksB = (nfiltC + ThreadsB - 1) / ThreadsB;
 
     getElementBoundingBoxes<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleBbox);
+    check_error();
 
     // Have each filtered element calculate a rough distance to each filtered face
-    cuttingPass1New<<<Blocks1,Threads1>>>(*this, filt_eles, nfiltC, cutFaces,
-        nvertf, nfiltF, filt_faces, cfCorner, cfDist);
+
+    dim3 Threads0(32,4);
+    dim3 Blocks0( (nfiltC + Threads0.x - 1) / Threads0.x,
+                  (nfiltF + Threads0.y - 1) / Threads0.y );
+
+    cuttingPass0<<<Blocks0,Threads0>>>(eleBbox, cutFaces, nfiltC, nfiltF, nvertf, filt_faces, cfDist);
     check_error();
 
-    int ThreadsS = 128;
-    int BlocksS = (nfiltC + ThreadsS - 1) / ThreadsS;
-    sortFaces<<<BlocksS, ThreadsS>>>(filt_faces, nfiltC, nfiltF, cfDist,
-        cfCorner, checkFaces, corners);
+    int ThreadsS0 = 128;
+    int BlocksS0 = (nfiltC + ThreadsS0 - 1) / ThreadsS0;
+
+    sortFaces0<<<BlocksS0, ThreadsS0>>>(filt_faces, nfiltC, nfiltF, cfDist, checkFaces);
+    check_error();
+    // Have each filtered element calculate a rough distance to the reduced face list
+
+    dim3 Threads1(32,4);
+    dim3 Blocks1( (nfiltC + Threads1.x - 1) / Threads1.x,
+                  (nCheck1 + Threads1.y - 1) / Threads1.y );
+
+    cuttingPass1<<<Blocks1,Threads1>>>(*this, filt_eles, nfiltC, cutFaces,
+        nvertf, nCheck1, checkFaces, cfCorner, cfDist);
     check_error();
 
-    dvec<float> cfNorm, cfVec;
+    // Sort the distance lists for each element [down to NF2 faces to check in detail]
+
+    int ThreadsS1 = 128;
+    int BlocksS1 = (nfiltC + ThreadsS1 - 1) / ThreadsS1;
+
+    sortFaces<<<BlocksS1, ThreadsS1>>>(nfiltC, nCheck1, cfDist, cfCorner, checkFaces, corners);
+    check_error();
+
     cfNorm.resize(3*nfiltC*nTri*NF2);
     cfVec.resize(3*nfiltC*nTri*NF2);
     cfDist.resize(nfiltC*nTri*NF2);
@@ -3113,61 +1815,41 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     switch(nvertf)
     {
       case 4:
-        switch(nvert)
-        {
-          case 8:
-            // Both element & face linear - no further checking required
-            break;
-          default:
-            printf("nvert = %d\n",nvert);
-            ThrowException("nvert case not implemented for directCut on device");
-        }
+        cuttingPass2<2><<<b3, t3>>>(*this, cutFaces, checkFaces, filt_eles,
+            nfiltC, nSideC, eleBbox, corners, cfDist, cfVec);
+        break;
+
+      case 9:
+        cuttingPass2<3><<<b3, t3>>>(*this, cutFaces, checkFaces, filt_eles, nfiltC, nSideC, eleBbox, corners, cfDist, cfVec);
         break;
 
       case 16:
-        switch(nvert)
-        {
-          case 8:
-//            cuttingPass3<2,4><<<blocks1, nTri, nbShare3>>>(*this, cutFaces, checkFaces, cutFlag_d.data(), cutType, filt_eles, nfiltC, corners);
-            check_error();
-
-            cuttingPass3One<2,4><<<b3, t3>>>(*this, cutFaces, checkFaces, filt_eles, nfiltC, eleBbox, corners, cfDist, cfVec);
-            check_error();
-            break;
-          case 64:
-//            cuttingPass3<4,4><<<blocks1, nTri, nbShare3>>>(*this, cutFaces, checkFaces, cutFlag_d.data(), cutType, filt_eles, nfiltC, corners);
-            check_error();
-
-            cuttingPass3One<4,4><<<b3, t3>>>(*this, cutFaces, checkFaces, filt_eles, nfiltC, eleBbox, corners, cfDist, cfVec);
-            check_error();
-            break;
-          default:
-            printf("nvert = %d\n",nvert);
-            ThrowException("nvert case not implemented for directCut on device");
-        }
+        cuttingPass2<4><<<b3, t3>>>(*this, cutFaces, checkFaces, filt_eles, nfiltC, nSideC, eleBbox, corners, cfDist, cfVec);
         break;
+
       default:
         printf("nvertFace = %d, nCut = %d\n",nvertf,nCut);
         ThrowException("nvertFace case not implemented for directCut on device");
     }
+    check_error();
 
     int BlocksM = (nfiltC + 32 - 1) / 32;
     getMinDist<<<BlocksM, t3>>>(cfDist, cfVec, nfiltC, nTri);
+
     getFinalFlag<<<BlocksM, 128>>>(filt_eles, checkFaces, cutFaces, nfiltC, nvertf,
         nTri, cutFlag_d, cfDist, cfVec, cutType);
-
-    // Free data...
-    cfNorm.free_data();
-    cfVec.free_data();
-    eleBbox.free_data();
+    check_error();
   }
-
-  cfDist.free_data();
-  cfCorner.free_data();
 
   cuda_copy_d2h(cutFlag_d.data(), cutFlag, ncells);
 
   // Free all data allocated in this function
+
+  cfDist.free_data();
+  cfCorner.free_data();
+  cfNorm.free_data();
+  cfVec.free_data();
+  eleBbox.free_data();
 
   nfilt_d.free_data();
   nfilt_h.free_data();

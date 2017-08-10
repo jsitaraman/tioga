@@ -56,6 +56,7 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
   const int ndim = 2*nDims;
   int stack[MAX_LEVEL] = {0};
   int size = 1;
+  int possibleID = -1;
 
   while (size > 0)
   {
@@ -79,6 +80,8 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
       mb.checkContainment<nDims,nside>(ele,cellIndex,bbox,xsearch,rst);
       if (cellIndex > -1)
         return;
+      else if (cellIndex > -BIGINT) // 'out of tol' but not by a huge amount
+        possibleID = abs(cellIndex);
     }
 
     // check the left and right children now
@@ -103,6 +106,10 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
       }
     }
   }
+
+  // No 'exact' donor cell found; return the closest probable cell ID
+  if (cellIndex < 0 && possibleID > -1)
+    cellIndex = possibleID;
 }
 
 template<int nDims, int nside>

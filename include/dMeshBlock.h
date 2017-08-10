@@ -4,6 +4,8 @@
 #include "cuda_funcs.h"
 #include <vector>
 
+#define BIG_INT 2147483647
+
 //! Helper struct for direct-cut method [Galbraith 2013]
 typedef struct dCutMap
 {
@@ -146,7 +148,7 @@ public:
 
   template<int nSide>
   __device__ __forceinline__
-  bool getRefLoc(const float* __restrict__ coords, const float* __restrict__ bbox,
+  int getRefLoc(const float* __restrict__ coords, const float* __restrict__ bbox,
                  const float* __restrict__ xyz, float* __restrict__ rst);
 
   __host__
@@ -301,7 +303,7 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
 
 template<int nSide>
 __device__
-bool dMeshBlock::getRefLoc(const float* __restrict__ coords,
+int dMeshBlock::getRefLoc(const float* __restrict__ coords,
     const float* __restrict__ bbox, const float* __restrict__ xyz,
     float* __restrict__ rst)
 {
@@ -310,28 +312,29 @@ bool dMeshBlock::getRefLoc(const float* __restrict__ coords,
   // Use a relative tolerance to handle extreme grids
   float h = ( (bbox[3]-bbox[0]) + (bbox[4]-bbox[1]) + (bbox[5]-bbox[2]) ) / 3.f;
 
-  float EPS = 5e-4f;
-  float tol = EPS*h;
+  double EPS = 5e-4;
+  double tol = EPS*h;
 
   int iter = 0;
-  int iterMax = 8;
-  float norm = 1;
-  float norm_prev = 2;
+  int iterMax = 10;
+  double norm = 1;
+  double norm_prev = 2;
 
-  float shape[nNodes];
-  float dshape[3*nNodes];
+  double shape[nNodes];
+  double dshape[3*nNodes];
 
   rst[0] = 0.f;
   rst[1] = 0.f;
   rst[2] = 0.f;
+  double rstd[3] = {0.0};;
 
   while (norm > tol && iter < iterMax)
   {
-    calcDShape<nSide>(shape, dshape, rst);
+    calcDShape<nSide>(shape, dshape, rstd);
 
-    float dx[3] = {xyz[0], xyz[1], xyz[2]};
-    float grad[3][3] = {{0.0f}};
-    float ginv[3][3];
+    double dx[3] = {xyz[0], xyz[1], xyz[2]};
+    double grad[3][3] = {{0.0}};
+    double ginv[3][3];
 
     for (int nd = 0; nd < nNodes; nd++)
       for (int i = 0; i < 3; i++)
@@ -342,20 +345,20 @@ bool dMeshBlock::getRefLoc(const float* __restrict__ coords,
       for (int i = 0; i < 3; i++)
         dx[i] -= shape[nd] * coords[i+3*nd];
 
-    float detJ = cuda_funcs::det_3x3(&grad[0][0]);
+    double detJ = cuda_funcs::det_3x3(&grad[0][0]);
 
     cuda_funcs::adjoint_3x3(&grad[0][0], &ginv[0][0]);
 
-    float delta[3] = {0.0};
+    double delta[3] = {0.0};
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
         delta[i] += ginv[i][j]*dx[j]/detJ;
 
     norm = sqrt(dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2]);
     for (int i = 0; i < 3; i++)
-      rst[i] = max(min(rst[i]+delta[i],1.0001f),-1.0001f);
+      rstd[i] = max(min(rstd[i]+delta[i],1.0001),-1.0001);
 
-    if (iter > 1 && norm > .99f*norm_prev) // If it's clear we're not converging
+    if (iter > 1 && norm > .99*norm_prev) // If it's clear we're not converging
       break;
 
     norm_prev = norm;
@@ -363,10 +366,16 @@ bool dMeshBlock::getRefLoc(const float* __restrict__ coords,
     iter++;
   }
 
-  if ( norm <= 10.f*tol || (norm <= 50.f*tol && (max(max(rst[0],rst[1]),rst[2])) <= 1.0f) )
-    return true;
+  rst[0] = rstd[0];
+  rst[1] = rstd[1];
+  rst[2] = rstd[2];
+
+  if (norm <= 10.*tol) // Return 'yes'
+    return 1;
+  else if (norm <= 100.*tol) // Return 'maybe'
+    return -1;
   else
-    return false;
+    return 0;
 }
 
 template<int ndim, int nside>
@@ -378,7 +387,7 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID,
   const int nNodes = nside*nside*nside;
 
   int ele = eleList[adtEle];
-  cellID = -1;
+  cellID = -BIG_INT;
 
   float ecoord[nNodes*ndim];
   for (int i = 0; i < nNodes; i++)
@@ -404,7 +413,8 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID,
     isInEle = getRefLoc<nside>(ecoord,bbox,xyz,rst);
   }
 
-  if (isInEle) cellID = ele;
+  if (isInEle > 0) cellID = ele;
+  else if (isInEle < 0) cellID = -ele;
 }
 
 template<int ndim, int nside>

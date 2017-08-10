@@ -8,7 +8,7 @@
 
 /* --- Handy Vector Operation Macros --- */
 
-#define NF1 16 // 20-32 depending on unstructured-ness of grid & desire for robustness
+#define NF1 16 // 16-32 depending on unstructured-ness of grid & desire for robustness
 #define NF2  4 // 3-6 depending on unstructured-ness of grid & desire for robustness
 
 #define CROSS(a, b, c) { \
@@ -289,8 +289,8 @@ float lineSegmentDistance(float *p1, float *p2, float *p3, float *p4, float *dx)
   // (see http://geomalgorithms.com/a07-_distance.html for full algo)
 
   // Calculate line parameters (if nearly parallel, set one & calculate other)
-  float s = (den < 1e-10f) ? 0.0f : (uv*vw - vv*uw) / den;
-  float t = (den < 1e-10f) ? uw / uv: (uu*vw - uv*uw) / den;
+  float s = (den < 1e-7f) ? 0.0f : (uv*vw - vv*uw) / den;
+  float t = (den < 1e-7f) ? uw / uv: (uu*vw - uv*uw) / den;
 
   s = fmin(fmax(s, 0.f), 1.f);
   t = fmin(fmax(t, 0.f), 1.f);
@@ -312,7 +312,8 @@ float lineSegmentDistance(float *p1, float *p2, float *p3, float *p4, float *dx)
  *  Also returns vector of minimum distance from T1 to T2 */
 static
 __device__
-float triTriDistance2(float* T1, float* T2, float* minVec, float tol)
+float triTriDistanceVec(float* __restrict__ T1, float* __restrict__ T2,
+    float* __restrict__ minVec, float tol)
 {
   float dist = 1e15f;
   float vec[3];
@@ -620,11 +621,10 @@ float triTriDistance2(float* T1, float* T2, float* minVec, float tol)
 
 /*! Modified Moller triangle-triangle intersection algorithm
  *  Determines if triangles intersect, or returns an approximate minimum
- *  distance between them otherwise
- *  Also returns vector of minimum distance from T1 to T2 */
+ *  distance between them otherwise */
 static
 __device__
-float triTriDistance3(float* T1, float* T2, float tol)
+float triTriDistance(float* __restrict__ T1, float* __restrict__ T2, float tol)
 {
   float dist = 1e15f;
   float vec[3];
@@ -684,13 +684,13 @@ float triTriDistance3(float* T1, float* T2, float tol)
   float d22 = DOT(N1,V22) + d1;
 
   // Round values near 0 to 0
-  d01 = (fabs(d01) < 1e-10) ? 0 : d01;
-  d11 = (fabs(d11) < 1e-10) ? 0 : d11;
-  d21 = (fabs(d21) < 1e-10) ? 0 : d21;
+  d01 = (fabs(d01) < 1e-7f) ? 0 : d01;
+  d11 = (fabs(d11) < 1e-7f) ? 0 : d11;
+  d21 = (fabs(d21) < 1e-7f) ? 0 : d21;
 
-  d02 = (fabs(d02) < 1e-10) ? 0 : d02;
-  d12 = (fabs(d12) < 1e-10) ? 0 : d12;
-  d22 = (fabs(d22) < 1e-10) ? 0 : d22;
+  d02 = (fabs(d02) < 1e-7f) ? 0 : d02;
+  d12 = (fabs(d12) < 1e-7f) ? 0 : d12;
+  d22 = (fabs(d22) < 1e-7f) ? 0 : d22;
 
   if (fabs(d01) + fabs(d11) + fabs(d21) < 3*tol ||
       fabs(d02) + fabs(d12) + fabs(d22) < 3*tol)
@@ -883,10 +883,10 @@ float triTriDistance3(float* T1, float* T2, float tol)
       break;
   }
 
-  s1 = (fabs(s1) < 1e-10f) ? 0 : s1;
-  s2 = (fabs(s2) < 1e-10f) ? 0 : s2;
-  t1 = (fabs(t1) < 1e-10f) ? 0 : t1;
-  t2 = (fabs(t2) < 1e-10f) ? 0 : t2;
+  s1 = (fabs(s1) < 1e-7f) ? 0 : s1;
+  s2 = (fabs(s2) < 1e-7f) ? 0 : s2;
+  t1 = (fabs(t1) < 1e-7f) ? 0 : t1;
+  t2 = (fabs(t2) < 1e-7f) ? 0 : t2;
 
   if (s1 > s2)
     swap(s1,s2);
@@ -912,30 +912,6 @@ float triTriDistance3(float* T1, float* T2, float tol)
   return 0.f;
 }
 
-
-static
-__device__ __forceinline__
-dPoint faceNormal(const double* xv)
-{
-  /* Assuming nodes of face ordered CCW such that right-hand rule gives
-     * outward normal */
-
-  // Triangle #1
-  dPoint pt0 = dPoint(&xv[0]);
-  dPoint pt1 = dPoint(&xv[3]);
-  dPoint pt2 = dPoint(&xv[6]);
-  dPoint norm1 = (pt1-pt0).cross(pt2-pt0);           // Face normal vector
-
-  // Triangle #2
-  pt1 = dPoint(&xv[9]);
-  dPoint norm2 = (pt2-pt0).cross(pt1-pt0);
-
-  // Average the two triangle's normals
-  dPoint norm = 0.5*(norm1+norm2);
-
-  return (norm / norm.norm());
-}
-
 static
 __device__ __forceinline__
 dPointf faceNormal(const float* xv)
@@ -959,6 +935,7 @@ dPointf faceNormal(const float* xv)
   return (norm / norm.norm());
 }
 
+//! Calculate the distance between a linear triangle and a curved face
 template<int nSideF>
 __device__
 float intersectionCheckOne(dMeshBlock &mb, const float* __restrict__ fxv,
@@ -968,7 +945,7 @@ float intersectionCheckOne(dMeshBlock &mb, const float* __restrict__ fxv,
 
   const int sorderF = nSideF-1;
 
-  float tol = 1e-9;
+  float tol = 1e-7f;
   float TF[9];
   float minDist = BIG_DOUBLE;
   minVec[0] = minDist;
@@ -1002,7 +979,7 @@ float intersectionCheckOne(dMeshBlock &mb, const float* __restrict__ fxv,
         }
 
         float vec[3];
-        float dist = triTriDistance2(TF, TC, vec, tol);
+        float dist = triTriDistanceVec(TF, TC, vec, tol);
 
         if (dist < tol)
           return 0.;
@@ -1020,8 +997,9 @@ float intersectionCheckOne(dMeshBlock &mb, const float* __restrict__ fxv,
   return minDist;
 }
 
+//! Calc distance from near half of a hex to a face, assuming both linear
 __device__ __forceinline__
-float intersectionCheckLinear2(const float* __restrict__ fxv,
+float intersectionCheckLinear(const float* __restrict__ fxv,
     const float* __restrict__ exv, char &cornerOut)
 {
   /* --- Prerequisites --- */
@@ -1083,7 +1061,7 @@ float intersectionCheckLinear2(const float* __restrict__ fxv,
             TF[3*p+d] = fxv[3*ipt+d];
         }
 
-        float dist = triTriDistance3(TF, TC, tol);
+        float dist = triTriDistance(TF, TC, tol);
 
         if (dist < tol)
           return 0.;
@@ -1096,8 +1074,26 @@ float intersectionCheckLinear2(const float* __restrict__ fxv,
   return minDist;
 }
 
+//! Perform initial ele-face distance sorting using centroids
 __global__
-void cuttingPass0(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
+void cuttingPass0C(dvec<float> eleXC, dvec<float> faceXC, int nEles,
+    int nFaces, dvec<float> outDist)
+{
+  const int IC = blockIdx.x * blockDim.x + threadIdx.x;
+  const int F = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (IC >= nEles || F >= nFaces) return;
+
+  float dx[3];
+  for (int i = 0; i < 3; i++)
+    dx[i] = faceXC[3*F+i] - eleXC[3*IC+i];
+
+  outDist[nEles*F+IC] = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]; // dist^2 works just as well as dist
+}
+
+//! Perform initial ele-face distance sorting using bounding boxes
+__global__
+void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
     int nFaces, int nvertf, dvec<int> filt_faces, dvec<float> outDist)
 {
   const int IC = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1182,7 +1178,7 @@ void cuttingPass1(dMeshBlock mb, dvec<int> filt_eles, int nEles,
   }
 
   // Each thread will check against 1 face
-  outDist[nEles*F+IC] = intersectionCheckLinear2(&cutFaces[ff*stride], xv, outCorner[nEles*F+IC]);
+  outDist[nEles*F+IC] = intersectionCheckLinear(&cutFaces[ff*stride], xv, outCorner[nEles*F+IC]);
 }
 
 __global__
@@ -1231,6 +1227,37 @@ void sortFaces(int nEles, int nFaces, dvec<float> distList,
 }
 
 __global__
+void getFaceCentroids(dvec<float> cutFaces, dvec<int> faceList, int nFaces,
+    int nvertf, dvec<float> faceCentroid)
+{
+  int F = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (F >= nFaces) return;
+
+  int ff = faceList[F];
+
+  cuda_funcs::getCentroid<3,4>(&cutFaces[3*nvertf*ff], &faceCentroid[3*F]);
+}
+
+__global__
+void getElementCentroids(dMeshBlock mb, dvec<int> eleList, int nEles,
+    dvec<float> eleCentroid)
+{
+  int IC = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (IC >= nEles) return;
+
+  int ic = eleList[IC];
+
+  float xv[8*3];  // Only concerning ourselves with linear portion of ele
+  for (int i = 0; i < 8; i++)
+    for (int d = 0; d < 3; d++)
+      xv[3*i+d] = mb.coord[ic+mb.ncells*(d+3*i)];
+
+  cuda_funcs::getCentroid<3,8>(xv,&eleCentroid[3*IC]);
+}
+
+__global__
 void getElementBoundingBoxes(dMeshBlock mb, dvec<int> eleList, int nEles,
     dvec<float> eleBbox)
 {
@@ -1245,7 +1272,7 @@ void getElementBoundingBoxes(dMeshBlock mb, dvec<int> eleList, int nEles,
     for (int d = 0; d < 3; d++)
       xv[3*i+d] = mb.coord[ic+mb.ncells*(d+3*i)];
 
-  cuda_funcs::getBoundingBox<3,8>(xv,&eleBbox[6*IC]);
+  cuda_funcs::getBoundingBox<3,8>(xv,&eleBbox[6*IC]); /// TODO: swap rows/cols in eleBbox for better coalesced access
 }
 
 template<int nSideF>
@@ -1291,7 +1318,7 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
 
   /// Or TODO on storing href in global memory instead...
   const float href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
-  const float dtol = 2e-2*href;
+  const float dtol = 1e-1*href;
 
   // Only checking half the element's faces; figure out which ones
   const char corner = corners[nEles*FID+IC];
@@ -1438,6 +1465,7 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
   {
     int ff = checkFaces[nEles*F+IC];
     dPointf norm = faceNormal(&cutFaces[ff*nvertf*3]);
+    if (cutType == 0) norm *= -1;
 
     float dist = dists[F+nTri*IC];
 
@@ -1484,7 +1512,8 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
     }
   }
 
-  myFlag = (cutType != 0) ? DC_HOLE : DC_NORMAL;
+  if (myFlag == DC_CUT)
+    myFlag = (cutType != 0) ? DC_HOLE : DC_NORMAL;
 
   // Write out final result
   cutFlag[ic] = myFlag;
@@ -1692,7 +1721,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
       printf("nvert = %d\n",nvert);
       ThrowException("nvert case not implemented for filterElements on device");
   }
-
   check_error();
 
   if (nCut == 0)
@@ -1716,6 +1744,9 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     case 4:
       filterFaces<4><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
       break;
+    case 9:
+      filterFaces<9><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      break;
     case 16:
       filterFaces<16><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
       break;
@@ -1723,7 +1754,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
       printf("nvertf = %d\n",nvertf);
       ThrowException("nvertf case not implemented for filterFaces on device");
   }
-
   check_error();
 
   nfilt_h.assign(nfilt_d.data(), 2);
@@ -1748,6 +1778,8 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   checkFaces.resize(NF1*nfiltC);
   corners.resize(NF2*nfiltC);
 
+  dvec<float> eleXC, faceXC;
+
   if (nfiltC > 0)
   {
     /* Pass 0: 'Coarse-Grained' Check using Bounding Boxes
@@ -1757,8 +1789,10 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
     // Tell CUDA to offer more space for registers over shared memory
     cudaFuncSetCacheConfig(getElementBoundingBoxes, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(sortFaces0, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(sortFaces, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(cuttingPass0, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(cuttingPass0B, cudaFuncCachePreferL1);
+    cudaFuncSetCacheConfig(cuttingPass0C, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass1, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass2<2>, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass2<3>, cudaFuncCachePreferL1);
@@ -1766,10 +1800,20 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
     eleBbox.resize(6*nfiltC);
 
+    eleXC.resize(nfiltC*3);
+    faceXC.resize(nfiltC*3);
+
     int ThreadsB = 128;
     int BlocksB = (nfiltC + ThreadsB - 1) / ThreadsB;
 
     getElementBoundingBoxes<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleBbox);
+
+    getElementCentroids<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleXC);
+
+    int ThreadsF = 128;
+    int BlocksF = (nfiltF + ThreadsF - 1) / ThreadsF;
+
+    getFaceCentroids<<<BlocksF,ThreadsF>>>(cutFaces, filt_faces, nfiltF, nvertf, faceXC);
     check_error();
 
     // Have each filtered element calculate a rough distance to each filtered face
@@ -1778,14 +1822,14 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     dim3 Blocks0( (nfiltC + Threads0.x - 1) / Threads0.x,
                   (nfiltF + Threads0.y - 1) / Threads0.y );
 
-    cuttingPass0<<<Blocks0,Threads0>>>(eleBbox, cutFaces, nfiltC, nfiltF, nvertf, filt_faces, cfDist);
-    check_error();
+    cuttingPass0C<<<Blocks0,Threads0>>>(eleXC, faceXC, nfiltC, nfiltF, cfDist);
 
     int ThreadsS0 = 128;
     int BlocksS0 = (nfiltC + ThreadsS0 - 1) / ThreadsS0;
 
     sortFaces0<<<BlocksS0, ThreadsS0>>>(filt_faces, nfiltC, nfiltF, cfDist, checkFaces);
     check_error();
+
     // Have each filtered element calculate a rough distance to the reduced face list
 
     dim3 Threads1(32,4);
@@ -1794,7 +1838,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
     cuttingPass1<<<Blocks1,Threads1>>>(*this, filt_eles, nfiltC, cutFaces,
         nvertf, nCheck1, checkFaces, cfCorner, cfDist);
-    check_error();
 
     // Sort the distance lists for each element [down to NF2 faces to check in detail]
 
@@ -1809,7 +1852,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     cfDist.resize(nfiltC*nTri*NF2);
 
 
-    dim3 t3(32,4);
+    dim3 t3(32,NF2);
     int b3 = (nfiltC*nTri + t3.x - 1) / t3.x;
 
     switch(nvertf)
@@ -1850,6 +1893,8 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   cfNorm.free_data();
   cfVec.free_data();
   eleBbox.free_data();
+  eleXC.free_data();
+  faceXC.free_data();
 
   nfilt_d.free_data();
   nfilt_h.free_data();

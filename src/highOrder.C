@@ -69,6 +69,12 @@ void MeshBlock::extraConn(void)
         c2c[nface*ic+j] = ic1;
     }
   }
+  /// DEBUGGING
+  if (myid == 9)
+  {
+    for (int i = 0; i < 6; i++)
+      printf("Cell 3523: c2c[%d] = %d\n",i,c2c[6*3523+i]);
+  }
   
   // List of all solid wall-boundary faces
   nCutHole = nWallFaces;

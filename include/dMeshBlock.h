@@ -179,18 +179,15 @@ void dMeshBlock::calcDShape(double* __restrict__ shape, double* __restrict__ dsh
     dlag_k[i] = cuda_funcs::dLagrange_gpu(xlist.data(), nSide,  mu, i);
   }
 
-  //int nd = 0;
   for (int k = 0; k < nSide; k++)
     for (int j = 0; j < nSide; j++)
       for (int i = 0; i < nSide; i++)
       {
         int gnd = ijk2gmsh[i+nSide*(j+nSide*k)];
-        //int gnd = i+nSide*(j+nSide*k);
         shape[gnd] = lag_i[i] * lag_j[j] * lag_k[k];
         dshape[gnd*3+0] = dlag_i[i] *  lag_j[j] *  lag_k[k];
         dshape[gnd*3+1] =  lag_i[i] * dlag_j[j] *  lag_k[k];
         dshape[gnd*3+2] =  lag_i[i] *  lag_j[j] * dlag_k[k];
-        //nd++;
       }
 }
 
@@ -220,18 +217,15 @@ void dMeshBlock::calcDShape(float* __restrict__ shape, float* __restrict__ dshap
     dlag_k[i] = cuda_funcs::dLagrange_gpu(xlistf.data(), nSide,  mu, i);
   }
 
-  //int nd = 0;
   for (int k = 0; k < nSide; k++)
     for (int j = 0; j < nSide; j++)
       for (int i = 0; i < nSide; i++)
       {
         int gnd = ijk2gmsh[i+nSide*(j+nSide*k)];
-        //int gnd = i+nSide*(j+nSide*k);
         shape[gnd] = lag_i[i] * lag_j[j] * lag_k[k];
         dshape[gnd*3+0] = dlag_i[i] *  lag_j[j] *  lag_k[k];
         dshape[gnd*3+1] = lag_i[i] * dlag_j[j] *  lag_k[k];
         dshape[gnd*3+2] = lag_i[i] *  lag_j[j] * dlag_k[k];
-        //nd++;
       }
 }
 
@@ -244,14 +238,13 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
   const int nNodes = nSide*nSide*nSide;
 
   // Use a relative tolerance to handle extreme grids
-  float h = fmin(bbox[3]-bbox[0],bbox[4]-bbox[1]);
-  h = fmin(h,bbox[5]-bbox[2]);
+  float h = ( (bbox[3]-bbox[0]) + (bbox[4]-bbox[1]) + (bbox[5]-bbox[2]) ) / 3.;
 
   float EPS = 1e-5f;
   float tol = EPS*h;
 
   int iter = 0;
-  int iterMax = 4;
+  int iterMax = 10;
   float norm = 1;
   float norm_prev = 2;
 
@@ -300,7 +293,7 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
     iter++;
   }
 
-  if (norm <= tol)
+  if ( norm <= 10.*tol || (norm <= 20.*tol && (max(max(rst[0],rst[1]),rst[2])) <= 1.0) )
     return true;
   else
     return false;
@@ -315,30 +308,29 @@ bool dMeshBlock::getRefLoc(const float* __restrict__ coords,
   const int nNodes = nSide*nSide*nSide;
 
   // Use a relative tolerance to handle extreme grids
-  float h = fmin(bbox[3]-bbox[0],bbox[4]-bbox[1]);
-  h = fmin(h,bbox[5]-bbox[2]);
+  float h = ( (bbox[3]-bbox[0]) + (bbox[4]-bbox[1]) + (bbox[5]-bbox[2]) ) / 3.f;
 
-  float EPS = 1e-4f;
+  float EPS = 5e-4f;
   float tol = EPS*h;
 
   int iter = 0;
-  int iterMax = 4;
+  int iterMax = 8;
   float norm = 1;
   float norm_prev = 2;
 
   float shape[nNodes];
   float dshape[3*nNodes];
 
-  rst[0] = 0.;
-  rst[1] = 0.;
-  rst[2] = 0.;
+  rst[0] = 0.f;
+  rst[1] = 0.f;
+  rst[2] = 0.f;
 
   while (norm > tol && iter < iterMax)
   {
     calcDShape<nSide>(shape, dshape, rst);
 
     float dx[3] = {xyz[0], xyz[1], xyz[2]};
-    float grad[3][3] = {{0.0}};
+    float grad[3][3] = {{0.0f}};
     float ginv[3][3];
 
     for (int nd = 0; nd < nNodes; nd++)
@@ -361,7 +353,7 @@ bool dMeshBlock::getRefLoc(const float* __restrict__ coords,
 
     norm = sqrt(dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2]);
     for (int i = 0; i < 3; i++)
-      rst[i] = max(min(rst[i]+delta[i],1.f+1e-6f),-1.f-1e-6f);
+      rst[i] = max(min(rst[i]+delta[i],1.0001f),-1.0001f);
 
     if (iter > 1 && norm > .99f*norm_prev) // If it's clear we're not converging
       break;
@@ -371,7 +363,7 @@ bool dMeshBlock::getRefLoc(const float* __restrict__ coords,
     iter++;
   }
 
-  if (norm <= tol)
+  if ( norm <= 10.f*tol || (norm <= 50.f*tol && (max(max(rst[0],rst[1]),rst[2])) <= 1.0f) )
     return true;
   else
     return false;
@@ -383,7 +375,6 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID,
     const float* __restrict__ bbox, const float* __restrict__ xyz,
     float* __restrict__ rst)
 {
-  //const int ndim_adt = 2*ndim;
   const int nNodes = nside*nside*nside;
 
   int ele = eleList[adtEle];
@@ -393,11 +384,10 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID,
   for (int i = 0; i < nNodes; i++)
     for (int d = 0; d < ndim; d++)
       ecoord[i*ndim+d] = coord[ele+ncells*(d+ndim*i)];
-  //ecoord[i*ndim+d] = coord[d+ndim*(i+nNodes*ele)];
 
   bool isInEle = false;
 
-  if (rrot) // Transform search point back to current physical location
+  if (rrot) // Transform search point *back* to current *physical* location
   {
     float x2[ndim];
     for (int d1 = 0; d1 < ndim; d1++)
@@ -422,7 +412,6 @@ __device__
 void dMeshBlock::checkContainment(int adtEle, int& cellID, const double* __restrict__ bbox,
     const double* __restrict__ xyz, double* __restrict__ rst)
 {
-  //const int ndim_adt = 2*ndim;
   const int nNodes = nside*nside*nside;
 
   int ele = eleList[adtEle];
@@ -432,7 +421,6 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID, const double* __restr
   for (int i = 0; i < nNodes; i++)
     for (int d = 0; d < ndim; d++)
       ecoord[i*ndim+d] = coord[ele+ncells*(d+ndim*i)];
-  //ecoord[i*ndim+d] = coord[d+ndim*(i+nNodes*ele)];
 
   bool isInEle = false;
 

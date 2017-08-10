@@ -97,7 +97,7 @@ void tioga::getHoleMap(void)
       double dsmax = max(max(ds[0], ds[1]), ds[2]);
       double dsmin = min(min(ds[0], ds[1]), ds[2]);
       double dx_avg = .5*(dsmax + dsmin);
-      int NX_HOLEMAP = 80; // Originally 64
+      int NX_HOLEMAP = 64; // Originally 64
       double dsbox = dx_avg/NX_HOLEMAP; // Accounting somewhat for high aspect ratios
 
       for (int j = 0; j < 3; j++)

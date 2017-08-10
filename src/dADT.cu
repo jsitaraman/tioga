@@ -5,6 +5,7 @@
 #include "funcs.hpp"
 
 #define MAX_LEVEL 20
+#define FTOL 1e-6f
 
 dADT::~dADT()
 {
@@ -69,8 +70,8 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
     bool flag = true;
     for (int i = 0; i < nDims; i++)
     {
-      flag = (flag && (xsearch[i] >= bbox[i]-TOL));
-      flag = (flag && (xsearch[i] <= bbox[i+nDims]+TOL));
+      flag = (flag && (xsearch[i] >= bbox[i]-FTOL));
+      flag = (flag && (xsearch[i] <= bbox[i+nDims]+FTOL));
     }
 
     if (flag)
@@ -93,8 +94,8 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
         flag = true;
         for (int i = 0; i < nDims; i++)
         {
-          flag = (flag && (xsearch[i] >= bbox[i]-TOL));
-          flag = (flag && (xsearch[i] <= bbox[i+nDims]+TOL));
+          flag = (flag && (xsearch[i] >= bbox[i]-FTOL));
+          flag = (flag && (xsearch[i] <= bbox[i+nDims]+FTOL));
         }
 
         if (flag)
@@ -112,10 +113,7 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
 
   if (pt >= mb.nsearch) return;
 
-  //const int ndim_adt = 2*nDims;
-
   // check if the given point is in the bounds of the ADT
-  //int rootNode = 0;
   int cellID = -1;
 
   float xsearch[nDims];
@@ -124,9 +122,7 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
 
   if (adt.rrot) // Transform back to ADT's coordinate system
   {
-    float x2[nDims];// = {0.0}; /// TODO: figure out when/if this works?
-    for (int d = 0; d < nDims; d++)
-      x2[d] = 0.0;
+    float x2[nDims] = {0.0};
     for (int d1 = 0; d1 < nDims; d1++)
       for (int d2 = 0; d2 < nDims; d2++)
         x2[d1] += adt.Rmat[d1+nDims*d2]*(xsearch[d2]-adt.offset[d2]);
@@ -138,16 +134,14 @@ void searchADT_kernel(dADT adt, dMeshBlock mb)
   bool flag = true;
   for (int d = 0; d < nDims; d++)
   {
-    flag = (flag && (xsearch[d] >= adt.adtBBox[2*d]-TOL));
-    flag = (flag && (xsearch[d] <= adt.adtBBox[2*d+1]+TOL));
+    flag = (flag && (xsearch[d] >= adt.adtBBox[2*d]-FTOL));
+    flag = (flag && (xsearch[d] <= adt.adtBBox[2*d+1]+FTOL));
   }
 
   // call recursive routine to check intersections with ADT nodes
   float rst[nDims] = {0.0};
   if (flag)
     d_searchADTstack<nDims,nside>(adt,mb,cellID,xsearch,rst);
-
-  __syncthreads();
 
   mb.donorId[pt] = cellID;
   for (int d = 0; d < nDims; d++)

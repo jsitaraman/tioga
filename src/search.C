@@ -197,7 +197,6 @@ void MeshBlock::search(void)
   for (int i = 0; i < nsearch; i++)
     if (donorId[i] > -1)
       donorCount++;
-
 //  htime.stopTimer();
 #endif
 //  printf("%d: nsearch %d\n",myid,nsearch);

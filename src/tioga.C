@@ -230,11 +230,13 @@ void tioga::unblankPart2(int nvar)
   }
 }
 
-//#define TG_NORMAL
+#ifdef _GPU
 #define TG_DIRECTCUT
+#else
+#define TG_NORMAL
+#endif
 void tioga::doHoleCutting(void)
 {
-//  MPI_Barrier(MPI_COMM_WORLD);
 #ifdef TG_NORMAL
   Timer tgTime("Normal Version: ");
   tgTime.startTimer();
@@ -269,7 +271,6 @@ void tioga::doHoleCutting(void)
   tgTime.stopTimer();
   POP_NVTX_RANGE;
 #endif
-//  MPI_Barrier(MPI_COMM_WORLD);
 
 #ifdef TG_DIRECTCUT
   PUSH_NVTX_RANGE("DirectCut", 2);
@@ -287,43 +288,6 @@ void tioga::doHoleCutting(void)
   dcTime.stopTimer();
   POP_NVTX_RANGE;
 #endif
-//  MPI_Barrier(MPI_COMM_WORLD);
-
-//  dcTime.showTime(3);
-//  MPI_Barrier(MPI_COMM_WORLD);
-//  printf("\n");
-//  MPI_Barrier(MPI_COMM_WORLD);
-
-//  tgTime.showTime(3);
-
-//  // Generate structured map of solid boundary (hole) locations
-//  getHoleMap();
-
-//  // Send/Recv the hole maps to/from all necessary ranks
-//  exchangeBoxes();
-
-//  // Find a list of all potential receptor points and send to all possible
-//  // donor ranks
-//  exchangeSearchData();
-
-//  // Find donors for all search points (other grids' possible receptor points)
-//  mb->search();
-
-//  // Exchange found donor data and do final iblank setting
-//  exchangeDonors();
-
-//  if (ihighGlobal)
-//  {
-//    // Calculate cell iblank values from nodal iblank values
-//    mb->getCellIblanks(meshcomm);
-////    directCut(); /// TODO: complete a working version
-
-//    if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
-//    {
-//      // Find artificial boundary faces
-//      mb->calcFaceIblanks(meshcomm);
-//    }
-//  }
 }
 
 void tioga::doPointConnectivity(bool unblanking)

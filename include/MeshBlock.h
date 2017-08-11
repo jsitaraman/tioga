@@ -497,7 +497,7 @@ private:
   void getDirectCutCells(std::vector<std::unordered_set<int>> &cellList, std::vector<double> &cutBox_global, int nGroups_glob);
 
   //! Determine blanking status based upon given set of wall and overset faces
-  void directCut(std::vector<double> &cutFaces, int nCut, int nvertf, CutMap& cutMap, int cutType = 1);
+  void directCut(std::vector<double> &cutFaces, int nCut, int nvertf, std::vector<double> &cutBbox, CutMap& cutMap, int cutType = 1);
 
   //! Peform the Direct Cut alogorithm on the GPU
   void directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvertf, std::vector<double>& cutBbox,

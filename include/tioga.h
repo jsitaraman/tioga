@@ -338,7 +338,19 @@ class tioga
     mb->setCallbackArtBndGpu(d2h,h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
     gpu = true;
   }
-  
+
+  void setp4estcallback(void (*f1)(double *,int *,int *,int *),
+                        void (*f2) (int *,int *))
+  {
+    mb->setp4estcallback(f1,f2);
+  }
+
+  void set_p4est(void)
+  {
+    mytag=-mytag;
+    mb->resolutionScale=1000.0;
+  }
+
   void set_amr_callback(void (*f1)(int *,double *,int *,double *))
   {
     cg->setcallback(f1);
@@ -349,6 +361,7 @@ class tioga
   void register_amr_local_data(int, int ,int *, double *);  
   void exchangeAMRDonors(void);
   void checkComm(void);
+  void outputStatistics(void);
 
 #ifdef _GPU
   void setupCommBuffersGPU(void);

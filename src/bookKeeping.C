@@ -225,7 +225,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
         if (verbose) traced(temp->donorRes);
         if (temp->donorRes < nodeRes[i])
         {
-          iblank[i] = -temp->donorData[1]; //FRINGE;
+          iblank[i] = -temp->donorData[1] - 1; // meshtag range [0,nmesh-1]; subtracting 1 to avoid '-0'
           if (verbose) {
           tracei(iblank[i]);
           tracei(temp->donorData[0]);
@@ -294,7 +294,6 @@ void MeshBlock::initializeInterpList(int ninterp_input)
 void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
 {
   double xv[8][3];
-<<<<<<< HEAD
   std::vector<double> xv2;
   std::vector<double> frac;
   std::vector<int> inode;
@@ -340,7 +339,7 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
     if (iblank[inode[m]] <= 0 && receptorRes2 > 0.0) // || nodeRes[inode[m]] == BIGVALUE)
     {
       if (nodeRes[inode[m]]==BIGVALUE) acceptFlag=0;
-      if (abs(iblank[inode[m]])==meshtagrecv) acceptFlag=0;
+      if (abs(iblank[inode[m]])==meshtagrecv+1) acceptFlag=0;
       if (iblank[inode[m]]==0) acceptFlag=0;
     }
 
@@ -416,8 +415,8 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
   interpList[recid].receptorInfo[0] = procid;
   interpList[recid].receptorInfo[1] = pointid;
   if (verbose) {
-    tracei(interpList[*recid].receptorInfo[0]);
-    tracei(interpList[*recid].receptorInfo[1]);
+    tracei(interpList[recid].receptorInfo[0]);
+    tracei(interpList[recid].receptorInfo[1]);
   }
   interpList[recid].inode.resize(nvert);
   interpList[recid].weights.resize(nvert);

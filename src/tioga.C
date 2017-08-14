@@ -1337,7 +1337,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, double* q_spts, int dataFlag)
 
     // change the state of cells/nodes who are orphans
     if (!iartbnd)
-      mb->clearOrphans(itmp.data());
+      mb->clearOrphans(holeMap, nmesh, itmp.data());
 
     if (iartbnd)
     {

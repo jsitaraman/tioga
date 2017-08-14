@@ -130,7 +130,6 @@ void MeshBlock::tagBoundary(void)
   cellRes.resize(ncells);
   nodeRes.resize(nnodes);
 
-<<<<<<< HEAD
   if (userSpecifiedNodeRes == NULL && userSpecifiedCellRes == NULL)
   {
     for (int i = 0; i < nnodes; i++) nodeRes[i] = 0.0;

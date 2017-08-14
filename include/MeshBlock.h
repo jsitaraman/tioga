@@ -263,6 +263,7 @@ private:
 
   int nfringe;
   int meshtag; /** < tag of the mesh that this block belongs to */
+  double resolutionScale = 1.0;
 
   //! Oriented bounding box of this partition
   OBB *obb;
@@ -274,8 +275,7 @@ private:
   std::vector<int> isearch;       /** < index of query points in the remote process */
   std::vector<double> xsearch;    /** < coordinates of the query points */
   std::vector<int> tagsearch;    /** < coordinates of the query points */
-  //double *rst;            /**  natrural coordinates */
-  //int *donorId;       /** < donor indices for those found */
+
 #ifdef _GPU
   hvec<double> rst;
   hvec<double> rst_h; //! Specificallly for donor_frac_gpu
@@ -331,6 +331,12 @@ private:
   cudaStream_t stream_handle;
   cudaEvent_t event_handle;
 #endif
+
+  /* ---- Additional callbacks for p4est ---- */
+
+  //! Call back functions to use p4est to search its own internal data
+  void (*p4estsearchpt) (double *,int *,int *,int *);
+  void (*check_intersect_p4est) (int *, int *);
 
   /** basic constructor */
   MeshBlock()
@@ -478,11 +484,16 @@ private:
 
   void clearIblanks(void);
 
+  void getStats(int mstat[2]);
+
   void setIblanks(int inode);
 
   void getDonorCount(int *dcount,int *fcount);
 
   void getDonorInfo(int *receptors,int *indices, double *frac);
+
+  void getReducedOBB(OBB *obc, double *points);
+
   //
   // routines for high order connectivity and interpolation
   //
@@ -571,6 +582,12 @@ private:
     gpu = true;
   }
 
+  void setp4estcallback(void (*f1)(double *,int *,int *,int *),
+      void (*f2)(int *,int *))
+  {
+    p4estsearchpt=f1;
+    check_intersect_p4est=f2;
+  }
 
   void writeCellFile(int, int* flag);
 
@@ -618,7 +635,7 @@ private:
     fp << i << " " << rxyz[3*i] << " " << rxyz[3*i+1] << " " << rxyz[3*i+2] << std::endl;
   }
 
-  void clearOrphans(int *itmp);
+  void clearOrphans(HOLEMAP *holemap, int nmesh, int *itmp);
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);

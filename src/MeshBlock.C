@@ -130,6 +130,7 @@ void MeshBlock::tagBoundary(void)
   cellRes.resize(ncells);
   nodeRes.resize(nnodes);
 
+<<<<<<< HEAD
   if (userSpecifiedNodeRes == NULL && userSpecifiedCellRes == NULL)
   {
     for (int i = 0; i < nnodes; i++) nodeRes[i] = 0.0;
@@ -165,15 +166,14 @@ void MeshBlock::tagBoundary(void)
             for (int j = 0; j < 3; j++)
               xv[m][j] = x[i3+j];
           }
-//          vol = computeCellVolume(xv, nvert);
           vol = computeVolume(&xv[0][0], nvert, 3);
         }
 
-        cellRes[k++] = vol;
+        cellRes[k++] = vol*resolutionScale;
         for (int m = 0; m < nvert; m++)
         {
           iflag[inode[m]]++;
-          nodeRes[inode[m]] += vol;
+          nodeRes[inode[m]] += vol*resolutionScale;
         }
       }
     }
@@ -251,7 +251,7 @@ void MeshBlock::tagBoundary(void)
         for (int m = 0; m < nvert; m++)
         {
           inode[m] = vconn[n][nvert*i+m]-BASE;
-          if (iflag[inode[m]])
+          if (nodeRes[inode[m]] == BIGVALUE) //iflag[inode[m]])
           {
             cellRes[k]=BIGVALUE;
             break;
@@ -792,12 +792,10 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
   
 void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
 {
-  int i,j,i3;
-  int inode;
-
   *mtag = meshtag - BASE;
-  if (nwbc <=0) { /// TESTING
-    *existWall=0;
+  if (nwbc <= 0)
+  {
+    *existWall = 0;
     for (int i = 0; i < 3; i++)
     {
       wbox[i]   = BIGVALUE;
@@ -807,20 +805,19 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   }
 
   *existWall=1;
-  wbox[0]=wbox[1]=wbox[2]=BIGVALUE;
-  wbox[3]=wbox[4]=wbox[5]=-BIGVALUE;
+  wbox[0] = wbox[1] = wbox[2] =  BIGVALUE;
+  wbox[3] = wbox[4] = wbox[5] = -BIGVALUE;
 
   for (int i = 0; i < nwbc; i++)
+  {
+    int inode = wbcnode[i]-BASE;
+    int i3 = 3*inode;
+    for (int j = 0; j < 3; j++)
     {
-      inode=wbcnode[i]-BASE;
-      i3=3*inode;
-      for (int j = 0; j < 3; j++)
-	{
-	  wbox[j]=min(wbox[j],x[i3+j]);
-	  wbox[j+3]=max(wbox[j+3],x[i3+j]);
-	}
+      wbox[j] = min(wbox[j],x[i3+j]);
+      wbox[j+3] = max(wbox[j+3],x[i3+j]);
     }
-  
+  }
 }
 
 void MeshBlock::getOversetBounds(int *mtag, int *existOver, double obox[6])
@@ -1023,7 +1020,66 @@ void MeshBlock::markOversetBoundary(int *sam,int nx[3],double extents[6])
     }
   }
 }
-	
+
+void MeshBlock::getReducedOBB(OBB *obc,double *realData) 
+{
+  int i,j,k,m,n,i3;
+  int nvert;
+  bool iflag;
+  double bbox[6],xd[3];
+
+  for(j=0;j<3;j++)
+    {
+      realData[j]=BIGVALUE;
+      realData[j+3]=-BIGVALUE;
+    }
+  for(n=0;n<ntypes;n++)
+    {
+      nvert=nv[n];
+      for(i=0;i<nc[n];i++)
+	{
+	  bbox[0]=bbox[1]=bbox[2]=BIGVALUE;
+	  bbox[3]=bbox[4]=bbox[5]=-BIGVALUE;
+
+	  for(m=0;m<nvert;m++)
+	    {
+	      i3=3*(vconn[n][nvert*i+m]-BASE);
+	      for(j=0;j<3;j++) xd[j]=0;
+	      for(j=0;j<3;j++)
+		for(k=0;k<3;k++)
+		  xd[j]+=(x[i3+k]-obc->xc[k])*obc->vec[j][k];
+	      for(j=0;j<3;j++) bbox[j]=min(bbox[j],xd[j]);
+	      for(j=0;j<3;j++) bbox[j+3]=max(bbox[j+3],xd[j]);
+	    }
+	  iflag=0;
+	  for(j=0;j<3;j++) iflag=(iflag || (bbox[j] > obc->dxc[j]));
+	  if (iflag) continue;
+	  iflag=0;
+	  for(j=0;j<3;j++) iflag=(iflag || (bbox[j+3] < -obc->dxc[j]));
+	  if (iflag) continue;
+	  for (m=0;m<nvert;m++)
+	    {
+	      i3=3*(vconn[n][nvert*i+m]-BASE);
+	      for(j=0;j<3;j++) xd[j]=0;
+	      for(j=0;j<3;j++)
+		for(k=0;k<3;k++)
+		  xd[j]+=(x[i3+k]-obb->xc[k])*obb->vec[j][k];
+	      for(j=0;j<3;j++) realData[j]=min(realData[j],xd[j]);
+	      for(j=0;j<3;j++) realData[j+3]=max(realData[j+3],xd[j]);
+	    }
+	}
+    }
+  for(j=0;j<6;j++) bbox[j]=realData[j];
+  for(j=0;j<3;j++)
+    {
+      realData[j]=obb->xc[j];
+      for(k=0;k<3;k++)
+       realData[j]+=((bbox[k]+bbox[k+3])*0.5)*obb->vec[k][j];
+      realData[j+3]=(bbox[j+3]-bbox[j])*0.51;
+    }
+  return;
+}
+	      
 void MeshBlock::getQueryPoints(OBB *obc,
 			       int *nints,int **intData,
 			       int *nreals, double **realData)
@@ -1071,7 +1127,7 @@ void MeshBlock::getQueryPoints(OBB *obc,
   //
   free(inode);
 }  
-	  
+  
 void MeshBlock::writeOBB(int bid)
 {
   FILE *fp;

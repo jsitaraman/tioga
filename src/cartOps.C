@@ -207,8 +207,8 @@ void MeshBlock::findInterpListCart(void)
 
   if (interpListCart)
   {
-      free(interpListCart);
-      interpListCartSize=0;
+    free(interpListCart);
+    interpListCartSize=0;
   }
   for(irecord=0;irecord<nsearch;irecord++)
     if (donorId[irecord]!=-1) interpListCartSize++;
@@ -313,7 +313,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  weight=interpList[i].weights[m];
 		  if (weight < 0 || weight > 1.0) {
                     traced(weight);
-                    printf("warning: weights are not convex\n");
+                    printf("warning: weights are not convex 3\n");
                    }
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[inode*nvar+k]*weight;
@@ -336,7 +336,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  weight=interpListCart[i].weights[m];
 		  if (weight < 0 || weight > 1.0) {
                     traced(weight);
-                    printf("warning: weights are not convex\n");
+                    printf("warning: weights are not convex 4\n");
                    }
 		  for(k=0;k<nvar;k++)
                     {

@@ -96,15 +96,24 @@ void tioga::exchangeBoxes(void)
          obbIntersectCheck(obblist[k].vec,obblist[k].xc,obblist[k].dxc,
                            mb->obb->vec,mb->obb->xc,mb->obb->dxc))
     {
-      rcvMap[m]=sndMap[k];
-      for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-          obblist[m].vec[i][j]=obblist[k].vec[i][j];
-      for (int i = 0; i < 3; i++)
-        obblist[m].xc[i]=obblist[k].xc[i];
-      for (int i = 0; i < 3; i++)
-        obblist[m].dxc[i]=obblist[k].dxc[i];
-      m++;
+      int overlap_present = 0;
+      if (alltags[sndMap[k]] < 0 || mytag < 0)
+        mb->check_intersect_p4est(&sndMap[k],&overlap_present);
+      else
+        overlap_present = 1;
+
+      if (overlap_present)
+      {
+        rcvMap[m]=sndMap[k];
+        for (int i = 0; i < 3; i++)
+          for (int j = 0; j < 3; j++)
+            obblist[m].vec[i][j]=obblist[k].vec[i][j];
+        for (int i = 0; i < 3; i++)
+          obblist[m].xc[i]=obblist[k].xc[i];
+        for (int i = 0; i < 3; i++)
+          obblist[m].dxc[i]=obblist[k].dxc[i];
+        m++;
+      }
     }
   }
   nsend = nrecv = m;
@@ -113,7 +122,6 @@ void tioga::exchangeBoxes(void)
 
   // clear packets before nsend and nrecv are modified in pc->setMap
   pc->clearPackets(sndPack,rcvPack);
-
   pc->setMap(nsend,nrecv,sndMap,rcvMap);  
 
 #ifdef _GPU
@@ -121,9 +129,26 @@ void tioga::exchangeBoxes(void)
   mb->setCommMap(nsend,nrecv,sndMap,rcvMap);
 #endif
 
-  // free local memory
+  for (int k = 0; k < nsend; k++) {
+    sndPack[k].nints = 0;
+    sndPack[k].nreals = 6;
+    sndPack[k].realData = (double *)malloc(sizeof(double)*sndPack[k].nreals);
+    mb->getReducedOBB(&obblist[k],sndPack[k].realData);
+  }
+
+  pc->sendRecvPackets(sndPack,rcvPack);
+
+  for (int k = 0; k < nrecv; k++) {
+    for (int j = 0; j < 3; j++) obblist[k].xc[j] = rcvPack[k].realData[j];
+    for (int j = 0; j < 3; j++) obblist[k].dxc[j] = rcvPack[k].realData[j+3];
+    obblist[k].meshtag = alltags[rcvMap[k]];
+  }
+
+  pc->clearPackets(sndPack,rcvPack);
+
+  // Free local memory
   free(sndMap);
   free(rcvMap);
   free(sndPack);
-  free(rcvPack);    
+  free(rcvPack);
 }

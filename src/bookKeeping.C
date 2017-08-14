@@ -27,6 +27,8 @@ extern "C"
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
 }
 
+#define verbose false
+
 using namespace tg_funcs;
 
 void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
@@ -101,13 +103,15 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
 			      int *nrecords)
 {
   // First mark all hole points
-  int *iflag = (int *)malloc(sizeof(int)*nmesh);
+  std::vector<int> iflag(nmesh);
 
   for (int i = 0; i < nnodes; i++)
   {
     iblank[i] = NORMAL;
+    if (verbose) tracei(i);
     if (donorList[i]==NULL)
     {
+      if (verbose) printf("No donor found for %d\n", i);
       for (int j = 0; j < nmesh; j++)
         if (j != (meshtag-BASE) && holemap[j].existWall)
         {
@@ -128,6 +132,10 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
       {
         int meshtagdonor = temp->donorData[1]-BASE;
         iflag[meshtagdonor] = 1;
+        if (verbose) {
+          tracei(meshtagdonor);
+          traced(temp->donorRes);
+        }
         temp = temp->next;
       }
       for (int j = 0; j < nmesh; j++)
@@ -203,14 +211,26 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   *nrecords=0;
   for (int i = 0; i < nnodes; i++)
   {
+    //if (myid==553 && i==29670) verbose=1;
+    if (verbose) {
+       tracei(i);
+       tracei(iblank[i]);
+    }
     if (donorList[i] != NULL && iblank[i] != HOLE)
     {
       DONORLIST *temp = donorList[i];
+      if (verbose) traced(nodeRes[i]);
       while (temp != NULL)
       {
+        if (verbose) traced(temp->donorRes);
         if (temp->donorRes < nodeRes[i])
         {
-          iblank[i] = FRINGE;
+          iblank[i] = -temp->donorData[1]; //FRINGE;
+          if (verbose) {
+          tracei(iblank[i]);
+          tracei(temp->donorData[0]);
+          tracei(temp->donorData[1]);
+          tracei(temp->donorData[2]);}
           (*nrecords)++;
           break;
         }
@@ -228,17 +248,29 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   int k = 0;
   for (int i = 0; i < nnodes; i++)
   {
-    if (iblank[i] == FRINGE)
+    if (iblank[i] < 0)
     {
       DONORLIST *temp = donorList[i];
-      (*receptorResolution)[k++] = nodeRes[i];
+      while(temp != NULL)
+      {
+        if (temp->donorRes < nodeRes[i])
+        {
+          break;
+        }
+      }
+      //(*receptorResolution)[k++] = nodeRes[i];
+      (*receptorResolution)[k++] = (resolutionScale > 1.0) ? -nodeRes[i] : nodeRes[i];
       (*donorRecords)[m++] = temp->donorData[0];
       (*donorRecords)[m++] = temp->donorData[2];
+      if (verbose) {
+        tracei(iblank[i]);
+        tracei(m);
+        tracei((*donorRecords)[m-1]);
+        tracei((*donorRecords)[m-2]);
+        traced((*receptorResolution)[k-1]);
+      }
     }
   }
-
-  // release local memory
-  free(iflag);
 }
 
 void MeshBlock::initializeInterpList(int ninterp_input)
@@ -259,16 +291,19 @@ void MeshBlock::initializeInterpList(int ninterp_input)
     
 }
 		
-void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes)
+void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
 {
   double xv[8][3];
+<<<<<<< HEAD
   std::vector<double> xv2;
   std::vector<double> frac;
   std::vector<int> inode;
   INTEGERLIST *clist;
 
+  double receptorRes = fabs(receptorRes2);
   int procid = isearch[2*irecord];
   int pointid = isearch[2*irecord+1];
+  int meshtagrecv = tagsearch[irecord];
   int i3 = 3*irecord;
 
   double xp[3];
@@ -301,10 +336,12 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes)
   {
     inode[m]=vconn[n][nvert*idonor+m]-BASE;
     i3 = 3*inode[m];
-    ///if (iblank[inode[m]] == HOLE || (!iartbnd && iblank[inode[m]] == FRINGE))
-    if (iblank[inode[m]] != NORMAL)
+    //if (iblank[inode[m]] != NORMAL)
+    if (iblank[inode[m]] <= 0 && receptorRes2 > 0.0) // || nodeRes[inode[m]] == BIGVALUE)
     {
-      acceptFlag = 0;
+      if (nodeRes[inode[m]]==BIGVALUE) acceptFlag=0;
+      if (abs(iblank[inode[m]])==meshtagrecv) acceptFlag=0;
+      if (iblank[inode[m]]==0) acceptFlag=0;
     }
 
     if (nvert > 8)
@@ -315,9 +352,10 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes)
         xv[m][j] = x[i3+j];
   }
 
-  if (acceptFlag == 0 && receptorRes != BIGVALUE) return;
+  if (verbose) tracei(acceptFlag);
+  if (acceptFlag == 0 && receptorRes2 != BIGVALUE) return;
 
-  if (receptorRes == BIGVALUE) /// && !iartbnd) // Node tagged as 'mandatory fringe' receptor
+  if (receptorRes2 == BIGVALUE) /// && !iartbnd) // Node tagged as 'mandatory fringe' receptor
   {
     clist=cancelList;
 
@@ -327,7 +365,16 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes)
     for (int m = 0; m < nvert; m++)
     {
       inode[m] = vconn[n][nvert*idonor+m]-BASE;
-      if (iblank[inode[m]] == FRINGE && nodeRes[inode[m]] != BIGVALUE)
+      if (verbose) tracei(inode[m]);
+      if (verbose) traced(nodeRes[inode[m]]);
+      if (verbose) {
+        tracei(procid);
+        tracei(pointid);
+        traced(receptorRes);
+        tracei(irecord);
+        tracei(donorId[irecord]);
+      }
+      if (iblank[inode[m]] < 0 && nodeRes[inode[m]] != BIGVALUE)
       {
         iblank[inode[m]]=NORMAL;
         if (clist == NULL)
@@ -368,6 +415,10 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes)
   interpList[recid].nweights = nvert;
   interpList[recid].receptorInfo[0] = procid;
   interpList[recid].receptorInfo[1] = pointid;
+  if (verbose) {
+    tracei(interpList[*recid].receptorInfo[0]);
+    tracei(interpList[*recid].receptorInfo[1]);
+  }
   interpList[recid].inode.resize(nvert);
   interpList[recid].weights.resize(nvert);
   for (int m = 0; m < nvert; m++)
@@ -428,6 +479,17 @@ void MeshBlock::clearIblanks(void)
   int i;
   for(i=0;i<nnodes;i++)
      if (iblank[i] < 0) iblank[i]=1;
+}
+
+void MeshBlock::getStats(int mstats[2])
+{
+  int i;
+  mstats[0]=mstats[1]=0;
+  for (i=0;i<nnodes;i++)
+    {
+      if (iblank[i]==0) mstats[0]++;
+      if (iblank[i] < 0) mstats[1]++;
+    }
 }
 
 void MeshBlock::setIblanks(int inode)

@@ -264,6 +264,18 @@ extern "C" {
     //convert_to_modal=f5;
   }
 
+  void tioga_set_p4est_(void)
+  {
+    tg->set_p4est();
+  }
+
+  void tioga_set_p4est_search_callback_(void (*f1)(double *xsearch,int *process_id,int *cell_id,int *npts),
+          void (*f2)(int *pid,int *iflag))
+  {
+    tg->setp4estcallback(f1,f2);
+  //jayfixme  tg->set_p4est_search_callback(f1);
+  }
+
   void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                               void (*gfn)(int* id, int* npf, double* xyz),
                               double (*gqs)(int ic, int spt, int var),

@@ -113,6 +113,7 @@ typedef struct OBB
   double xc[3];
   double dxc[3];
   double vec[3][3];
+  int meshtag;
 }OBB;
 typedef struct DONORLIST
 {

@@ -257,6 +257,15 @@ void tioga::doHoleCutting(void)
   // Exchange found donor data and do final iblank setting
   exchangeDonors();
 
+  /*outputStatistics();
+  MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
+  //if (ihighGlobal) {
+  mb->getCellIblanks();
+  mb->writeCellFile(myid);
+  //}
+  //mb->writeOutput(myid);
+  //tracei(myid);*/
+
   if (ihighGlobal)
   {
     // Calculate cell iblank values from nodal iblank values
@@ -626,8 +635,8 @@ void tioga::performConnectivityAMR(void)
   exchangeAMRDonors();
   mb->getCellIblanks(meshcomm);
 //  mb->writeCellFile(myid);
-  for(i=0;i<ncart;i++)
-	cb[i].writeCellFile(i);
+//  for(i=0;i<ncart;i++)
+//    cb[i].writeCellFile(i);
   //MPI_Barrier(scomm);
   //printf("Finished performConnectivityAMR in %d\n",myid);
   //ierr=0;
@@ -895,7 +904,7 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   int norphanPoint;
   int *itmp;
   FILE *fp;
-  char ofname[10];
+  char ofname[100];
   //
   // initialize send and recv packets
   //
@@ -971,7 +980,7 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   norphanPoint=0;
   for(i=0;i<mb->ntotalPoints;i++)
     {
-      if (itmp[i]==0) {
+      if (itmp[i]==0 && iorphanPrint) {
 	if (fp==NULL) 
 	  {
 	    sprintf(ofname,"orphan%d.dat",myid);
@@ -988,7 +997,7 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
     iorphanPrint=0;
    }
   // change the state of cells/nodes who are orphans
-  mb->clearOrphans(itmp);
+  mb->clearOrphans(holeMap,nmesh,itmp);
   //
   mb->updatePointData(q,qtmp,nvar,interptype);
   //
@@ -1159,7 +1168,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 
     // change the state of cells/nodes who are orphans
     if (!iartbnd)
-      mb->clearOrphans(recv_itmp.data());
+      mb->clearOrphans(holeMap,nmesh,recv_itmp.data());
 
     if (iartbnd)
     {

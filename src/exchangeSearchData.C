@@ -24,6 +24,7 @@ void tioga::exchangeSearchData(void)
   // Get the processor map for sending and receiving
   int nsend, nrecv;
   int *sndMap, *rcvMap;
+
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
 
   // Create packets to send and receive points, and initialize them to zero
@@ -64,6 +65,7 @@ void tioga::exchangeSearchData(void)
   mb->xsearch.resize(3*mb->nsearch);
   mb->isearch.resize(2*mb->nsearch);
   mb->donorId.resize(mb->nsearch);
+  mb->tagsearch.resize(mb->nsearch);
   if (ihigh)
   {
     mb-> rst.resize(3*mb->nsearch); /// NEEDED HERE?
@@ -73,6 +75,7 @@ void tioga::exchangeSearchData(void)
   // now fill the query point arrays
   int icount = 0;
   int dcount = 0;
+  int tcount = 0;
   for (int k = 0; k < nrecv; k++)
   {
     int l = 0;
@@ -83,6 +86,7 @@ void tioga::exchangeSearchData(void)
       mb->xsearch[dcount++] = rcvPack[k].realData[l++];
       mb->xsearch[dcount++] = rcvPack[k].realData[l++];
       mb->xsearch[dcount++] = rcvPack[k].realData[l++];
+      mb->tagsearch[tcount++] = obblist[k].meshtag;
     }
   }
 

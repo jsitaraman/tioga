@@ -45,6 +45,7 @@
 extern "C" 
 {
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
+  int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
 
 using namespace tg_funcs;
@@ -69,13 +70,7 @@ void MeshBlock::extraConn(void)
         c2c[nface*ic+j] = ic1;
     }
   }
-  /// DEBUGGING
-  if (myid == 9)
-  {
-    for (int i = 0; i < 6; i++)
-      printf("Cell 3523: c2c[%d] = %d\n",i,c2c[6*3523+i]);
-  }
-  
+
   // List of all solid wall-boundary faces
   nCutHole = nWallFaces;
   cutFacesW.reserve(nCutHole);
@@ -957,8 +952,11 @@ void MeshBlock::setArtificialBoundaries(void)
   }
 }
 
-void MeshBlock::clearOrphans(int *itmp)
+void MeshBlock::clearOrphans(HOLEMAP *holemap, int nmesh, int *itmp)
 {
+  int i,j,k,m;
+  int reject;
+
   if (iartbnd)
   {
     int fpt = 0;
@@ -986,39 +984,54 @@ void MeshBlock::clearOrphans(int *itmp)
     }
   }
   else if (ihigh)
+  {
+    m=0;
+    for(i=0;i<nreceptorCells;i++)
     {
-      int m=0;
-      for (int i = 0; i < nreceptorCells;i++)
-	{
-	  bool reject = false;
-	  for (int j = 0; j < pointsPerCell[i];j++)
-	    {
-	      if (itmp[m]==0) reject = true;
-	      m++;
-	    }
-	  if (reject) 
-	    {
-	      iblank_cell[ctag[i]-1]=0; // changed to hole for off-body
-	    }
-	}
+      reject=0;
+      for(j=0;j<pointsPerCell[i];j++)
+      {
+        if (itmp[m]==0)
+        {
+          reject=2;
+          for(k=0;k<nmesh;k++)
+            if (k!=(meshtag-BASE) && holemap[k].existWall)
+            {
+              if (checkHoleMap(&rxyz[3*m],holemap[k].nx,holemap[k].sam,holemap[k].extents))
+              {
+                reject=1;
+                break;
+              }
+            }
+        }
+        m++;
+      }
+      if (reject==1)
+      {
+        iblank_cell[ctag[i]-1]=0; // changed to hole if inside hole map
+      }
+      else if (reject==2)
+      {
+        iblank_cell[ctag[i]-1]=1; // changed to field if not inside hole map
+      }
     }
+  }
   else
+  {
+    m=0;
+    for(i=0;i<nnodes;i++)
     {
-      int m=0;
-      for (int i = 0; i < nnodes;i++)
-	{
-	  if (picked[i]) 
-	    {
-	      bool reject = false;
-	      if (itmp[m]==0) reject = true;
-	      if (reject) iblank[i]=1; // changed to field for near-body
-                                       // perhaps not the right thing to do
-              m++;
-	    }
-	}
+      if (picked[i])
+      {
+        reject=0;
+        if (itmp[m]==0) reject=1;
+        if (reject) iblank[i]=1; // changed to field for near-body
+        // perhaps not the right thing to do
+        m++;
+      }
     }
+  }
 }
-
 
 void MeshBlock::getInternalNodes(void)
 {
@@ -1526,7 +1539,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints, int *nreals,
         {
           int inode = interpList2[i].inode[m];
           double weight = interpList2[i].weights[m];
-          if (weight < 0 || weight > 1.0) {
+          if (weight < 0-TOL || weight > 1.0+TOL) {
             traced(weight);
             printf("warning: weights are not convex\n");
           }

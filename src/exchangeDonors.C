@@ -133,7 +133,7 @@ void tioga::exchangeDonors(void)
   free(donorRecords);
   donorRecords=NULL;
 
-  // cancel donors that have conflict 
+  // cancel donors that have conflict
   mb->getCancellationData(nrecords, donorRecords);
   //printf("process %d has %d cancelled receptors\n",myid,nrecords);
 
@@ -205,4 +205,17 @@ void tioga::exchangeDonors(void)
   pc->clearPackets(sndPack,rcvPack);
   free(sndPack);
   free(rcvPack);
+}
+
+void tioga::outputStatistics(void)
+{
+  int mstats[2],mstats_global[2];
+  mb->getStats(mstats);
+  MPI_Reduce(mstats,mstats_global,2,MPI_INT,MPI_SUM,0,scomm);
+  if (myid==0) {
+    printf("#tioga -----------------------------------------\n");
+    printf("#tioga : total receptors:\t%d\n",mstats_global[1]);
+    printf("#tioga : total holes    :\t%d\n",mstats_global[0]);
+    printf("#tioga -----------------------------------------\n");
+  }
 }

@@ -273,6 +273,7 @@ private:
   int nsearch;        /** < number of query points to search in this block */
   std::vector<int> isearch;       /** < index of query points in the remote process */
   std::vector<double> xsearch;    /** < coordinates of the query points */
+  std::vector<int> tagsearch;    /** < coordinates of the query points */
   //double *rst;            /**  natrural coordinates */
   //int *donorId;       /** < donor indices for those found */
 #ifdef _GPU

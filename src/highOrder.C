@@ -317,7 +317,7 @@ void MeshBlock::getDirectCutCells(std::vector<std::unordered_set<int>> &cellList
 }
 
 void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
-    CutMap &cutMap, int cutType)
+    std::vector<double> &cutBbox, CutMap &cutMap, int cutType)
 {
   /* Peform hole cutting with solid or overset boundary faces
    *
@@ -563,6 +563,7 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
 void MeshBlock::directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvertf,
     std::vector<double> &cutBbox, HOLEMAP &holeMap, CutMap &cutMap, int cutType)
 {
+#ifdef _GPU
   cutMap.flag.resize(ncells);
 
   // Call out to the device to perform the cutting
@@ -570,6 +571,7 @@ void MeshBlock::directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvert
   mb_d.assignHoleMap(holeMap.existWall, holeMap.nx, holeMap.sam, holeMap.extents);
   mb_d.directCut(cutFaces.data(), nCut, nvertf, cutBbox.data(), cutMap.flag.data(), cutType);
   POP_NVTX_RANGE;
+#endif
 }
 
 void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)

@@ -778,17 +778,19 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 
   point pos = point(in_xyz);
   /* --- Want the closest reference location to the given point, so don't just give up --- */
-//  if (pos.x < xmin-eps || pos.y < ymin-eps || pos.z < zmin-eps ||
-//      pos.x > xmax+eps || pos.y > ymax+eps || pos.z > zmax+eps) {
-//    // Point does not lie within cell - return an obviously bad ref position
-//    for (int i = 0; i < nDims; i++) out_rst[i] = 99.;
-//    return false;
-//  }
+  if (pos.x < xmin-eps || pos.y < ymin-eps || pos.z < zmin-eps ||
+      pos.x > xmax+eps || pos.y > ymax+eps || pos.z > zmax+eps) {
+    // Point does not lie within cell - return an obviously bad ref position
+    for (int i = 0; i < nDims; i++) out_rst[i] = 99.;
+    return false;
+  }
 
   // Use a relative tolerance to handle extreme grids
-  double h = std::min(xmax-xmin,ymax-ymin);
-  if (nDims==3) h = std::min(h,zmax-zmin);
-
+  double h;
+  if (nDims == 2)
+    h = ( (xmax-xmin) + (ymax-ymin) ) / 2.;
+  else
+    h = ( (xmax-xmin) + (ymax-ymin) + (zmax-zmin) ) / 3.;
 //  double tol = 1e-12*h;
   double tol = 1e-10*h;
 
@@ -798,7 +800,7 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
   ginv.resize(nDims*nDims);
 
   int iter = 0;
-  int iterMax = 20;
+  int iterMax = 15;
   double norm = 1;
   double norm_prev = 2;
 
@@ -851,7 +853,8 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
   for (int i = 0; i < nDims; i++)
     out_rst[i] = loc[i];
 
-  if (std::max( std::abs(loc[0]), std::max( std::abs(loc[1]), std::abs(loc[2]) ) ) <= 1.+eps)
+  //if (std::max( std::abs(loc[0]), std::max( std::abs(loc[1]), std::abs(loc[2]) ) ) <= 1.+eps)
+  if (norm <= tol)
     return true;
   else
     return false;

@@ -233,7 +233,7 @@ void searchIntersections(MeshBlock *mb, int *cellIndex, int *adtInts,
       if (flag)
       {
         searchIntersections(mb,cellIndex,adtInts,adtDbls,coord,level+1,
-                            nodeChild,xsearch,rst,xs_adt,nelem,ndim);
+                            nodeChild,xsearch,xs_adt,rst,nelem,ndim);
         if (*cellIndex > -1) return;
       }
     }

@@ -394,7 +394,7 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID,
     for (int d = 0; d < ndim; d++)
       ecoord[i*ndim+d] = coord[ele+ncells*(d+ndim*i)];
 
-  bool isInEle = false;
+  int isInEle = 0;
 
   if (rrot) // Transform search point *back* to current *physical* location
   {
@@ -432,7 +432,7 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID, const double* __restr
     for (int d = 0; d < ndim; d++)
       ecoord[i*ndim+d] = coord[ele+ncells*(d+ndim*i)];
 
-  bool isInEle = false;
+  int isInEle = 0;
 
   if (rrot) // Transform search point back to current physical location
   {

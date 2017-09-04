@@ -350,7 +350,7 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
     std::queue<int> cellList;
 
     if (rrot)
-      getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox, Rmat.data());
+      getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox, Rmat);
     else
       getBoundingBox(&cutFaces[ff*stride], nvertf, nDims, bbox);
 

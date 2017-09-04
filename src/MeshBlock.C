@@ -1234,8 +1234,8 @@ void MeshBlock::setTransform(double* mat, double* off, int ndim)
     ThrowException("MeshBlock::set_transform: input ndim != nDims");
 
   rrot = true;
-  Rmat.assign(mat, mat+ndim*ndim);
-  std::copy(off,off+ndim,offset);
+  Rmat = mat;
+  offset = off;
 
   if (adt)
     adt->setTransform(mat,off,ndim);

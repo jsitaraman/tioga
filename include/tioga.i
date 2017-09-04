@@ -19,7 +19,7 @@
 
 %pythoncallback;
 // Functions declared here will be able to act like (C-style) function pointers
-void tioga_dataupdate_ab(int nvar, double* q_spts, int gradFlag);
+void tioga_dataupdate_ab(int nvar, int gradFlag);
 void tioga_dataupdate_ab_send(int nvar, int gradFlag = 0);
 void tioga_dataupdate_ab_recv(int nvar, int gradFlag = 0);
 void tioga_preprocess_grids_(void);
@@ -27,6 +27,8 @@ void tioga_performconnectivity_(void);
 void tioga_do_point_connectivity(void);
 void tioga_set_iter_iblanks(double dt, int nvar);
 void tioga_set_transform(double *mat, double *off, int ndim);
+void tioga_unblank_part_1(void);
+void tioga_unblank_part_2(int nvar);
 %nopythoncallback;
 
 %ignore tioga_dataupdate_ab;
@@ -37,6 +39,8 @@ void tioga_set_transform(double *mat, double *off, int ndim);
 %ignore tioga_set_iter_iblanks;
 %ignore tioga_do_point_connectivity;
 %ignore tioga_set_transform;
+%ignore tioga_unblank_part_1;
+%ignore tioga_unblank_part_2;
 %include "tiogaInterface.h"
 
 // <-- Additional C++ declations [anything that would normally go in a header]

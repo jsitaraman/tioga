@@ -1,7 +1,7 @@
 TEMPLATE = library
 CONFIG -= app_bundle
 CONFIG -= qt
-DEFINES = _GPU
+DEFINES = _CPU
 
 INCLUDEPATH += include/
 
@@ -62,3 +62,6 @@ HEADERS += \
     include/tiogaInterface.h \
     include/dADT.h \
     include/dMeshBlock.h
+
+DISTFILES += \
+    run/tiogaInterface.py

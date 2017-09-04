@@ -18,7 +18,7 @@ SWIG = $(SWIG_BIN)/swig
 CFLAGS = -std=c++11 -fPIC -rdynamic 
 CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
-SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/
+SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/ -I$(NUMPY_INC_DIR)/
 
 # Intel compiler flags: 
 # Floating-point exception; underflow gives 0.0: -fpe0
@@ -93,41 +93,47 @@ endif
 LDFLAGS= -L/lib64/ -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
 
 lib:	$(OBJECTS) $(OBJF90)
+	@mkdir -p bin
 	$(AR) $(BINDIR)/lib$(MODULENAME).a $(OBJECTS) $(OBJF90)
 
 shared:	$(OBJECTS) $(OBJF90)
+	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o $(BINDIR)/lib$(MODULENAME).so -lc $(LIBS)
 
 swig: CFLAGS += $(SFLAGS)
 swig: $(OBJECTS) $(OBJF90) $(OBJSWIG)
+	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(SFLAGS) $(OBJECTS) $(OBJF90) $(OBJSWIG) -shared -fPIC -o $(BINDIR)/_tioga.so -lc $(LIBS)
 
 default: $(OBJECTS) $(OBJF90)
+	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) $(LDFLAGS) -lm -o $(BINDIR)/$(MODULENAME).exe
 
-$(SRCDIR)/%_wrap.cpp: $(INCDIR)/%.i $(INCDIR)/tiogaInterface.h
+$(BINDIR)/%_wrap.cpp: $(INCDIR)/%.i $(INCDIR)/tiogaInterface.h
 	$(SWIG) -c++ -python $(SFLAGS) -o $@ $<
 
+$(BINDIR)/%_wrap.o: $(BINDIR)/%_wrap.cpp 
+	$(CXX) $(CFLAGS) $(SFLAGS) -c $< -o $@
+
 $(BINDIR)/%.o: $(SRCDIR)/%.cu  $(INCDIR)/*.h $(INCDIR)/*.hpp
-	@mkdir -p bin
 	$(CUC) $(INCS) $(CUFLAGS) $(FLAGS) -c $< -o $@
+
 $(BINDIR)/%.o: $(SRCDIR)/%.cpp $(INCDIR)/*.h $(INCDIR)/*.hpp
-	@mkdir -p bin
 	$(CXX) $(INCS) $(CFLAGS) -c $< -o $@
+
 $(BINDIR)/%.o: $(SRCDIR)/%.C $(INCDIR)/*.h $(INCDIR)/*.hpp
-	@mkdir -p bin
 	$(CXX) $(INCS) $(CFLAGS) -c $< -o $@
+
 $(BINDIR)/%.o: $(SRCDIR)/%.c $(INCDIR)/*.h $(INCDIR)/*.hpp
-	@mkdir -p bin
 	$(CXX) $(INCS) $(CFLAGS) -c $< -o $@
+
 $(BINDIR)/%.o: $(SRCDIR)/%.F90 $(INCDIR)/*.h $(INCDIR)/*.hpp
-	@mkdir -p bin
 	$(F90) $(FFLAGS) -c $< -o $@
+
 $(BINDIR)/%.o: $(SRCDIR)/%.f90 $(INCDIR)/*.h $(INCDIR)/*.hpp
-	@mkdir -p bin
 	$(F90) $(FFLAGS) -c $< -o $@
+
 $(BINDIR)/%.o: $(SRCDIR)/%.f $(INCDIR)/*.h $(INCDIR)/*.hpp
-	@mkdir -p bin
 	$(F90) $(FFLAGS) -c $< -o $@
 
 .PHONY: clean

@@ -115,8 +115,8 @@ private:
   std::vector<int> sndMap, rcvMap;
 
   bool rrot = false;
-  std::vector<double> Rmat;
-  double offset[3] = {0.0};
+  double* Rmat = NULL;
+  double* offset = NULL;
 
 #ifdef _GPU
   dADT adt_d;       /** GPU-based ADT */

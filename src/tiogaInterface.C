@@ -185,27 +185,19 @@ extern "C" {
       }
   }
 
-  void tioga_dataupdate_ab(int nvar, double *q_spts, int gradFlag)
+  void tioga_dataupdate_ab(int nvar, int gradFlag)
   {
-    tg->dataUpdate_artBnd(nvar, q_spts, gradFlag);
+    tg->dataUpdate_artBnd(nvar, gradFlag);
   }
 
   void tioga_dataupdate_ab_send(int nvar, int gradFlag)
   {
-#ifdef _GPU
     tg->dataUpdate_artBnd_send(nvar, gradFlag);
-#else
-    tg->dataUpdate_artBnd_send(nvar, NULL, gradFlag);
-#endif
   }
 
   void tioga_dataupdate_ab_recv(int nvar, int gradFlag)
   {
-#ifdef _GPU
     tg->dataUpdate_artBnd_recv(nvar, gradFlag);
-#else
-    tg->dataUpdate_artBnd_recv(nvar, NULL, gradFlag);
-#endif
   }
 
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)

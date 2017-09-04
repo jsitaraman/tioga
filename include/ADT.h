@@ -40,8 +40,8 @@ private :
   double *coord;          /** < bounding box of each element */
 
   bool rrot = false;         /** Flag for rigid-body rotation (apply transform to all search points) */
-  std::vector<double> Rmat;   /** Rotation Matrix (global->body coords) for rigid motion */
-  std::vector<double> offset; /** Translation Offset (in global coords) for rigid motion */
+  double* Rmat = NULL;   /** Rotation Matrix (global->body coords) for rigid motion */
+  double* offset = NULL; /** Translation Offset (in global coords) for rigid motion */
 
 public :
 

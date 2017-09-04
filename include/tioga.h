@@ -137,6 +137,10 @@ class tioga
   std::vector<int> intData;
   std::vector<double> dblData;
 
+  //! Callback functions for solution and gradient data
+  double* (*get_q_spts)(int& ele_stride, int& spt_stride, int& var_stride);
+  double* (*get_dq_spts)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
+
   /* ---- GPU-Related Variables ---- */
 #ifdef _GPU
   int resizeFlag = 0;
@@ -262,15 +266,10 @@ class tioga
   void dataUpdate_highorder(int nvar,double *q, int interptype) ;
 
   /** Perform data interpolation for artificial boundary method */
-  void dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag);
+  void dataUpdate_artBnd(int nvar, int dataFlag);
 
-#ifdef _GPU
   void dataUpdate_artBnd_send(int nvar, int dataFlag);
   void dataUpdate_artBnd_recv(int nvar, int dataFlag);
-#else
-  void dataUpdate_artBnd_send(int nvar, double* q_spts, int dataFlag);
-  void dataUpdate_artBnd_recv(int nvar, double* q_spts, int dataFlag);
-#endif
 
   /** get hole map for each mesh */
  
@@ -322,6 +321,10 @@ class tioga
                        double* (*gdqs)(int& es, int& ss, int& vs, int& ds))
   {
     mb->setCallbackArtBnd(gnf, gfn, gqs, gqf, ggs, ggf, gqss, gdqs);
+
+    get_q_spts = gqss;
+    get_dq_spts = gdqs;
+
     iartbnd = 1;
   }
 

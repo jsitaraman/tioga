@@ -36,10 +36,10 @@ void MeshBlock::search(void)
   {
     //rebuildADT();
     /// TODO: worry about updating ADT based on changing OBB of search points
-    adt->setTransform(Rmat.data(), offset, nDims);
+    adt->setTransform(Rmat, offset, nDims);
 #ifdef _GPU
-    adt_d.setTransform(Rmat.data(), offset, nDims);
-    mb_d.setTransform(Rmat.data(), offset, nDims);
+    adt_d.setTransform(Rmat, offset, nDims);
+    mb_d.setTransform(Rmat, offset, nDims);
     mb_d.updateSearchPoints(nsearch,isearch.data(),xsearch.data());
 #endif
   }

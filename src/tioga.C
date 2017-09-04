@@ -187,7 +187,7 @@ if (nunblank > 0) printf("Rank %d unblanking %d elements\n",myid,nunblank);
   {
     doPointConnectivity(); /// TODO: just do unblank cells only, no faces
 
-    dataUpdate_artBnd(nvar, NULL, 0);
+    dataUpdate_artBnd(nvar, 0);
 
     mb->clearUnblanks();
   }
@@ -224,7 +224,7 @@ void tioga::unblankPart2(int nvar)
   {
     doPointConnectivity(true); /// TODO: just do unblank cells only, no faces
 
-    dataUpdate_artBnd(nvar, NULL, 0);
+    dataUpdate_artBnd(nvar, 0);
 
     mb->clearUnblanks();
   }
@@ -1015,7 +1015,7 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
 }
 
 #ifdef _GPU
-void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
+void tioga::dataUpdate_artBnd(int nvar, int dataFlag)
 {
   dataUpdate_artBnd_send(nvar,dataFlag);
 
@@ -1191,15 +1191,19 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 #endif
 
 #ifndef _GPU
-void tioga::dataUpdate_artBnd(int nvar, double *q_spts, int dataFlag)
+void tioga::dataUpdate_artBnd(int nvar, int dataFlag)
 {
-  dataUpdate_artBnd_send(nvar,q_spts,dataFlag);
+  dataUpdate_artBnd_send(nvar,dataFlag);
 
-  dataUpdate_artBnd_recv(nvar,q_spts,dataFlag);
+  dataUpdate_artBnd_recv(nvar,dataFlag);
 }
 
-void tioga::dataUpdate_artBnd_send(int nvar, double *q_spts, int dataFlag)
+void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 {
+  int es, ss, vs, ds;
+  double* q_spts = (dataFlag == 0) ? get_q_spts(es, ss, vs) :
+                                     get_dq_spts(es, ss, vs, ds);
+
   // initialize send and recv packets
   int nsend,nrecv;
   int *sndMap,*rcvMap;
@@ -1281,8 +1285,12 @@ void tioga::dataUpdate_artBnd_send(int nvar, double *q_spts, int dataFlag)
   free(realRecords);
 }
 
-void tioga::dataUpdate_artBnd_recv(int nvar, double* q_spts, int dataFlag)
+void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 {
+  int es, ss, vs, ds;
+  double* q_spts = (dataFlag == 0) ? get_q_spts(es, ss, vs) :
+                                     get_dq_spts(es, ss, vs, ds);
+
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);

@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 /* Nice NVTX macro from Parallel Forall blog */
-#if defined(_NVTX)
+#if defined(_NVTX) && defined(_GPU)
 #include "cuda_runtime.h"
 #include "nvToolsExt.h"
 

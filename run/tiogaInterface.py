@@ -207,7 +207,6 @@ class Tioga:
                 unblankToDevice, qSpts_d, dqSpts_d, faceNodesGPU, cellNodesGPU,
                 nWeightsGPU, weightsGPU)
 
-
             coords_d = arrayToDblPtr(gridData['nodesGPU'][0])
             ecoords_d = arrayToDblPtr(gridData['eleCoordsGPU'][0])
             iblankCell_d = arrayToIntPtr(gridData['iblankCellGPU'][0])

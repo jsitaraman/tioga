@@ -1775,21 +1775,18 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
   if (nreceptorCells > 0)
     cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
 #else
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
-//  int fpt_start = 0;
-#pragma omp parallel for
+  int fpt_start = 0;
+//#pragma omp parallel for
   for(int i = 0; i < nreceptorFaces; i++)
   {
     if (iblank_face[ftag[i]-BASE] == FRINGE)
     {
-      int fpt_start = pointsPerFace[0]*nvar*i;
       for (int j = 0; j < pointsPerFace[i]; j++)
         for (int n = 0; n < nvar; n++)
           get_q_fpt(ftag[i], j, n) = qtmp[fpt_start+j*nvar+n];
     }
-//    fpt_start += (pointsPerFace[i]*nvar);
+    fpt_start += (pointsPerFace[i]*nvar);
   }
 #endif
 }
@@ -1803,8 +1800,9 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
   if (nreceptorFaces > 0)
     face_data_to_device(ftag, nreceptorFaces, 1, dqtmp);
 #else
-//  int fpt_start = 0;
-#pragma omp parallel for
+
+  int fpt_start = 0;
+//#pragma omp parallel for
   for (int i = 0; i < nreceptorFaces; i++)
   {
     if (iblank_face[ftag[i]-BASE] == FRINGE)
@@ -1815,7 +1813,7 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
           for (int n = 0; n < nvar; n++)
             get_grad_fpt(ftag[i], j, dim, n) = dqtmp[fpt_start+nvar*(j*3+dim)+n];
     }
-//    fpt_start += (pointsPerFace[i]*nvar*3);
+    fpt_start += (pointsPerFace[i]*nvar*3);
   }
 #endif
   POP_NVTX_RANGE;

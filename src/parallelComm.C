@@ -114,7 +114,7 @@ void parallelComm::sendRecvPackets(PACKET *sndPack,PACKET *rcvPack)
   }
   //
   irnum=0;
-  tag=1;
+  tag=10;
   //
   for(i=0;i<nrecv;i++)
     MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],tag,scomm,&request[irnum++]);
@@ -133,14 +133,14 @@ void parallelComm::sendRecvPackets(PACKET *sndPack,PACKET *rcvPack)
   for(i=0;i<nrecv;i++)
     {
       if (rcvPack[i].nints > 0) {
-	tag=1;
+  tag=10;
 	rcvPack[i].intData=(int *) malloc(sizeof(int)*rcvPack[i].nints);
 	MPI_Irecv(rcvPack[i].intData,rcvPack[i].nints,
 		  MPI_INT,rcvMap[i],
 		  tag,scomm,&request[irnum++]);
       }
       if (rcvPack[i].nreals > 0) {
-	tag=2;
+  tag=20;
 	rcvPack[i].realData=(REAL *) malloc(sizeof(REAL)*rcvPack[i].nreals);
 	MPI_Irecv(rcvPack[i].realData,rcvPack[i].nreals,
 		  MPI_DOUBLE,rcvMap[i],
@@ -151,13 +151,13 @@ void parallelComm::sendRecvPackets(PACKET *sndPack,PACKET *rcvPack)
   for(i=0;i<nsend;i++)
     {
       if (sndPack[i].nints > 0){
-	tag=1;
+  tag=10;
 	MPI_Isend(sndPack[i].intData,sndPack[i].nints,
 		  MPI_INT,sndMap[i],
 		  tag,scomm,&request[irnum++]);
       }
       if (sndPack[i].nreals > 0){
-	tag=2;
+  tag=20;
 	MPI_Isend(sndPack[i].realData,sndPack[i].nreals,
 		  MPI_DOUBLE,sndMap[i],
 		  tag,scomm,&request[irnum++]);
@@ -188,10 +188,10 @@ void parallelComm::sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<V
   int irnum = 0;
 
   for (int i = 0; i < nrecv; i++)
-    MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],1,scomm,&request[irnum++]);
+    MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],10,scomm,&request[irnum++]);
 
   for (int i = 0; i < nsend; i++)
-    MPI_Isend(&(scount[2*i]),2,MPI_INT,sndMap[i],1,scomm,&request[irnum++]);
+    MPI_Isend(&(scount[2*i]),2,MPI_INT,sndMap[i],10,scomm,&request[irnum++]);
 
   MPI_Waitall(irnum,request.data(),status.data());
 
@@ -208,14 +208,14 @@ void parallelComm::sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<V
     {
       rcvPack[i].intData.resize(rcvPack[i].nints);
       MPI_Irecv(rcvPack[i].intData.data(),rcvPack[i].nints,MPI_INT,
-                rcvMap[i],1,scomm,&request[irnum++]);
+                rcvMap[i],10,scomm,&request[irnum++]);
     }
 
     if (rcvPack[i].nreals > 0)
     {
       rcvPack[i].realData.resize(rcvPack[i].nreals);
       MPI_Irecv(rcvPack[i].realData.data(),rcvPack[i].nreals,MPI_DOUBLE,
-                rcvMap[i],2,scomm,&request[irnum++]);
+                rcvMap[i],20,scomm,&request[irnum++]);
     }
   }
 
@@ -224,12 +224,12 @@ void parallelComm::sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<V
     if (sndPack[i].nints > 0)
     {
       MPI_Isend(sndPack[i].intData.data(),sndPack[i].nints,MPI_INT,
-                sndMap[i],1,scomm,&request[irnum++]);
+                sndMap[i],10,scomm,&request[irnum++]);
     }
     if (sndPack[i].nreals > 0)
     {
       MPI_Isend(sndPack[i].realData.data(),sndPack[i].nreals,MPI_DOUBLE,
-                sndMap[i],2,scomm,&request[irnum++]);
+                sndMap[i],20,scomm,&request[irnum++]);
     }
   }
   MPI_Waitall(irnum,request.data(),status.data());
@@ -250,10 +250,10 @@ void parallelComm::sendPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACK
   nwait = 0;
 
   for (int i = 0; i < nrecv; i++)
-    MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],1,scomm,&reqs[nwait++]);
+    MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],10,scomm,&reqs[nwait++]);
 
   for (int i = 0; i < nsend; i++)
-    MPI_Isend(&(scount[2*i]),2,MPI_INT,sndMap[i],1,scomm,&reqs[nwait++]);
+    MPI_Isend(&(scount[2*i]),2,MPI_INT,sndMap[i],10,scomm,&reqs[nwait++]);
 
   MPI_Waitall(nwait,reqs.data(),stats.data());
 
@@ -270,14 +270,14 @@ void parallelComm::sendPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACK
     {
       rcvPack[i].intData.resize(rcvPack[i].nints);
       MPI_Irecv(rcvPack[i].intData.data(),rcvPack[i].nints,MPI_INT,
-                rcvMap[i],1,scomm,&reqs[nwait++]);
+                rcvMap[i],10,scomm,&reqs[nwait++]);
     }
 
     if (rcvPack[i].nreals > 0)
     {
       rcvPack[i].realData.resize(rcvPack[i].nreals);
       MPI_Irecv(rcvPack[i].realData.data(),rcvPack[i].nreals,MPI_DOUBLE,
-                rcvMap[i],2,scomm,&reqs[nwait++]);
+                rcvMap[i],20,scomm,&reqs[nwait++]);
     }
   }
 
@@ -286,12 +286,12 @@ void parallelComm::sendPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACK
     if (sndPack[i].nints > 0)
     {
       MPI_Isend(sndPack[i].intData.data(),sndPack[i].nints,MPI_INT,
-                sndMap[i],1,scomm,&reqs[nwait++]);
+                sndMap[i],10,scomm,&reqs[nwait++]);
     }
     if (sndPack[i].nreals > 0)
     {
       MPI_Isend(sndPack[i].realData.data(),sndPack[i].nreals,MPI_DOUBLE,
-                sndMap[i],2,scomm,&reqs[nwait++]);
+                sndMap[i],20,scomm,&reqs[nwait++]);
     }
   }
 }
@@ -311,10 +311,10 @@ void parallelComm::sendPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACK
   nwait = 0;
 
   for (int i = 0; i < nrecv; i++)
-    MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],1,scomm,&reqs[nwait++]);
+    MPI_Irecv(&(rcount[2*i]),2,MPI_INT,rcvMap[i],10,scomm,&reqs[nwait++]);
 
   for (int i = 0; i < nsend; i++)
-    MPI_Isend(&(scount[2*i]),2,MPI_INT,sndMap[i],1,scomm,&reqs[nwait++]);
+    MPI_Isend(&(scount[2*i]),2,MPI_INT,sndMap[i],10,scomm,&reqs[nwait++]);
 
   MPI_Waitall(nwait,reqs.data(),stats.data());
 
@@ -331,14 +331,14 @@ void parallelComm::sendPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACK
     {
       rcvPack[i].intData.resize(rcvPack[i].nints);
       MPI_Irecv(rcvPack[i].intData.data(),rcvPack[i].nints,MPI_INT,
-                rcvMap[i],1,scomm,&reqs[nwait++]);
+                rcvMap[i],10,scomm,&reqs[nwait++]);
     }
 
     if (rcvPack[i].nreals > 0)
     {
       rcvPack[i].realData.resize(rcvPack[i].nreals);
       MPI_Irecv(rcvPack[i].realData.data(),rcvPack[i].nreals,MPI_DOUBLE,
-                rcvMap[i],2,scomm,&reqs[nwait++]);
+                rcvMap[i],20,scomm,&reqs[nwait++]);
     }
   }
 
@@ -347,12 +347,12 @@ void parallelComm::sendPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACK
     if (sndPack[i].nints > 0)
     {
       MPI_Isend(sndPack[i].intData,sndPack[i].nints,MPI_INT,
-                sndMap[i],1,scomm,&reqs[nwait++]);
+                sndMap[i],10,scomm,&reqs[nwait++]);
     }
     if (sndPack[i].nreals > 0)
     {
       MPI_Isend(sndPack[i].realData,sndPack[i].nreals,MPI_DOUBLE,
-                sndMap[i],2,scomm,&reqs[nwait++]);
+                sndMap[i],20,scomm,&reqs[nwait++]);
     }
   }
 }

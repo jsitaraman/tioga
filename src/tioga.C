@@ -1201,8 +1201,8 @@ void tioga::dataUpdate_artBnd(int nvar, int dataFlag)
 void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 {
   int es, ss, vs, ds;
-  double* q_spts = (dataFlag == 0) ? get_q_spts(es, ss, vs) :
-                                     get_dq_spts(es, ss, vs, ds);
+  double* q_spts = NULL; //(dataFlag == 0) ? get_q_spts(es, ss, vs) :
+                         //            get_dq_spts(es, ss, vs, ds);
 
   // initialize send and recv packets
   int nsend,nrecv;

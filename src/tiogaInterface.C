@@ -23,6 +23,7 @@
 #include "tioga.h"
 #include "globals.h"
 #include <string.h>
+
 //
 // All the interfaces that are 
 // accessible to third party f90 and C
@@ -37,11 +38,9 @@ extern "C" {
   void tioga_init_f90_(int *scomm)
   {
     int id_proc,nprocs;
-    MPI_Comm tcomm;
-    //tcomm=(MPI_Comm) (*scomm);
-    tcomm=MPI_Comm_f2c(*scomm);
+    MPI_Comm tcomm = MPI_Comm_f2c(*scomm);
     //
-    tg=new tioga[1];
+    tg=new tioga();
     //
     //MPI_Comm_rank(MPI_COMM_WORLD,&id_proc);
     //MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
@@ -57,46 +56,55 @@ extern "C" {
   void tioga_init_(MPI_Comm tcomm)
   {
     int id_proc,nprocs;
-    //MPI_Comm tcomm;
-    //tcomm=(MPI_Comm) (*scomm);
-    //tcomm=MPI_Comm_f2c(*scomm);
-    //
-    tg=new tioga[1];
-    //
-    //MPI_Comm_rank(MPI_COMM_WORLD,&id_proc);
-    //MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
+
+    tg = new tioga();
+
     MPI_Comm_rank(tcomm,&id_proc);
     MPI_Comm_size(tcomm,&nprocs);
-    //
+
     tg->setCommunicator(tcomm,id_proc,nprocs);
     nc=NULL;
     nv=NULL;
     vconn=NULL;
   }
   
-
-  void tioga_registergrid_data_(int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
-			       int *obcnode,int *ntypes,...)
+  void tioga_registergrid_data_(int btag, int nnodes, double *xyz, int *ibl,
+                                int nwbc, int nobc, int *wbcnode, int *obcnode,
+                                int ntypes, int _nv, int _nc, int *_vconn)
   {
-    va_list arguments;
-    int i;
+    free(nv);
+    free(nc);
+    free(vconn);
 
-    va_start(arguments, ntypes);
+    // NOTE: due to SWIG/Python wrapping, removing va_args stuff for now
+    nv    = (int *) malloc(sizeof(int)*ntypes);
+    nc    = (int *) malloc(sizeof(int)*ntypes);
+    vconn = (int **)malloc(sizeof(int *)*ntypes);
+    nv[0] = _nv;
+    nc[0] = _nc;
+    vconn[0] = _vconn;
 
-    if(nv) free(nv);
-    if(nc) free(nc);
-    if(vconn) free(vconn);
+    tg->registerGridData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
+  }
 
-    nv=(int *) malloc(sizeof(int)*(*ntypes));    
-    nc=(int *) malloc(sizeof(int)*(*ntypes));
-    vconn=(int **)malloc(sizeof(int *)*(*ntypes));
-    for(i=0;i<*ntypes;i++)
-     {
-      nv[i]=*(va_arg(arguments, int *));
-      nc[i]=*(va_arg(arguments, int *));
-      vconn[i]=va_arg(arguments, int *);
-     }
-    tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,nv,nc,vconn);
+  void tioga_register_face_data_(int gtype, int *f2c, int *c2f, int *fibl, int nOverFaces,
+      int nWallFaces, int nMpiFaces, int *overFaces, int *wallFaces, int *mpiFaces,
+      int* mpiProcR, int* mpiFidR, int nftype, int _nfv, int _nf, int *_fconn)
+  {
+    free(nfv);
+    free(nf);
+    free(fconn);
+
+    nfv   = (int *) malloc(sizeof(int)*nftype);
+    nf    = (int *) malloc(sizeof(int)*nftype);
+    fconn = (int **)malloc(sizeof(int *)*nftype);
+    nfv[0] = _nfv;
+    nf[0] = _nf;
+    fconn[0] = _fconn;
+
+    tg->registerFaceConnectivity(gtype, nftype, nf, nfv, fconn, f2c, c2f, fibl,
+        nOverFaces, nWallFaces, nMpiFaces, overFaces, wallFaces, mpiFaces,
+        mpiProcR, mpiFidR);
   }
 
   void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
@@ -176,6 +184,22 @@ extern "C" {
 	  }
       }
   }
+
+  void tioga_dataupdate_ab(int nvar, int gradFlag)
+  {
+    tg->dataUpdate_artBnd(nvar, gradFlag);
+  }
+
+  void tioga_dataupdate_ab_send(int nvar, int gradFlag)
+  {
+    tg->dataUpdate_artBnd_send(nvar, gradFlag);
+  }
+
+  void tioga_dataupdate_ab_recv(int nvar, int gradFlag)
+  {
+    tg->dataUpdate_artBnd_recv(nvar, gradFlag);
+  }
+
   void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)
   {
     int interptype;
@@ -225,32 +249,108 @@ extern "C" {
 				     void (*f5)(int *,int *,double *,int *,int *,double *))
   {
     tg->setcallback(f1,f2,f3,f4,f5);
-    //    get_nodes_per_cell=f1;
+    //get_nodes_per_cell=f1;
     //get_receptor_nodes=f2;
     //donor_inclusion_test=f3;
     //donor_frac=f4;
     //convert_to_modal=f5;
   }
-  
+
   void tioga_set_p4est_(void)
   {
     tg->set_p4est();
   }
+
+  void tioga_set_p4est_search_callback_(void (*f1)(double *xsearch,int *process_id,int *cell_id,int *npts),
+          void (*f2)(int *pid,int *iflag))
+  {
+    tg->setp4estcallback(f1,f2);
+  //jayfixme  tg->set_p4est_search_callback(f1);
+  }
+
+  void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
+                              void (*gfn)(int* id, int* npf, double* xyz),
+                              double (*gqs)(int ic, int spt, int var),
+                              double& (*gqf)(int ff, int fpt, int var),
+                              double (*ggs)(int ic, int spt, int dim, int var),
+                              double& (*ggf)(int, int, int, int),
+                              double* (*gqss)(int& es, int& ss, int& vs),
+                              double* (*gdqs)(int& es, int& ss, int& vs, int& ds))
+  {
+    tg->set_ab_callback(gnf, gfn, gqs, gqf, ggs, ggf, gqss, gdqs);
+  }
+
+  void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
+                                  void (*h2df)(int* ids, int nf, int grad, double *data),
+                                  void (*h2dc)(int* ids, int nc, int grad, double *data),
+                                  double* (*gqd)(int&, int&, int&),
+                                  double* (*gdqd)(int&, int&, int&, int&),
+                                  void (*gfng)(int*, int, int*, double*),
+                                  void (*gcng)(int*, int, int*, double*),
+                                  int (*gnw)(int),
+                                  void (*dfg)(int*, int, double*, double*))
+  {
+    tg->set_ab_callback_gpu(d2h,h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
+  }
+
+  void tioga_register_moving_grid_data(double* grid_vel, double* offset, double* Rmat)
+  {
+    tg->registerMovingGridData(grid_vel, offset, Rmat);
+  }
+
   void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *))
   {
     tg->set_amr_callback(f1);
   }
-  void tioga_set_p4est_search_callback_(void (*f1)(double *xsearch,int *process_id,int *cell_id,int *npts),
-					void (*f2)(int *pid,int *iflag))
+
+  void tioga_set_transform(double *rmat, double *offset, int ndim)
   {
-    tg->setp4estcallback(f1,f2);
-  //jayfixme  tg->set_p4est_search_callback(f1);
-  }  
+    tg->setTransform(rmat, offset, ndim);
+  }
+  
+  void tioga_do_point_connectivity(void)
+  {
+    tg->doPointConnectivity();
+  }
+
+  void tioga_set_iter_iblanks(double dt, int nvar)
+  {
+    tg->setIterIblanks(dt, nvar);
+  }
+
+  void tioga_unblank_part_1(void)
+  {
+    tg->unblankPart1();
+  }
+
+  void tioga_unblank_part_2(int nvar)
+  {
+    tg->unblankPart2(nvar);
+  }
+
   void tioga_delete_(void)
    {
-    delete [] tg;
-    if (nc) free(nc);
-    if (nv) free(nv);
-    if (vconn) free(vconn);
+    delete tg;
+    free(nc);
+    free(nv);
+    free(vconn);
+    free(nf);
+    free(nfv);
+    free(fconn);
    }
+
+  void tioga_set_stream_handle(void* stream, void* event)
+  {
+#ifdef _GPU
+    // Using void*'s for the sake of a build-independent wrapping interface
+    tg->set_stream_handle(*(cudaStream_t*)stream, *(cudaEvent_t*)event);
+#endif
+  }
+
+  void tioga_set_device_geo_data(double* xyz, double* coord, int* ibc, int* ibf)
+  {
+#ifdef _GPU
+    tg->registerDeviceGridData(xyz, coord, ibc,  ibf);
+#endif
+  }
 }

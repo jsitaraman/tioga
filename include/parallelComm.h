@@ -18,6 +18,8 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "mpi.h"
+#include <vector>
+
 /**
 * Parallel communication methods
 * the MPI calls are abstracted into
@@ -36,6 +38,12 @@ class parallelComm
   int myid;
   int numprocs;
   MPI_Comm scomm;
+
+  /// TESTING SEPARATE SEND/RECV FOR OVERLAP
+  std::vector<int> scount, rcount;
+  std::vector<MPI_Request> reqs;
+  std::vector<MPI_Status> stats;
+  int nwait;
   
   parallelComm() { sndMap=NULL; rcvMap=NULL;}
   
@@ -46,6 +54,12 @@ class parallelComm
   
   void sendRecvPackets(PACKET *sndPack,PACKET *rcvPack);
 
+  void sendRecvPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+
+  void sendPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+  void sendPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+  void recvPacketsV(void);
+
   void sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack);
 
   void setMap(int ns, int nr, int *snd,int *rcv);
@@ -53,9 +67,13 @@ class parallelComm
   void getMap(int *ns,int *nr, int **snd, int **rcv);
 
   void initPackets(PACKET *sndPack, PACKET *rcvPack);
+  void initPacketsV(std::vector<VPACKET>& sndPack, std::vector<VPACKET>& rcvPack);
+  void initPacketsV2(std::vector<PACKET>& sndPack, std::vector<VPACKET>& rcvPack);
 
   void clearPackets(PACKET *sndPack, PACKET *rcvPack);
   void clearPackets2(PACKET *sndPack, PACKET *rcvPack);
+  void clearPacketsV(std::vector<VPACKET> &sndPack, std::vector<VPACKET> &rcvPack);
+  void clearPacketsV2(std::vector<PACKET> &sndPack, std::vector<VPACKET> &rcvPack);
   
 };
   

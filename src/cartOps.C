@@ -205,16 +205,11 @@ void MeshBlock::findInterpListCart(void)
   int isum,interpCount;
   int procid,pointid,localid;
 
-  if (interpListCart) 
-    {
-      for(i=0;i<interpListCartSize;i++)
-	{
-	  if (interpListCart[i].inode) free(interpListCart[i].inode);
-	  if (interpListCart[i].weights) free(interpListCart[i].weights);
-	}
-      free(interpListCart);
-      interpListCartSize=0;
-    }
+  if (interpListCart)
+  {
+    free(interpListCart);
+    interpListCartSize=0;
+  }
   for(irecord=0;irecord<nsearch;irecord++)
     if (donorId[irecord]!=-1) interpListCartSize++;
   interpListCart=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListCartSize);
@@ -257,8 +252,8 @@ void MeshBlock::findInterpListCart(void)
 	interpListCart[interpCount].nweights=nvert;
 	interpListCart[interpCount].cancel=0;
 	//
-	interpListCart[interpCount].inode=(int *)malloc(sizeof(int)*nvert);
-	interpListCart[interpCount].weights=(double *)malloc(sizeof(double)*nvert);
+  interpListCart[interpCount].inode.resize(nvert);
+  interpListCart[interpCount].weights.resize(nvert);
 	for(m=0;m<nvert;m++)
 	  {
 	    interpListCart[interpCount].inode[m]=inode[m];

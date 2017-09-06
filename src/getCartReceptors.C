@@ -177,19 +177,11 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 	}
     }
   pc->setMap(nsend,nrecv,sndMap,rcvMap);
-  //
-  // if these were already allocated
-  // get rid of them
-  //
-  if (xsearch) free(xsearch);
-  if (isearch) free(isearch);
-  if (donorId) free(donorId);
-  if (rst) free(rst);
-  //
-  xsearch=(double *)malloc(sizeof(double)*3*nsearch);
-  isearch=(int *)malloc(3*sizeof(int)*nsearch);
-  donorId=(int *)malloc(sizeof(int)*nsearch);
-  rst=(double *) malloc(sizeof(double)*3*nsearch);
+
+  xsearch.resize(3*nsearch);
+  isearch.resize(3*nsearch);
+  donorId.resize(nsearch);
+  rst.resize(3*nsearch);
   //
   dataPtr=head->next;
   m=n=0;

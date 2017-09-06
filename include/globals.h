@@ -26,7 +26,10 @@ tioga *tg;
 ** pointer storage for connectivity arrays that
 ** comes from external solver
 */
-int **vconn;
-int *nc;
-int *nv;
+int **vconn = NULL;  /// Cell-to-vertex connectivity
+int *nc = NULL;      /// Number of cells (per cell type)
+int *nv = NULL;      /// Number of vertices per cell (per cell type)
 
+int **fconn = NULL;  /// face-to-vertex connectivity
+int *nf = NULL;      /// Number of faces (per face type)
+int *nfv = NULL;     /// Number of vertices per face (per face type)

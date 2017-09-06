@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void get_amr_index_xyz( int nq,int i,int j,int k,
 			int pBasis,
 			int nX,int nY,int nZ,
@@ -106,3 +110,7 @@ void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf, int nq,
   ijklmn[4] = m;
   ijklmn[5] = n;    
 }
+
+#ifdef __cplusplus
+}
+#endif

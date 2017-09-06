@@ -22,70 +22,95 @@
 extern "C"{
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
 }
+
+using namespace tg_funcs;
 			   
-void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch)
+void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch, double *rst)
 {
-  int i,j,k,m,n,i3;
-  int nvert;
-  int icell,icell1;
-  int passFlag;
-  int isum;
-  double xv[8][3];
-  double frac[8];
-  //
-  icell=elementList[adtElement];
-  if (ihigh==0) 
+  int icell = elementList[adtElement];
+
+  if (ihigh == 0)
+  {
+    //
+    // locate the type of the cell
+    //
+    int isum = 0;
+    int ic = -1;
+    int n = 0;
+    for (n = 0; n < ntypes; n++)
     {
-      //
-      // locate the type of the cell
-      //
-      isum=0;
-      for(n=0;n<ntypes;n++) 
-	{
-	  isum+=nc[n];
-	  if (icell < isum)
-	    {
-	      i=icell-(isum-nc[n]);
-	      break;
-	    }
-	}
-      //
-      // now collect all the vertices in the
-      // array xv
-      //
-      nvert=nv[n];
-      for(m=0;m<nvert;m++)
-	{
-	  i3=3*(vconn[n][nvert*i+m]-BASE);
-	  for(j=0;j<3;j++)
-	    xv[m][j]=x[i3+j];
-	}
-      //
+      isum += nc[n];
+      if (icell < isum)
+      {
+        ic = icell-(isum-nc[n]);
+        break;
+      }
+    }
+
+    if (ic < 0)
+    {
+      printf("TIOGA: invalid icell (adtElement) in checkContainment\n");
+      exit(1);
+    }
+
+    int nvert = nv[n];
+    if (nvert > 8)
+    {
+      /* --- Quadratic or higher-order shape functions - use general func --- */
+
+      std::vector<double> xv2(nvert*3);
+      for (int m = 0; m < nvert; m++)
+      {
+        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+        for (int j = 0; j < 3; j++)
+          xv2[m*3+j] = x[i3+j];
+      }
+
+      double refloc[3];
+      bool isInEle = getRefLocNewton(xv2.data(), xsearch, &refloc[0], nvert, 3);
+
+      if (!isInEle)
+        *cellIndex = -1;
+      else
+        *cellIndex = icell;
+
+      return;
+    }
+    else
+    {
+      /* --- Linear shape functions --- */
+
+      double xv[8][3];
+      double frac[8];
+
+      for (int m = 0; m < nvert; m++)
+      {
+        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+        for (int j = 0; j < 3; j++)
+          xv[m][j] = x[i3+j];
+      }
+
       computeNodalWeights(xv,xsearch,frac,nvert);
-      //
-      *cellIndex=icell;
-      //
-      // if any of the nodal weights are 
-      // not in between [-TOL 1+TOL] discard
-      // cell
-      //
-      for(m=0;m<nvert;m++)
-	{
-	  if ((frac[m]+TOL)*(frac[m]-1.0-TOL) > 0) 
-	    {
-	      *cellIndex=-1;
-	      return;
-	    }
-	}
+
+      // if any of the nodal weights are not in between [-TOL 1+TOL] discard cell
+      for (int m = 0; m < nvert; m++)
+      {
+        if ((frac[m]+TOL)*(frac[m]-1.0-TOL) > 0)
+        {
+          *cellIndex=-1;
+          return;
+        }
+      }
       return;
     }
+  }
   else
-    {
-      icell1=icell+BASE;
-      *cellIndex=-1;
-      donor_inclusion_test(&icell1,xsearch,&passFlag,&(rst[ipoint]));
-      if (passFlag) *cellIndex=icell;
-      return;
-    }
+  {
+    int icell1 = icell+BASE;
+    *cellIndex = -1;
+    int passFlag;
+    donor_inclusion_test(&icell1,xsearch,&passFlag,rst);
+    if (passFlag) *cellIndex = icell;
+  }
 
 }

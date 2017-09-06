@@ -95,6 +95,78 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 	    }
 	}
     }
+  free(qq);
+}
+
+void MeshBlock::getInterpolatedSolution2(int &nints,int &nreals,int *&intData,
+  double *&realData,double *q,int nvar, int interptype)
+{
+  std::vector<double> qq(nvar);
+
+  nints = 0;
+  nreals = 0;
+  for (int i = 0; i < ninterp2; i++)
+  {
+    if (!interpList2[i].cancel)
+    {
+      nints++;
+      nreals += nvar;
+    }
+  }
+  if (nints == 0) return;
+
+  intData = (int *)malloc(sizeof(int)*2*nints);
+  realData = (double *)malloc(sizeof(double)*nreals);
+  int icount = 0;
+  int dcount = 0;
+
+  if (interptype == ROW)
+  {
+    for (int i = 0; i < ninterp2; i++)
+    {
+      if (!interpList2[i].cancel)
+      {
+        qq.assign(nvar, 0);
+        for (int m = 0; m < interpList2[i].nweights; m++)
+        {
+          int inode = interpList2[i].inode[m];
+          double weight = interpList2[i].weights[m];
+          if (weight < 0 || weight > 1.0)
+          {
+            traced(weight);
+            printf("warning: weights are not convex\n");
+          }
+          for (int k = 0; k < nvar; k++)
+            qq[k] += q[inode*nvar+k]*weight;
+        }
+        intData[icount++] = interpList2[i].receptorInfo[0];
+        intData[icount++] = interpList2[i].receptorInfo[1];
+        for (int k = 0; k < nvar; k++)
+          realData[dcount++] = qq[k];
+      }
+    }
+  }
+  else if (interptype == COLUMN)
+  {
+    for (int i = 0; i < ninterp2; i++)
+    {
+      if (!interpList2[i].cancel)
+      {
+        qq.assign(nvar, 0);
+        for (int m = 0; m < interpList2[i].nweights; m++)
+        {
+          int inode = interpList2[i].inode[m];
+          double weight = interpList2[i].weights[m];
+          for (int k = 0; k < nvar; k++)
+            qq[k] += q[k*nnodes+inode]*weight;
+        }
+        intData[icount++] = interpList2[i].receptorInfo[0];
+        intData[icount++] = interpList2[i].receptorInfo[1];
+        for (int k = 0; k < nvar; k++)
+          realData[dcount++] = qq[k];
+      }
+    }
+  }
 }
 	
 void MeshBlock::updateSolnData(int inode,double *qvar,double *q,int nvar,int interptype)

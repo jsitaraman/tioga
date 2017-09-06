@@ -1,4 +1,5 @@
-//
+#ifndef ADT_H
+#define ADT_H
 // This file is part of the Tioga software library
 //
 // Tioga  is a tool for overset grid assembly on parallel distributed systems
@@ -17,6 +18,10 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include <stdlib.h>
+#include <unordered_set>
+#include <vector>
+
 /** 
  * Generic Alternating Digital Tree For Search Operations
  */
@@ -24,7 +29,8 @@
 class MeshBlock; 
 class ADT
 {
-  private :
+friend class dADT;
+private :
   
   int ndim;          /** < number of dimensions (usually 3 but can be more) */
   int nelem;         /** < number of elements */
@@ -33,27 +39,48 @@ class ADT
   double *adtExtents; /** < global extents */
   double *coord;          /** < bounding box of each element */
 
- public :
-  ADT() {ndim=6;nelem=0;adtIntegers=NULL;adtReals=NULL;adtExtents=NULL;coord=NULL;};
-  ~ADT() 
-    {
-      if (adtIntegers) free(adtIntegers);
-      if (adtReals) free(adtReals);
-      if (adtExtents) free(adtExtents);
-      adtIntegers=NULL;
-      adtReals=NULL;
-      adtExtents=NULL;
-    };
+  bool rrot = false;         /** Flag for rigid-body rotation (apply transform to all search points) */
+  double* Rmat = NULL;   /** Rotation Matrix (global->body coords) for rigid motion */
+  double* offset = NULL; /** Translation Offset (in global coords) for rigid motion */
+
+public :
+
+  ADT() {ndim=6;nelem=0;adtIntegers=NULL;adtReals=NULL;adtExtents=NULL;coord=NULL;}
+
+  ~ADT()
+  {
+    free(adtIntegers);
+    free(adtReals);
+    free(adtExtents);
+    adtIntegers=NULL;
+    adtReals=NULL;
+    adtExtents=NULL;
+  }
+
   void clearData(void)
-    {
-      if (adtIntegers) free(adtIntegers);
-      if (adtReals) free(adtReals);
-      if (adtExtents) free(adtExtents);
-      adtIntegers=NULL;
-      adtReals=NULL;
-      adtExtents=NULL;
-    };      
+  {
+    free(adtIntegers);
+    free(adtReals);
+    free(adtExtents);
+    adtIntegers=NULL;
+    adtReals=NULL;
+    adtExtents=NULL;
+  }
+
   void buildADT(int d,int nelements,double *elementBbox);  
-  void searchADT(MeshBlock *mb,int *cellindx,double *xsearch);
+
+  void setTransform(double* mat, double* off, int ndims);
+
+  //! Search the ADT for the element containint the point xsearch
+  void searchADT(MeshBlock *mb, int *cellIndex, double *xsearch, double* rst);
+
+  //! Search the ADT for all elements overlapping with bounding-box bbox
+  void searchADT_box(int *elementList, std::unordered_set<int>& icells, double *bbox);
+
+  /*! Search ADT for element containing a displaced point
+   *  Apply linear transform to search point to avoid re-creating ADT during
+   *  rigid-body motion */
+  void searchADT_rot(MeshBlock* mb, int* cellIndex, double* xsearch, double* rst);
 };
 
+#endif

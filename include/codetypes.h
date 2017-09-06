@@ -1,4 +1,5 @@
-//
+#ifndef CODETYPES_H
+#define CODETYPES_H
 // This file is part of the Tioga software library
 //
 // Tioga  is a tool for overset grid assembly on parallel distributed systems
@@ -20,7 +21,9 @@
 #define MPICH_SKIP_MPICXX
 #include<stdio.h>
 #include<stdlib.h>
-#include<math.h>
+#include<cmath>
+#include <vector>
+
 #include "mpi.h"
 /*====================================================================*/
 /*  Floating point definition                                         */
@@ -29,7 +32,7 @@
 /*====================================================================*/
 /*  Base for indexing (0 or 1)
 /*====================================================================*/
-# define BASE 1
+#define BASE 0
 
 /*====================================================================*/
 /*  Define arithmetic constants                                       */
@@ -55,8 +58,10 @@
 /*==================================================================*/
 # define tracei(x)  printf("#tioga:\t"#x" =%d\n",x);
 # define traced(x)  printf("#tioga:\t"#x" =%.16e\n",x);
-# define min(x,y)  (x) < (y) ? (x) : (y)
-# define max(x,y)  (x) > (y) ? (x) : (y)
+//#define min(x,y)  (x < y) ? x : y;
+//#define max(x,y)  (x > y) ? x : y;
+using std::min;
+using std::max;
 # define debug(x,y)  printf("#tioga:\t"#x"=%d,"#y"=%d\n",x,y);
 # define stdwrite(x) if (myid==0) printf("#tioga:\t"#x"\n");
 # define dstr(x) printf("#tioga:\t"#x"\n");
@@ -74,7 +79,23 @@
         (((aa) >= 0)? (aa): -(aa))
 #define Round(aa)\
         (int) ((fabs((aa) - floor(aa)) >= HALF)? ceil(aa): floor(aa))
-#define swap(a,b) { a=a+b;b=a-b;a=a-b;}
+//#define swap(a,b) { a=a+b;b=a-b;a=a-b;}
+
+/*====================================================================*/
+/* IBLANK value definitions                                           */
+/*====================================================================*/
+#define NORMAL  1
+#define HOLE    0
+#define FRINGE -1
+
+/*====================================================================*/
+/* DirectCut value definitions                                        */
+/*====================================================================*/
+#define DC_HOLE 0
+#define DC_UNASSIGNED 1
+#define DC_CUT 1
+#define DC_NORMAL 1
+
 /*********************************************************************/
 /* Code specific types
 /*********************************************************************/
@@ -82,7 +103,6 @@ typedef struct HOLEMAP
 {
   int existWall;
   int nx[3];
-  int *samLocal;
   int *sam;
   double extents[6];
 } HOLEMAP;
@@ -111,14 +131,23 @@ typedef struct PACKET
   REAL *realData;
 } PACKET;
 
+typedef struct VPACKET
+{
+  int nints;
+  int nreals;
+  std::vector<int> intData;
+  std::vector<double> realData;
+} VPACKET;
+
 typedef struct INTERPLIST
 {
   int cancel;
   int nweights;
   int receptorInfo[3];
+  int donorID; // donor-cell ID
   double xtmp[3];
-  int *inode;
-  double *weights;
+  std::vector<int> inode;
+  std::vector<double> weights;
 } INTERPLIST;
 
 typedef struct INTERPLIST2
@@ -144,3 +173,5 @@ typedef struct INTEGERLIST2
   double *realData;
   struct INTEGERLIST2 *next;
 }INTEGERLIST2; 
+
+#endif // CODETYPES_H

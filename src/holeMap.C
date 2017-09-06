@@ -21,147 +21,229 @@
 extern "C" 
 { 
   void fillHoleMap(int *holeMap, int ix[3],int isym);
-
-};
+}
 
 /**
- * Create hole maps for all grids
- * this routine is not efficient
- * since it does mutiple global reduce ops
- * have to change it at a later date when
- * there is more time to develop code
+ * Create hole maps (structured cartesian maps of solid surfaces) for all grids
+ * Using simplified 'vision space bins' concept from Sitaraman et al, JCP 2010
+ * This routine is not efficient since it does mutiple global reduce ops
+ * have to change it at a later date when there is more time to develop code
  */
 void tioga::getHoleMap(void)
 {
-  int i,j,k,m;
-  int ii,jj,kk;
+  // Get the bounding box of all wall boundary nodes on this rank
   double wbox[6];
   int existWall;
-  int meshtag,maxtag;
-  int *existHoleLocal;
-  int *existHole;
-  double *bboxLocal;
-  double *bboxGlobal;
-  double ds[3],dsmax,dsbox;
-  int bufferSize;
-  FILE *fp;
-  char fname[80];
-  char intstring[7];
- //
- // get the local bounding box
- //
- mb->getWallBounds(&meshtag,&existWall,wbox);
- MPI_Allreduce(&meshtag,&maxtag,1,MPI_INT,MPI_MAX,scomm);
- //
- if (holeMap) 
-   {
-     for(i=0;i<nmesh;i++)
-       if (holeMap[i].existWall) free(holeMap[i].sam);
-     delete [] holeMap;
-   }
- holeMap=new HOLEMAP[maxtag];
- //
- existHoleLocal=(int *)malloc(sizeof(int)*maxtag);
- existHole=(int *)malloc(sizeof(int)*maxtag);
- //
- for(i=0;i<maxtag;i++) existHole[i]=existHoleLocal[i]=0;
- //
- existHoleLocal[meshtag-1]=existWall;
- //
- MPI_Allreduce(existHoleLocal,existHole,maxtag,MPI_INT,MPI_MAX,scomm);
- //
- for(i=0;i<maxtag;i++) holeMap[i].existWall=existHole[i];
- //
- bboxLocal=(double *) malloc(sizeof(double)*6*maxtag);
- bboxGlobal=(double *) malloc(sizeof(double)*6*maxtag);
- //
- for(i=0;i<3*maxtag;i++) bboxLocal[i]=BIGVALUE;
- for(i=0;i<3*maxtag;i++) bboxLocal[i+3*maxtag]=-BIGVALUE;
- for(i=0;i<3*maxtag;i++) bboxGlobal[i]=BIGVALUE;
- for(i=0;i<3*maxtag;i++) bboxGlobal[i+3*maxtag]=-BIGVALUE;
+  int meshtag;
 
- //
- for(i=0;i<3;i++)
-   {
-     bboxLocal[3*(meshtag-1)+i]=wbox[i];
-     bboxLocal[3*(meshtag-1)+i+3*maxtag]=wbox[i+3];
-   }
- //
- // get the global bounding box info across all the
- // partitions for all meshes
- //
- MPI_Allreduce(bboxLocal,bboxGlobal,3*maxtag,MPI_DOUBLE,MPI_MIN,scomm);
- MPI_Allreduce(&(bboxLocal[3*maxtag]),&(bboxGlobal[3*maxtag]),3*maxtag,MPI_DOUBLE,MPI_MAX,scomm);
- //
- // find the bounding box for each mesh
- // from the globally reduced data
- //
- for(i=0;i<maxtag;i++)
-   {
-     if (holeMap[i].existWall) 
-       {
-	 for(j=0;j<3;j++)
-	   {
-	     holeMap[i].extents[j]=bboxGlobal[3*i+j];
-	     holeMap[i].extents[j+3]=bboxGlobal[3*i+j+3*maxtag];
-	     ds[j]=holeMap[i].extents[j+3]-holeMap[i].extents[j];
-	   }	 
-	 dsmax=max(ds[0],ds[1]);
-	 dsmax=max(dsmax,ds[2]);	 
-	 dsbox=dsmax/64;
-	 
-	 for(j=0;j<3;j++)
-	   {
-	     holeMap[i].extents[j]-=(2*dsbox);
-	     holeMap[i].extents[j+3]+=(2*dsbox);
-	     holeMap[i].nx[j]=floor(max((holeMap[i].extents[j+3]-holeMap[i].extents[j])/dsbox,1));
-	   }
-	 bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
-	 holeMap[i].sam=(int *)malloc(sizeof(int)*bufferSize);
-	 holeMap[i].samLocal=(int *)malloc(sizeof(int)*bufferSize);	 
-	 for(j=0;j<bufferSize;j++) holeMap[i].sam[j]=holeMap[i].samLocal[j]=0;
-       }
-   }
- //
- // mark the wall boundary cells in the holeMap
- //
- if (holeMap[meshtag-1].existWall) {
- mb->markWallBoundary(holeMap[meshtag-1].samLocal,holeMap[meshtag-1].nx,holeMap[meshtag-1].extents);
- }
- //
- // allreduce the holeMap of each mesh
- //
- for(i=0;i<maxtag;i++)
-   {
-    if (holeMap[i].existWall) 
-     {
-      bufferSize=holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
-      MPI_Allreduce(holeMap[i].samLocal,holeMap[i].sam,bufferSize,MPI_INT,MPI_MAX,scomm);
-     }
-   }
- //
- for(i=0;i<maxtag;i++)
-   if (holeMap[i].existWall) free(holeMap[i].samLocal);
- //
- // set the global number of meshes to maxtag
- //
- nmesh=maxtag;
- //
- // now fill the holeMap
- //
- for(i=0;i<maxtag;i++)
-   if (holeMap[i].existWall) fillHoleMap(holeMap[i].sam,holeMap[i].nx,isym);
- //
- // output the hole map
- //
- //this->outputHoleMap();
- //
- // free local memory
- //
- free(existHoleLocal);
- free(existHole);
- free(bboxLocal);
- free(bboxGlobal);
+  if (holeMap)
+  {
+    for (int i = 0; i < nmesh; i++)
+      if (holeMap[i].existWall)
+      {
+        free(holeMap[i].sam);
+      }
+    delete [] holeMap;
+  }
+
+  // Grid/Mesh ID, whether rank has wall nodes, and bbox of wall nodes if so
+  mb->getWallBounds(&meshtag, &existWall, wbox);
+
+  // Get 'nmesh' : number of grids (separate mesh tags) in system
+  MPI_Allreduce(&meshtag, &nmesh, 1, MPI_INT, MPI_MAX, scomm);
+  nmesh += 1;
+
+  holeMap = new HOLEMAP[nmesh];
+
+  std::vector<int> existHoleLocal(nmesh);
+  std::vector<int> existHole(nmesh);
+
+  existHoleLocal[meshtag] = existWall;
+
+  MPI_Allreduce(existHoleLocal.data(),existHole.data(),nmesh,MPI_INT,MPI_MAX,scomm);
+
+  for (int i = 0; i < nmesh; i++) holeMap[i].existWall = existHole[i];
+
+  std::vector<double> bboxLocal(6*nmesh);
+  std::vector<double> bboxGlobal(6*nmesh);
+
+  for (int i = 0; i < 3*nmesh; i++) bboxLocal[i]          =  BIGVALUE;
+  for (int i = 0; i < 3*nmesh; i++) bboxLocal[i+3*nmesh]  = -BIGVALUE;
+  for (int i = 0; i < 3*nmesh; i++) bboxGlobal[i]         =  BIGVALUE;
+  for (int i = 0; i < 3*nmesh; i++) bboxGlobal[i+3*nmesh] = -BIGVALUE;
+
+  for (int i = 0;  i < 3; i++)
+  {
+    bboxLocal[3*meshtag+i] = wbox[i];
+    bboxLocal[3*meshtag+i+3*nmesh] = wbox[i+3];
+  }
+
+  // Get the global bounding box info across all the partitions for all meshes
+  MPI_Allreduce(&bboxLocal[0],        &bboxGlobal[0],        3*nmesh,MPI_DOUBLE,MPI_MIN,scomm);
+  MPI_Allreduce(&(bboxLocal[3*nmesh]),&(bboxGlobal[3*nmesh]),3*nmesh,MPI_DOUBLE,MPI_MAX,scomm);
+
+  // Find the bounding box for each mesh from the globally reduced data
+  for (int i = 0; i < nmesh; i++)
+  {
+    if (holeMap[i].existWall)
+    {
+      double ds[3];
+      for (int j = 0; j < 3; j++)
+      {
+        holeMap[i].extents[j] = bboxGlobal[3*i+j];
+        holeMap[i].extents[j+3] = bboxGlobal[3*i+j+3*nmesh];
+        ds[j] = holeMap[i].extents[j+3]-holeMap[i].extents[j];
+      }
+      double dsmax = max(max(ds[0], ds[1]), ds[2]);
+      double dsmin = min(min(ds[0], ds[1]), ds[2]);
+      double dx_avg = .5*(dsmax + dsmin);
+      int NX_HOLEMAP = 64; // Originally 64
+      double dsbox = dx_avg/NX_HOLEMAP; // Accounting somewhat for high aspect ratios
+
+      for (int j = 0; j < 3; j++)
+      {
+        // Extend bounding box by 2/NX_HOLEMAP of max dimension in each direction
+        holeMap[i].extents[j]   -= (2*dsbox);
+        holeMap[i].extents[j+3] += (2*dsbox);
+        // nx should end up ~= to NX_HOLEMAP for maximum dimension
+        holeMap[i].nx[j] = floor(max((ds[j]+4*dsbox)/dsbox, 1.));
+      }
+
+      int bufferSize = holeMap[i].nx[0] * holeMap[i].nx[1] * holeMap[i].nx[2];
+      holeMap[i].sam = (int *)malloc(sizeof(int)*bufferSize);
+
+      for (int j = 0; j < bufferSize; j++)
+        holeMap[i].sam[j] = 0;
+    }
+  }
+
+  // mark the wall boundary cells in the holeMap
+  if (holeMap[meshtag].existWall)
+  {
+    mb->markWallBoundary(holeMap[meshtag].sam,holeMap[meshtag].nx,holeMap[meshtag].extents);
+  }
+
+  // allreduce the holeMap of each mesh
+  for (int i = 0; i < nmesh; i++)
+  {
+    if (holeMap[i].existWall)
+    {
+      int bufferSize = holeMap[i].nx[0]*holeMap[i].nx[1]*holeMap[i].nx[2];
+      MPI_Allreduce(MPI_IN_PLACE,holeMap[i].sam,bufferSize,MPI_INT,MPI_MAX,scomm);
+    }
+  }
+
+  // now fill the holeMap
+  for (int i = 0; i < nmesh; i++)
+    if (holeMap[i].existWall) fillHoleMap(holeMap[i].sam,holeMap[i].nx,isym);
+
+  // output the hole map
+  //this->outputHoleMap();
+}
+
+/**
+ * Create hole maps (structured cartesian maps of solid surfaces) for all grids
+ * Using simplified 'vision space bins' concept from Sitaraman et al, JCP 2010
+ * This routine is not efficient since it does mutiple global reduce ops
+ * have to change it at a later date when there is more time to develop code
+ */
+void tioga::getOversetMap(void)
+{
+  // Get the bounding box of all wall boundary nodes on this rank
+  double wbox[6];
+  int existOver;
+  int meshtag;
+
+  // Grid/Mesh ID, whether rank has wall nodes, and bbox of wall nodes if so
+  mb->getOversetBounds(&meshtag, &existOver, wbox);
+
+  // Get 'nmesh' : number of grids (separate mesh tags) in system
+  MPI_Allreduce(&meshtag, &nmesh, 1, MPI_INT, MPI_MAX, scomm);
+  nmesh += 1;
+
+  overMap.resize(nmesh);
+
+  std::vector<int> existHoleLocal(nmesh);
+  std::vector<int> existHole(nmesh);
+
+  existHoleLocal[meshtag] = existOver;
+
+  MPI_Allreduce(existHoleLocal.data(),existHole.data(),nmesh,MPI_INT,MPI_MAX,scomm);
+
+  for (int i = 0; i < nmesh; i++) overMap[i].existWall = existHole[i];
+
+  std::vector<double> bboxLocal(6*nmesh);
+  std::vector<double> bboxGlobal(6*nmesh);
+
+  for (int i = 0; i < 3*nmesh; i++) bboxLocal[i]          =  BIGVALUE;
+  for (int i = 0; i < 3*nmesh; i++) bboxLocal[i+3*nmesh]  = -BIGVALUE;
+  for (int i = 0; i < 3*nmesh; i++) bboxGlobal[i]         =  BIGVALUE;
+  for (int i = 0; i < 3*nmesh; i++) bboxGlobal[i+3*nmesh] = -BIGVALUE;
+
+  for (int i = 0;  i < 3; i++)
+  {
+    bboxLocal[3*meshtag+i] = wbox[i];
+    bboxLocal[3*meshtag+i+3*nmesh] = wbox[i+3];
+  }
+
+  // Get the global bounding box info across all the partitions for all meshes
+  MPI_Allreduce(&bboxLocal[0],        &bboxGlobal[0],        3*nmesh,MPI_DOUBLE,MPI_MIN,scomm);
+  MPI_Allreduce(&(bboxLocal[3*nmesh]),&(bboxGlobal[3*nmesh]),3*nmesh,MPI_DOUBLE,MPI_MAX,scomm);
+
+  // Find the bounding box for each mesh from the globally reduced data
+  for (int i = 0; i < nmesh; i++)
+  {
+    if (overMap[i].existWall)
+    {
+      double ds[3];
+      for (int j = 0; j < 3; j++)
+      {
+        overMap[i].extents[j] = bboxGlobal[3*i+j];
+        overMap[i].extents[j+3] = bboxGlobal[3*i+j+3*nmesh];
+        ds[j] = overMap[i].extents[j+3]-overMap[i].extents[j];
+      }
+      double dsmax = max(max(ds[0], ds[1]), ds[2]);
+      double dsmin = min(min(ds[0], ds[1]), ds[2]);
+      double dx_avg = .5*(dsmax + dsmin);
+      int NX_HOLEMAP = 80; // Originally 64
+      double dsbox = dx_avg/NX_HOLEMAP; // Accounting somewhat for high aspect ratios
+
+      for (int j = 0; j < 3; j++)
+      {
+        // Extend bounding box by 2/NX_HOLEMAP of max dimension in each direction
+        overMap[i].extents[j]   -= (2*dsbox);
+        overMap[i].extents[j+3] += (2*dsbox);
+        // nx should end up ~= to NX_HOLEMAP for maximum dimension
+        overMap[i].nx[j] = floor(max((ds[j]+4*dsbox)/dsbox, 1.));
+      }
+
+      int bufferSize = overMap[i].nx[0] * overMap[i].nx[1] * overMap[i].nx[2];
+      overMap[i].sam = (int *)malloc(sizeof(int)*bufferSize);
+
+      for (int j = 0; j < bufferSize; j++)
+        overMap[i].sam[j] = 0;
+    }
+  }
+
+  // mark the wall boundary cells in the holeMap
+  if (overMap[meshtag].existWall)
+  {
+    mb->markOversetBoundary(overMap[meshtag].sam,overMap[meshtag].nx,overMap[meshtag].extents);
+  }
+
+  // allreduce the holeMap of each mesh
+  for (int i = 0; i < nmesh; i++)
+  {
+    if (overMap[i].existWall)
+    {
+      int bufferSize = overMap[i].nx[0]*overMap[i].nx[1]*overMap[i].nx[2];
+      MPI_Allreduce(MPI_IN_PLACE,overMap[i].sam,bufferSize,MPI_INT,MPI_MAX,scomm);
+    }
+  }
+
+  // now fill the holeMap
+  for (int i = 0; i < nmesh; i++)
+    if (overMap[i].existWall) fillHoleMap(overMap[i].sam,overMap[i].nx,isym);
 }
 
 /**

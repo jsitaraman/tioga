@@ -18,7 +18,7 @@ SWIG = $(SWIG_BIN)/swig
 CFLAGS = -std=c++11 -fPIC -rdynamic 
 CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
-SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/ -I$(NUMPY_INC_DIR)/
+SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/ -I$(NUMPY_INC_DIR)/ -I$(NUMPY_INC_DIR)/
 
 # Intel compiler flags: 
 # Floating-point exception; underflow gives 0.0: -fpe0
@@ -104,6 +104,9 @@ swig: CFLAGS += $(SFLAGS)
 swig: $(OBJECTS) $(OBJF90) $(OBJSWIG)
 	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(SFLAGS) $(OBJECTS) $(OBJF90) $(OBJSWIG) -shared -fPIC -o $(BINDIR)/_tioga.so -lc $(LIBS)
+
+convert: $(BINDIR)/convert_wrap.o
+	$(CXX) $(CFLAGS) $(SFLAGS) $(BINDIR)/convert_wrap.o -shared -fPIC -o $(BINDIR)/_convert.so
 
 default: $(OBJECTS) $(OBJF90)
 	@mkdir -p bin

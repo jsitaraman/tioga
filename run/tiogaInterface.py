@@ -187,9 +187,9 @@ class Tioga:
             get_dq_spts)
 
         if self.motion:
-            gridV = gridData['gridVel'][0]
-            offset = gridData['rigidOffset'][0]
-            Rmat = gridData['rigidRotMat'][0]
+            gridV = arrayToDblPtr(gridData['gridVel'][0])
+            offset = arrayToDblPtr(gridData['rigidOffset'][0])
+            Rmat = arrayToDblPtr(gridData['rigidRotMat'][0])
             tg.tioga_register_moving_grid_data(gridV,offset,Rmat)
 
         if self.useGpu:

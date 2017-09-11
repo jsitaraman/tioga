@@ -29,12 +29,10 @@ void dADT::copyADT(ADT *adt)
   adtBBox.assign(adt->adtExtents, ndim);
   coord.assign(adt->coord, ndim*nelem);
   rrot = adt->rrot;
-  //rrot = false;
-  /// ^ WORKING ON REBUILD-ADT VERSION
   if (rrot)
   {
-    offset.assign(offset, 3);
-    Rmat.assign(Rmat, 9);
+    offset.assign(adt->offset, 3);
+    Rmat.assign(adt->Rmat, 9);
   }
 }
 

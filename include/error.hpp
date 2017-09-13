@@ -44,6 +44,9 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 }
 #else
 #define check_error()
+#define __host__
+#define __device__
+#define __forceinline__ inline
 #endif
 
 //! Prints the error message, the source file and line number, and exits

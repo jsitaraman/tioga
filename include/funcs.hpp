@@ -42,7 +42,9 @@
 #include "error.hpp"
 #include "points.hpp"
 
+#ifdef _GPU
 #include <cuda_runtime.h>
+#endif
 
 #ifndef BIG_DOUBLE
 #define BIG_DOUBLE 1.0e15

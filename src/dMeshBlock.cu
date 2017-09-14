@@ -1494,7 +1494,7 @@ void cuttingPass1(dMeshBlock mb, dvec<int> filt_eles, int nEles,
   }
 
   // Each thread will check against 1 face
-  outDist[nEles*F+IC] = intersectionCheckLinear(&cutFaces[ff*stride], xv, outCorner[nEles*F+IC];
+  outDist[nEles*F+IC] = intersectionCheckLinear(&cutFaces[ff*stride], xv, outCorner[nEles*F+IC]);
 }
 
 __global__

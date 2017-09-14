@@ -33,8 +33,8 @@ void dADT::copyADT(ADT *adt)
   /// ^ WORKING ON REBUILD-ADT VERSION
   if (rrot)
   {
-    offset.assign(offset, 3);
-    Rmat.assign(Rmat, 9);
+    offset.assign(adt->offset, 3);
+    Rmat.assign(adt->Rmat, 9);
   }
 }
 

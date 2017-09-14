@@ -57,6 +57,24 @@ void print_nodes(const double* pts, int id, int npts)
   }
 }
 
+__device__ __forceinline__
+void print_nodes(const float* pts, int id, int npts)
+{
+  int idx = threadIdx.x;
+  for (int tid = 0; tid < 32; tid++)
+  {
+    if (idx == tid)
+    {
+      printf("Points%d = [",id);
+      for (int i = 0; i < npts - 1; i++)
+        printf("%f %f %f;\n",pts[3*i+0],pts[3*i+1],pts[3*i+2]);
+
+      int I = npts-1;
+      printf("%f %f %f];\n",pts[3*I+0],pts[3*I+1],pts[3*I+2]);
+    }
+  }
+}
+
 #define WARP_SZ 32
 
 __device__
@@ -263,6 +281,256 @@ void dMeshBlock::setTransform(double* mat, double* off, int ndim)
   rrot = true; /// WORKING ON ADT REBUILD - DISABLED RROT
   Rmat.assign(mat, ndim*ndim);
   offset.assign(off, ndim);
+}
+
+/* ---------------------------- Geometric Functions --------------------------- */
+
+__device__ __forceinline__
+int oobbCheck(float* vA, float* xA, float* dxA, float* vB, float* xB, float* dxB)
+{
+  double eps = 1e-10;
+
+  // D = distance between centers
+  float D[3];
+  for (int i = 0; i < 3; i++)
+    D[i] = xB[i] - xA[i];
+
+  // C = scalar product of axes
+  float c[3][3];
+  for (int i = 0; i < 3; i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      c[i][j] = 0;
+      for (int k = 0; k < 3; k++)
+        c[i][j] = c[i][j] + vA[3*i+k]*vB[3*j+k];
+    }
+  }
+
+  // separating axes based on the faces of box A
+  for (int i = 0; i < 3; i++)
+  {
+    float r0 = dxA[i];
+    float r1 = 0;
+    float r = 0;
+    for (int j = 0; j < 3; j++)
+    {
+      r1 += dxB[j] * fabs(c[i][j]);
+      r += fabs(vA[3*i+j]) * D[j];
+    }
+
+    if (r > (r0+r1+eps))
+      return 0;
+  }
+
+  // separating axes based on the faces of box B
+  for (int i = 0; i < 3; i++)
+  {
+    float r1 = dxB[i];
+    float r0 = 0;
+    float r = 0;
+    for (int j = 0; j < 3; j++)
+    {
+      r0 += dxA[j] * fabs(c[j][i]);
+      r += fabs(vB[3*i+j]) * D[j];
+    }
+    if (r > (r0+r1+eps)) return 0;
+  }
+
+  // cross products
+  for (int i = 0; i < 3; i++)
+  {
+    int i1 = (i+1)%3;
+    int i2 = (i+2)%3;
+    for (int j = 0; j < 3; j++)
+    {
+      int j1 = (j+1)%3;
+      int j2 = (j+2)%3;
+
+      float r0 = dxA[i1] * fabs(c[i2][j]) + dxA[i2] * fabs(c[i1][j]);
+      float r1 = dxB[j1] * fabs(c[i][j2]) + dxB[j2] * fabs(c[i][j1]);
+
+      float d2 = 0;
+      float d1 = 0;
+      for (int k = 0; k < 3; k++)
+      {
+        d2 += vA[3*i2+k]*D[k];
+        d1 += vA[3*i1+k]*D[k];
+      }
+
+      float r = fabs( c[i1][j]*d2 - c[i2][j]*d1 );
+
+      if (r > (r0+r1+eps)) {
+        return 0;
+      }
+    }
+  }
+
+  // return 1 if no separation can be found [intersection]
+  return 1;
+}
+
+/* From Demmel 1997, Applied Numerical Linear Algebra, pp. 232-235 */
+
+//! Specific to a 3x3 matrix [used to get oriented bounding box axes]
+__device__ __forceinline__
+void jacobi_rotation(float A[3][3], float* __restrict__ J, int j, int k)
+{
+  if (abs(A[j][k]) > 1e-10)
+  {
+    float tau = (A[j][j] - A[k][k]) / (2*A[j][k]);
+    float t = sign_d(tau) / (abs(tau) + sqrt(1+tau*tau));
+    float c = 1. / (sqrt(1+t*t));
+    float s = c*t;
+
+    // Temporary matrix for matrix-matrix multiplication
+    float B[6];
+
+    // Apply R^T from left - rotates rows j,k by theta
+    for (int d = 0; d < 3; d++)
+    {
+      B[d]   =  c*A[d][j] + s*A[d][k];
+      B[d+3] = -s*A[d][j] + c*A[d][k];
+    }
+
+    // Update A to be result of R^T*A (Row i not changed)
+    for (int d = 0; d < 3; d++)
+    {
+      A[j][d] = B[d];
+      A[k][d] = B[d+3];
+    }
+
+    // Copy columns j,k of A to B
+    for (int d = 0; d < 3; d++)
+    {
+      B[d]   = A[d][j];
+      B[d+3] = A[d][k];
+    }
+
+    // Apply R from right - rotates cols j,k by theta
+    for (int d = 0; d < 3; d++)
+    {
+      A[d][j] =  c*B[d] + s*B[d+3];
+      A[d][k] = -s*B[d] + c*B[d+3];
+    }
+
+    // Copy columns j,k of J into tmp storage for multiplication
+    for (int d = 0; d < 3; d++)
+    {
+      B[d]   = J[3*d+j];
+      B[d+3] = J[3*d+k];
+    }
+
+    // Update J [eventual eigenvectors] [J = J*R]
+    for (int d = 0; d < 3; d++)
+    {
+      J[3*d+j] =  c*B[d] + s*B[d+3];
+      J[3*d+k] = -s*B[d] + c*B[d+3];
+    }
+  }
+}
+
+__device__ __forceinline__
+float off_norm(float A[3][3])
+{
+  return sqrt(A[0][1]*A[0][1] + A[0][2]*A[0][2] + A[1][2]*A[1][2]);
+}
+
+//! Get the eigenvectors of a 3x3 symmetric matrix [covariance matrix]
+__device__ __forceinline__
+void get_eigenvectors(float mat[3][3], float* __restrict__ evecs)
+{
+  for (int i = 0; i < 3; i++)
+  {
+    for (int j = 0; j < i; j++)
+      evecs[3*i+j] = 0;
+
+    evecs[3*i+i] = 1;
+
+    for (int j = i+1; j < 3; j++)
+      evecs[3*i+j] = 0;
+  }
+
+  //while (off_norm(mat) < 1.e-8)
+  for (int i = 0; i < 4; i++)
+  {
+    jacobi_rotation(mat, evecs, 0, 1);
+    jacobi_rotation(mat, evecs, 0, 2);
+    jacobi_rotation(mat, evecs, 1, 2);
+  }
+}
+
+/*! Get the 3x3 covariance matrix for a set of points
+ *  WARNING: upon return 'pts' will be shifted to place centroid at origin */
+__device__ __forceinline__
+void get_covariance(float* __restrict__ pts, int npts, float xc[3], float cov[3][3])
+{
+  // Get the centroid of all points
+  xc[0] = xc[1] = xc[2] = 0.f;
+
+  for (int i = 0; i < npts; i++)
+    for (int d = 0; d < 3; d++)
+      xc[d] += pts[3*i+d];
+
+  for (int d = 0; d < 3; d++)
+    xc[d] /= (float)npts;
+
+  // Shift the centroid to the origin
+  for (int i = 0; i < npts; i++)
+    for (int d = 0; d < 3; d++)
+      pts[3*i+d] -= xc[d];
+
+  // Compute the covarience [just the upper-triangular terms]
+  for (int d1 = 0; d1 < 3; d1++)
+  {
+    for (int d2 = d1; d2 < 3; d2++)
+    {
+      cov[d1][d2] = 0.f;
+      for (int i = 0; i < npts; i++)
+        cov[d1][d2] += pts[3*i+d1]*pts[3*i+d2];
+      cov[d1][d2] /= (float)npts;
+    }
+  }
+
+  // Apply symmetry
+  for (int d1 = 0; d1 < 3; d1++)
+    for (int d2 = d1; d2 < 3; d2++)
+      cov[d2][d1] = cov[d1][d2];
+}
+
+/*! Get the oriented bounding box of a set of points using the eigenvectors
+ *  of the covariance matrix as the axis of the box
+ *  First 9 values of obb are the new axes; next 6 are transformed bbox */
+__device__ __forceinline__
+void getOBB(float* __restrict__ pts, int npts, float* obb)
+{
+  float cov[3][3], xc[3], axes[9];
+  get_covariance(pts, npts, xc, cov);
+
+  get_eigenvectors(cov, axes);
+
+  for (int i = 0; i < 9; i++)
+    obb[i] = axes[i];
+
+  for (int i = 0; i < 3; i++)
+  {
+    obb[9+i]   =  BIG_DOUBLE;
+    obb[9+i+3] = -BIG_DOUBLE;
+  }
+
+  for (int i = 0; i < npts; i++)
+  {
+    float pt[3] = {0.f, 0.f, 0.f};
+    for (int j = 0; j < 3; j++)
+      for (int k = 0; k < 3; k++)
+        pt[j] += obb[3*k+j] * (pts[3*i+k]+xc[k]);
+
+    for (int d = 0; d < 3; d++)
+    {
+      obb[9+d]   = fminf(obb[9+d],   pt[d]);
+      obb[9+d+3] = fmaxf(obb[9+d+3], pt[d]);
+    }
+  }
 }
 
 /* ---------------------------- Direct Cut Method Functions --------------------------- */
@@ -1040,7 +1308,7 @@ float intersectionCheckLinear(const float* __restrict__ fxv,
   {
     char f = fList[F];
     // Get triangles for the sub-hex of the larger curved hex
-    for (int i = f; i < f+2; i++)
+    for (int i = 2*f; i < 2*f+2; i++)
     {
       for (int p = 0; p < 3; p++)
       {
@@ -1066,7 +1334,7 @@ float intersectionCheckLinear(const float* __restrict__ fxv,
         if (dist < tol)
           return 0.;
 
-        dist = (minDist < dist) ? minDist : dist;
+        minDist = (minDist < dist) ? minDist : dist;
       }
     }
   }
@@ -1076,22 +1344,53 @@ float intersectionCheckLinear(const float* __restrict__ fxv,
 
 //! Perform initial ele-face distance sorting using centroids
 __global__
-void cuttingPass0C(dvec<float> eleXC, dvec<float> faceXC, int nEles,
-    int nFaces, dvec<float> outDist)
+void cuttingPass0C(dMeshBlock mb, dvec<float> eleXC, dvec<float> faceXC, int nEles,
+    int nFaces, dvec<float> outDist, dvec<int> eleList) /// DEBUGGING - rm eleList
 {
   const int IC = blockIdx.x * blockDim.x + threadIdx.x;
   const int F = blockIdx.y * blockDim.y + threadIdx.y;
 
   if (IC >= nEles || F >= nFaces) return;
 
-  float dx[3];
-  for (int i = 0; i < 3; i++)
-    dx[i] = faceXC[3*F+i] - eleXC[3*IC+i];
+  int ic = eleList[IC];
+  float minDist = BIG_FLOAT;
+  for (int i = 0; i < 8; i++)
+  {
+    float dx[3];
+    for (int d = 0; d < 3; d++)
+      dx[d] = faceXC[3*F+d] - mb.coord[ic+mb.ncells*(d+3*i)];
+    float dist = dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2];
+    if (dist < minDist)
+      minDist = dist;
+  }
 
-  outDist[nEles*F+IC] = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]; // dist^2 works just as well as dist
+//  float dx[3];
+//  for (int i = 0; i < 3; i++)
+//    dx[i] = faceXC[3*F+i] - eleXC[3*IC+i];
+//  outDist[nEles*F+IC] = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]; // dist^2 works just as well as dist
+  outDist[nEles*F+IC] = minDist;
 }
 
 //! Perform initial ele-face distance sorting using bounding boxes
+//__global__
+//void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
+//    int nFaces, int nvertf, dvec<int> filt_faces, dvec<float> outDist)
+//{
+//  const int IC = blockIdx.x * blockDim.x + threadIdx.x;
+//  const int F = blockIdx.y * blockDim.y + threadIdx.y;
+
+//  if (IC >= nEles || F >= nFaces) return;
+
+//  const int nDims = 3;
+
+//  const int ff = filt_faces[F];
+//  const int stride = nDims*nvertf;
+
+//  float bboxF[6];
+//  cuda_funcs::getBoundingBox<3,4>(&cutFaces[ff*stride], bboxF);
+
+//  outDist[nEles*F+IC] = cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[6*IC]);
+//}
 __global__
 void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
     int nFaces, int nvertf, dvec<int> filt_faces, dvec<float> outDist)
@@ -1106,10 +1405,27 @@ void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
   const int ff = filt_faces[F];
   const int stride = nDims*nvertf;
 
-  float bboxF[6];
-  cuda_funcs::getBoundingBox<3,4>(&cutFaces[ff*stride], bboxF);
+  float pts[12];
+  for (int i = 0; i < 4; i++)
+  {
+    float pt[3];
+    for (int j = 0; j < 3; j++)
+      pt[j] = cutFaces[ff*stride+3*i+j];
 
-  outDist[nEles*F+IC] = cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[6*IC]);
+    for (int j = 0; j < 3; j++)
+    {
+      pts[3*i+j] = 0;
+      for (int k = 0; k < 3; k++)
+      {
+        pts[3*i+j] += eleBbox[16*IC+3*k+j] * pt[k];
+      }
+    }
+  }
+
+  float bboxF[6];
+  cuda_funcs::getBoundingBox<3,4>(pts, bboxF);
+
+  outDist[nEles*F+IC] = cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[16*IC+9]);
 }
 
 __global__
@@ -1178,7 +1494,7 @@ void cuttingPass1(dMeshBlock mb, dvec<int> filt_eles, int nEles,
   }
 
   // Each thread will check against 1 face
-  outDist[nEles*F+IC] = intersectionCheckLinear(&cutFaces[ff*stride], xv, outCorner[nEles*F+IC]);
+  outDist[nEles*F+IC] = intersectionCheckLinear(&cutFaces[ff*stride], xv, outCorner[nEles*F+IC];
 }
 
 __global__
@@ -1275,6 +1591,24 @@ void getElementBoundingBoxes(dMeshBlock mb, dvec<int> eleList, int nEles,
   cuda_funcs::getBoundingBox<3,8>(xv,&eleBbox[6*IC]); /// TODO: swap rows/cols in eleBbox for better coalesced access
 }
 
+__global__
+void getElementOrientedBoundingBoxes(dMeshBlock mb, dvec<int> eleList, int nEles,
+    dvec<float> eleBbox)
+{
+  int IC = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (IC >= nEles) return;
+
+  int ic = eleList[IC];
+
+  float xv[8*3];  // Only concerning ourselves with linear portion of ele
+  for (int i = 0; i < 8; i++)
+    for (int d = 0; d < 3; d++)
+      xv[3*i+d] = mb.coord[ic+mb.ncells*(d+3*i)];
+
+  getOBB(xv, 8, &eleBbox[16*IC]);
+}
+
 template<int nSideF>
 __global__
 void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
@@ -1312,7 +1646,7 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
 
   float bboxC[2*nDims];
   for (int i = 0; i < 2*nDims; i++)
-    bboxC[i] = eleBbox[6*IC+i];
+    bboxC[i] = eleBbox[16*IC+9+i];
 
   /* ---- Check against our reduced list of faces ---- */
 
@@ -1386,9 +1720,15 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
   float TC[9];
   for (int p = 0; p < 3; p++)
   {
-    int ipt = lin2curv[TriPts[F+t][p]];
+    int ipt = lin2curv[TriPts[2*F+t][p]];
     for (int d = 0; d < 3; d++)
       TC[3*p+d] = mb.coord[ic+mb.ncells*(d+nDims*ipt)]; /// NOTE: 'row-major' ZEFR layout
+  }
+  for (int ii = 0; ii < 6; ii++)
+  {
+    if (ic==35216 && ff == 1120 && T == ii)
+      print_nodes(TC,T,3);
+    __syncthreads();
   }
 
   // Find distance from face to cell
@@ -1410,10 +1750,15 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
     //outNorm[IC+nEles*(i+3*FID)] = myNorm[i];
     outVec[T+nTri*(IC+nEles*(FID+NF2*i))] = vec[i];
   }
+
+  if (ic==35216 && ff == 1120)
+  {
+    printf("CutPass 2: Dist from %d to %d, tri %d, = %.4e\n",ic,ff,T,myDist);
+  }
 }
 
 __global__
-void getMinDist(dvec<float> dists, dvec<float> vecs, int nEles, int nTri)
+void getMinDist(dvec<float> dists, dvec<float> vecs, int nEles, int nTri, dvec<int> eleList) /// DEBUGGING - rm eleList
 {
   const int IC = blockDim.x * blockIdx.x + threadIdx.x;
   const int F = threadIdx.y;
@@ -1765,7 +2110,9 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
   int nSideC = std::cbrt(nvert);
   int nTri = 3*2*(nSideC-1)*(nSideC-1);
-  
+
+  if (nTri < NF2) ThrowException("Incompatible nTri / NF2!");
+
   int nCheck1 = min(NF1, nfiltF);
 
   dvec<float> eleBbox, cfDist, cfNorm, cfVec;
@@ -1798,7 +2145,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     cudaFuncSetCacheConfig(cuttingPass2<3>, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass2<4>, cudaFuncCachePreferL1);
 
-    eleBbox.resize(6*nfiltC);
+    eleBbox.resize(16*nfiltC);
 
     eleXC.resize(nfiltC*3);
     faceXC.resize(nfiltC*3);
@@ -1806,7 +2153,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     int ThreadsB = 128;
     int BlocksB = (nfiltC + ThreadsB - 1) / ThreadsB;
 
-    getElementBoundingBoxes<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleBbox);
+    getElementOrientedBoundingBoxes<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleBbox);
 
     getElementCentroids<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleXC);
 
@@ -1822,7 +2169,8 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     dim3 Blocks0( (nfiltC + Threads0.x - 1) / Threads0.x,
                   (nfiltF + Threads0.y - 1) / Threads0.y );
 
-    cuttingPass0C<<<Blocks0,Threads0>>>(eleXC, faceXC, nfiltC, nfiltF, cfDist);
+    //cuttingPass0C<<<Blocks0,Threads0>>>(*this, eleXC, faceXC, nfiltC, nfiltF, cfDist, filt_eles);
+    cuttingPass0B<<<Blocks0,Threads0>>>(eleBbox, cutFaces, nfiltC, nfiltF, nvertf, filt_faces, cfDist);
 
     int ThreadsS0 = 128;
     int BlocksS0 = (nfiltC + ThreadsS0 - 1) / ThreadsS0;
@@ -1877,7 +2225,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     check_error();
 
     int BlocksM = (nfiltC + 32 - 1) / 32;
-    getMinDist<<<BlocksM, t3>>>(cfDist, cfVec, nfiltC, nTri);
+    getMinDist<<<BlocksM, t3>>>(cfDist, cfVec, nfiltC, nTri, filt_eles); /// DEBUGGING - rm filt_eles
 
     getFinalFlag<<<BlocksM, 128>>>(filt_eles, checkFaces, cutFaces, nfiltC, nvertf,
         nTri, cutFlag_d, cfDist, cfVec, cutType);

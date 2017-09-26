@@ -1334,7 +1334,7 @@ float intersectionCheckLinear(const float* __restrict__ fxv,
         if (dist < tol)
           return 0.;
 
-        minDist = (minDist < dist) ? minDist : dist;
+        minDist = (dist < minDist) ? dist : minDist;
       }
     }
   }
@@ -1371,29 +1371,10 @@ void cuttingPass0C(dMeshBlock mb, dvec<float> eleXC, dvec<float> faceXC, int nEl
   outDist[nEles*F+IC] = minDist;
 }
 
-//! Perform initial ele-face distance sorting using bounding boxes
-//__global__
-//void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
-//    int nFaces, int nvertf, dvec<int> filt_faces, dvec<float> outDist)
-//{
-//  const int IC = blockIdx.x * blockDim.x + threadIdx.x;
-//  const int F = blockIdx.y * blockDim.y + threadIdx.y;
-
-//  if (IC >= nEles || F >= nFaces) return;
-
-//  const int nDims = 3;
-
-//  const int ff = filt_faces[F];
-//  const int stride = nDims*nvertf;
-
-//  float bboxF[6];
-//  cuda_funcs::getBoundingBox<3,4>(&cutFaces[ff*stride], bboxF);
-
-//  outDist[nEles*F+IC] = cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[6*IC]);
-//}
+//! Perform initial ele-face distance sorting using oriented bounding boxes
 __global__
-void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
-    int nFaces, int nvertf, dvec<int> filt_faces, dvec<float> outDist)
+void cuttingPass0B(dvec<float> eleBbox, dvec<float> eleXC, dvec<float> faceXC,
+    dvec<float> cutFaces, int nEles, int nFaces, int nvertf, dvec<int> filt_faces, dvec<float> outDist)
 {
   const int IC = blockIdx.x * blockDim.x + threadIdx.x;
   const int F = blockIdx.y * blockDim.y + threadIdx.y;
@@ -1405,6 +1386,7 @@ void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
   const int ff = filt_faces[F];
   const int stride = nDims*nvertf;
 
+  /// Alternatively: compute distance to ele bbox for all 4 corner points
   float pts[12];
   for (int i = 0; i < 4; i++)
   {
@@ -1425,7 +1407,12 @@ void cuttingPass0B(dvec<float> eleBbox, dvec<float> cutFaces, int nEles,
   float bboxF[6];
   cuda_funcs::getBoundingBox<3,4>(pts, bboxF);
 
-  outDist[nEles*F+IC] = cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[16*IC+9]);
+  float dist = 0;
+  for (int i = 0; i < 3; i++)
+    dist += (eleXC[3*IC+i]-faceXC[3*F+i])*(eleXC[3*IC+i]-faceXC[3*F+i]);
+  dist = sqrt(dist);
+
+  outDist[nEles*F+IC] = dist + cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[16*IC+9]);
 }
 
 __global__
@@ -1607,6 +1594,11 @@ void getElementOrientedBoundingBoxes(dMeshBlock mb, dvec<int> eleList, int nEles
       xv[3*i+d] = mb.coord[ic+mb.ncells*(d+3*i)];
 
   getOBB(xv, 8, &eleBbox[16*IC]);
+
+  // Use last entry for 'href' [average length of oriented bounding box]
+  eleBbox[16*IC+15] = ( (eleBbox[16*IC+12] - eleBbox[16*IC+9]) +
+                        (eleBbox[16*IC+13] - eleBbox[16*IC+10]) +
+                        (eleBbox[16*IC+14] - eleBbox[16*IC+11]) ) / 3.;
 }
 
 template<int nSideF>
@@ -1644,14 +1636,10 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
   if (ff < 0)
     return;
 
-  float bboxC[2*nDims];
-  for (int i = 0; i < 2*nDims; i++)
-    bboxC[i] = eleBbox[16*IC+9+i];
-
   /* ---- Check against our reduced list of faces ---- */
 
   /// Or TODO on storing href in global memory instead...
-  const float href = (bboxC[3]-bboxC[0]+bboxC[4]-bboxC[1]+bboxC[5]-bboxC[2]) / nDims;
+  const float href = eleBbox[16*IC+15];
   const float dtol = 1e-1*href;
 
   // Only checking half the element's faces; figure out which ones
@@ -1724,12 +1712,6 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
     for (int d = 0; d < 3; d++)
       TC[3*p+d] = mb.coord[ic+mb.ncells*(d+nDims*ipt)]; /// NOTE: 'row-major' ZEFR layout
   }
-  for (int ii = 0; ii < 6; ii++)
-  {
-    if (ic==35216 && ff == 1120 && T == ii)
-      print_nodes(TC,T,3);
-    __syncthreads();
-  }
 
   // Find distance from face to cell
   /// NOTE: ignoring case of face entirely inside cell, since any valid grid
@@ -1750,15 +1732,10 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
     //outNorm[IC+nEles*(i+3*FID)] = myNorm[i];
     outVec[T+nTri*(IC+nEles*(FID+NF2*i))] = vec[i];
   }
-
-  if (ic==35216 && ff == 1120)
-  {
-    printf("CutPass 2: Dist from %d to %d, tri %d, = %.4e\n",ic,ff,T,myDist);
-  }
 }
 
 __global__
-void getMinDist(dvec<float> dists, dvec<float> vecs, int nEles, int nTri, dvec<int> eleList) /// DEBUGGING - rm eleList
+void getMinDist(dvec<float> dists, dvec<float> vecs, int nEles, int nTri)
 {
   const int IC = blockDim.x * blockIdx.x + threadIdx.x;
   const int F = threadIdx.y;
@@ -1788,8 +1765,8 @@ void getMinDist(dvec<float> dists, dvec<float> vecs, int nEles, int nTri, dvec<i
 
 __global__
 void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
-    dvec<float> cutFaces, int nEles, int nvertf, int nTri, dvec<int> cutFlag,
-    dvec<float> dists, dvec<float> vecs, int cutType)
+    dvec<float> cutFaces, dvec<float> eleBbox, int nEles, int nvertf, int nTri,
+    dvec<int> cutFlag, dvec<float> dists, dvec<float> vecs, int cutType)
 {
   const int IC = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -1797,7 +1774,7 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
 
   const int ic = eleList[IC];
 
-  const float dtol = 1e-5; /// TODO: load xv or bboxC & calculate href...?
+  const float dtol = .05*eleBbox[16*IC+15];
 
   // Find nearest face distance for this element
 
@@ -1896,7 +1873,7 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
   // Set all cell flags initially to DC_NORMAL (filtered cells will remain 'NORMAL')
   cutFlag[ic] = DC_NORMAL;
 
-  float href = .005/3.*(bboxF[3]-bboxF[0]+bboxF[4]-bboxF[1]+bboxF[5]-bboxF[2]);
+  float href = .005f/3.f*(bboxF[3]-bboxF[0]+bboxF[4]-bboxF[1]+bboxF[5]-bboxF[2]);
 
   // Get element nodes
   float xv[nvert*3];
@@ -1979,7 +1956,7 @@ void filterFaces(dvec<float> ele_bbox, int nCut,
     }
   }
 
-  __shared__ float bboxE[6];
+  __shared__ float bboxE[6]; // Global bounding box of all filtered elements
 
   for (int i = threadIdx.x; i < 6; i += blockDim.x)
     bboxE[i] = ele_bbox[i];
@@ -2104,7 +2081,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   nfilt_h.assign(nfilt_d.data(), 2);
   int nfiltC = nfilt_h[0];
   int nfiltF = nfilt_h[1];
-  //printf("%d: nfilt = %d/%d, %d/%d; cutType = %d\n",rank,nfilt_h[0], ncells, nfilt_h[1], nCut, cutType);
 
   /* Perform the Direct Cut algorithm on the filtered list of elements & faces */
 
@@ -2169,8 +2145,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     dim3 Blocks0( (nfiltC + Threads0.x - 1) / Threads0.x,
                   (nfiltF + Threads0.y - 1) / Threads0.y );
 
-    //cuttingPass0C<<<Blocks0,Threads0>>>(*this, eleXC, faceXC, nfiltC, nfiltF, cfDist, filt_eles);
-    cuttingPass0B<<<Blocks0,Threads0>>>(eleBbox, cutFaces, nfiltC, nfiltF, nvertf, filt_faces, cfDist);
+    cuttingPass0B<<<Blocks0,Threads0>>>(eleBbox, eleXC, faceXC, cutFaces, nfiltC, nfiltF, nvertf, filt_faces, cfDist);
 
     int ThreadsS0 = 128;
     int BlocksS0 = (nfiltC + ThreadsS0 - 1) / ThreadsS0;
@@ -2225,10 +2200,10 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     check_error();
 
     int BlocksM = (nfiltC + 32 - 1) / 32;
-    getMinDist<<<BlocksM, t3>>>(cfDist, cfVec, nfiltC, nTri, filt_eles); /// DEBUGGING - rm filt_eles
+    getMinDist<<<BlocksM, t3>>>(cfDist, cfVec, nfiltC, nTri);
 
-    getFinalFlag<<<BlocksM, 128>>>(filt_eles, checkFaces, cutFaces, nfiltC, nvertf,
-        nTri, cutFlag_d, cfDist, cfVec, cutType);
+    getFinalFlag<<<BlocksM, 128>>>(filt_eles, checkFaces, cutFaces, eleBbox,
+        nfiltC, nvertf, nTri, cutFlag_d, cfDist, cfVec, cutType);
     check_error();
   }
 

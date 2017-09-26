@@ -1,7 +1,7 @@
 TEMPLATE = library
 CONFIG -= app_bundle
 CONFIG -= qt
-DEFINES = _CPU
+DEFINES = _GPU
 
 INCLUDEPATH += include/
 

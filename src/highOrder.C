@@ -901,6 +901,8 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
             iblank_face[ff] = FRINGE;
           }
         }
+
+        break;
       }
     }
   }

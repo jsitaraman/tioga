@@ -1342,35 +1342,6 @@ float intersectionCheckLinear(const float* __restrict__ fxv,
   return minDist;
 }
 
-//! Perform initial ele-face distance sorting using centroids
-__global__
-void cuttingPass0C(dMeshBlock mb, dvec<float> eleXC, dvec<float> faceXC, int nEles,
-    int nFaces, dvec<float> outDist, dvec<int> eleList) /// DEBUGGING - rm eleList
-{
-  const int IC = blockIdx.x * blockDim.x + threadIdx.x;
-  const int F = blockIdx.y * blockDim.y + threadIdx.y;
-
-  if (IC >= nEles || F >= nFaces) return;
-
-  int ic = eleList[IC];
-  float minDist = BIG_FLOAT;
-  for (int i = 0; i < 8; i++)
-  {
-    float dx[3];
-    for (int d = 0; d < 3; d++)
-      dx[d] = faceXC[3*F+d] - mb.coord[ic+mb.ncells*(d+3*i)];
-    float dist = dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2];
-    if (dist < minDist)
-      minDist = dist;
-  }
-
-//  float dx[3];
-//  for (int i = 0; i < 3; i++)
-//    dx[i] = faceXC[3*F+i] - eleXC[3*IC+i];
-//  outDist[nEles*F+IC] = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]; // dist^2 works just as well as dist
-  outDist[nEles*F+IC] = minDist;
-}
-
 //! Perform initial ele-face distance sorting using oriented bounding boxes
 __global__
 void cuttingPass0B(dvec<float> eleBbox, dvec<float> eleXC, dvec<float> faceXC,
@@ -1412,7 +1383,7 @@ void cuttingPass0B(dvec<float> eleBbox, dvec<float> eleXC, dvec<float> faceXC,
     dist += (eleXC[3*IC+i]-faceXC[3*F+i])*(eleXC[3*IC+i]-faceXC[3*F+i]);
   dist = sqrt(dist);
 
-  outDist[nEles*F+IC] = dist + cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[16*IC+9]);
+  outDist[nEles*F+IC] = .01f*dist + cuda_funcs::boundingBoxDist<3>(bboxF, &eleBbox[16*IC+9]);
 }
 
 __global__
@@ -2115,7 +2086,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     cudaFuncSetCacheConfig(sortFaces0, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(sortFaces, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass0B, cudaFuncCachePreferL1);
-    cudaFuncSetCacheConfig(cuttingPass0C, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass1, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass2<2>, cudaFuncCachePreferL1);
     cudaFuncSetCacheConfig(cuttingPass2<3>, cudaFuncCachePreferL1);

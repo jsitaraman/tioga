@@ -357,6 +357,8 @@ void tioga::performConnectivityHighOrder(void)
 
 void tioga::directCut(void)
 {
+  PUSH_NVTX_RANGE("DC-PreProc",1);
+
   int nDims = mb->nDims;
 
   /// TODO: Callbacks
@@ -575,6 +577,8 @@ void tioga::directCut(void)
       bbox_g[g][d+nDims] = std::max(bbox_g[g][d+nDims], bbox_tmp[2*nDims*p+d+nDims]);
     }
   }
+
+  POP_NVTX_RANGE;
 
   // Do the cutting
   std::vector<CutMap> cutMap(nGrids);
@@ -1161,7 +1165,11 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
       }
     }
     fp.close();
-    if (norphanPoint > 0) ThrowException("Orphan points found!");
+    if (norphanPoint > 0) {
+      printf("Orphan points found!\n");
+      //MPI_Finalize();
+      exit(2);
+    }
     if (norphanPoint > 0 && iorphanPrint) {
       printf("Warning::number of orphans in rank %d = %d of %d\n",myid,norphanPoint,mb->ntotalPoints);
       iorphanPrint = 0;

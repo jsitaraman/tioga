@@ -664,6 +664,27 @@ void adjoint_3x3(const double* __restrict__ mat, double* __restrict__ adj)
 
 static
 __device__ __forceinline__
+void adjoint_3x3(double* __restrict__ mat)
+{
+  double a11 = mat[0], a12 = mat[1], a13 = mat[2];
+  double a21 = mat[3], a22 = mat[4], a23 = mat[5];
+  double a31 = mat[6], a32 = mat[7], a33 = mat[8];
+
+  mat[0] = a22*a33 - a23*a32;
+  mat[1] = a13*a32 - a12*a33;
+  mat[2] = a12*a23 - a13*a22;
+
+  mat[3] = a23*a31 - a21*a33;
+  mat[4] = a11*a33 - a13*a31;
+  mat[5] = a13*a21 - a11*a23;
+
+  mat[6] = a21*a32 - a22*a31;
+  mat[7] = a12*a31 - a11*a32;
+  mat[8] = a11*a22 - a12*a21;
+}
+
+static
+__device__ __forceinline__
 void adjoint_3x3(const float* __restrict__ mat, float* __restrict__ adj)
 {
   float a11 = mat[0], a12 = mat[1], a13 = mat[2];
@@ -681,6 +702,27 @@ void adjoint_3x3(const float* __restrict__ mat, float* __restrict__ adj)
   adj[6] = a21*a32 - a22*a31;
   adj[7] = a12*a31 - a11*a32;
   adj[8] = a11*a22 - a12*a21;
+}
+
+static
+__device__ __forceinline__
+void adjoint_3x3(float* __restrict__ mat)
+{
+  float a11 = mat[0], a12 = mat[1], a13 = mat[2];
+  float a21 = mat[3], a22 = mat[4], a23 = mat[5];
+  float a31 = mat[6], a32 = mat[7], a33 = mat[8];
+
+  mat[0] = a22*a33 - a23*a32;
+  mat[1] = a13*a32 - a12*a33;
+  mat[2] = a12*a23 - a13*a22;
+
+  mat[3] = a23*a31 - a21*a33;
+  mat[4] = a11*a33 - a13*a31;
+  mat[5] = a13*a21 - a11*a23;
+
+  mat[6] = a21*a32 - a22*a31;
+  mat[7] = a12*a31 - a11*a32;
+  mat[8] = a11*a22 - a12*a21;
 }
 
 /*! Evaluates the Lagrange function corresponding to the specified mode on xiGrid at location xi.

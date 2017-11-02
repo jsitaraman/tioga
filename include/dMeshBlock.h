@@ -155,6 +155,8 @@ public:
   void directCut(double* cutFaces_h, int nCut, int nvertf, double* cutBbox, int* cutFlag, int cutType);
 };
 
+#ifdef __CUDACC__
+
 template<int nSide>
 __device__ __forceinline__
 void dMeshBlock::calcDShape(double* __restrict__ shape, double* __restrict__ dshape,
@@ -263,7 +265,6 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
 
     float dx[3] = {(float)xyz[0], (float)xyz[1], (float)xyz[2]};
     float grad[3][3] = {{0.0}};
-    float ginv[3][3];
 
     for (int nd = 0; nd < nNodes; nd++)
       for (int i = 0; i < 3; i++)
@@ -274,18 +275,18 @@ bool dMeshBlock::getRefLoc(const double* __restrict__ coords,
       for (int i = 0; i < 3; i++)
         dx[i] -= shape[nd] * coords[i+3*nd];
 
-    float detJ = cuda_funcs::det_3x3(&grad[0][0]);
+    float idetJ = 1.f / cuda_funcs::det_3x3(&grad[0][0]);
 
-    cuda_funcs::adjoint_3x3(&grad[0][0], &ginv[0][0]);
+    cuda_funcs::adjoint_3x3(&grad[0][0]);
 
     float delta[3] = {0.0};
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
-        delta[i] += ginv[i][j]*dx[j]/detJ;
+        delta[i] += grad[i][j]*dx[j] * idetJ;
 
     norm = sqrt(dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2]);
     for (int i = 0; i < 3; i++)
-      rst[i] = max(min(rst[i]+delta[i],1.+1e-6),-1.-1e-6);
+      rst[i] = max(min(rst[i]+delta[i],1.+1e-4),-1.-1e-4);
 
     if (iter > 1 && norm > .99*norm_prev) // If it's clear we're not converging
       break;
@@ -310,10 +311,8 @@ int dMeshBlock::getRefLoc(const float* __restrict__ coords,
   const int nNodes = nSide*nSide*nSide;
 
   // Use a relative tolerance to handle extreme grids
-  float h = ( (bbox[3]-bbox[0]) + (bbox[4]-bbox[1]) + (bbox[5]-bbox[2]) ) / 3.f;
-
-  double EPS = 5e-4;
-  double tol = EPS*h;
+  const float h = ( (bbox[3]-bbox[0]) + (bbox[4]-bbox[1]) + (bbox[5]-bbox[2]) ) / 3.f;
+  const double tol = 1e-4*h;
 
   int iter = 0;
   int iterMax = 10;
@@ -326,7 +325,7 @@ int dMeshBlock::getRefLoc(const float* __restrict__ coords,
   rst[0] = 0.f;
   rst[1] = 0.f;
   rst[2] = 0.f;
-  double rstd[3] = {0.0};;
+  double rstd[3] = {0.0};
 
   while (norm > tol && iter < iterMax)
   {
@@ -334,7 +333,6 @@ int dMeshBlock::getRefLoc(const float* __restrict__ coords,
 
     double dx[3] = {xyz[0], xyz[1], xyz[2]};
     double grad[3][3] = {{0.0}};
-    double ginv[3][3];
 
     for (int nd = 0; nd < nNodes; nd++)
       for (int i = 0; i < 3; i++)
@@ -345,18 +343,18 @@ int dMeshBlock::getRefLoc(const float* __restrict__ coords,
       for (int i = 0; i < 3; i++)
         dx[i] -= shape[nd] * coords[i+3*nd];
 
-    double detJ = cuda_funcs::det_3x3(&grad[0][0]);
+    double idetJ = 1. / cuda_funcs::det_3x3(&grad[0][0]);
 
-    cuda_funcs::adjoint_3x3(&grad[0][0], &ginv[0][0]);
+    cuda_funcs::adjoint_3x3(&grad[0][0]);
 
     double delta[3] = {0.0};
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
-        delta[i] += ginv[i][j]*dx[j]/detJ;
+        delta[i] += grad[i][j]*dx[j] * idetJ;
 
     norm = sqrt(dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2]);
     for (int i = 0; i < 3; i++)
-      rstd[i] = max(min(rstd[i]+delta[i],1.0001),-1.0001);
+      rstd[i] = max(min(rstd[i]+delta[i],1.0005),-1.0005);
 
     if (iter > 1 && norm > .99*norm_prev) // If it's clear we're not converging
       break;
@@ -425,7 +423,7 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID, const double* __restr
   const int nNodes = nside*nside*nside;
 
   int ele = eleList[adtEle];
-  cellID = -1;
+  cellID = -BIG_INT;
 
   double ecoord[nNodes*ndim];
   for (int i = 0; i < nNodes; i++)
@@ -453,5 +451,7 @@ void dMeshBlock::checkContainment(int adtEle, int& cellID, const double* __restr
 
   if (isInEle) cellID = ele;
 }
+
+#endif
 
 #endif

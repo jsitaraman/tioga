@@ -247,13 +247,13 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
       // }
      assert((ix[n] >=0 && ix[n] < dims[n]));
     }
-  listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
-  listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
   listptr->inode=(int *)malloc(sizeof(int)*3);
   listptr->inode[0]=ix[0];
   listptr->inode[1]=ix[1];
   listptr->inode[2]=ix[2];
   if (itype==0) {
+    listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
+    listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
     donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
   }
   else
@@ -262,6 +262,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
       // JC will improve this
       // get_cart_interp_weights(&listptr->nweights,&index,&listptr->weights); 
       listptr->nweights=8;
+      listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
       listptr->weights[0]=(ONE-rst[0])*(ONE-rst[1])*(ONE-rst[2]);
       listptr->weights[1]=rst[0]*(ONE-rst[1])*(ONE-rst[2]);
       listptr->weights[2]=rst[0]*rst[1]*(ONE-rst[2]);

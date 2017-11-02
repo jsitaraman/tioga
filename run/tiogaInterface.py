@@ -114,7 +114,10 @@ class Tioga:
         xyz = arrayToDblPtr(gridData['grid-coordinates'][0])
         c2v = arrayToIntPtr(gridData['hexaConn'][0])
         iblank = arrayToIntPtr(gridData['iblanking'][0])
-	#pickle.dump(gridData['grid-coordinates'],open('xyz'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
+        print "wallNode.shape=",gridData['wallnode'][0].shape
+        print "obcNode.shape=",gridData['obcnode'][0].shape
+	#pickle.dump(gridData['wallnode'],open('wallNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
+	#pickle.dump(gridData['obcnode'],open('obcNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         overNodes = arrayToIntPtr(gridData['obcnode'][0])
         wallNodes = arrayToIntPtr(gridData['wallnode'][0])
 
@@ -218,7 +221,7 @@ class Tioga:
             tb.tioga_set_stream_handle(gridData['cuStream'],gridData['cuEvent'])
             
     def initAMRData(self,gridData):
-        pickle.dump(gridData,open('obeGridData'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
+        #pickle.dump(gridData,open('obeGridData'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         ngrids=len(gridData['gridParam'])
         local2global_tmp=np.zeros((ngrids,),'i')
         local2global=np.zeros((ngrids,),'i')

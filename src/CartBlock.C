@@ -41,7 +41,7 @@ extern "C" {
 }
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData,
-				    int nvar)
+				    int nvar,int itype)
 {
   int i,n;
   int ploc;
@@ -54,6 +54,8 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
   int nintold,nrealold;
   int interpCount=0;
   double weight;
+  int ix[3];
+
   listptr=interpList;
   while(listptr!=NULL)
     {
@@ -84,26 +86,51 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       icount=3*nintold;
       dcount=nrealold;
       xtmp=(double *)malloc(sizeof(double)*p3*3);
-      index=(int *)malloc(sizeof(int)*p3);
+      if (itype==0) 
+	{
+	  index=(int *)malloc(sizeof(int)*p3);
+	}
+      else
+	{
+	  //
+	  // need to fix this as well with high-order stencil
+	  // JC
+	  //
+	  index=(int *)malloc(sizeof(int)*8);
+	}
       ploc=(pdegree)*(pdegree+1)/2;
       qq=(double *)malloc(sizeof(double)*nvar);
       while(listptr!=NULL)
 	{
-	  get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
-			    pdegree,dims[0],dims[1],dims[2],nf,
-			    xlo,dx,&qnode[ploc],index,xtmp);
+	  if (itype==0) 
+	    {
+	      get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
+				pdegree,dims[0],dims[1],dims[2],nf,
+				xlo,dx,&qnode[ploc],index,xtmp);
+	    }
+	  else
+	    {
+              ix[0]=listptr->inode[0];
+	      ix[1]=listptr->inode[1];
+              ix[2]=listptr->inode[2];
+	      index[0]=(ix[2]+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(ix[1]+nf)*(dims[0]+2*nf)+ix[0]+nf;
+	      index[1]=index[0]+1;
+	      index[2]=index[1]+(dims[0]+2*nf);
+	      index[3]=index[0]+(dims[0]+2*nf);
+	      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
+	    }
 	  (*intData)[icount++]=listptr->receptorInfo[0];
 	  (*intData)[icount++]=-1;
 	  (*intData)[icount++]=listptr->receptorInfo[1];	  
 	  for(n=0;n<nvar;n++)
            {
             qq[n]=0;
-	    for(i=0;i<p3;i++)
+	    for(i=0;i < (itype==0)?p3:8 ;i++)
 	      {
 		weight=listptr->weights[i];
 		qq[n]+=q[index[i]+d3nf*n]*weight;
 	      }
-            }
+	   }
           //writeqnode_(&myid,qq,&nvar);
 	  for(n=0;n<nvar;n++)
 	    (*realData)[dcount++]=qq[n];
@@ -131,16 +158,16 @@ void CartBlock::preprocess(CartGrid *cg)
     char intstring[7];
     char fname[20];  
     myid=cg->myid;
-    //sprintf(intstring,"%d",100000+myid);
-    //sprintf(fname,"cart_block%s.dat",&(intstring[1]));
-    //fp=fopen(fname,"a");
+    sprintf(intstring,"%d",100000+myid);
+    sprintf(fname,"cart_block%s.dat",&(intstring[1]));
+    fp=fopen(fname,"a");
     for(int n=0;n<3;n++) xlo[n]=cg->xlo[3*global_id+n];
     for(int n=0;n<3;n++) dx[n]=cg->dx[3*global_id+n];
     dims[0]=cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
     dims[1]=cg->ihi[3*global_id+1]-cg->ilo[3*global_id+1]+1;
     dims[2]=cg->ihi[3*global_id+2]-cg->ilo[3*global_id+2]+1;
-    //fprintf(fp,"%d %d %d\n",dims[0],dims[1],dims[2]);
-    //fclose(fp);
+    fprintf(fp,"%d %d %d\n",dims[0],dims[1],dims[2]);
+    fclose(fp);
     pdegree=cg->porder[global_id];
     p3=(pdegree+1)*(pdegree+1)*(pdegree+1);
     nf=cg->nf;
@@ -172,10 +199,11 @@ void CartBlock::clearLists(void)
 }
 
 
-void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
+void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int itype)
 {
   int i,n;
   int ix[3];
+  int index[8];
   double *rst;
   rst=(double *)malloc(sizeof(double)*3);
   if (interpList==NULL) 
@@ -225,16 +253,43 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
   listptr->inode[0]=ix[0];
   listptr->inode[1]=ix[1];
   listptr->inode[2]=ix[2];
-  donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
+  if (itype==0) {
+    donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
+  }
+  else
+    {
+      // tri-linear weights for now
+      // JC will improve this
+      // get_cart_interp_weights(&listptr->nweights,&index,&listptr->weights); 
+      listptr->nweights=8;
+      listptr->weights[0]=(ONE-rst[0])*(ONE-rst[1])*(ONE-rst[2]);
+      listptr->weights[1]=rst[0]*(ONE-rst[1])*(ONE-rst[2]);
+      listptr->weights[2]=rst[0]*rst[1]*(ONE-rst[2]);
+      listptr->weights[3]=(ONE-rst[0])*rst[1]*(ONE-rst[2]);
+      listptr->weights[4]=(ONE-rst[0])*(ONE-rst[1])*rst[2];
+      listptr->weights[5]=rst[0]*(ONE-rst[1])*rst[2];
+      listptr->weights[6]=rst[0]*rst[1]*rst[2];
+      listptr->weights[7]=(ONE-rst[0])*rst[1]*rst[2];
+      index[0]=(ix[2]+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(ix[1]+nf)*(dims[0]+2*nf)+ix[0]+nf;
+      index[1]=index[0]+1;
+      index[2]=index[1]+(dims[0]+2*nf);
+      index[3]=index[0]+(dims[0]+2*nf);
+      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
+      for(n=0;n<listptr->nweights;n++) ibl[index[n]]=-2;
+    }
+      
   free(rst);
 }
   
-void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes)
+void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes,
+                                 int itype)
 {
   DONORLIST *temp1;
   int ijklmn[6];
   int pointid;
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
+  if (itype==0) 
+  {
   amr_index_to_ijklmn(pdegree,dims[0],dims[1],dims[2],nf,qstride,index,ijklmn);
   //pointid=ijklmn[5]*(pdegree+1)*(pdegree+1)*d3+
   //        ijklmn[4]*(pdegree+1)*d3+
@@ -257,18 +312,26 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
 	   ijklmn[3],ijklmn[4],ijklmn[5]);
   }
   assert((pointid >= 0 && pointid < ndof));
+  }
+  else
+  {
+   pointid=index;
+  }
     
   temp1->donorData[0]=senderid;
   temp1->donorData[1]=meshtagdonor;
   temp1->donorData[2]=remoteid;
   temp1->donorRes=cellRes;
   temp1->cancel=0;
+  //if (myid!=1) return;
+  //printf("%d %d\n",pointid,ndof);
+  assert((pointid >= 0 && pointid < ndof));
   insertInList(&(donorList[pointid]),temp1);
 }
 
-void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
+void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 {
-  int i,j,k,l,m,n,h,p;
+  int i,j,k,l,m,n,h,p,iadd;
   int ibcount,idof,meshtagdonor,icount;
   DONORLIST *temp;
   int *iflag;
@@ -281,6 +344,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
   char qstr[2];
   char intstring[7];
   int ni,nj,nk,ibcheck;
+  int *ibstore;
   //sprintf(intstring,"%d",100000+myid);
   //sprintf(fname,"fringes_%s.dat",&(intstring[1]));
   //if (local_id==0) 
@@ -298,19 +362,32 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
   iflag=(int *)malloc(sizeof(int)*nmesh);
   index=(int *)malloc(sizeof(int)*p3);
   xtmp=(double *)malloc(sizeof(double)*p3*3);
+  ibstore=(int *)malloc(sizeof(int)*d3nf);
+  for(i=0;i<d3nf;i++) ibstore[i]=ibl[i];
   //
   ibcount=-1;
   idof=-1;
   //for(i=0;i<(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);i++) ibl[i]=1;
   ploc=pdegree*(pdegree+1)/2;
-
-  for(k=0;k<dims[2];k++)
-    for(j=0;j<dims[1];j++)
-      for(i=0;i<dims[0];i++)
+  //iadd=(itype==0)?0:1;
+  iadd=0;
+  // 
+  for(k=0;k<dims[2]+iadd;k++)
+    for(j=0;j<dims[1]+iadd;j++)
+      for(i=0;i<dims[0]+iadd;i++)
 	{
 	  ibcount++;
-	  get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
+          if (itype==0) 
+          {
+	   get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
 			    xlo,dx,&qnode[ploc],index,xtmp);
+          }
+          else 
+          {
+             xtmp[0]=xlo[0]+dx[0]*j;
+             xtmp[1]=xlo[1]+dx[1]*k;
+             xtmp[2]=xlo[2]+dx[2]*l;
+          }
           holeFlag=1;
           idof=ibcount*p3-1;
 	  for(p=0;p<p3 && holeFlag;p++)
@@ -324,6 +401,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 			if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			  {
 	                    ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+                            // check hole-map
 			    ibl[ibindex]=0;
                             holeFlag=0;
 			    break;
@@ -347,7 +425,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 			  if (!iflag[h])
 			    if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			      {
-	                        ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+                                ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+                                // check hole-map
 				ibl[ibindex]=0;
                                 holeFlag=0;
 				break;
@@ -357,16 +436,21 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		}
 	    }
 	}
-  ibcount=-1;
-  idof=-1;
-  for(k=0;k<dims[2];k++)
-    for(j=0;j<dims[1];j++)
-      for(i=0;i<dims[0];i++)
+
+    ibcount=-1;
+    idof=-1;    
+    for(k=0;k<dims[2]+iadd;k++)
+      for(j=0;j<dims[1]+iadd;j++)
+	for(i=0;i<dims[0]+iadd;i++)
 	{
 	  ibcount++;
           ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-          get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
-                            xlo,dx,&qnode[ploc],index,xtmp);
+	  if (itype==0) 
+	    {
+	      get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
+				xlo,dx,&qnode[ploc],index,xtmp);
+	    }
+
 	  if (ibl[ibindex]==0) 
 	    {
               idof=ibcount*p3-1;
@@ -383,7 +467,24 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 			}
 		    }
 		}
-
+	    }
+	  else if (ibl[ibindex]==-2)  // this node was part of a Cartesian donor cell
+	    {
+	      idof=ibcount*p3-1;
+	      for(p=0;p<p3;p++)
+                {
+                  idof++;
+                  if (donorList[idof]!=NULL)
+                    {
+                      temp=donorList[idof];
+                      while(temp!=NULL)
+                        {
+                          temp->cancel=1;
+                          temp=temp->next;
+                        }
+                    }
+                }
+	      ibl[ibindex]=min(ibstore[ibindex],1);
 	    }
 	  else
 	    {
@@ -431,10 +532,11 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		}
 	    }
 	}
-
-  for(k=0;k<dims[2];k++)
-    for(j=0;j<dims[1];j++)
-      for(i=0;i<dims[0];i++)
+  if (itype==0) 
+  {
+  for(k=0;k<dims[2]+iadd;k++)
+    for(j=0;j<dims[1]+iadd;j++)
+      for(i=0;i<dims[0]+iadd;i++)
         {
           ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
           if (ibl[ibindex]==1)
@@ -456,7 +558,12 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
                 }
             }
         }
-
+  }
+ //for(i=0;i<d3nf;i++) ibl[i]=ibstore[i];
+ free(xtmp);
+ free(index);
+ free(iflag);
+ free(ibstore);
   // fclose(fp);
 }
 			      
@@ -493,7 +600,7 @@ void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
 }
 
 
-void CartBlock::writeCellFile(int bid)
+void CartBlock::writeCellFile(int bid,int itype)
 {
   int ibmin,ibmax;
   char fname[80];
@@ -506,12 +613,20 @@ void CartBlock::writeCellFile(int bid)
   int ba,id;
   int nvert;
   int nnodes,ncells;
-  int dd1,dd2;
+  int dd1,dd2,iadd;
   
   ibmin=30000000;
   ibmax=-30000000;
-  nnodes=(dims[1]+1)*(dims[0]+1)*(dims[2]+1);
-  ncells=dims[0]*dims[1]*dims[2];
+  if (itype==0) 
+    {
+      nnodes=(dims[1]+1)*(dims[0]+1)*(dims[2]+1);
+      ncells=dims[0]*dims[1]*dims[2];
+    }
+  else
+    {
+      nnodes=dims[0]*dims[1]*dims[2];
+      ncells=(dims[0]-1)*(dims[1]-1)*(dims[2]-1);
+    }
   sprintf(intstring,"%d",100000+myid);
   sprintf(fname,"cart_cell%s.dat",&(intstring[1]));
   if (bid==0) 
@@ -524,26 +639,43 @@ void CartBlock::writeCellFile(int bid)
     }
   if (bid==0) {
   fprintf(fp,"TITLE =\"Tioga output\"\n");
-  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK_CELL\" ");
+  if (itype==0) 
+   {
+    fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK_CELL\" ");
+   }
+  else
+   {
+   fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK \" ");
+   }
+  
   fprintf(fp,"\n");
   }
   fprintf(fp,"ZONE T=\"VOL_MIXED\",N=%d E=%d ET=BRICK, F=FEBLOCK\n",nnodes,
 	  ncells);
-  fprintf(fp,"VARLOCATION =  (1=NODAL, 2=NODAL, 3=NODAL, 4=CELLCENTERED)\n");
+  if (itype==0) 
+    {
+      fprintf(fp,"VARLOCATION =  (1=NODAL, 2=NODAL, 3=NODAL, 4=CELLCENTERED)\n");
+    }
+  else
+    {
+      fprintf(fp,"VARLOCATION =  (1=NODAL, 2=NODAL, 3=NODAL, 4=NODAL)\n");
+    }
+  iadd=(itype==0)?1:0;
 
-  for(k=0;k<dims[2]+1;k++)
-    for(j=0;j<dims[1]+1;j++)
-      for(i=0;i<dims[0]+1;i++)
+  for(k=0;k<dims[2]+iadd;k++)
+    for(j=0;j<dims[1]+iadd;j++)
+      for(i=0;i<dims[0]+iadd;i++)
 	fprintf(fp,"%lf\n",xlo[0]+dx[0]*i);
-  for(k=0;k<dims[2]+1;k++)
-    for(j=0;j<dims[1]+1;j++)
-      for(i=0;i<dims[0]+1;i++)
+  for(k=0;k<dims[2]+iadd;k++)
+    for(j=0;j<dims[1]+iadd;j++)
+      for(i=0;i<dims[0]+iadd;i++)
 	fprintf(fp,"%lf\n",xlo[1]+dx[1]*j);
-  for(k=0;k<dims[2]+1;k++)
-    for(j=0;j<dims[1]+1;j++)
-      for(i=0;i<dims[0]+1;i++)
+  for(k=0;k<dims[2]+iadd;k++)
+    for(j=0;j<dims[1]+iadd;j++)
+      for(i=0;i<dims[0]+iadd;i++)
 	fprintf(fp,"%lf\n",xlo[2]+dx[2]*k);
-		
+
+
   for(k=0;k<dims[2];k++)
     for(j=0;j<dims[1];j++)
       for(i=0;i<dims[0];i++)
@@ -560,11 +692,11 @@ void CartBlock::writeCellFile(int bid)
 
   //printf("proc %d , block %d, ibmin/ibmax=%d %d\n",myid,bid,ibmin,ibmax);
   id=0;
-  dd1=(dims[0]+1);
-  dd2=dd1*(dims[1]+1);
-  for(k=0;k<dims[2];k++)
-    for(j=0;j<dims[1];j++)
-      for(i=0;i<dims[0];i++)
+  dd1=(dims[0]+iadd);
+  dd2=dd1*(dims[1]+iadd);
+  for(k=0;k<dims[2]-1+iadd;k++)
+    for(j=0;j<dims[1]-1+iadd;j++)
+      for(i=0;i<dims[0]-1+iadd;i++)
         {
 	  id=k*dd2+j*dd1+i+1;
           fprintf(fp,"%d %d %d %d %d %d %d %d\n",

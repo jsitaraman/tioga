@@ -138,7 +138,7 @@ void tioga::getHoleMap(void)
     if (holeMap[i].existWall) fillHoleMap(holeMap[i].sam,holeMap[i].nx,isym);
 
   // output the hole map
-  //this->outputHoleMap();
+  this->outputHoleMap();
 }
 
 /**

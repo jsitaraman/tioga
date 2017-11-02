@@ -1141,10 +1141,20 @@ void MeshBlock::getFringeNodes(bool unblanking)
     get_face_nodes_gpu(ftag,nreceptorFaces,pointsPerFace,rxyz.data());
 #else
     // Find the position of each flux point using callback function
+    //
+    // kludge rxyzCart now
+    //  
+    if (rxyzCart) free(rxyzCart);
+    rxyzCart=(double *)malloc(sizeof(double)*nFacePoints*3);
+    if (donorIdCart) free(donorIdCart);
+    donorIdCart=(int *)malloc(sizeof(int)*nFacePoints);
+    ntotalPointsCart=ntotalPoints;
+
     int m = 0;
     for (int i = 0; i < nreceptorFaces; i++)
     {
       get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyz[m]));
+      get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyzCart[m]));
       m += (3*pointsPerFace[i]);
     }
 #endif

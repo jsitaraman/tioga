@@ -127,15 +127,23 @@ void CartBlock::update(double *qval, int index,int nq)
 void CartBlock::preprocess(CartGrid *cg)
   {
     int nfrac;
+    FILE *fp;
+    char intstring[7];
+    char fname[20];  
+    myid=cg->myid;
+    //sprintf(intstring,"%d",100000+myid);
+    //sprintf(fname,"cart_block%s.dat",&(intstring[1]));
+    //fp=fopen(fname,"a");
     for(int n=0;n<3;n++) xlo[n]=cg->xlo[3*global_id+n];
     for(int n=0;n<3;n++) dx[n]=cg->dx[3*global_id+n];
     dims[0]=cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
     dims[1]=cg->ihi[3*global_id+1]-cg->ilo[3*global_id+1]+1;
     dims[2]=cg->ihi[3*global_id+2]-cg->ilo[3*global_id+2]+1;
+    //fprintf(fp,"%d %d %d\n",dims[0],dims[1],dims[2]);
+    //fclose(fp);
     pdegree=cg->porder[global_id];
     p3=(pdegree+1)*(pdegree+1)*(pdegree+1);
     nf=cg->nf;
-    myid=cg->myid;
     qstride=cg->qstride;
     donor_frac=cg->donor_frac;
     qnode=cg->qnode;
@@ -544,6 +552,9 @@ void CartBlock::writeCellFile(int bid)
 	    (j+nf)*(dims[0]+2*nf)+(i+nf);
           ibmin=min(ibmin,ibl[ibindex]);
           ibmax=max(ibmax,ibl[ibindex]);
+          //if (ibindex > (dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf)) {
+          // printf("problem: %d %d %d\n",myid,bid,ibindex);
+          //}
 	  fprintf(fp,"%d\n", ibl[ibindex]);
 	}
 

@@ -41,7 +41,6 @@
 
 #include "error.hpp"
 #include "points.hpp"
-
 #ifdef _GPU
 #include <cuda_runtime.h>
 #endif

@@ -97,6 +97,10 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
   for(i=0;i<ncells;i++)
     if (iflag[i]==-1) ctag_cart[nreceptorCellsCart++]=i+1;
   //
+  // TODO for JC
+  // mods here to get ZEFR specific outer nodes for
+  // the points on the artificial boundary
+  //  
   if (ihigh) 
     {
       if (pointsPerCell!=NULL) free(pointsPerCell);

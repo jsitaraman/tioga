@@ -1,0 +1,154 @@
+// File:        samcart.input 
+// Description: Input file for SAMCart solver
+
+// global parameters
+GP { 
+   nsteps         = 10000    
+   timeacc        = TRUE
+   dt             = 0.0002 
+   cfl            = 1.0
+   nsubsteps      = 7
+   from_restart   = FALSE  // whether to start from restart
+   restart_step   = -1 // if from_restart=TRUE, step to start from
+
+   nsave          = 1000    // how often to write soln
+   nrestart       = 1000   // how often to write restart
+
+   initstate      = 0  // 0=quiescent flow, 1=sphere, 2=vortex
+   fringe         = 3  // number of fringe cells
+   verbose        = 5  // level of verbosity (1-10)
+}
+
+// Settings formerly in input.arc3d in Hv5 and before
+Cart {
+   fsmach = 0.2   // Freestream Mach number
+   alpha  = 0.0            // Angle of attack
+   beta   = 0.0             // sideslip
+
+   ilhs     =  1     //  lhs option (1=lusgs, 2=global gs, 5=expl rk3)
+   irhs     =  0           //  rhs option (0=5th central+4th vis, 2=5thO-weno, 4=3rdO-mscl)
+   nsweeps  = 1             //  if using global lhs option (ilhs=2)
+
+   // Boundary conditions
+   //    -1 = freestream
+   //     0 = symmetry/inviscid wall/ground plane
+   //    10 = inflow/outflow
+   bcs_lo   = -1 , -1 , -1
+   bcs_hi   = -1 , -1 , -1
+
+   // Viscous/Turbulence model entries
+   ivis     =  1         // =0 Euler, =1 Navier-Stokes
+   iturb    = 0         //  =0 Laminar, =1 RANS-SA, =2 RANS-DES 
+   refRey   = 1140000.0      // Reference Reynolds number
+   refMach  = 0.2          // Reference Mach number
+   refMu    = 1.78865642077e-05     // Reference dynamic viscosity
+   refPrandtl  = 0.72           // Reference Prandtl number
+   refRgas  = 287.05    // Reference Gas constant
+   mut0     = 0.01               // SA turb model freestream MuT
+
+
+   // Hover terms
+   ihover   = 0        // =0 no hover, =1 hover grid speeds
+   hcenter  = 0., 0., 0. // center of rotation
+   omegaz   = 0.       // angular velocity
+
+   // Maneuver terms
+   imaneuver = 0        // =0 fixed alpha/beta, =1 modifyable grid speeds
+   gridvel = 0., 0., 0.  // grid velocities in X,Y,Z
+}
+
+
+// IO parameters
+IO {
+   viz_file_output_type = "fv"  // options are "overgrid", "fv", "visit"
+   viz_file_precision   = 1     // 1=single, 2=double
+   viz_write_delq       = FALSE
+   viz_write_err        = FALSE
+   viz_show_fringe      = FALSE
+   viz_show_cfbdry      = TRUE   // false - gaps at coarse-fine bdry
+   viz_show_overlaps    = FALSE  // true - solutions on all levels
+   restart_output_type  = "HDF5"
+}
+
+// adaptive meshing inputs
+AdaptiveMeshing {
+   // coarse level inputs
+   coarse_domain = 60 , 40 , 40 // COARSE case 
+   xlo           = -2.0 , -2.0 , -2.0  // lower far-field domain extents
+   xhi           =  4.0 ,  2.0 ,  2.0  // upper far-field domain extents
+
+   max_levels       = 4     // max grid levels
+
+   // Adaptation inputs
+   adapt         = FALSE  // whether to do dynamic adaptation
+                         // (if false, it will only do geometry and/or
+                         // fixed refinement at beginning only)
+
+   adapt_nfreq   = 10    // how often to adapt (if adapt = TRUE)
+
+   // Geometry refinement
+   geom_refinement       = TRUE   // whether to do geometry refinement
+   auto_compute_nlevels  = TRUE  // use igbps to determine finest level
+   addnl_refinement_levels = 1    // optional additional finer levels
+                                  // use -1 for coarser
+   geom_max_levels       = 15      // max levels applied for geometry refinement
+   use_finest_for_igbps  = TRUE   // apply finest geom level to all igbps
+                                  // (false means refine to scaled igbp spacing)
+   ds_scale_factor       = 1.0    // igbp ds scale factor (used if above=false)
+
+   // Fixed refinement
+   fixed_refinement      = TRUE  // whether to do fixed refinement
+   num_fixed_regions     = 1
+   region_0 {
+   dx = 0.0001
+   xlo = -0.2, -0.2, -0.2
+   xhi = 0.4, 0.2, 0.2
+   }
+
+   // Solution refinement
+   adapt_nstart_soln = 1440     // step to start solution adaptation
+   soln_tagmethod    = -1  // -1=gamr, 3=vorticity, 4=q-crit
+   soln_threshold    = 1.0
+   use_gamr          = TRUE
+
+   // Tag cutoff inputs
+   //tag_cutoff_zlo     = -225.
+   tag_cutoff_xlo         = -3.0
+   tag_cutoff_ylo         = -3.0
+   tag_cutoff_zlo         = -3.0
+   tag_cutoff_xhi          = 4.0
+   tag_cutoff_yhi          = 3.0
+   tag_cutoff_zhi          = 3.0
+
+   // grid gen inputs
+   periodic             = FALSE, FALSE, FALSE
+   max_pts_per_proc     = 2000000 // max allowed points per processor
+   largest_block        = 50 // largest allowed domain block (NxNxN blk)
+   smallest_block       = 8 // smallest   "      "      "
+   cluster_eff          = 0.70    // block cluster control
+   combine_eff          = 0.85    // block merge control
+   refine_ratio         = 2,2,2,2,2,2,2   // refine ratio between levels
+   tag_buffer           = 4  // size of buffer around solution tags
+   nesting_buffer       = 4  // buffer between grid levels
+   blank_overlap        = TRUE    // blank coarse levels overlapped by finer
+
+   // orphan checks
+   do_iblank_checks      = TRUE // run checks for orphans, incomplete fringes
+   write_orphans         = FALSE // write to orphans.out.<procid>
+   orphans_warning       = 1000  // print a warning if orphans > this number
+   do_orphan_averaging   = TRUE  // apply averaging on detected orphans
+
+
+}
+
+ 
+
+// SAMRAI timers
+TimerManager {
+   print_exclusive      = TRUE   // output exclusive time
+//   print_threshold      = -0.01   // don't output any that use < 0.01% total time
+   timer_list = "apps::SAMAdaptiveMeshing::*",
+                "apps::SAMTimeIntegration::*",
+                "apps::IGBPInterface::*",
+                "mesh::*::*"
+}

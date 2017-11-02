@@ -637,7 +637,7 @@ private:
 
   void clearOrphans(HOLEMAP *holemap, int nmesh, int *itmp);
   void getUnresolvedMandatoryReceptors();
-  void getCartReceptors(CartGrid *cg, parallelComm *pc);
+  void getCartReceptors(CartGrid *cg, parallelComm *pc, int itype=0);
   void setCartIblanks(void);
 
   void setupADT(void);

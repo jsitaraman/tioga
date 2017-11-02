@@ -1,0 +1,44 @@
+# Master input file for HELIOS-compatible ZEFR
+ndims    3
+nfields  5
+moving-grid  0
+viscous      1
+
+zefrInput  zefr/input_sphere
+rinf   1.4
+ainf   1.00
+meshRefLength  1.0
+reyNumber      200.0
+reyRefLength   1.0
+dt             .0001
+Mach           .2
+refMach        .2
+from_restart   no
+
+nsteps  500
+nstages 4
+
+report-freq   10
+plot-freq     100
+
+use-gpu  0
+#
+# samcart parameters
+# 
+moving yes
+obeEqnSet laminar
+rotor no
+refFrame inertial
+obesubsteps 10
+obecfl 10
+nsave 100
+alpha 0.0
+beta 0.0
+omega 1.0
+itransient 0
+trim_type freeflight
+prandtl 0.72
+gamma 1.4
+viscosity 1.76e-5
+timeacc yes
+scrubber off

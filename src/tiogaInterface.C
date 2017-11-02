@@ -107,22 +107,30 @@ extern "C" {
         mpiProcR, mpiFidR);
   }
 
-  void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
+  void tioga_register_amr_global_data_(int nf, int qstride, double *qnodein,
 				      int *idata,double *rdata,
-				      int *ngridsin,int *qnodesize)
+				      int ngridsin,int qnodesize)
   {
-    tg->register_amr_global_data(*nf,*qstride,qnodein,idata,rdata,*ngridsin,*qnodesize);
+    /*
+    printf("A:%d %d %d %d\n",*nf,*qstride,*ngridsin,*qnodesize);
+    printf("B:%d %d %d %d\n",nf[0],qstride[0],ngridsin[0],qnodesize[0]);
+    printf("C:%d %d %d %d\n",idata[12],idata[13],idata[14],idata[15]);
+    tracei(*qstride);
+    tracei(*ngridsin);
+    tracei(*qnodesize);
+    */
+    tg->register_amr_global_data(nf,qstride,qnodein,idata,rdata,ngridsin,qnodesize);
   }
 
 
-  void tioga_register_amr_patch_count_(int *npatches)
+  void tioga_register_amr_patch_count_(int npatches)
   {
-    tg->set_amr_patch_count(*npatches);
+    tg->set_amr_patch_count(npatches);
   }
 
-  void tioga_register_amr_local_data_(int *ipatch,int *global_id,int *iblank,double *q)
+  void tioga_register_amr_local_data_(int ipatch,int global_id,int *iblank,double *q)
   {
-    tg->register_amr_local_data(*ipatch,*global_id,iblank,q);
+    tg->register_amr_local_data(ipatch,global_id,iblank,q);
   }
 
   void tioga_preprocess_grids_(void)

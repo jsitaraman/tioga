@@ -39,9 +39,9 @@ extern "C"{
   void deallocateLinkList3(INTEGERLIST2 *);
 }
 
-void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
+void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
 {
-  int i,j,k,l,m,ploc,c,n,ntm,jj,kk;
+  int i,j,k,l,m,ploc,c,n,ntm,jj,kk,iadd,nf;
   int i3;
   int iflag;
   int icount,dcount;
@@ -99,16 +99,26 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 	{
 	  intersectCount++;
           //if (myid==0 && intersectCount==0) writeOBB2(obcart,c);
-           
-	  ntm=(cg->porder[c]+1)*(cg->porder[c]+1)*(cg->porder[c]+1);      
+          if (itype==0) 
+          {         
+	   ntm=(cg->porder[c]+1)*(cg->porder[c]+1)*(cg->porder[c]+1);      
+           iadd=0;
+          }
+          else 
+          {
+            ntm=1;
+            iadd=1;
+          }
 	  xtm=(double *)malloc(sizeof(double)*3*ntm);
 	  itm=(int *) malloc(sizeof(int)*ntm);
 	  ploc=(cg->porder[c])*(cg->porder[c]+1)/2;
-	  for(j=0;j<cg->dims[3*c];j++)
-	    for(k=0;k<cg->dims[3*c+1];k++)
-	      for(l=0;l<cg->dims[3*c+2];l++)
+	  for(j=0;j<cg->dims[3*c]+iadd;j++)
+	    for(k=0;k<cg->dims[3*c+1]+iadd;k++)
+	      for(l=0;l<cg->dims[3*c+2]+iadd;l++)
 		{
-		  get_amr_index_xyz(cg->qstride,j,k,l,
+                 if (itype==0) 
+                  {
+		   get_amr_index_xyz(cg->qstride,j,k,l,
 				    cg->porder[c],cg->dims[3*c],cg->dims[3*c+1],cg->dims[3*c+2],
 				    cg->nf,
 				    &cg->xlo[3*c],
@@ -116,6 +126,15 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 				    &cg->qnode[ploc],
 				    itm,
 				    xtm);
+                   }
+                  else
+                   {
+                    xtm[0]=cg->xlo[3*c  ]+cg->dx[3*c  ]*j;
+                    xtm[1]=cg->xlo[3*c+1]+cg->dx[3*c+1]*k;
+                    xtm[2]=cg->xlo[3*c+2]+cg->dx[3*c+2]*l;
+                    nf=cg->nf;
+                    itm[0]=l*(cg->dims[3*c]+2*nf)*(cg->dims[3*c+1]+2*nf)+k*(cg->dims[3*c]+2*nf)+j+2*nf;
+                   }   
 		  iflag=0;
 		  for(n=0;n<ntm;n++)
 		    {
@@ -204,5 +223,3 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
   free(sndMap);
   free(rcvMap);
 }
-
-  

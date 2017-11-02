@@ -15,7 +15,7 @@ import os
 import copy
 import string
 import types
-
+import pickle
 #Extension modules
 #sys.path.append(os.path.abspath(os.getenv('PYTHONPATH')))
 #sys.path.append(os.path.abspath(os.getenv('PYTHONPATH')+'/numpy'))
@@ -114,7 +114,7 @@ class Tioga:
         xyz = arrayToDblPtr(gridData['grid-coordinates'][0])
         c2v = arrayToIntPtr(gridData['hexaConn'][0])
         iblank = arrayToIntPtr(gridData['iblanking'][0])
-
+	#pickle.dump(gridData['grid-coordinates'],open('xyz'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         overNodes = arrayToIntPtr(gridData['obcnode'][0])
         wallNodes = arrayToIntPtr(gridData['wallnode'][0])
 
@@ -216,6 +216,61 @@ class Tioga:
                 iblankFace_d)
 
             tb.tioga_set_stream_handle(gridData['cuStream'],gridData['cuEvent'])
+            
+    def initAMRData(self,gridData):
+        pickle.dump(gridData,open('obeGridData'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
+        ngrids=len(gridData['gridParam'])
+        local2global_tmp=np.zeros((ngrids,),'i')
+        local2global=np.zeros((ngrids,),'i')
+        for i in range(len(gridData['qParam'])):
+            local2global_tmp[gridData['qParam'][i][0]]=i
+        MPI.COMM_WORLD.Allreduce(local2global_tmp,local2global)
+        #
+        # these variables are from high-order FE off-body implementation
+        # have to see if p=0 defaults work
+        #
+        nf=3
+        qstride=1
+        qnodein=0.0
+        qnodeinC=arrayToDblPtr(np.array([qnodein,0.0],'d'))
+        qnodesize=1
+        #
+        idata=np.zeros((ngrids*11),'i')
+        rdata=np.zeros((ngrids*6),'d')
+        for i in range(ngrids):
+            m=i*11
+            idata[m]   =gridData['gridParam'][i][0] # global id of patch
+            idata[m+1] =gridData['gridParam'][i][1] # level number of patch 
+            idata[m+2] =gridData['gridParam'][i][3] # proc id containing patch
+            idata[m+3] =0                        # porder (set to zero for FD) 
+            idata[m+4] =local2global[idata[m]]   # local number of patch  
+            idata[m+5] =gridData['ilo'][i][0]       # lower left-hand front global numbering (x)
+            idata[m+6] =gridData['ilo'][i][1]       # lower left-hand front global numbering (y)
+            idata[m+7] =gridData['ilo'][i][2]       # lower left-hand front global numbering (z)
+            idata[m+8] =gridData['ihi'][i][0]       # upper right-hand back global numbering (x) 
+            idata[m+9] =gridData['ihi'][i][1]       # lower right-hand back global numbering (y)
+            idata[m+10] =gridData['ihi'][i][2]      # lower left-hand  back global numbering (z)
+            m1=i*6
+            rdata[m1]   = gridData['xlo'][i][0]
+            rdata[m1+1] = gridData['xlo'][i][1]
+            rdata[m1+2] = gridData['xlo'][i][2]
+            rdata[m1+3] = gridData['dx'][i]
+            rdata[m1+4] = gridData['dx'][i]
+            rdata[m1+5] = gridData['dx'][i]
+        idataC=arrayToIntPtr(idata)
+        rdataC=arrayToDblPtr(rdata)
+        tg.tioga_register_amr_global_data_(nf,qstride,qnodeinC,idataC,rdataC,ngrids,qnodesize)
+        #
+        npatches=len(gridData['qParam'])
+        tg.tioga_register_amr_patch_count_(npatches)
+        for i in range(npatches):
+            global_id=gridData['qParam'][i][0]
+            qC=arrayToDblPtr(gridData['q-variables'][i])
+            iblankC=arrayToIntPtr(gridData['iblanking'][i])
+            tg.tioga_register_amr_local_data_(i,global_id,iblankC,qC)
 
+    def performAMRConnectivity(self):
+        tg.tioga_performconnectivity_amr_()
+        
     def finish(self,step):
         tg.tioga_delete_()

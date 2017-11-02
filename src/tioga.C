@@ -323,6 +323,7 @@ void tioga::doPointConnectivity(bool unblanking)
 #ifdef _GPU
   setupCommBuffersGPU();
 #endif
+  mb->writeCellFile(myid,NULL);
 }
 
 #ifdef _GPU
@@ -622,13 +623,20 @@ void tioga::performConnectivityAMR(void)
   MPI_Allreduce(&iamr,&iamrGlobal,1,MPI_INT,MPI_MAX,scomm);
   cg->preprocess();
   for(i=0;i<ncart;i++) cb[i].preprocess(cg);
-  
+  for(i=0;i<ncart;i++)
+     cb[i].writeCellFile(i);
+  return;
   if (nblocks > 0) 
     {
-      mb->getCartReceptors(cg,pc_cart);
+      //mb->getCartReceptors(cg,pc_cart,1);
+      mb->getCartReceptors(cg,pc_cart,1);
       mb->ihigh=ihigh;
       mb->search();
-      mb->getUnresolvedMandatoryReceptors();
+      //
+      // Fringe nodes on the artificial boundary
+      //  
+      mb->getFringeNodes();
+      //mb->getUnresolvedMandatoryReceptors();
       cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
     }    
   //checkComm();

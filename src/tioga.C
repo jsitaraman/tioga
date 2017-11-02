@@ -623,9 +623,6 @@ void tioga::performConnectivityAMR(void)
   MPI_Allreduce(&iamr,&iamrGlobal,1,MPI_INT,MPI_MAX,scomm);
   cg->preprocess();
   for(i=0;i<ncart;i++) cb[i].preprocess(cg);
-  for(i=0;i<ncart;i++)
-     cb[i].writeCellFile(i);
-  return;
   if (nblocks > 0) 
     {
       //mb->getCartReceptors(cg,pc_cart,1);
@@ -640,9 +637,12 @@ void tioga::performConnectivityAMR(void)
       cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
     }    
   //checkComm();
-  exchangeAMRDonors();
+  exchangeAMRDonors(1);
+  for(i=0;i<ncart;i++)
+    cb[i].writeCellFile(i,1);
+ return;
 
-  mb->getCellIblanks(meshcomm);
+//  mb->getCellIblanks(meshcomm);
 //  mb->writeCellFile(myid);
 //  for(i=0;i<ncart;i++)
 //    cb[i].writeCellFile(i);
@@ -686,7 +686,7 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   realRecords=NULL;
   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
   for(i=0;i<ncart;i++)
-    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
+    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar,1);
   //
   // populate the packets
   //

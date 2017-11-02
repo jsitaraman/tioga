@@ -50,13 +50,13 @@ class CartBlock
   void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData,
-			   int nvar);
+			   int nvar,int itype=0);
   void update(double *qval,int index,int nq);
   void getCancellationData(int *cancelledData, int *ncancel);
-  void processDonors(HOLEMAP *holemap, int nmesh);
-  void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes);
-  void insertInInterpList(int procid,int remoteid,double *xtmp);
-  void writeCellFile(int bid);
+  void processDonors(HOLEMAP *holemap, int nmesh,int itype=0);
+  void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes,int itype);
+  void insertInInterpList(int procid,int remoteid,double *xtmp,int itype);
+  void writeCellFile(int bid,int itype=0);
   void clearLists(void);
   void initializeLists(void);
 };

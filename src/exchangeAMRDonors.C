@@ -19,7 +19,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h"
 #include <assert.h>
-void tioga::exchangeAMRDonors(void)
+void tioga::exchangeAMRDonors(int itype)
 {
   int i,j,k,l,m,n,i3;
   int nsend_sav,nrecv_sav,nsend,nrecv;
@@ -176,7 +176,7 @@ void tioga::exchangeAMRDonors(void)
 	      xtmp[0]=rcvPack[i].realData[n++];
 	      xtmp[1]=rcvPack[i].realData[n++];
 	      xtmp[2]=rcvPack[i].realData[n++];	      
-	      cb[localid].insertInInterpList(i,remoteid,xtmp);
+	      cb[localid].insertInInterpList(i,remoteid,xtmp,itype);
 	      bcount[localid]++;
 	    }
 	  for(j=0;j<donorCount;j++)
@@ -186,12 +186,12 @@ void tioga::exchangeAMRDonors(void)
 	      meshtag=rcvPack[i].intData[m++];
 	      remoteid=rcvPack[i].intData[m++];
 	      cellRes=rcvPack[i].realData[n++];
- 	      cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes);
+ 	      cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,itype);
 	      bcount[localid]++;
 	    }
 	}
     }
-  for(i=0;i<ncart;i++) cb[i].processDonors(holeMap,nmesh);
+  for(i=0;i<ncart;i++) cb[i].processDonors(holeMap,nmesh,itype);
   pc_cart->clearPackets2(sndPack,rcvPack);  
   for(i=0;i<nsend;i++)
     {
@@ -250,10 +250,11 @@ void tioga::exchangeAMRDonors(void)
 	    }
 	}
     }
-  mb->setCartIblanks();
+  if (itype==0) mb->setCartIblanks();
   pc_cart->clearPackets2(sndPack,rcvPack);
   //
-  mb->findInterpListCart();
+  // need change from JC
+  //mb->findInterpListCart();
   if (cancelledData) free(cancelledData);
   //fclose(fp);
   free(bcount);

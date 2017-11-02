@@ -248,7 +248,12 @@ void MeshBlock::findInterpListCart(void)
 	      xv[m][j]=x[i3+j];
 	  }
 	//  
-	computeNodalWeights(xv,xp,frac,nvert);
+	//computeNodalWeights(xv,xp,frac,nvert);
+	// change needed from JC
+	// 
+	frac[1]=1.0;
+	for(m=1;m<nvert;m++) frac[m]=0.0;
+        
 	//
 	interpListCart[interpCount].receptorInfo[0]=procid;
 	interpListCart[interpCount].receptorInfo[1]=pointid;
@@ -256,8 +261,8 @@ void MeshBlock::findInterpListCart(void)
 	interpListCart[interpCount].nweights=nvert;
 	interpListCart[interpCount].cancel=0;
 	//
-  interpListCart[interpCount].inode.resize(nvert);
-  interpListCart[interpCount].weights.resize(nvert);
+        interpListCart[interpCount].inode.resize(nvert);
+        interpListCart[interpCount].weights.resize(nvert);
 	for(m=0;m<nvert;m++)
 	  {
 	    interpListCart[interpCount].inode[m]=inode[m];

@@ -107,7 +107,7 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
           else 
           {
             ntm=1;
-            iadd=1;
+            iadd=0;
           }
 	  xtm=(double *)malloc(sizeof(double)*3*ntm);
 	  itm=(int *) malloc(sizeof(int)*ntm);
@@ -133,7 +133,8 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
                     xtm[1]=cg->xlo[3*c+1]+cg->dx[3*c+1]*k;
                     xtm[2]=cg->xlo[3*c+2]+cg->dx[3*c+2]*l;
                     nf=cg->nf;
-                    itm[0]=l*(cg->dims[3*c]+2*nf)*(cg->dims[3*c+1]+2*nf)+k*(cg->dims[3*c]+2*nf)+j+2*nf;
+                    itm[0]=l*(cg->dims[3*c])*(cg->dims[3*c+1])+k*(cg->dims[3*c])+j;
+                    //itm[0]=(l+nf)*(cg->dims[3*c]+2*nf)*(cg->dims[3*c+1]+2*nf)+(k+nf)*(cg->dims[3*c]+2*nf)+j+nf;
                    }   
 		  iflag=0;
 		  for(n=0;n<ntm;n++)

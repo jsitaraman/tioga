@@ -28,6 +28,7 @@ class CartBlock
   int d1,d2,d3,d3nf;
   int myid;
   int *ibl;
+  int *ibstore;
   double *q;
   double *qnode;
   double xlo[3]; 
@@ -38,8 +39,8 @@ class CartBlock
   DONORLIST **donorList;
   void (*donor_frac) (int *,double *,int *,double *);
  public:
-  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;interpListSize=0;donorList=NULL;interpList=NULL;};
-  ~CartBlock() { clearLists();};
+  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;ibstore=NULL;interpListSize=0;donorList=NULL;interpList=NULL;};
+  ~CartBlock() { clearLists(); if (ibstore) free(ibstore);};
   void registerData(int local_id_in,int global_id_in,int *iblankin,double *qin)
   {
     local_id=local_id_in;

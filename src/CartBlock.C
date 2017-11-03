@@ -178,6 +178,8 @@ void CartBlock::preprocess(CartGrid *cg)
     d2=dims[0]*dims[1];
     d3=d2*dims[2];
     d3nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
+    ibstore=(int *)malloc(sizeof(int)*d3nf);
+    for(int i=0;i<d3nf;i++) ibstore[i]=ibl[i];
     ndof=d3*p3;
   };
 
@@ -201,7 +203,8 @@ void CartBlock::clearLists(void)
 
 void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int itype)
 {
-  int i,n;
+  int i,j,k,n;
+  int i1,j1,k1;
   int ix[3];
   int index[8];
   double *rst;
@@ -247,13 +250,13 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
       // }
      assert((ix[n] >=0 && ix[n] < dims[n]));
     }
-  listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
-  listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
   listptr->inode=(int *)malloc(sizeof(int)*3);
   listptr->inode[0]=ix[0];
   listptr->inode[1]=ix[1];
   listptr->inode[2]=ix[2];
   if (itype==0) {
+    listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
+    listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
     donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
   }
   else
@@ -262,6 +265,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
       // JC will improve this
       // get_cart_interp_weights(&listptr->nweights,&index,&listptr->weights); 
       listptr->nweights=8;
+      listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
       listptr->weights[0]=(ONE-rst[0])*(ONE-rst[1])*(ONE-rst[2]);
       listptr->weights[1]=rst[0]*(ONE-rst[1])*(ONE-rst[2]);
       listptr->weights[2]=rst[0]*rst[1]*(ONE-rst[2]);
@@ -270,14 +274,29 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
       listptr->weights[5]=rst[0]*(ONE-rst[1])*rst[2];
       listptr->weights[6]=rst[0]*rst[1]*rst[2];
       listptr->weights[7]=(ONE-rst[0])*rst[1]*rst[2];
-      index[0]=(ix[2]+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(ix[1]+nf)*(dims[0]+2*nf)+ix[0]+nf;
-      index[1]=index[0]+1;
-      index[2]=index[1]+(dims[0]+2*nf);
-      index[3]=index[0]+(dims[0]+2*nf);
-      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
-      for(n=0;n<listptr->nweights;n++) ibl[index[n]]=-2;
+      //
+      // create a 2 cell overlap around the
+      // for high-order Lagrange interpolation
+      //
+      for(i=-2;i<=2;i++)
+        for(j=-2;j<=2;j++)
+	  for(k=-2;k<=2;k++)
+	     {
+               i1=min(max(ix[0]+i,0),dims[0]-2); // limit these to real points
+               j1=min(max(ix[1]+j,0),dims[1]-2); // i.e. no halo needs to be tagged
+               k1=min(max(ix[2]+k,0),dims[2]-2); // since they are not checked later
+               
+	       index[0]= (k1+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)
+		        +(j1+nf)*(dims[0]+2*nf)
+ 		        +(i1+nf);
+
+	       index[1]=index[0]+1;
+	       index[2]=index[1]+(dims[0]+2*nf);
+	       index[3]=index[0]+(dims[0]+2*nf);
+	       for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
+	       for(n=0;n<listptr->nweights;n++) ibl[index[n]]=-2;
+	     }
     }
-      
   free(rst);
 }
   
@@ -344,7 +363,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
   char qstr[2];
   char intstring[7];
   int ni,nj,nk,ibcheck;
-  int *ibstore;
   //sprintf(intstring,"%d",100000+myid);
   //sprintf(fname,"fringes_%s.dat",&(intstring[1]));
   //if (local_id==0) 
@@ -362,8 +380,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
   iflag=(int *)malloc(sizeof(int)*nmesh);
   index=(int *)malloc(sizeof(int)*p3);
   xtmp=(double *)malloc(sizeof(double)*p3*3);
-  ibstore=(int *)malloc(sizeof(int)*d3nf);
-  for(i=0;i<d3nf;i++) ibstore[i]=ibl[i];
   //
   ibcount=-1;
   idof=-1;
@@ -384,9 +400,9 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
           }
           else 
           {
-             xtmp[0]=xlo[0]+dx[0]*j;
-             xtmp[1]=xlo[1]+dx[1]*k;
-             xtmp[2]=xlo[2]+dx[2]*l;
+             xtmp[0]=xlo[0]+dx[0]*i;
+             xtmp[1]=xlo[1]+dx[1]*j;
+             xtmp[2]=xlo[2]+dx[2]*k;
           }
           holeFlag=1;
           idof=ibcount*p3-1;
@@ -484,7 +500,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
                         }
                     }
                 }
-	      ibl[ibindex]=min(ibstore[ibindex],1);
+	      ibl[ibindex]=1; //min(ibstore[ibindex],1);
 	    }
 	  else
 	    {
@@ -509,7 +525,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 		}
 	      if (icount==p3) 
 		{
-		  ibl[ibindex]=-1;
+                  if (ibstore[ibindex]==1) ibl[ibindex]=-1;
                   //for(p=0;p<p3;p++)
 	          // fprintf(fp,"%f %f %f\n",xtmp[3*p],xtmp[3*p+1],xtmp[3*p+2]);
 		}
@@ -563,7 +579,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
  free(xtmp);
  free(index);
  free(iflag);
- free(ibstore);
   // fclose(fp);
 }
 			      

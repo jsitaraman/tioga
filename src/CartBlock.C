@@ -124,7 +124,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
           for (int j = 0; j < N; j++)
             for (int i = 0; i < N; i++)
             {
-              index[m] = ind + i + dj*(j + dk*k);
+              index[m] = ind + i + dj*j + dk*k;
               m++;
             }
       }

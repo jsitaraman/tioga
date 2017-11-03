@@ -301,9 +301,9 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
 
     // Create a local 'reference element' and perform Lagrange interpolation
     // Element is centered around node i0,j0,k0
-    int I = std::min(std::max(ix[0] - N/2 + 1, 0), dims[0]-N);
-    int J = std::min(std::max(ix[1] - N/2 + 1, 0), dims[1]-N);
-    int K = std::min(std::max(ix[2] - N/2 + 1, 0), dims[2]-N);
+    unsigned int I = std::min(std::max(ix[0] - N/2 + 1, 0), dims[0]-N);
+    unsigned int J = std::min(std::max(ix[1] - N/2 + 1, 0), dims[1]-N);
+    unsigned int K = std::min(std::max(ix[2] - N/2 + 1, 0), dims[2]-N);
 
     // Change inode to point to the lower-left corner of our constructed element
     listptr->inode[0] = I;
@@ -327,9 +327,9 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
     }
 
     // Shorthands for reconstructing node index
-    int ind = I + dims[0] * (J + dims[1] * K);
-    int dj = dims[0];
-    int dk = dims[0]*dims[1];
+    unsigned int ind = I + dims[0] * (J + dims[1] * K);
+    unsigned int dj = dims[0];
+    unsigned int dk = dims[0]*dims[1];
 
     int m = 0;
     for (int k = 0; k < N; k++)
@@ -338,7 +338,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
         {
           listptr->weights[m] =  lag_i[i] * lag_j[j] * lag_k[k];
           // Set iblank of this node to be mandatory donor
-          ibl[ind + i + dj*(j + dk*k)] = -2;
+          ibl[ind + i + dj*j + dk*k] = -2;
           m++;
         }
     // --------------------------------------------------------------------

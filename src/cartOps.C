@@ -21,6 +21,7 @@
 #include <assert.h>
 #define ROW 0
 #define COLUMN 1
+#define NFRAC 1331
 
 extern "C" 
 {
@@ -200,76 +201,103 @@ void MeshBlock::writeOBB2(OBB * obc, int bid)
 
 void MeshBlock::findInterpListCart(void)
 {
-  int irecord,i3,i,j,n,m;
   double xp[3];
   double xv[8][3];
-  double frac[8];
   int inode[8];
-  int nvert;
-  int isum,interpCount;
-  int procid,pointid,localid;
 
   if (interpListCart)
   {
     free(interpListCart);
     interpListCartSize=0;
   }
-  for(irecord=0;irecord<nsearch;irecord++)
+
+  for(int irecord=0;irecord<nsearch;irecord++)
     if (donorId[irecord]!=-1) interpListCartSize++;
+
   interpListCart=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListCartSize);
-  interpCount=0;
-  for(irecord=0;irecord<nsearch;irecord++)
+
+  int buffsize = NFRAC;
+  std::vector<double> frac(buffsize); // COPIED FROM PROCESSPOINTDONORS
+
+  int interpCount = 0;
+  for (int irecord = 0; irecord < nsearch; irecord++)
+  {
     if (donorId[irecord]!=-1) 
+    {
+      if (ihigh)
       {
-	i3=3*irecord;
-	procid=isearch[i3];
-	localid=isearch[i3+1];
-	pointid=isearch[i3+2];
-	xp[0]=xsearch[i3];
-	xp[1]=xsearch[i3+1];
-	xp[2]=xsearch[i3+2];
-	//
-	isum=0;
-	for(n=0;n<ntypes;n++)
-	  {
-	    isum+=nc[n];
-	    if (donorId[irecord] < isum)
-	      {
-		i=donorId[irecord]-(isum-nc[n]);
-		break;
-	      }
-	  }
-	nvert=nv[n];
-	for(m=0;m<nvert;m++)
-	  {
-	    inode[m]=vconn[n][nvert*i+m]-BASE;
-	    i3=3*inode[m];
-	    for(j=0;j<3;j++)
-	      xv[m][j]=x[i3+j];
-	  }
-	//  
-	//computeNodalWeights(xv,xp,frac,nvert);
-	// change needed from JC
-	// 
-	frac[1]=1.0;
-	for(m=1;m<nvert;m++) frac[m]=0.0;
+        const int i = irecord;
+        const int m = interpCount;
+        int icell = donorId[i]+BASE;
+        interpListCart[m].inode.resize(1);
+        interpListCart[m].nweights = 0;
+        interpListCart[m].donorID = icell;
+
+        // Use High-Order callback function to get interpolation weights
+        donor_frac(&(icell), &(xsearch[3*i]), &(interpListCart[m].nweights),
+                   interpListCart[m].inode.data(), frac.data(), &(rst[3*i]), &buffsize);
+
+        interpListCart[m].weights.resize(interpListCart[m].nweights);
+        for(int j = 0; j < interpListCart[m].nweights; j++)
+          interpListCart[m].weights[j] = frac[j];
+
+        interpListCart[m].receptorInfo[0] = isearch[2*i];   // procID
+        interpListCart[m].receptorInfo[1] = isearch[2*i+1]; // localID
+        interpListCart[m].receptorInfo[2] = isearch[2*i+2]; // pointID
+        interpListCart[m].cancel = 0;
+
+        interpCount++;
+      }
+      else
+      {
+        int i3=3*irecord;
+        int procid=isearch[i3];
+        int localid=isearch[i3+1];
+        int pointid=isearch[i3+2];
+        xp[0]=xsearch[i3];
+        xp[1]=xsearch[i3+1];
+        xp[2]=xsearch[i3+2];
+
+        int isum = 0;
+        int i = -1;
+        int n;
+        for (n=0;n<ntypes;n++)
+        {
+          isum+=nc[n];
+          if (donorId[irecord] < isum)
+          {
+            i = donorId[irecord]-(isum-nc[n]);
+            break;
+          }
+        }
+        int nvert=nv[n];
+        for (int m=0;m<nvert;m++)
+        {
+          inode[m]=vconn[n][nvert*i+m]-BASE;
+          int i3=3*inode[m];
+          for(int j=0;j<3;j++)
+            xv[m][j]=x[i3+j];
+        }
+
+        computeNodalWeights(xv,xp,frac.data(),nvert);
+
+        interpListCart[interpCount].receptorInfo[0]=procid;
+        interpListCart[interpCount].receptorInfo[1]=pointid;
+        interpListCart[interpCount].receptorInfo[2]=localid;
+        interpListCart[interpCount].nweights=nvert;
+        interpListCart[interpCount].cancel=0;
         
-	//
-	interpListCart[interpCount].receptorInfo[0]=procid;
-	interpListCart[interpCount].receptorInfo[1]=pointid;
-	interpListCart[interpCount].receptorInfo[2]=localid;
-	interpListCart[interpCount].nweights=nvert;
-	interpListCart[interpCount].cancel=0;
-	//
         interpListCart[interpCount].inode.resize(nvert);
         interpListCart[interpCount].weights.resize(nvert);
-	for(m=0;m<nvert;m++)
-	  {
-	    interpListCart[interpCount].inode[m]=inode[m];
-	    interpListCart[interpCount].weights[m]=frac[m];
-	  }
-	interpCount++;
+        for (int m=0;m<nvert;m++)
+        {
+          interpListCart[interpCount].inode[m]=inode[m];
+          interpListCart[interpCount].weights[m]=frac[m];
+        }
+        interpCount++;
       }
+    }
+  }
   ninterpCart=interpCount;
   assert((ninterpCart==interpCount));
 }    

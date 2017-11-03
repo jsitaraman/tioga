@@ -92,11 +92,10 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 	}
       else
 	{
-	  //
 	  // need to fix this as well with high-order stencil
 	  // JC
-	  //
-	  index=(int *)malloc(sizeof(int)*8);
+	  // This should copy out data created in 'insertInInterpList'
+	  index = (int *)malloc(sizeof(int)*listptr->nweights);
 	}
       ploc=(pdegree)*(pdegree+1)/2;
       qq=(double *)malloc(sizeof(double)*nvar);

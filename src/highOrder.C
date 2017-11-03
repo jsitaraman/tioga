@@ -901,6 +901,8 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
             iblank_face[ff] = FRINGE;
           }
         }
+
+        break;
       }
     }
   }
@@ -1803,7 +1805,7 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
 
 void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
 {
-  if (!ihigh) FatalError("updateFringePointData not applicable to non-high order solvers");
+  if (!ihigh) FatalError("updateFringePointGradient not applicable to non-high order solvers");
 
   PUSH_NVTX_RANGE("tg_update_fringeGrad", 2);
 #ifdef _GPU

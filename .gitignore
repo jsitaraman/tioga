@@ -24,7 +24,11 @@
 *.prof
 *.nvprof
 
+# Compiled Python Scripts
+*.pyc
+
 # Other
 *.dat
 *.csv
 *.out
+bin/*

@@ -5,6 +5,7 @@
 #include "funcs.hpp"
 
 #define MAX_LEVEL 20
+#define MAX_NCHECK 20
 #define FTOL 1e-6f
 
 dADT::~dADT()
@@ -53,8 +54,9 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
 {
   const int ndim = 2*nDims;
   int stack[MAX_LEVEL] = {0};
+  int estack[MAX_NCHECK] = {-1};
   int size = 1;
-  int possibleID = -1;
+  int ncheck = 0;
 
   while (size > 0)
   {
@@ -73,14 +75,9 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
       flag = (flag && (xsearch[i] <= bbox[i+nDims]+FTOL));
     }
 
+    // Insert into list of elements to check
     if (flag)
-    {
-      mb.checkContainment<nDims,nside>(ele,cellIndex,bbox,xsearch,rst);
-      if (cellIndex > -1)
-        return;
-      else if (cellIndex > -BIGINT) // 'out of tol' but not by a huge amount
-        possibleID = abs(cellIndex);
-    }
+      estack[ncheck++] = ele;
 
     // check the left and right children now
     for (int d = 1; d < 3; d++)
@@ -105,9 +102,19 @@ void d_searchADTstack(dADT& adt, dMeshBlock& mb, int& cellIndex, float* xsearch,
     }
   }
 
-  // No 'exact' donor cell found; return the closest probable cell ID
-  if (cellIndex < 0 && possibleID > -1)
-    cellIndex = possibleID;
+  // Perform the point/cell containment checks [avoiding thread divergence]
+  for (int n = 0; n < ncheck; n++)
+  {
+    int ele = estack[n];
+    float bbox[ndim];
+    for (int i = 0; i < ndim; i++)
+      bbox[i] = mb.eleBBox[ndim*ele+i];
+
+    mb.checkContainment<nDims,nside>(ele,cellIndex,bbox,xsearch,rst);
+
+    if (cellIndex > -1)
+      return;
+  }
 }
 
 template<int nDims, int nside>

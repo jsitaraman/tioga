@@ -769,7 +769,7 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
       }
       else // AMR grid
       {
-        cb[bid].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
+        cb[bid].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar,1);
       }
 
       m += nvar;

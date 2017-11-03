@@ -47,7 +47,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData,
 				    int nvar,int itype)
 {
-  int i,n;
+  int i,n,npnode;
   int ploc;
   double *xtmp;
   int *index;
@@ -106,6 +106,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
             xlo,dx,&qnode[ploc],index,xtmp);
       }
       else
+<<<<<<< HEAD
       {
         // inode contains index of lower-left corner of Lagrange reconstruction
         const int I = listptr->inode[0];
@@ -147,6 +148,62 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       for(n=0;n<nvar;n++)
         (*realData)[dcount++]=qq[n];
       listptr=listptr->next;
+=======
+	{
+	  // need to fix this as well with high-order stencil
+	  // JC
+	  // This should copy out data created in 'insertInInterpList'
+	  index = (int *)malloc(sizeof(int)*listptr->nweights);
+	}
+      ploc=(pdegree)*(pdegree+1)/2;
+      qq=(double *)malloc(sizeof(double)*nvar);
+      while(listptr!=NULL)
+	{
+	  if (itype==0) 
+	    {
+	      get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
+				pdegree,dims[0],dims[1],dims[2],nf,
+				xlo,dx,&qnode[ploc],index,xtmp);
+              npnode=p3;
+	    }
+	  else
+	    {
+              ix[0]=listptr->inode[0];
+	      ix[1]=listptr->inode[1];
+              ix[2]=listptr->inode[2];
+	      index[0]=(ix[2]+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(ix[1]+nf)*(dims[0]+2*nf)+ix[0]+nf;
+	      index[1]=index[0]+1;
+	      index[2]=index[1]+(dims[0]+2*nf);
+	      index[3]=index[0]+(dims[0]+2*nf);
+	      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
+              //
+              // JC needs to change this for
+              // high-order interp
+              //  
+              npnode=8;
+	    }
+	  (*intData)[icount++]=listptr->receptorInfo[0];
+	  (*intData)[icount++]=-1;
+	  (*intData)[icount++]=listptr->receptorInfo[1];	  
+	  for(n=0;n<nvar;n++)
+           {
+            qq[n]=0;
+	    for(i=0;i < npnode ;i++)
+	      {
+		weight=listptr->weights[i];
+                assert((index[i] >=0 && index[i] < d3nf));
+		qq[n]+=q[index[i]+d3nf*n]*weight;
+	      }
+	   }
+          //writeqnode_(&myid,qq,&nvar);
+	  for(n=0;n<nvar;n++)
+	    (*realData)[dcount++]=qq[n];
+	  listptr=listptr->next;
+	}
+      free(xtmp);
+      free(index);
+      free(qq);
+>>>>>>> 12d019a0901249d7d58f588253ec3cd03746c3f7
     }
     free(xtmp);
     free(index);
@@ -155,11 +212,25 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 }
 
 
-void CartBlock::update(double *qval, int index,int nq)
+void CartBlock::update(double *qval, int index,int nq,int itype)
 {
   int i;
-  for(i=0;i<nq;i++)
-    q[index+d3nf*i]=qval[i];
+  if (itype==0) 
+   {
+    for(i=0;i<nq;i++)
+      q[index+d3nf*i]=qval[i];
+   }
+  else
+   {
+     int itmp=index;
+     int k=itmp/(dims[1]*dims[0]);
+     itmp=itmp%(dims[1]*dims[0]);
+     int j=itmp/dims[0];
+     int i=itmp%dims[0];
+     itmp=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+     for(i=0;i<nq;i++)
+       q[itmp+d3nf*i]=qval[i];
+   }
 }
 
   
@@ -190,6 +261,8 @@ void CartBlock::preprocess(CartGrid *cg)
     d2=dims[0]*dims[1];
     d3=d2*dims[2];
     d3nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
+    ibstore=(int *)malloc(sizeof(int)*d3nf);
+    for(int i=0;i<d3nf;i++) ibstore[i]=ibl[i];
     ndof=d3*p3;
   };
 
@@ -213,7 +286,8 @@ void CartBlock::clearLists(void)
 
 void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int itype)
 {
-  int i,n;
+  int i,j,k,n;
+  int i1,j1,k1;
   int ix[3];
   int index[8];
   double *rst;
@@ -326,7 +400,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
         }
     // --------------------------------------------------------------------
   }
-      
+
   free(rst);
 }
   
@@ -393,7 +467,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
   char qstr[2];
   char intstring[7];
   int ni,nj,nk,ibcheck;
-  int *ibstore;
   //sprintf(intstring,"%d",100000+myid);
   //sprintf(fname,"fringes_%s.dat",&(intstring[1]));
   //if (local_id==0) 
@@ -411,8 +484,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
   iflag=(int *)malloc(sizeof(int)*nmesh);
   index=(int *)malloc(sizeof(int)*p3);
   xtmp=(double *)malloc(sizeof(double)*p3*3);
-  ibstore=(int *)malloc(sizeof(int)*d3nf);
-  for(i=0;i<d3nf;i++) ibstore[i]=ibl[i];
   //
   ibcount=-1;
   idof=-1;
@@ -433,9 +504,9 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
           }
           else 
           {
-             xtmp[0]=xlo[0]+dx[0]*j;
-             xtmp[1]=xlo[1]+dx[1]*k;
-             xtmp[2]=xlo[2]+dx[2]*l;
+             xtmp[0]=xlo[0]+dx[0]*i;
+             xtmp[1]=xlo[1]+dx[1]*j;
+             xtmp[2]=xlo[2]+dx[2]*k;
           }
           holeFlag=1;
           idof=ibcount*p3-1;
@@ -533,7 +604,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
                         }
                     }
                 }
-	      ibl[ibindex]=min(ibstore[ibindex],1);
+	      ibl[ibindex]=1; //min(ibstore[ibindex],1);
 	    }
 	  else
 	    {
@@ -558,7 +629,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 		}
 	      if (icount==p3) 
 		{
-		  ibl[ibindex]=-1;
+                  if (ibstore[ibindex]==1) ibl[ibindex]=-1;
                   //for(p=0;p<p3;p++)
 	          // fprintf(fp,"%f %f %f\n",xtmp[3*p],xtmp[3*p+1],xtmp[3*p+2]);
 		}
@@ -612,7 +683,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
  free(xtmp);
  free(index);
  free(iflag);
- free(ibstore);
   // fclose(fp);
 }
 			      

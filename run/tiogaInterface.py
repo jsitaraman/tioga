@@ -85,6 +85,9 @@ class Tioga:
     # Interpolate solution and send/receive all data
     def exchangeSolution(self):
         tg.tioga_dataupdate_ab(self.nfields, 0)
+     
+    def exchangeSolutionAMR(self):
+        tg.tioga_dataupdate_amr(self.q,self.nfields,1)
 
     # Interpolate solution gradient and send/receive all data
     def exchangeGradient(self):
@@ -125,6 +128,7 @@ class Tioga:
         f2c = arrayToIntPtr(gridData['face2cell'][0])
 
         iblank = arrayToIntPtr(gridData['iblanking'][0])
+        self.q = arrayToDblPtr(gridData['q-variables'][0])
         iblank_face = arrayToIntPtr(gridData['iblank-face'][0])
         iblank_cell = arrayToIntPtr(gridData['iblank-cell'][0])
 

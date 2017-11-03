@@ -241,9 +241,9 @@ void MeshBlock::findInterpListCart(void)
         for(int j = 0; j < interpListCart[m].nweights; j++)
           interpListCart[m].weights[j] = frac[j];
 
-        interpListCart[m].receptorInfo[0] = isearch[2*i];   // procID
-        interpListCart[m].receptorInfo[1] = isearch[2*i+1]; // localID
-        interpListCart[m].receptorInfo[2] = isearch[2*i+2]; // pointID
+        interpListCart[m].receptorInfo[0] = isearch[3*i];   // procID
+        interpListCart[m].receptorInfo[1] = isearch[3*i+1]; // localID
+        interpListCart[m].receptorInfo[2] = isearch[3*i+2]; // pointID
         interpListCart[m].cancel = 0;
 
         interpCount++;

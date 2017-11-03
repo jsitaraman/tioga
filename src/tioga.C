@@ -323,7 +323,7 @@ void tioga::doPointConnectivity(bool unblanking)
 #ifdef _GPU
   setupCommBuffersGPU();
 #endif
-  mb->writeCellFile(myid,NULL);
+  //mb->writeCellFile(myid,NULL);
 }
 
 #ifdef _GPU
@@ -626,7 +626,7 @@ void tioga::performConnectivityAMR(void)
   iamr=(ncart >0)?1:0;
   MPI_Allreduce(&iamr,&iamrGlobal,1,MPI_INT,MPI_MAX,scomm);
   cg->preprocess();
-  for(i=0;i<ncart;i++) cb[i].preprocess(cg);
+  for(i=0;i<ncart;i++) cb[i].preprocess(cg,1);
   if (nblocks > 0) 
     {
       //mb->getCartReceptors(cg,pc_cart,1);
@@ -642,9 +642,9 @@ void tioga::performConnectivityAMR(void)
     }    
   //checkComm();
   exchangeAMRDonors(1);
-  for(i=0;i<ncart;i++)
-    cb[i].writeCellFile(i,1);
- return;
+  //for(i=0;i<ncart;i++)
+  //  cb[i].writeCellFile(i,1);
+  return;
 
 //  mb->getCellIblanks(meshcomm);
 //  mb->writeCellFile(myid);
@@ -688,7 +688,7 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   //
   integerRecords=NULL;
   realRecords=NULL;
-  mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+  mb->getInterpolatedSolutionAtPointsAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
   for(i=0;i<ncart;i++)
     cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar,1);
   //

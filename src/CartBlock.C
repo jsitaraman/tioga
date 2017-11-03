@@ -91,19 +91,20 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
     listptr=interpList;
     icount=3*nintold;
     dcount=nrealold;
-    xtmp = (double *)malloc(sizeof(double)*p3*3);
 
     index = (int *)malloc(sizeof(int)*listptr->nweights);
-
     ploc=(pdegree)*(pdegree+1)/2;
     qq=(double *)malloc(sizeof(double)*nvar);
+
     while(listptr!=NULL)
     {
       if (itype==0)
       {
+	xtmp = (double *)malloc(sizeof(double)*p3*3);
         get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
             pdegree,dims[0],dims[1],dims[2],nf,
             xlo,dx,&qnode[ploc],index,xtmp);
+	free(xtmp);
       }
       else
       {
@@ -114,9 +115,9 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
         // Shorthands for reconstructing node index
         const int N = pdegree + 1;
-        const int dj = dims[0];
-        const int dk = dims[0]*dims[1];
-        const int ind = I + dj*J + dk*K;
+        const int dj = (dims[0]+2*nf);
+        const int dk = (dims[0]+2*nf)*(dims[1]+2*nf);
+        const int ind = I + nf + dj*(J+nf) + dk*(K+nf);
 
         // Grab the cube of p3 node indices starting from I,J,K
         int m = 0;
@@ -144,11 +145,10 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       }
 
       //writeqnode_(&myid,qq,&nvar);
-      for(n=0;n<nvar;n++)
+      for(int n=0;n<nvar;n++)
         (*realData)[dcount++]=qq[n];
       listptr=listptr->next;
     }
-    free(xtmp);
     free(index);
     free(qq);
   }
@@ -177,23 +177,23 @@ void CartBlock::update(double *qval, int index,int nq,int itype)
 }
 
   
-void CartBlock::preprocess(CartGrid *cg)
+void CartBlock::preprocess(CartGrid *cg,int itype)
   {
     int nfrac;
     FILE *fp;
     char intstring[7];
     char fname[20];  
     myid=cg->myid;
-    sprintf(intstring,"%d",100000+myid);
-    sprintf(fname,"cart_block%s.dat",&(intstring[1]));
-    fp=fopen(fname,"a");
+    //sprintf(intstring,"%d",100000+myid);
+    //sprintf(fname,"cart_block%s.dat",&(intstring[1]));
+    //fp=fopen(fname,"a");
     for(int n=0;n<3;n++) xlo[n]=cg->xlo[3*global_id+n];
     for(int n=0;n<3;n++) dx[n]=cg->dx[3*global_id+n];
     dims[0]=cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
     dims[1]=cg->ihi[3*global_id+1]-cg->ilo[3*global_id+1]+1;
     dims[2]=cg->ihi[3*global_id+2]-cg->ilo[3*global_id+2]+1;
-    fprintf(fp,"%d %d %d\n",dims[0],dims[1],dims[2]);
-    fclose(fp);
+    //fprintf(fp,"%d %d %d\n",dims[0],dims[1],dims[2]);
+    //fclose(fp);
     pdegree=cg->porder[global_id];
     p3=(pdegree+1)*(pdegree+1)*(pdegree+1);
     nf=cg->nf;
@@ -206,7 +206,7 @@ void CartBlock::preprocess(CartGrid *cg)
     d3nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
     ibstore=(int *)malloc(sizeof(int)*d3nf);
     for(int i=0;i<d3nf;i++) ibstore[i]=ibl[i];
-    ndof=d3*p3;
+    ndof=(itype==0)?(d3*p3):d3;
   };
 
 void CartBlock::initializeLists(void)
@@ -327,9 +327,9 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
     }
 
     // Shorthands for reconstructing node index
-    unsigned int ind = I + dims[0] * (J + dims[1] * K);
-    unsigned int dj = dims[0];
-    unsigned int dk = dims[0]*dims[1];
+    unsigned int dj = dims[0]+2*nf;
+    unsigned int dk = dj*(dims[1]+2*nf);
+    unsigned int ind = (I+nf) + (J+nf)*dj + (K+nf)*dk;
 
     int m = 0;
     for (int k = 0; k < N; k++)
@@ -424,9 +424,10 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
   //
   // first mark hole points
   //
+  int p3t=(itype==0)?p3:1;
   iflag=(int *)malloc(sizeof(int)*nmesh);
-  index=(int *)malloc(sizeof(int)*p3);
-  xtmp=(double *)malloc(sizeof(double)*p3*3);
+  index=(int *)malloc(sizeof(int)*p3t);
+  xtmp=(double *)malloc(sizeof(double)*p3t*3);
   //
   ibcount=-1;
   idof=-1;
@@ -452,8 +453,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
              xtmp[2]=xlo[2]+dx[2]*k;
           }
           holeFlag=1;
-          idof=ibcount*p3-1;
-	  for(p=0;p<p3 && holeFlag;p++)
+          idof=ibcount*p3t-1;
+	  for(p=0;p<p3t && holeFlag;p++)
 	    {
 	      idof++;
 	      if (donorList[idof]==NULL)
@@ -516,8 +517,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 
 	  if (ibl[ibindex]==0) 
 	    {
-              idof=ibcount*p3-1;
-	      for(p=0;p<p3;p++)
+              idof=ibcount*p3t-1;
+	      for(p=0;p<p3t;p++)
 		{
 		  idof++;
 		  if (donorList[idof]!=NULL)
@@ -533,8 +534,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 	    }
 	  else if (ibl[ibindex]==-2)  // this node was part of a Cartesian donor cell
 	    {
-	      idof=ibcount*p3-1;
-	      for(p=0;p<p3;p++)
+	      idof=ibcount*p3t-1;
+	      for(p=0;p<p3t;p++)
                 {
                   idof++;
                   if (donorList[idof]!=NULL)
@@ -552,8 +553,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 	  else
 	    {
 	      icount=0;
-              idof=ibcount*p3-1;
-	      for(p=0;p<p3;p++)
+              idof=ibcount*p3t-1;
+	      for(p=0;p<p3t;p++)
 		{
 		  idof++;
 		  if (donorList[idof]!=NULL)
@@ -570,16 +571,16 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 			}
 		    }
 		}
-	      if (icount==p3) 
+	      if (icount==p3t) 
 		{
                   if (ibstore[ibindex]==1) ibl[ibindex]=-1;
-                  //for(p=0;p<p3;p++)
+                  //for(p=0;p<p3t;p++)
 	          // fprintf(fp,"%f %f %f\n",xtmp[3*p],xtmp[3*p+1],xtmp[3*p+2]);
 		}
 	      else
 		{
-                  idof=ibcount*p3-1;
-		  for(p=0;p<p3;p++)
+                  idof=ibcount*p3t-1;
+		  for(p=0;p<p3t;p++)
 		    {
 		      idof++;
 		      if (donorList[idof]!=NULL)
@@ -630,18 +631,20 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 }
 			      
 
-void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
+void CartBlock::getCancellationData(int *cancelledData, int *ncancel, int itype)
 {
-  int i,j,k,p,m;
+  int i,j,k,p,m,p3t;
   int idof;
   DONORLIST *temp;
+
+  p3t=(itype==0)?p3:1;
   idof=-1;
   m=0;
   *ncancel=0;
   for(k=0;k<dims[2];k++)
     for(j=0;j<dims[1];j++)
       for(i=0;i<dims[0];i++)
-	for(p=0;p<p3;p++)
+	for(p=0;p<p3t;p++)
 	  {
 	    idof++;
 	    if (donorList[idof]!=NULL)

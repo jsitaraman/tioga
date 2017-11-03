@@ -437,6 +437,10 @@ private:
 
   void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,
 				  int nvar, int interptype);
+
+  void getInterpolatedSolutionAtPointsAMR(int *nints,int *nreals,int **intData,double **realData,
+					 double *q,
+					 int nvar, int interptype);
   
   void getInterpolatedSolutionArtBnd(int &nints, int &nreals,
            std::vector<int> &intData, std::vector<double> &realData, int nvar);

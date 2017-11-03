@@ -207,14 +207,16 @@ void MeshBlock::findInterpListCart(void)
 
   if (interpListCart)
   {
-    free(interpListCart);
+    //free(interpListCart);
+    delete [] interpListCart;
     interpListCartSize=0;
   }
 
   for(int irecord=0;irecord<nsearch;irecord++)
     if (donorId[irecord]!=-1) interpListCartSize++;
 
-  interpListCart=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListCartSize);
+  //interpListCart=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListCartSize);
+  interpListCart=new INTERPLIST[interpListCartSize];
 
   int buffsize = NFRAC;
   std::vector<double> frac(buffsize); // COPIED FROM PROCESSPOINTDONORS
@@ -432,5 +434,42 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		(*realData)[dcount++]=qq[k];
 	    }
 	}
+    }
+}
+
+
+void MeshBlock::getInterpolatedSolutionAtPointsAMR(int *nints,int *nreals,int **intData,
+						  double **realData,double *q,
+						  int nvar, int interptype)
+{
+
+  (*nints) = ninterpCart;
+  (*nreals) = ninterpCart*nvar;
+  if ((*nints) == 0) return;
+
+  (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
+  (*realData)=(double *)malloc(sizeof(double)*(*nreals));
+
+  std::vector<double> qq(nvar,0);
+  int icount = 0;
+  int dcount = 0;
+  
+  for (int i = 0; i < ninterpCart; i++)
+    {
+      qq.assign(nvar,0);
+      int ic = interpListCart[i].donorID;
+      for (int spt = 0; spt < interpListCart[i].nweights; spt++)
+	{
+	  double weight = interpListCart[i].weights[spt];
+	  for (int k = 0; k < nvar; k++) {
+	    double val = get_q_spt(ic,spt,k);
+	    qq[k] += val*weight;
+	  }
+	}
+      (*intData)[icount++] = interpListCart[i].receptorInfo[0];
+      (*intData)[icount++] = interpListCart[i].receptorInfo[1];
+      (*intData)[icount++]=interpListCart[i].receptorInfo[2];
+      for (int k = 0; k < nvar; k++)
+	(*realData)[dcount++] = qq[k];
     }
 }

@@ -220,7 +220,7 @@ void tioga::exchangeAMRDonors(int itype)
       ncancel=bcount[i];
       if (ncancel > 0) {
 	cancelledData=(int *)malloc(sizeof(int)*3*ncancel);
-	cb[i].getCancellationData(cancelledData,&ncancel);
+	cb[i].getCancellationData(cancelledData,&ncancel,1);
 	for(j=0;j<ncancel;j++)
 	  {
 	    procid=cancelledData[3*j];

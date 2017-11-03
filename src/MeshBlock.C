@@ -1200,7 +1200,7 @@ MeshBlock::~MeshBlock()
     free(donorList);
   }
   return;  /// Why is this here??
-  free(interpListCart);
+  if (interpListCart) delete [] interpListCart;
   if (obb) free(obb);
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);

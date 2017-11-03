@@ -722,7 +722,7 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
       sndPack[k].intData[icount[k]++]=integerRecords[3*i+1];
       sndPack[k].intData[icount[k]++]=integerRecords[3*i+2];
       for(j=0;j<nvar;j++)
-	sndPack[k].realData[dcount[k]++]=realRecords[m++];
+        sndPack[k].realData[dcount[k]++]=realRecords[m++];
     }
   //
   // communicate the data across
@@ -731,24 +731,80 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   //
   // decode the packets and update the data
   //
-  for(k=0;k<nrecv;k++)
-    {
-      m=0;
-      for(i=0;i<rcvPack[k].nints/2;i++)
-	{
-	  bid=rcvPack[k].intData[2*i];
-	  if (bid< 0) 
-	    {
-	      mb->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],q,nvar,interptype);
-	    }
-	  else
-	    {
 
-	      cb[bid].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
-	      m+=nvar;
-	    }
-	}
+  int stride = nvar;
+
+  // Decode the packets and update the values in the solver's data array
+
+  std::vector<double> qtmp;
+  std::vector<int> itmp; /// FOR DEBUGGING ONLY
+  if (iartbnd)
+  {
+    qtmp.resize(stride*mb->ntotalPoints);
+    itmp.resize(mb->ntotalPoints);
+  }
+
+  for (int k = 0; k < nrecv; k++)
+  {
+    int m = 0;
+    for (int i = 0; i < rcvPack[k].nints/2; i++)
+    {
+      const int bid = rcvPack[k].intData[2*i];
+      if (bid < 0) // Unstructured grid
+      {
+        const int ind = rcvPack[k].intData[2*i+1];
+        if (iartbnd)
+        {
+          // Pack all data into buffer for use in callback function
+          for (int j = 0; j < stride; j++)
+          {
+            itmp[ind] = 1;
+            qtmp[ind*stride+j] = rcvPack[k].realData[m+j];
+          }
+        }
+        else
+        {
+          mb->updateSolnData(ind,&rcvPack[k].realData[m],q,nvar,interptype);
+        }
+      }
+      else // AMR grid
+      {
+        cb[bid].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
+      }
+
+      m += nvar;
     }
+  }
+
+  if (iartbnd)
+  {
+    // --- Check for orphan points - shouldn't be any!!
+    // DEBUGGING only - shouldn't be needed once all working
+    std::ofstream fp;
+    int norphanPoint = 0;
+    for (int i = 0; i < mb->ntotalPoints; i++) {
+      if (itmp[i] == 0) {
+        if (!fp.is_open()) {
+          std::stringstream ss;
+          ss << "orphan" << myid << ".dat";
+          fp.open(ss.str().c_str(),std::ofstream::out);
+        }
+        mb->outputOrphan(fp,i);
+        norphanPoint++;
+      }
+    }
+    fp.close();
+    if (norphanPoint > 0) {
+      printf("Orphan points found!\n");
+      exit(2);
+    }
+    // --- End orphan printing
+
+    // Update all fringe data now using callback functions
+    /// TODO: make sure this never gets called for gradient interp
+    mb->updateFringePointData(qtmp.data(),nvar);
+  }
+
   //
   // release all memory
   //

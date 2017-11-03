@@ -4,9 +4,9 @@
 # Geometry:
 nDims    3
 meshfile sphere_hex.coarse.msh
-#overset false 
-overset  true
-overset_grids  sphere_hex.coarse.msh  box2.coarse.msh
+overset  1
+overset_grids  sphere_hex.coarse.msh
+#overset_grids  sphere_hex.coarse.msh  box2.coarse.msh
 
 # =============================================================
 # Boundary Conditions

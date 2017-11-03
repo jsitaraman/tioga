@@ -160,39 +160,46 @@ void tioga::exchangeAMRDonors(int itype)
     cb[i].initializeLists();
     bcount[i]=0;
   }
+
   for(i=0;i<nrecv;i++)
+  {
+    if (rcvPack[i].nreals > 0)
     {
-      if (rcvPack[i].nreals > 0) 
-	{
-     	  m=2;
-	  n=0;
-	  interpCount=rcvPack[i].intData[0];
-	  donorCount=rcvPack[i].intData[1];
-	  icount[i]=interpCount+donorCount;
-	  for(j=0;j<interpCount;j++)
-	    {
-     	      localid=rcvPack[i].intData[m++];
-	      remoteid=rcvPack[i].intData[m++];
-	      xtmp[0]=rcvPack[i].realData[n++];
-	      xtmp[1]=rcvPack[i].realData[n++];
-	      xtmp[2]=rcvPack[i].realData[n++];	      
-	      cb[localid].insertInInterpList(i,remoteid,xtmp,itype);
-	      bcount[localid]++;
-	    }
-	  for(j=0;j<donorCount;j++)
-	    {
-     	      localid=rcvPack[i].intData[m++];
-	      index=rcvPack[i].intData[m++];
-	      meshtag=rcvPack[i].intData[m++];
-	      remoteid=rcvPack[i].intData[m++];
-	      cellRes=rcvPack[i].realData[n++];
- 	      cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,itype);
-	      bcount[localid]++;
-	    }
-	}
+      m=2;
+      n=0;
+      interpCount=rcvPack[i].intData[0];
+      donorCount=rcvPack[i].intData[1];
+      icount[i]=interpCount+donorCount;
+
+      // Get interpolation weights from AMR grid for this grid's receptors
+      for(j=0;j<interpCount;j++)
+      {
+        localid=rcvPack[i].intData[m++];
+        remoteid=rcvPack[i].intData[m++];
+        xtmp[0]=rcvPack[i].realData[n++];
+        xtmp[1]=rcvPack[i].realData[n++];
+        xtmp[2]=rcvPack[i].realData[n++];
+        cb[localid].insertInInterpList(i,remoteid,xtmp,itype);
+        bcount[localid]++;
+      }
+
+      for(j=0;j<donorCount;j++)
+      {
+        localid=rcvPack[i].intData[m++];
+        index=rcvPack[i].intData[m++];
+        meshtag=rcvPack[i].intData[m++];
+        remoteid=rcvPack[i].intData[m++];
+        cellRes=rcvPack[i].realData[n++];
+        cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,itype);
+        bcount[localid]++;
+      }
     }
+  }
+
   for(i=0;i<ncart;i++) cb[i].processDonors(holeMap,nmesh,itype);
+
   pc_cart->clearPackets2(sndPack,rcvPack);  
+
   for(i=0;i<nsend;i++)
     {
       if (icount[i] > 0) 
@@ -252,9 +259,9 @@ void tioga::exchangeAMRDonors(int itype)
     }
   if (itype==0) mb->setCartIblanks();
   pc_cart->clearPackets2(sndPack,rcvPack);
-  //
-  // need change from JC
-  //mb->findInterpListCart();
+
+  mb->findInterpListCart();
+
   if (cancelledData) free(cancelledData);
   //fclose(fp);
   free(bcount);

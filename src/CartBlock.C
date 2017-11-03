@@ -20,7 +20,10 @@
 #include "codetypes.h"
 #include "CartBlock.h"
 #include "CartGrid.h"
+#include "funcs.hpp"
+
 #include <assert.h>
+
 extern "C" {
   void deallocateLinkList(DONORLIST *temp);
   void deallocateLinkList2(INTEGERLIST *temp);
@@ -39,6 +42,7 @@ extern "C" {
     int checkHoleMap(double *x,int *nx,int *sam,double *extents);
     //void writeqnode_(int *myid,double *qnodein,int *qnodesize);
 }
+
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData,
 				    int nvar,int itype)
@@ -62,83 +66,92 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       interpCount++;
       listptr=listptr->next;
     }
+
   if (interpCount > 0) 
-    {
-      nintold=(*nints);
-      nrealold=(*nreals);
-      if (nintold > 0) {
+  {
+    nintold=(*nints);
+    nrealold=(*nreals);
+    if (nintold > 0) {
       tmpint=(int *)malloc(sizeof(int)*3*(*nints));
       tmpreal=(double *)malloc(sizeof(double)*(*nreals));
       for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
       for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
-      }
-      (*nints)+=interpCount;
-      (*nreals)+=(interpCount*nvar);
-      (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
-      (*realData)=(double *)malloc(sizeof(double)*(*nreals));
-      if (nintold > 0) {
+    }
+    (*nints)+=interpCount;
+    (*nreals)+=(interpCount*nvar);
+    (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
+    (*realData)=(double *)malloc(sizeof(double)*(*nreals));
+    if (nintold > 0) {
       for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
-      for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];      
+      for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];
       free(tmpint);
       free(tmpreal);
-      }
-      listptr=interpList;
-      icount=3*nintold;
-      dcount=nrealold;
-      xtmp=(double *)malloc(sizeof(double)*p3*3);
-      if (itype==0) 
-	{
-	  index=(int *)malloc(sizeof(int)*p3);
-	}
-      else
-	{
-	  // need to fix this as well with high-order stencil
-	  // JC
-	  // This should copy out data created in 'insertInInterpList'
-	  index = (int *)malloc(sizeof(int)*listptr->nweights);
-	}
-      ploc=(pdegree)*(pdegree+1)/2;
-      qq=(double *)malloc(sizeof(double)*nvar);
-      while(listptr!=NULL)
-	{
-	  if (itype==0) 
-	    {
-	      get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
-				pdegree,dims[0],dims[1],dims[2],nf,
-				xlo,dx,&qnode[ploc],index,xtmp);
-	    }
-	  else
-	    {
-              ix[0]=listptr->inode[0];
-	      ix[1]=listptr->inode[1];
-              ix[2]=listptr->inode[2];
-	      index[0]=(ix[2]+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(ix[1]+nf)*(dims[0]+2*nf)+ix[0]+nf;
-	      index[1]=index[0]+1;
-	      index[2]=index[1]+(dims[0]+2*nf);
-	      index[3]=index[0]+(dims[0]+2*nf);
-	      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
-	    }
-	  (*intData)[icount++]=listptr->receptorInfo[0];
-	  (*intData)[icount++]=-1;
-	  (*intData)[icount++]=listptr->receptorInfo[1];	  
-	  for(n=0;n<nvar;n++)
-           {
-            qq[n]=0;
-	    for(i=0;i < (itype==0)?p3:8 ;i++)
-	      {
-		weight=listptr->weights[i];
-		qq[n]+=q[index[i]+d3nf*n]*weight;
-	      }
-	   }
-          //writeqnode_(&myid,qq,&nvar);
-	  for(n=0;n<nvar;n++)
-	    (*realData)[dcount++]=qq[n];
-	  listptr=listptr->next;
-	}
-      free(xtmp);
-      free(index);
-      free(qq);
     }
+
+    listptr=interpList;
+    icount=3*nintold;
+    dcount=nrealold;
+    xtmp = (double *)malloc(sizeof(double)*p3*3);
+
+    index = (int *)malloc(sizeof(int)*listptr->nweights);
+
+    ploc=(pdegree)*(pdegree+1)/2;
+    qq=(double *)malloc(sizeof(double)*nvar);
+    while(listptr!=NULL)
+    {
+      if (itype==0)
+      {
+        get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
+            pdegree,dims[0],dims[1],dims[2],nf,
+            xlo,dx,&qnode[ploc],index,xtmp);
+      }
+      else
+      {
+        // inode contains index of lower-left corner of Lagrange reconstruction
+        const int I = listptr->inode[0];
+        const int J = listptr->inode[1];
+        const int K = listptr->inode[2];
+
+        // Shorthands for reconstructing node index
+        const int N = pdegree + 1;
+        const int dj = dims[0];
+        const int dk = dims[0]*dims[1];
+        const int ind = I + dj*J + dk*K;
+
+        // Grab the cube of p3 node indices starting from I,J,K
+        int m = 0;
+        for (int k = 0; k < N; k++)
+          for (int j = 0; j < N; j++)
+            for (int i = 0; i < N; i++)
+            {
+              index[m] = ind + i + dj*(j + dk*k);
+              m++;
+            }
+      }
+
+      (*intData)[icount++]=listptr->receptorInfo[0];
+      (*intData)[icount++]=-1;
+      (*intData)[icount++]=listptr->receptorInfo[1];
+
+      for (int n = 0; n < nvar; n++)
+      {
+        qq[n] = 0;
+        for (int i = 0; i < listptr->nweights; i++)
+        {
+          const double weight = listptr->weights[i];
+          qq[n] += q[index[i]+d3nf*n] * weight;
+        }
+      }
+
+      //writeqnode_(&myid,qq,&nvar);
+      for(n=0;n<nvar;n++)
+        (*realData)[dcount++]=qq[n];
+      listptr=listptr->next;
+    }
+    free(xtmp);
+    free(index);
+    free(qq);
+  }
 }
 
 
@@ -215,15 +228,17 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
       listptr->next=(INTERPLIST2 *)malloc(sizeof(INTERPLIST2));
       listptr=listptr->next;
     }
+
   listptr->next=NULL;
   listptr->inode=NULL;
   listptr->weights=NULL;
   listptr->receptorInfo[0]=procid;
   listptr->receptorInfo[1]=remoteid;
-  for(n=0;n<3;n++)
-    {
-      ix[n]=(xtmp[n]-xlo[n])/dx[n];
-      rst[n]=(xtmp[n]-xlo[n]-ix[n]*dx[n])/dx[n];
+
+  for (int n = 0; n < 3; n++)
+  {
+    ix[n] = (xtmp[n] - xlo[n]) / dx[n];
+    rst[n] = (xtmp[n] - xlo[n] - ix[n]*dx[n]) / dx[n];
       // if (!(ix[n] >=0 && ix[n] < dims[n]) && myid==77) {
       //  tracei(procid);
       //  tracei(global_id);
@@ -245,38 +260,72 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
       //  printf("--------------------------\n");
       // }
      assert((ix[n] >=0 && ix[n] < dims[n]));
-    }
+  }
+
   listptr->inode=(int *)malloc(sizeof(int)*3);
   listptr->inode[0]=ix[0];
   listptr->inode[1]=ix[1];
   listptr->inode[2]=ix[2];
+
   if (itype==0) {
-    listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
+    listptr->nweights = p3;
     listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
     donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
   }
   else
+  {
+    /// TODO: maybe write separate function? (need another to get indices as well)
+    listptr->nweights = p3;
+    listptr->weights = (double *)malloc(sizeof(double)*listptr->nweights);
+
+    // -------------------- from cart_interp.cpp --------------------
+    const int N = pdegree + 1;
+    double dn = 2. / N;
+
+    // Create a local 'reference element' and perform Lagrange interpolation
+    // Element is centered around node i0,j0,k0
+    int I = std::min(std::max(ix[0] - N/2 + 1, 0), dims[0]-N);
+    int J = std::min(std::max(ix[1] - N/2 + 1, 0), dims[1]-N);
+    int K = std::min(std::max(ix[2] - N/2 + 1, 0), dims[2]-N);
+
+    // Change inode to point to the lower-left corner of our constructed element
+    listptr->inode[0] = I;
+    listptr->inode[1] = J;
+    listptr->inode[2] = K;
+
+    double xi  = -1. + 2. * (xtmp[0] - (xlo[0] + I*dx[0])) / (pdegree * dx[0]);
+    double eta = -1. + 2. * (xtmp[1] - (xlo[1] + J*dx[1])) / (pdegree * dx[1]);
+    double nu  = -1. + 2. * (xtmp[2] - (xlo[2] + K*dx[2])) / (pdegree * dx[2]);
+
+    std::vector<double> xiGrid(N); // Equidistant grid from -1 to 1
+    for (int i = 0; i < N; i++)
+      xiGrid[i] = -1. + i * dn;
+
+    std::vector<double> lag_i(N), lag_j(N), lag_k(N);
+    for (int i = 0; i < N; i++)
     {
-      // tri-linear weights for now
-      // JC will improve this
-      // get_cart_interp_weights(&listptr->nweights,&index,&listptr->weights); 
-      listptr->nweights=8;
-      listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
-      listptr->weights[0]=(ONE-rst[0])*(ONE-rst[1])*(ONE-rst[2]);
-      listptr->weights[1]=rst[0]*(ONE-rst[1])*(ONE-rst[2]);
-      listptr->weights[2]=rst[0]*rst[1]*(ONE-rst[2]);
-      listptr->weights[3]=(ONE-rst[0])*rst[1]*(ONE-rst[2]);
-      listptr->weights[4]=(ONE-rst[0])*(ONE-rst[1])*rst[2];
-      listptr->weights[5]=rst[0]*(ONE-rst[1])*rst[2];
-      listptr->weights[6]=rst[0]*rst[1]*rst[2];
-      listptr->weights[7]=(ONE-rst[0])*rst[1]*rst[2];
-      index[0]=(ix[2]+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(ix[1]+nf)*(dims[0]+2*nf)+ix[0]+nf;
-      index[1]=index[0]+1;
-      index[2]=index[1]+(dims[0]+2*nf);
-      index[3]=index[0]+(dims[0]+2*nf);
-      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
-      for(n=0;n<listptr->nweights;n++) ibl[index[n]]=-2;
+      lag_i[i] = tg_funcs::Lagrange(xiGrid.data(), N, xi, i);
+      lag_j[i] = tg_funcs::Lagrange(xiGrid.data(), N, eta, i);
+      lag_k[i] = tg_funcs::Lagrange(xiGrid.data(), N, nu, i);
     }
+
+    // Shorthands for reconstructing node index
+    int ind = I + dims[0] * (J + dims[1] * K);
+    int dj = dims[0];
+    int dk = dims[0]*dims[1];
+
+    int m = 0;
+    for (int k = 0; k < N; k++)
+      for (int j = 0; j < N; j++)
+        for (int i = 0; i < N; i++)
+        {
+          listptr->weights[m] =  lag_i[i] * lag_j[j] * lag_k[k];
+          // Set iblank of this node to be mandatory donor
+          ibl[ind + i + dj*(j + dk*k)] = -2;
+          m++;
+        }
+    // --------------------------------------------------------------------
+  }
       
   free(rst);
 }
@@ -290,32 +339,32 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
   if (itype==0) 
   {
-  amr_index_to_ijklmn(pdegree,dims[0],dims[1],dims[2],nf,qstride,index,ijklmn);
-  //pointid=ijklmn[5]*(pdegree+1)*(pdegree+1)*d3+
-  //        ijklmn[4]*(pdegree+1)*d3+
-  //        ijklmn[3]*d3+
-  //        ijklmn[2]*d2+
-  //        ijklmn[1]*d1+
-  //        ijklmn[0];
-  pointid=(ijklmn[2]*d2+ijklmn[1]*d1+ijklmn[0])*p3+
-           ijklmn[5]*(pdegree+1)*(pdegree+1)+
-           ijklmn[4]*(pdegree+1)+ijklmn[3];
-  if (!(pointid >= 0 && pointid < ndof)) {
-    tracei(index);
-    tracei(nf);
-    tracei(pdegree);
-    tracei(dims[0]);
-    tracei(dims[1]);
-    tracei(dims[2]);
-    tracei(qstride);
-    printf("%d %d %d %d %d %d\n",ijklmn[0],ijklmn[1],ijklmn[2],
-	   ijklmn[3],ijklmn[4],ijklmn[5]);
-  }
-  assert((pointid >= 0 && pointid < ndof));
+    amr_index_to_ijklmn(pdegree,dims[0],dims[1],dims[2],nf,qstride,index,ijklmn);
+    //pointid=ijklmn[5]*(pdegree+1)*(pdegree+1)*d3+
+    //        ijklmn[4]*(pdegree+1)*d3+
+    //        ijklmn[3]*d3+
+    //        ijklmn[2]*d2+
+    //        ijklmn[1]*d1+
+    //        ijklmn[0];
+    pointid=(ijklmn[2]*d2+ijklmn[1]*d1+ijklmn[0])*p3+
+        ijklmn[5]*(pdegree+1)*(pdegree+1)+
+        ijklmn[4]*(pdegree+1)+ijklmn[3];
+    if (!(pointid >= 0 && pointid < ndof)) {
+      tracei(index);
+      tracei(nf);
+      tracei(pdegree);
+      tracei(dims[0]);
+      tracei(dims[1]);
+      tracei(dims[2]);
+      tracei(qstride);
+      printf("%d %d %d %d %d %d\n",ijklmn[0],ijklmn[1],ijklmn[2],
+          ijklmn[3],ijklmn[4],ijklmn[5]);
+    }
+    assert((pointid >= 0 && pointid < ndof));
   }
   else
   {
-   pointid=index;
+    pointid=index;
   }
     
   temp1->donorData[0]=senderid;

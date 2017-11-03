@@ -24,7 +24,9 @@ class CartBlock
  private:
   int local_id;
   int global_id;
-  int dims[3],nf,qstride,ndof,pdegree,p3;
+  int dims[3];         //! # of nodes in each direction for this block
+  int pdegree, p3;     //! Polynomial order "P" of interpolant, and (P+1)^3
+  int nf,qstride,ndof;
   int d1,d2,d3,d3nf;
   int myid;
   int *ibl;

@@ -149,9 +149,7 @@ TIOGA.performConnectivity()
 SAMCART.initData()
 TIOGA.initAMRData(SAMCART.gridData)
 TIOGA.performAMRConnectivity()
-SAMCART.finish()
-MPI.Finalize()
-sys.exit()
+
 # ------------------------------------------------------------
 # Restarting (if requested)
 # ------------------------------------------------------------
@@ -174,6 +172,9 @@ else:
 iter = initIter
 
 ZEFR.writePlotData(iter)
+SAMCART.finish()
+MPI.Finalize()
+sys.exit()
 
 # ------------------------------------------------------------
 # Run the simulation
@@ -210,8 +211,8 @@ for i in range(iter+1,nSteps+1):
         ZEFR.runSubStepMid(i,j)
 
         # Interpolated gradient
-        if viscous:
-            TIOGA.exchangeGradient()
+        #if viscous:
+        #    TIOGA.exchangeGradient()
 
         # Finish residual calculation and RK stage advancement
         # (Should include rigid_body_update() if doing 6DOF from ZEFR)

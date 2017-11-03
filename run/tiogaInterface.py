@@ -114,10 +114,10 @@ class Tioga:
         xyz = arrayToDblPtr(gridData['grid-coordinates'][0])
         c2v = arrayToIntPtr(gridData['hexaConn'][0])
         iblank = arrayToIntPtr(gridData['iblanking'][0])
-        print "wallNode.shape=",gridData['wallnode'][0].shape
-        print "obcNode.shape=",gridData['obcnode'][0].shape
-	#pickle.dump(gridData['wallnode'],open('wallNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
-	#pickle.dump(gridData['obcnode'],open('obcNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
+        print("nwall = {}".format(gridData['wallnode'][0].shape[0]))
+        print("nobc = {}".format(gridData['obcnode'][0].shape[0]))
+        #pickle.dump(gridData['wallnode'],open('wallNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
+        #pickle.dump(gridData['obcnode'],open('obcNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         overNodes = arrayToIntPtr(gridData['obcnode'][0])
         wallNodes = arrayToIntPtr(gridData['wallnode'][0])
 
@@ -245,7 +245,7 @@ class Tioga:
             idata[m]   =gridData['gridParam'][i][0] # global id of patch
             idata[m+1] =gridData['gridParam'][i][1] # level number of patch 
             idata[m+2] =gridData['gridParam'][i][3] # proc id containing patch
-            idata[m+3] =0                        # porder (set to zero for FD) 
+            idata[m+3] =gridData['porder']          # porder (order of Lagrange reconstruction to use) 
             idata[m+4] =local2global[idata[m]]   # local number of patch  
             idata[m+5] =gridData['ilo'][i][0]       # lower left-hand front global numbering (x)
             idata[m+6] =gridData['ilo'][i][1]       # lower left-hand front global numbering (y)

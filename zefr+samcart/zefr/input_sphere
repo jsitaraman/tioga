@@ -25,7 +25,7 @@ mesh_bound  sphere  wall_ns_adi
 # =============================================================
 # Solver:
 equation  EulerNS    (AdvDiff, EulerNS)
-order     1
+order     2
 viscous   1
 motion    0
 

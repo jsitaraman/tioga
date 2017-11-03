@@ -106,7 +106,6 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
             xlo,dx,&qnode[ploc],index,xtmp);
       }
       else
-<<<<<<< HEAD
       {
         // inode contains index of lower-left corner of Lagrange reconstruction
         const int I = listptr->inode[0];
@@ -148,62 +147,6 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       for(n=0;n<nvar;n++)
         (*realData)[dcount++]=qq[n];
       listptr=listptr->next;
-=======
-	{
-	  // need to fix this as well with high-order stencil
-	  // JC
-	  // This should copy out data created in 'insertInInterpList'
-	  index = (int *)malloc(sizeof(int)*listptr->nweights);
-	}
-      ploc=(pdegree)*(pdegree+1)/2;
-      qq=(double *)malloc(sizeof(double)*nvar);
-      while(listptr!=NULL)
-	{
-	  if (itype==0) 
-	    {
-	      get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
-				pdegree,dims[0],dims[1],dims[2],nf,
-				xlo,dx,&qnode[ploc],index,xtmp);
-              npnode=p3;
-	    }
-	  else
-	    {
-              ix[0]=listptr->inode[0];
-	      ix[1]=listptr->inode[1];
-              ix[2]=listptr->inode[2];
-	      index[0]=(ix[2]+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(ix[1]+nf)*(dims[0]+2*nf)+ix[0]+nf;
-	      index[1]=index[0]+1;
-	      index[2]=index[1]+(dims[0]+2*nf);
-	      index[3]=index[0]+(dims[0]+2*nf);
-	      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
-              //
-              // JC needs to change this for
-              // high-order interp
-              //  
-              npnode=8;
-	    }
-	  (*intData)[icount++]=listptr->receptorInfo[0];
-	  (*intData)[icount++]=-1;
-	  (*intData)[icount++]=listptr->receptorInfo[1];	  
-	  for(n=0;n<nvar;n++)
-           {
-            qq[n]=0;
-	    for(i=0;i < npnode ;i++)
-	      {
-		weight=listptr->weights[i];
-                assert((index[i] >=0 && index[i] < d3nf));
-		qq[n]+=q[index[i]+d3nf*n]*weight;
-	      }
-	   }
-          //writeqnode_(&myid,qq,&nvar);
-	  for(n=0;n<nvar;n++)
-	    (*realData)[dcount++]=qq[n];
-	  listptr=listptr->next;
-	}
-      free(xtmp);
-      free(index);
-      free(qq);
->>>>>>> 12d019a0901249d7d58f588253ec3cd03746c3f7
     }
     free(xtmp);
     free(index);

@@ -52,7 +52,7 @@ class CartBlock
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData,
 			   int nvar,int itype=0);
-  void update(double *qval,int index,int nq);
+  void update(double *qval,int index,int nq,int itype=0);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh,int itype=0);
   void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes,int itype);

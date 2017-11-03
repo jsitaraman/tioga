@@ -62,6 +62,8 @@ void tioga_performconnectivity_amr_(void);
 
 void tioga_dataupdate_(double *q,int *nvar,char *itype);
 
+void tioga_dataupdate_amr(double *q, int nvar, int interptype);
+
 void tioga_dataupdate_ab(int nvar, int gradFlag = 0);
 
 void tioga_dataupdate_ab_send(int nvar, int gradFlag = 0);

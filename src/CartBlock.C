@@ -43,7 +43,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData,
 				    int nvar,int itype)
 {
-  int i,n;
+  int i,n,npnode;
   int ploc;
   double *xtmp;
   int *index;
@@ -106,6 +106,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 	      get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
 				pdegree,dims[0],dims[1],dims[2],nf,
 				xlo,dx,&qnode[ploc],index,xtmp);
+              npnode=p3;
 	    }
 	  else
 	    {
@@ -117,6 +118,11 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 	      index[2]=index[1]+(dims[0]+2*nf);
 	      index[3]=index[0]+(dims[0]+2*nf);
 	      for(n=0;n<4;n++) index[n+4]=index[n]+(dims[1]+2*nf)*(dims[0]+2*nf);
+              //
+              // JC needs to change this for
+              // high-order interp
+              //  
+              npnode=8;
 	    }
 	  (*intData)[icount++]=listptr->receptorInfo[0];
 	  (*intData)[icount++]=-1;
@@ -124,9 +130,10 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 	  for(n=0;n<nvar;n++)
            {
             qq[n]=0;
-	    for(i=0;i < (itype==0)?p3:8 ;i++)
+	    for(i=0;i < npnode ;i++)
 	      {
 		weight=listptr->weights[i];
+                assert((index[i] >=0 && index[i] < d3nf));
 		qq[n]+=q[index[i]+d3nf*n]*weight;
 	      }
 	   }
@@ -142,11 +149,25 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 }
 
 
-void CartBlock::update(double *qval, int index,int nq)
+void CartBlock::update(double *qval, int index,int nq,int itype)
 {
   int i;
-  for(i=0;i<nq;i++)
-    q[index+d3nf*i]=qval[i];
+  if (itype==0) 
+   {
+    for(i=0;i<nq;i++)
+      q[index+d3nf*i]=qval[i];
+   }
+  else
+   {
+     int itmp=index;
+     int k=itmp/(dims[1]*dims[0]);
+     itmp=itmp%(dims[1]*dims[0]);
+     int j=itmp/dims[0];
+     int i=itmp%dims[0];
+     itmp=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+     for(i=0;i<nq;i++)
+       q[itmp+d3nf*i]=qval[i];
+   }
 }
 
   

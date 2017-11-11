@@ -129,12 +129,30 @@ int MeshBlock::getIterIblanks(void)
 
   // ibc_0 is the current blanking, iblank_cell is the new blanking,
   // and ibc_2 is the estimate for the end of the time step
-  for (int ic = 0; ic < ncells; ic++)
+  if (gridType == 0) // Grid being cut by overset boundary surfaces
   {
-    if ((ibc_0[ic] != NORMAL) && (ibc_2[ic] == NORMAL || iblank_cell[ic] == NORMAL))
+    for (int ic = 0; ic < ncells; ic++)
     {
-      unblanks.insert(ic);
-      iblank_cell[ic] = FRINGE;
+      if ((ibc_0[ic] != NORMAL) && (ibc_2[ic] == NORMAL || iblank_cell[ic] == NORMAL))
+      {
+        unblanks.insert(ic);
+        iblank_cell[ic] = FRINGE;
+      }
+    }
+  }
+  else if (gridType == 1) // Grid being cut by solid wall surfaces
+  {
+    for (int ic = 0; ic < ncells; ic++)
+    {
+      if (ibc_2[ic] == HOLE)
+      {
+        iblank_cell[ic] = HOLE;
+      }
+      else if ((ibc_0[ic] != NORMAL) && (ibc_2[ic] == NORMAL && iblank_cell[ic] == NORMAL))
+      {
+        unblanks.insert(ic);
+        iblank_cell[ic] = FRINGE;
+      }
     }
   }
 
@@ -559,10 +577,10 @@ void MeshBlock::directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvert
     std::vector<double> &cutBbox, HOLEMAP &holeMap, CutMap &cutMap, int cutType)
 {
 #ifdef _GPU
+  PUSH_NVTX_RANGE("DC-GPU",4);
   cutMap.flag.resize(ncells);
 
   // Call out to the device to perform the cutting
-  PUSH_NVTX_RANGE("DC-GPU",4);
   mb_d.assignHoleMap(holeMap.existWall, holeMap.nx, holeMap.sam, holeMap.extents);
   mb_d.directCut(cutFaces.data(), nCut, nvertf, cutBbox.data(), cutMap.flag.data(), cutType);
   POP_NVTX_RANGE;

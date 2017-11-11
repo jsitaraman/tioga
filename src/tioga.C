@@ -178,7 +178,7 @@ void tioga::setIterIblanks(double dt, int nvar)
 
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
-if (nunblank > 0) printf("Rank %d unblanking %d elements\n",myid,nunblank);
+//if (nunblank > 0) printf("Rank %d unblanking %d elements\n",myid,nunblank);
   mb->calcFaceIblanks(meshcomm);
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
@@ -200,7 +200,7 @@ void tioga::unblankPart1(void)
 
   mb->updateOBB();
 
-  doHoleCutting();
+  doHoleCutting(true);
 }
 
 void tioga::unblankPart2(int nvar)
@@ -215,7 +215,7 @@ void tioga::unblankPart2(int nvar)
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
 
-  if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank); /// DEBUGGING
+  //if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank); /// DEBUGGING
   mb->calcFaceIblanks(meshcomm);
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
@@ -235,7 +235,7 @@ void tioga::unblankPart2(int nvar)
 #else
 #define TG_NORMAL
 #endif
-void tioga::doHoleCutting(void)
+void tioga::doHoleCutting(bool unblanking)
 {
 #ifdef TG_NORMAL
   Timer tgTime("Normal Version: ");
@@ -282,20 +282,31 @@ void tioga::doHoleCutting(void)
 #endif
 
 #ifdef TG_DIRECTCUT
-  PUSH_NVTX_RANGE("DirectCut", 2);
   Timer dcTime("Direct Cut: ");
   dcTime.startTimer();
+
+  PUSH_NVTX_RANGE("HoleMaps", 4);
   // Generate structured map of solid boundary (hole) locations
   if (holeMap == NULL || overMap.size() == 0)
   {
     getHoleMap();
     getOversetMap();
   }
-  exchangeBoxes();
-  directCut();
-  mb->calcFaceIblanks(meshcomm);
-  dcTime.stopTimer();
   POP_NVTX_RANGE;
+
+  PUSH_NVTX_RANGE("ExchangeBoxes", 1);
+  if (!unblanking)
+    exchangeBoxes();
+  POP_NVTX_RANGE;
+
+  directCut();
+
+  PUSH_NVTX_RANGE("FaceIblanks", 3);
+  if (!unblanking)
+    mb->calcFaceIblanks(meshcomm);
+  POP_NVTX_RANGE;
+
+  dcTime.stopTimer();
 #endif
 }
 
@@ -308,12 +319,17 @@ void tioga::doPointConnectivity(bool unblanking)
 
   // Exchange new list of points, including high-order Artificial Boundary
   // face points or internal points (or fringe nodes for non-high order)
+  PUSH_NVTX_RANGE("TG-COMM", 2);
   exchangePointSearchData();
+  POP_NVTX_RANGE;
 
   // Search for donor cells for all given points
+  PUSH_NVTX_RANGE("TG-ADT",7);
   mb->search();
+  POP_NVTX_RANGE
 
   // Setup interpolation weights and such for final interp-point list
+  PUSH_NVTX_RANGE("CU-MEMCPY", 6);
 #ifdef _GPU
   mb->processPointDonorsGPU();
 #else
@@ -323,6 +339,7 @@ void tioga::doPointConnectivity(bool unblanking)
 #ifdef _GPU
   setupCommBuffersGPU();
 #endif
+  POP_NVTX_RANGE;
   //mb->writeCellFile(myid,NULL);
 }
 
@@ -358,7 +375,7 @@ void tioga::performConnectivityHighOrder(void)
 
 void tioga::directCut(void)
 {
-  PUSH_NVTX_RANGE("DC-PreProc",1);
+  PUSH_NVTX_RANGE("DC-PreProc",2);
 
   int nDims = mb->nDims;
 
@@ -1117,12 +1134,14 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 
   interpTime.startTimer();
 
+  PUSH_NVTX_RANGE("Interp", 2);
   if (dataFlag == 0)
     mb->interpSolution_gpu(ubuf_d.data(), nvar);
   else
     mb->interpGradient_gpu(ubuf_d.data(), nvar);
 
   ubuf_h.assign(ubuf_d.data(), ubuf_d.size(), &mb->stream_handle);
+  POP_NVTX_RANGE;
 
   interpTime.stopTimer();
 
@@ -1229,9 +1248,12 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
       }
     }
     fp.close();
+
+    MPI_Allreduce(MPI_IN_PLACE, &norphanPoint, 1, MPI_INT, MPI_SUM, scomm);
+
     if (norphanPoint > 0) {
-      printf("Orphan points found!\n");
-      //MPI_Finalize();
+      if (myid == 0) printf("Orphan points found!\n");
+      MPI_Finalize();
       exit(2);
     }
     if (norphanPoint > 0 && iorphanPrint) {

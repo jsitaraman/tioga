@@ -1611,7 +1611,7 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
 
   /// Or TODO on storing href in global memory instead...
   const float href = eleBbox[16*IC+15];
-  const float dtol = 1e-1*href;
+  const float dtol = .2*href;
 
   // Only checking half the element's faces; figure out which ones
   const char corner = corners[nEles*FID+IC];
@@ -1745,13 +1745,14 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
 
   const int ic = eleList[IC];
 
-  const float dtol = .05*eleBbox[16*IC+15];
+  const float dtol = .1*eleBbox[16*IC+15];
 
   // Find nearest face distance for this element
 
   int nMin = 0;
   char myFlag = DC_UNASSIGNED;
   float minDist = BIG_FLOAT;
+  float myDot = 0.f;
   dPointf myNorm;
 
   for (int F = 0; F < NF2; F++)
@@ -1776,11 +1777,11 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
       // Unflagged cell, or have a closer face to use
       minDist = dist;
       myNorm = norm;
-      double dot = myNorm*vec;
+      myDot = myNorm*vec;
 
       nMin = 1;
 
-      if (dot < 0)
+      if (myDot < 0)
         myFlag = DC_HOLE; // outwards normal = inside cutting surface
       else
         myFlag = DC_NORMAL;
@@ -1793,12 +1794,9 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
         myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
       nMin++;
 
-      //myDot = norm*vec;
-      double dot = 0.;
-      for (int d = 0; d < 3; d++)
-        dot += myNorm[d]*vec[d];
+      myDot = myNorm*vec;
 
-      if (dot < 0)
+      if (myDot < 0)
         myFlag = DC_HOLE; // outwards normal = inside cutting surface
       else
         myFlag = DC_NORMAL;
@@ -1878,7 +1876,7 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
         double x2[3] = {0.,0.,0.};
         for (int d1 = 0; d1 < 3; d1++)
           for (int d2 = 0; d2 < 3; d2++)
-            x2[d1] += mb.Rmat[d1+3*d2]*(xc[d2]-mb.offset[d2]);
+            x2[d1] += mb.Rmat[d1+3*d2]*(xc[d2]-mb.offset[d2]); //! TODO: include Rmat from other grid
 
         for (int d = 0; d < 3; d++)
           xc[d] = x2[d];
@@ -2074,7 +2072,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
   dvec<float> eleXC, faceXC;
 
-  if (nfiltC > 0)
+  if (nfiltC > 0 && nfiltF > 0)
   {
     /* Pass 0: 'Coarse-Grained' Check using Bounding Boxes
      * Pass 1: 'Medium-Grained' Check using Linear Parts of Elements/Faces
@@ -2102,7 +2100,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     getElementOrientedBoundingBoxes<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleBbox);
 
     getElementCentroids<<<BlocksB,ThreadsB>>>(*this, filt_eles, nfiltC, eleXC);
-
     int ThreadsF = 128;
     int BlocksF = (nfiltF + ThreadsF - 1) / ThreadsF;
 
@@ -2111,7 +2108,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
     // Have each filtered element calculate a rough distance to each filtered face
 
-    dim3 Threads0(32,4);
+    dim3 Threads0(16,8);
     dim3 Blocks0( (nfiltC + Threads0.x - 1) / Threads0.x,
                   (nfiltF + Threads0.y - 1) / Threads0.y );
 
@@ -2169,7 +2166,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     }
     check_error();
 
-    int BlocksM = (nfiltC + 32 - 1) / 32;
+    int BlocksM = (nfiltC + t3.x - 1) / t3.x;
     getMinDist<<<BlocksM, t3>>>(cfDist, cfVec, nfiltC, nTri);
 
     getFinalFlag<<<BlocksM, 128>>>(filt_eles, checkFaces, cutFaces, eleBbox,

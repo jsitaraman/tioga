@@ -141,10 +141,10 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
 
   // find the extents of the box
   // and coordinates of the center w.r.t. xc
-  // increase extents by 1% for tolerance
+  // increase extents by 5% for tolerance - NECESSARY FOR MOVING GRIDS!!
   for (int j = 0; j < 3; j++)
   {
-    dxc[j] = (xmax[j] - xmin[j]) * 0.5 * 1.01;
+    dxc[j] = (xmax[j] - xmin[j]) * 0.5 * 1.05;
     xd[j] = (xmax[j] + xmin[j]) * 0.5;
   }
   

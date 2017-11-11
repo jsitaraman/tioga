@@ -126,7 +126,7 @@ class tioga
   int nprocMesh, meshRank;
 
   int nCutFringe, nCutHole;   //! # of fringe/hole-cutting faces on this rank
-  int gridType;               //! Type of grid: background (0) or normal (1)
+  int gridType = 0;           //! Type of grid: background (0) or body (1)
   int nGrids;
   std::vector<int> gridIDs;   //! Grid ID for each rank
   std::vector<int> gridTypes; //! Grid type for each rank
@@ -252,7 +252,7 @@ class tioga
   void setIterIblanks(double dt, int nvar);
   void unblankPart1(void);
   void unblankPart2(int nvar);
-  void doHoleCutting(void);
+  void doHoleCutting(bool unblanking = false);
   void doPointConnectivity(bool unblanking = false);
 
   void setTransform(double *mat, double *off, int nDims) { mb->setTransform(mat,off,nDims); }

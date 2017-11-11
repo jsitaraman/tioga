@@ -135,7 +135,7 @@ spt_type   Legendre
 fconv_type Rusanov
 fvisc_type LDG
 rus_k      0.0
-ldg_b      0.0
+ldg_b      0.5
 ldg_tau    1.0
 
 # Multigrid:

@@ -11,7 +11,7 @@
 #include "cuda_runtime.h"
 #include "nvToolsExt.h"
 
-const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff };
+const uint32_t colors[] = { 0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff, 0xff000000 };
 const int num_colors = sizeof(colors)/sizeof(uint32_t);
 
 #define PUSH_NVTX_RANGE(name,cid) { \

@@ -161,34 +161,36 @@ void tioga::getOversetMap(void)
   MPI_Allreduce(&meshtag, &nmesh, 1, MPI_INT, MPI_MAX, scomm);
   nmesh += 1;
 
+  for (auto &omap: overMap)
+  {
+    free(omap.sam);
+    omap.sam = NULL;
+  }
+
   overMap.resize(nmesh);
 
-  std::vector<int> existHoleLocal(nmesh);
   std::vector<int> existHole(nmesh);
 
-  existHoleLocal[meshtag] = existOver;
+  existHole[meshtag] = existOver;
 
-  MPI_Allreduce(existHoleLocal.data(),existHole.data(),nmesh,MPI_INT,MPI_MAX,scomm);
+  MPI_Allreduce(MPI_IN_PLACE,existHole.data(),nmesh,MPI_INT,MPI_MAX,scomm);
 
   for (int i = 0; i < nmesh; i++) overMap[i].existWall = existHole[i];
 
-  std::vector<double> bboxLocal(6*nmesh);
   std::vector<double> bboxGlobal(6*nmesh);
 
-  for (int i = 0; i < 3*nmesh; i++) bboxLocal[i]          =  BIGVALUE;
-  for (int i = 0; i < 3*nmesh; i++) bboxLocal[i+3*nmesh]  = -BIGVALUE;
   for (int i = 0; i < 3*nmesh; i++) bboxGlobal[i]         =  BIGVALUE;
   for (int i = 0; i < 3*nmesh; i++) bboxGlobal[i+3*nmesh] = -BIGVALUE;
 
   for (int i = 0;  i < 3; i++)
   {
-    bboxLocal[3*meshtag+i] = wbox[i];
-    bboxLocal[3*meshtag+i+3*nmesh] = wbox[i+3];
+    bboxGlobal[3*meshtag+i] = wbox[i];
+    bboxGlobal[3*meshtag+i+3*nmesh] = wbox[i+3];
   }
 
   // Get the global bounding box info across all the partitions for all meshes
-  MPI_Allreduce(&bboxLocal[0],        &bboxGlobal[0],        3*nmesh,MPI_DOUBLE,MPI_MIN,scomm);
-  MPI_Allreduce(&(bboxLocal[3*nmesh]),&(bboxGlobal[3*nmesh]),3*nmesh,MPI_DOUBLE,MPI_MAX,scomm);
+  MPI_Allreduce(MPI_IN_PLACE, &bboxGlobal[0],        3*nmesh,MPI_DOUBLE,MPI_MIN,scomm);
+  MPI_Allreduce(MPI_IN_PLACE, &(bboxGlobal[3*nmesh]),3*nmesh,MPI_DOUBLE,MPI_MAX,scomm);
 
   // Find the bounding box for each mesh from the globally reduced data
   for (int i = 0; i < nmesh; i++)

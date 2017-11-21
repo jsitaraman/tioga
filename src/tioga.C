@@ -287,11 +287,11 @@ void tioga::doHoleCutting(bool unblanking)
 
   PUSH_NVTX_RANGE("HoleMaps", 4);
   // Generate structured map of solid boundary (hole) locations
-  if (holeMap == NULL || overMap.size() == 0)
-  {
+//  if (holeMap == NULL || overMap.size() == 0)
+//  {
     getHoleMap();
     getOversetMap();
-  }
+//  }
   POP_NVTX_RANGE;
 
   PUSH_NVTX_RANGE("ExchangeBoxes", 1);
@@ -467,6 +467,32 @@ void tioga::directCut(void)
   MPI_Waitall((int)sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
   MPI_Waitall((int)rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
 
+  // Get global AABB for each cutting surface
+  for (int p = 0; p < nproc; p++)
+  {
+    int g = gridIDs[p];
+    if (g == mytag) continue;
+
+    for (int d = 0; d < nDims; d++)
+    {
+      bbox_g[g][d] = std::min(bbox_g[g][d], bbox_tmp[2*nDims*p+d]);
+      bbox_g[g][d+nDims] = std::max(bbox_g[g][d+nDims], bbox_tmp[2*nDims*p+d+nDims]);
+    }
+  }
+
+  // Get a 'reference length' / error tolerance for each cutting surface
+  std::vector<double> href_g(nGrids);
+  for (int g = 0; g < nGrids; g++)
+  {
+    if (g == mytag) continue;
+
+    // 3% of the longest side length of the surface's AABB
+    href_g[g] = .03 * max(max(bbox_g[g][3]-bbox_g[g][0], bbox_g[g][4]-bbox_g[g][1]),
+                          bbox_g[g][5]-bbox_g[g][2]);
+    // (This is designed to be larger than the 'ds' used in the hole map)
+  }
+
+
   // Figure out which ranks cut faces must be sent/received from
 
   std::vector<int> dcSndMap;  // List of ranks to send cut faces to
@@ -480,8 +506,10 @@ void tioga::directCut(void)
     int g = gridIDs[p];
     if (g == mytag) continue;
 
-    // Check if our bbox overlaps with other rank's cut-group bbox
-    if (nFace_p[p] > 0 && tg_funcs::boundingBoxCheck(mb->aabb, &bbox_tmp[2*nDims*p], 3))
+    // Check if our bbox overlaps with global cut-group bbox and nearly-overlaps
+    // with other rank's local cut-group bbox [within tolerance 'href']
+    if (nFace_p[p] > 0 && tg_funcs::boundingBoxCheck(mb->aabb, &bbox_g[g][0], 3)
+        && tg_funcs::boundingBoxCheck(mb->aabb, &bbox_tmp[2*nDims*p], 3, href_g[g]))
       dcRcvMap.push_back(p);
 
     double *Bptr;
@@ -582,12 +610,18 @@ void tioga::directCut(void)
   MPI_Waitall((int)sreqs.size(), sreqs.data(), MPI_STATUSES_IGNORE);
   MPI_Waitall((int)rreqs.size(), rreqs.data(), MPI_STATUSES_IGNORE);
 
-  // Reduce the bounding box data to one box per grid
-  //for (int p = 0; p < nproc; p++)
+  // Reduce the bounding box data to one box per grid, using only bboxes of
+  // ranks sending faces to us
   for (int i = 0; i < nrecv; i++)
   {
     int p = dcRcvMap[i];
     int g = gridIDs[p];
+
+    for (int d = 0; d < nDims; d++)
+    {
+      bbox_g[g][d]       =  BIG_DOUBLE;
+      bbox_g[g][d+nDims] = -BIG_DOUBLE;
+    }
 
     for (int d = 0; d < nDims; d++)
     {

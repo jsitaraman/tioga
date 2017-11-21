@@ -269,11 +269,7 @@ void fillHoleMap(int *holeMap, int ix[3],int isym)
         }
   }
 
-  //! For Direct Cut - want to keep info about boundary-containing cells
-//  for (int i = 0; i < ix[2]*ix[1]*ix[0]; i++)
-//  {
-//    holeMap[i] = (holeMap[i] == 0 || holeMap[i] == 2);
-//  }
+  // For Direct Cut - want to keep info about boundary-containing cells
   for (int i = 0; i < ix[2]*ix[1]*ix[0]; i++)
   {
     if (holeMap[i] != 2)

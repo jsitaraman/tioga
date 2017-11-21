@@ -1786,15 +1786,28 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
       else
         myFlag = DC_NORMAL;
     }
-    else if (fabs(dist - minDist) <= .02*dtol)
+    else if (fabs(dist - minDist) <= .02*dtol && minDist > 0.)
     {
-      // Approx. same dist. to two faces; avg. their normals to decide
-      minDist = dist;
-      for (int d = 0; d < 3; d++)
-        myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
-      nMin++;
+      double dot = norm*vec;
 
-      myDot = myNorm*vec;
+      if (fabs(dot) > fabs(myDot) - .01)
+      {
+        if (fabs(dot) > fabs(myDot))
+        {
+          myNorm = norm; // swap to better normal
+          myDot = dot;
+        }
+      }
+      else if (sgn(dot) != sgn(myDot))
+      {
+        // Approx. same dist. to two faces; avg. their normals to decide
+        minDist = dist;
+        for (int d = 0; d < 3; d++)
+          myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
+        nMin++;
+
+        myDot = myNorm*vec;
+      }
 
       if (myDot < 0)
         myFlag = DC_HOLE; // outwards normal = inside cutting surface
@@ -1842,7 +1855,10 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
   // Set all cell flags initially to DC_NORMAL (filtered cells will remain 'NORMAL')
   cutFlag[ic] = DC_NORMAL;
 
-  float href = .005f/3.f*(bboxF[3]-bboxF[0]+bboxF[4]-bboxF[1]+bboxF[5]-bboxF[2]);
+  // Use hole map block size as ref. length [times ~sqrt(3)]
+  float href = 0.f;
+  for (int i = 0; i < 3; i++)
+    href = fmax(href, 2.f*(mb.hm_extents[i+3]-mb.hm_extents[i]) / mb.hm_nx[i]);
 
   // Get element nodes
   float xv[nvert*3];
@@ -1854,46 +1870,48 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
   float bboxC[6], xc[3];
   cuda_funcs::getBoundingBox<3,nvert>(xv, bboxC);
 
-  bool checkH = false;
+  bool tag1 = false; // Inside hole
+  bool tag2 = false; // Near boundary of hole
 
-  if (cutType == 1)
+  if (cutType == 0)
+    tag1 = true;
+
+  // Check the hole map status of all nodes
+  for (int i = 0; i < 8; i++)
   {
-    // Wall boundary - set as hole if centroid inside wall
-    cuda_funcs::getCentroid<3,nvert>(xv, xc);
-    char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
-    checkH = (tag != 1);
-  }
-  else
-  {
-    // Overset boundary - only set as hole if entirely inside hole map
-    for (int i = 0; i < 8; i++)
+    for (int d = 0; d < 3; d++)
+      xc[d] = xv[3*i+d];
+
+    if (mb.rrot) // Transform xc to hole map's coordinate system
     {
+      double x2[3] = {0.,0.,0.};
+      for (int d1 = 0; d1 < 3; d1++)
+        for (int d2 = 0; d2 < 3; d2++)
+          x2[d1] += mb.Rmat[d1+3*d2]*(xc[d2]-mb.offset[d2]); //! TODO: include Rmat from other grid
+
       for (int d = 0; d < 3; d++)
-        xc[d] = xv[3*i+d];
-
-      if (mb.rrot) // Transform xc to hole map's coordinate system
-      {
-        double x2[3] = {0.,0.,0.};
-        for (int d1 = 0; d1 < 3; d1++)
-          for (int d2 = 0; d2 < 3; d2++)
-            x2[d1] += mb.Rmat[d1+3*d2]*(xc[d2]-mb.offset[d2]); //! TODO: include Rmat from other grid
-
-        for (int d = 0; d < 3; d++)
-          xc[d] = x2[d];
-      }
-
-      char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
-      checkH = checkH || (tag != 1);
+        xc[d] = x2[d];
     }
+
+    char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
+
+    if (cutType == 1) // Wall boundary - if any nodes have tag == 1, set as hole
+      tag1 = tag1 || (tag == 1);
+    else      // Overset boundary - only remove elements if entirely in hole map
+      tag1 = tag1 && (tag == 1);
+
+    // Otherwise, if any nodes have non-zero tag, keep around for distance calc
+    tag2 = tag2 || (tag != 0);
   }
 
+  bool checkH = !tag1;
   bool checkB = cuda_funcs::boundingBoxCheck<3>(bboxC, bboxF, href);
 
   // If filtering element due to being completely inside hole region, tag as hole
-  if (!checkH)
+  if (tag1)
     cutFlag[ic] = DC_HOLE;
 
-  if (checkH && checkB)
+  if ( checkH && (checkB || tag2) ) // Not a hole, but near the boundary
   {
     int ind = atomicAggInc(&nfilt[0]);
     filt[ind] = ic;
@@ -1909,21 +1927,14 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
  *  from consideration (obviously do not intersect) */
 template<int nvertf>
 __global__
-void filterFaces(dvec<float> ele_bbox, int nCut,
-    dvec<float> cutFaces, dvec<int> filt, dvec<int> nfilt, dvec<float> bboxOut)
+void filterFaces(dMeshBlock mb, dvec<float> ele_bbox, int nCut,
+    dvec<float> cutFaces, dvec<int> filt, dvec<int> nfilt)
 {
   const unsigned int ff = blockIdx.x * blockDim.x + threadIdx.x;
 
   // Initialize nfilt to 0; will be atomically added to at end
   if (ff == 0)
-  {
     nfilt[1] = 0;
-    for (int d = 0; d < 3; d++)
-    {
-      bboxOut[d]   =  1e10f;
-      bboxOut[d+3] = -1e10f;
-    }
-  }
 
   __shared__ float bboxE[6]; // Global bounding box of all filtered elements
 
@@ -1934,7 +1945,10 @@ void filterFaces(dvec<float> ele_bbox, int nCut,
 
   if (ff >= nCut) return;
 
-  float href = .01f/3.f*(bboxE[3]-bboxE[0]+bboxE[4]-bboxE[1]+bboxE[5]-bboxE[2]);
+  // Use hole map block size as ref. length [times ~sqrt(3)]
+  float href = 0.f;
+  for (int i = 0; i < 3; i++)
+    href = fmax(href, 2.f*(mb.hm_extents[i+3]-mb.hm_extents[i]) / mb.hm_nx[i]);
 
   // Get face nodes
   float fxv[nvertf*3];
@@ -1952,11 +1966,6 @@ void filterFaces(dvec<float> ele_bbox, int nCut,
   {
     int ind = atomicAggInc(&nfilt[1]);
     filt[ind] = ff;
-    for (int d = 0; d < 3; d++)
-    {
-       atomicMinf(&bboxOut[d], bboxF[d]);
-       atomicMaxf(&bboxOut[d+3], bboxF[d+3]);
-    }
   }
 }
 
@@ -1992,7 +2001,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   nfilt_d.assign(nfilt_h.data(), nfilt_h.size());
 
   ele_bbox.resize(6);
-  face_bbox.resize(6);
 
   int threads = 128;
   int blocks = (ncells + threads - 1) / threads;
@@ -2033,13 +2041,13 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
   switch(nvertf)
   {
     case 4:
-      filterFaces<4><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      filterFaces<4><<<blocks, threads, 6*sizeof(float)>>>(*this, ele_bbox, nCut, cutFaces, filt_faces, nfilt_d);
       break;
     case 9:
-      filterFaces<9><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      filterFaces<9><<<blocks, threads, 6*sizeof(float)>>>(*this, ele_bbox, nCut, cutFaces, filt_faces, nfilt_d);
       break;
     case 16:
-      filterFaces<16><<<blocks, threads, 6*sizeof(float)>>>(ele_bbox, nCut, cutFaces, filt_faces, nfilt_d, face_bbox);
+      filterFaces<16><<<blocks, threads, 6*sizeof(float)>>>(*this, ele_bbox, nCut, cutFaces, filt_faces, nfilt_d);
       break;
     default:
       printf("nvertf = %d\n",nvertf);

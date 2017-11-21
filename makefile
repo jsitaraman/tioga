@@ -98,7 +98,7 @@ lib:	$(OBJECTS) $(OBJF90)
 
 shared:	$(OBJECTS) $(OBJF90)
 	@mkdir -p bin
-	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o $(BINDIR)/lib$(MODULENAME)-dbg.so -lc $(LIBS)
+	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o $(BINDIR)/lib$(MODULENAME).so -lc $(LIBS)
 
 swig: CFLAGS += $(SFLAGS)
 swig: $(OBJECTS) $(OBJF90) $(OBJSWIG)

@@ -2116,7 +2116,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
 
     // Have each filtered element calculate a rough distance to each filtered face
 
-    dim3 Threads0(16,8);
+    dim3 Threads0(4,32);
     dim3 Blocks0( (nfiltC + Threads0.x - 1) / Threads0.x,
                   (nfiltF + Threads0.y - 1) / Threads0.y );
 

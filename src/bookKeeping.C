@@ -80,7 +80,7 @@ void MeshBlock::getMBDonorPktSizes
     if (donorId[i] > -1) {
       int ii = isearch[3*i];
       nints[ii] += 4;
-      nreals[ii]++;
+      nreals[ii]+=2;
     }
   }
 }
@@ -103,6 +103,9 @@ void MeshBlock::getMBDonorPackets
     sndPack[k].intData[ix++] = isearch[3*i + 1];  // point ID
     sndPack[k].intData[ix++] = i;                 // point ID on donor side
     sndPack[k].intData[ix++] = isearch[3*i + 2];  // receptor block ID
+    sndPack[k].realData[rx++]=cellRes[donorId[i]];
+    sndPack[k].realData[rx++]=res_search[xtag[i]];
+    /*
     if ( (xtag[i]!=i || res_search[i]!=res_search0[i]) 
          && res_search[xtag[i]]==BIGVALUE 
          && cellRes[donorId[i]]!=BIGVALUE) 
@@ -113,6 +116,7 @@ void MeshBlock::getMBDonorPackets
       {
 	sndPack[k].realData[rx++] = cellRes[donorId[i]];
       }
+    */
   }  
 }
 
@@ -135,7 +139,7 @@ void MeshBlock::initializeDonorList(void)
 }
 
 void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int remoteid,
-			      double donorRes)
+			      double donorRes,double receptorRes)
 {
   DONORLIST *temp1;
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
@@ -143,6 +147,7 @@ void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int rem
   temp1->donorData[1]=meshtagdonor;
   temp1->donorData[2]=remoteid;
   temp1->donorRes=donorRes;
+  temp1->receptorRes=receptorRes;
   insertInList(&donorList[pointid],temp1);
 }
 
@@ -198,6 +203,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
                TRACEI(meshtagdonor);
 	       TRACED(temp->donorRes);
               }
+              nodeRes[i]=MAX(nodeRes[i],temp->receptorRes);
 	      temp=temp->next;
 	    }
 	  for(j=0;j<nmesh;j++)
@@ -319,7 +325,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
               break;
              }
            }
-          if (temp->donorRes < 0) nodeRes[i]=BIGVALUE;
+          //if (temp->donorRes < 0) nodeRes[i]=BIGVALUE;
 	  (*receptorResolution)[k++]=(resolutionScale > 1.0) ? -nodeRes[i]:nodeRes[i];
 	  (*donorRecords)[m++]=temp->donorData[0];
 	  (*donorRecords)[m++]=temp->donorData[2];

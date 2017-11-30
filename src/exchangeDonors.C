@@ -88,8 +88,9 @@ void tioga::exchangeDonors(void)
         int remoteid = rcvPack[k].intData[m++];
 	int ib       = rcvPack[k].intData[m++];
         double donorRes = rcvPack[k].realData[l++];
+        double receptorRes = rcvPack[k].realData[l++];
 	auto& mb = mblocks[ib];
-        mb->insertAndSort(pointid, k, meshtag, remoteid, donorRes);
+        mb->insertAndSort(pointid, k, meshtag, remoteid, donorRes,receptorRes);
       }
   }
   //

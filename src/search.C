@@ -194,7 +194,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   ipoint=0; 
   for(i=0;i<nsearch;i++)
     {
-      if (xtag[i]==i) {
+     if (xtag[i]==i) {
 	adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
       }
       else {
@@ -203,7 +203,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       if (donorId[i] > -1) {
 	  donorCount++;
 	}
-      ipoint+=3;
+       ipoint+=3;
     }
   //
   free(icell);

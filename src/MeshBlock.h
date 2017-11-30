@@ -205,7 +205,7 @@ class MeshBlock
 
   void initializeDonorList();
   
-  void insertAndSort(int pointid,int senderid,int meshtag, int remoteid, double donorRes);
+  void insertAndSort(int pointid,int senderid,int meshtag, int remoteid, double donorRes,double receptorRes);
   
   void processDonors(HOLEMAP *holemap, int nmesh,int **donorRecords,double **receptorResolution,
 		     int *nrecords);

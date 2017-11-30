@@ -109,6 +109,7 @@ typedef struct DONORLIST
 {
   int donorData[3];
   double donorRes;
+  double receptorRes;
   int cancel;
   struct DONORLIST *next;
 } DONORLIST;

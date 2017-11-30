@@ -112,7 +112,6 @@ class MeshBlock
   int *isearch;       /** < index of query points in the remote process */
   int *tagsearch;       /** < index of query points in the remote process */
   double *res_search;   /** < resolution of search points */
-  double *res_search0;   /** < resolution of search points */
   int *xtag;            /** < hash to determine if there are duplicates */
   double *xsearch;    /** < coordinates of the query points */
   double *rst;            /**  natrural coordinates */
@@ -142,7 +141,7 @@ class MeshBlock
   MeshBlock() { nv=NULL; nc=NULL; x=NULL;iblank=NULL;iblank_cell=NULL;vconn=NULL;wbcnode=NULL;
     obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
     interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; tagsearch=NULL;
-    res_search=NULL;res_search0=NULL;xsearch=NULL; donorId=NULL;xtag=NULL;
+    res_search=NULL;xsearch=NULL; donorId=NULL;xtag=NULL;
     adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=2;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;

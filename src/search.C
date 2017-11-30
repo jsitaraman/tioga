@@ -40,11 +40,11 @@ void MeshBlock::search(void)
   double dxc[3];
   double xmin[3];
   double xmax[3];
+  int *dId;
   //
   // form the bounding box of the 
   // query points
   //
-
   if (nsearch == 0) {
     donorCount=0;
     return;
@@ -182,20 +182,20 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   donorId=(int*)malloc(sizeof(int)*nsearch);
   if (xtag) free(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
-  if (res_search0) free(res_search0);
-  res_search0=(double *)malloc(sizeof(double)*nsearch);
   //
   // create a unique hash
   //
-  for(i=0;i<nsearch;i++) res_search0[i]=res_search[i];
   uniquenodes(xsearch,res_search,xtag,&nsearch);
   //
   donorCount=0;
   ipoint=0; 
+  dId=(int *) malloc(sizeof(int) *2);
   for(i=0;i<nsearch;i++)
     {
      if (xtag[i]==i) {
-	adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
+	//adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
+	adt->searchADT(this,dId,&(xsearch[3*i]));
+        donorId[i]=dId[0];
       }
       else {
 	donorId[i]=donorId[xtag[i]];
@@ -205,6 +205,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	}
        ipoint+=3;
     }
+  free(dId);
   //
   free(icell);
   free(obq);

@@ -63,7 +63,8 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
       //
       computeNodalWeights(xv,xsearch,frac,nvert);
       //
-      *cellIndex=icell;
+      cellIndex[0]=icell;
+      cellIndex[1]=0;
       //
       // if any of the nodal weights are 
       // not in between [-TOL 1+TOL] discard
@@ -73,18 +74,21 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
 	{
 	  if ((frac[m]+TOL)*(frac[m]-1.0-TOL) > 0) 
 	    {
-	      *cellIndex=-1;
+	      cellIndex[0]=-1;
 	      return;
 	    }
+          if (fabs(frac[m]) < TOL && cellRes[icell]==BIGVALUE) cellIndex[1]=1;
 	}
+      
       return;
     }
   else
     {
       icell1=icell+BASE;
-      *cellIndex=-1;
+      cellIndex[0]=-1;
+      cellIndex[1]=0;
       donor_inclusion_test(&icell1,xsearch,&passFlag,&(rst[ipoint]));
-      if (passFlag) *cellIndex=icell;
+      if (passFlag) cellIndex[0]=icell;
       return;
     }
 

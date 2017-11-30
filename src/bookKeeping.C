@@ -105,18 +105,6 @@ void MeshBlock::getMBDonorPackets
     sndPack[k].intData[ix++] = isearch[3*i + 2];  // receptor block ID
     sndPack[k].realData[rx++]=cellRes[donorId[i]];
     sndPack[k].realData[rx++]=res_search[xtag[i]];
-    /*
-    if ( (xtag[i]!=i || res_search[i]!=res_search0[i]) 
-         && res_search[xtag[i]]==BIGVALUE 
-         && cellRes[donorId[i]]!=BIGVALUE) 
-      {      
-	sndPack[k].realData[rx++] = -cellRes[donorId[i]];
-      }
-    else
-      {
-	sndPack[k].realData[rx++] = cellRes[donorId[i]];
-      }
-    */
   }  
 }
 

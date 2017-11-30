@@ -869,7 +869,6 @@ MeshBlock::~MeshBlock()
   if (isearch) free(isearch);
   if (xsearch) free(xsearch);
   if (res_search) free(res_search);
-  if (res_search0) free(res_search0);
   if (xtag) free(xtag);
   if (rst) free(rst);
   if (interp2donor) free(interp2donor);

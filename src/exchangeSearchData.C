@@ -116,6 +116,8 @@ void tioga::exchangeSearchData(void)
       free(mb->tagsearch);
     if (mb->donorId)
       free(mb->donorId);
+    if (mb->res_search)
+      free(mb->res_search);
   }
 
   // Loop through recv packets and estimate search array sizes in MeshBlock data
@@ -145,6 +147,7 @@ void tioga::exchangeSearchData(void)
     auto &mb = mblocks[ib];
     if (mb->nsearch < 1) continue;
     mb->xsearch = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
+    mb->res_search = (double*)malloc(sizeof(double) * mb->nsearch);
     mb->isearch = (int*)malloc(3 * sizeof(int) * mb->nsearch);
     mb->tagsearch = (int*)malloc(sizeof(int) * mb->nsearch);
     mb->donorId = (int*)malloc(sizeof(int) * mb->nsearch);
@@ -154,6 +157,7 @@ void tioga::exchangeSearchData(void)
   //
   std::vector<int> icOffset(nblocks,0); // Index of isearch arrays where next fill happens
   std::vector<int> dcOffset(nblocks, 0); // Index of xsearch arrays where next fill happens
+  std::vector<int> rcOffset(nblocks, 0); // Index of res_search arrays where next fill happens
   for (int k=0; k < nrecv; k++) {
     int l = 0;
     int m = 0;
@@ -166,6 +170,7 @@ void tioga::exchangeSearchData(void)
 
       int ioff = icOffset[ib];
       int doff = dcOffset[ib];
+      int roff = rcOffset[ib];
 
       m += 2; // Skip nints and nreals information
       for (int j=0; j < nintsRecv[ii]; j++) {
@@ -175,12 +180,15 @@ void tioga::exchangeSearchData(void)
         mb->tagsearch[ioff/3-1]=obblist[ii].tag_remote;
       }
 
-      for (int j=0; j < nrealsRecv[ii]; j++) {
-        mb->xsearch[doff++] = rcvPack[k].realData[l++];
+      for (int j=0; j < nrealsRecv[ii]/4; j++) {
+        for(int mm=0;mm<3;mm++)
+          mb->xsearch[doff++] = rcvPack[k].realData[l++];
+        mb->res_search[roff++]= rcvPack[k].realData[l++];
       }
 
       icOffset[ib] = ioff;
       dcOffset[ib] = doff;
+      rcOffset[ib] = roff;
     }
   }
 

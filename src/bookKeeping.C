@@ -103,9 +103,17 @@ void MeshBlock::getMBDonorPackets
     sndPack[k].intData[ix++] = isearch[3*i + 1];  // point ID
     sndPack[k].intData[ix++] = i;                 // point ID on donor side
     sndPack[k].intData[ix++] = isearch[3*i + 2];  // receptor block ID
-
-    sndPack[k].realData[rx++] = cellRes[donorId[i]];
-  }
+    if ( (xtag[i]!=i || res_search[i]!=res_search0[i]) 
+         && res_search[xtag[i]]==BIGVALUE 
+         && cellRes[donorId[i]]!=BIGVALUE) 
+      {      
+	sndPack[k].realData[rx++] = -cellRes[donorId[i]];
+      }
+    else
+      {
+	sndPack[k].realData[rx++] = cellRes[donorId[i]];
+      }
+  }  
 }
 
 void MeshBlock::initializeDonorList(void)
@@ -158,8 +166,11 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
     {
       iblank[i]=1;
       verbose=0;
-      //if (meshtag==3 && i==34299) verbose=1;
+      //if (meshtag==1 && myid==9 && i==28487) verbose=1;
       if (verbose) TRACEI(i);
+      if (verbose) TRACEI(iblank[i]);
+      if (verbose) TRACED(nodeRes[i]);
+      if (verbose) printf("%f %f %f\n",x[3*i],x[3*i+1],x[3*i+2]);
       if (donorList[i]==NULL)
 	{
           if (verbose) {
@@ -258,6 +269,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   for(i=0;i<nnodes;i++)
     {
       verbose=0;
+      //if (meshtag==1 && myid==9 && i==28487) verbose=1;
       //if (meshtag==3 && i==34299) verbose=1;
       if (verbose) {
          TRACEI(i);
@@ -307,6 +319,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
               break;
              }
            }
+          if (temp->donorRes < 0) nodeRes[i]=BIGVALUE;
 	  (*receptorResolution)[k++]=(resolutionScale > 1.0) ? -nodeRes[i]:nodeRes[i];
 	  (*donorRecords)[m++]=temp->donorData[0];
 	  (*donorRecords)[m++]=temp->donorData[2];

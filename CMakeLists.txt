@@ -2,16 +2,16 @@ cmake_minimum_required(VERSION 2.8)
 
 project(TIOGA CXX C Fortran)
 
-option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" off)
-option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" off)
-option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" off)
+option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" on)
+option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" on)
+option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" on)
 
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
 # Ensure C++11 standard is enabled
 if (CMAKE_VERSION VERSION_LESS "3.1")
-  set(CMAKE_CXX_FLAGS "-std=c++11" ${CMAKE_CXX_FLAGS})
+  set(CMAKE_CXX_FLAGS "-g -rdynamic -std=c++0x" ${CMAKE_CXX_FLAGS})
 else()
   set(CMAKE_CXX_STANDARD 11)
 endif()
@@ -19,7 +19,7 @@ endif()
 # Set some default compilation settings for Fortran compiler
 if (${CMAKE_Fortran_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_Fortran_FLAGS
-    "${CMAKE_Fortran_FLAGS} -fdefault-real-8 -ffree-line-length-none")
+    "${CMAKE_Fortran_FLAGS} -fbounds-check -fbacktrace -fdefault-real-8 -ffree-line-length-none")
 elseif (${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -r8 -double_size 128")
 endif()

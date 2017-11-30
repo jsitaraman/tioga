@@ -433,7 +433,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
   sprintf(fname,"flow%s.dat",&(intstring[1]));
   fp=fopen(fname,"w");
   fprintf(fp,"TITLE =\"Tioga output\"\n");
-  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK\" ");
+  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK\",\"BTAG\" ");
   for(i=0;i<nvar;i++)
     {
       sprintf(qstr,"Q%d",i);
@@ -447,7 +447,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
     {
       for(i=0;i<nnodes;i++)
 	{
-	  fprintf(fp,"%lf %lf %lf %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i]);
+	  fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i],meshtag);
 	  for(j=0;j<nvar;j++)
 	    fprintf(fp,"%lf ",q[i*nvar+j]);      
 	  //for(j=0;j<nvar;j++)
@@ -459,7 +459,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
     {
       for(i=0;i<nnodes;i++)
         {
-          fprintf(fp,"%lf %lf %lf %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i]);
+          fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i],meshtag);
           for(j=0;j<nvar;j++)
             fprintf(fp,"%lf ",q[j*nnodes+i]);
           fprintf(fp,"\n");
@@ -521,6 +521,12 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
 	    }
 	}
     }
+  fprintf(fp,"%d\n",nwbc);
+  for(i=0;i<nwbc;i++)
+    fprintf(fp,"%d\n",wbcnode[i]);
+  fprintf(fp,"%d\n",nobc);
+  for(i=0;i<nobc;i++)
+    fprintf(fp,"%d\n",obcnode[i]);
   fclose(fp);
   return;
 }
@@ -748,7 +754,7 @@ void MeshBlock::getQueryPoints(OBB *obc,
 	{
 	  inode[*nints]=i;
 	  (*nints)++;
-	  (*nreals)+=3;
+	  (*nreals)+=4;
 
 	}
     }
@@ -764,6 +770,7 @@ void MeshBlock::getQueryPoints(OBB *obc,
       (*realData)[m++]=x[i3];
       (*realData)[m++]=x[i3+1];
       (*realData)[m++]=x[i3+2];
+      (*realData)[m++]=nodeRes[inode[i]];
     }
   //
   free(inode);
@@ -861,6 +868,9 @@ MeshBlock::~MeshBlock()
   if (obb) free(obb);
   if (isearch) free(isearch);
   if (xsearch) free(xsearch);
+  if (res_search) free(res_search);
+  if (res_search0) free(res_search0);
+  if (xtag) free(xtag);
   if (rst) free(rst);
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);

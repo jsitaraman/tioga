@@ -22,6 +22,7 @@ extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
   void writebbox(OBB *obb,int bid);
   void writePoints(double *x,int nsearch,int bid);
+  void uniquenodes(double *x,double *rtag,int *itag,int *nn);
 }
 
 
@@ -32,6 +33,7 @@ void MeshBlock::search(void)
   int iptr,isum,nvert;
   OBB *obq;
   int *icell;
+  int *itag;
   int cell_count; 
   int cellindex;
   double xd[3];
@@ -178,15 +180,29 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   if (donorId) free(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
+  if (xtag) free(xtag);
+  xtag=(int *)malloc(sizeof(int)*nsearch);
+  if (res_search0) free(res_search0);
+  res_search0=(double *)malloc(sizeof(double)*nsearch);
+  //
+  // create a unique hash
+  //
+  for(i=0;i<nsearch;i++) res_search0[i]=res_search[i];
+  uniquenodes(xsearch,res_search,xtag,&nsearch);
   //
   donorCount=0;
-  ipoint=0;
+  ipoint=0; 
   for(i=0;i<nsearch;i++)
     {
-      adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
-      if (donorId[i] > -1) {
-	donorCount++;
+      if (xtag[i]==i) {
+	adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
       }
+      else {
+	donorId[i]=donorId[xtag[i]];
+      }
+      if (donorId[i] > -1) {
+	  donorCount++;
+	}
       ipoint+=3;
     }
   //

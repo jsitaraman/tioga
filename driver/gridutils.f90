@@ -132,6 +132,134 @@ enddo
 return
 !
 end subroutine readGrid_cell
+!=====================================================================
+!
+! read the grid files
+!
+!=====================================================================
+subroutine readGrid_from_file(fname,g)
+!
+use gridtype
+implicit none
+!
+character*(*) :: fname
+type(grid), intent(inout) :: g
+!
+! local variables
+!
+character*128 :: a
+character*1 :: hash
+integer :: i,junk,j,m,k
+real*8 :: rho,u,v,w,p,e,xx,yy,zz,rhoinf,pinf,uinf,qj
+real*8 :: fac,rsq
+real*8 :: SIXTH=1./6
+real*8 :: EIGHTH=1./8
+!
+open(unit=101,file=fname,form='formatted')
+!
+do i=1,3
+   read(101,"(A128)") a
+enddo
+do j=1,127
+   if (a(j:j+1).eq.'N=' ) then
+      k=j+2
+      do while(a(k:k).ne.' ')
+         k=k+1
+      enddo
+      read(a(j+2:k),*) g%nv
+   endif
+   if (a(j:j+1).eq.'E=') then
+      k=j+2
+     do while(a(k:k).ne.' ')
+        k=k+1
+     enddo
+     read(a(j+2:k),*) g%ncells
+   endif
+enddo
+g%n6=0
+g%n8=g%nCells
+g%nvar=1
+g%nghost=0
+g%ndof=g%ncells+g%nghost
+!
+allocate(g%x(3*g%nv),g%bodytag(g%nv),g%iblank(g%nv))
+allocate(g%scal(g%nvar))
+allocate(g%xcentroid(3*g%ndof))
+allocate(g%q(g%nvar*g%nv))
+allocate(g%dq(3*g%nvar*g%nv))
+!
+g%iblank=1
+!
+! read coordinates and body tag 
+! also create some conservative variables
+!
+rhoinf=1.
+uinf=0.5
+pinf=1/1.4
+!
+do i=1,g%nv
+   read(101,*) g%x(3*i-2),g%x(3*i-1),g%x(3*i),junk,g%bodytag(i),qj
+enddo
+!
+g%scal=1
+!
+allocate(g%ndc6(6,g%n6),g%ndc8(8,g%n8))
+!
+g%ndc6=0
+g%ndc8=0
+g%nmax=8
+!
+! read prizm connectivity
+!
+m=0
+do i=1,g%n6
+ read(101,*) g%ndc6(1,i),g%ndc6(2,i),g%ndc6(3,i),junk,&
+           g%ndc6(4,i),g%ndc6(5,i),g%ndc6(6,i),junk
+ m=m+1
+ g%xcentroid(3*m-2:3*m)=0.
+ do j=1,6
+    g%xcentroid(3*m-2)=g%xcentroid(3*m-2)+g%x(3*g%ndc6(j,i)-2)*SIXTH
+    g%xcentroid(3*m-1)=g%xcentroid(3*m-1)+g%x(3*g%ndc6(j,i)-1)*SIXTH
+    g%xcentroid(3*m)=g%xcentroid(3*m)+g%x(3*g%ndc6(j,i))*SIXTH
+ enddo
+enddo
+!
+! read hex connectivity
+!
+do i=1,g%n8
+   read(101,*) g%ndc8(1,i),g%ndc8(2,i),g%ndc8(3,i),g%ndc8(4,i),&
+             g%ndc8(5,i),g%ndc8(6,i),g%ndc8(7,i),g%ndc8(8,i)
+    m=m+1
+    g%xcentroid(3*m-2:3*m)=0.
+    do j=1,8
+       g%xcentroid(3*m-2)=g%xcentroid(3*m-2)+g%x(3*g%ndc8(j,i)-2)*EIGHTH
+       g%xcentroid(3*m-1)=g%xcentroid(3*m-1)+g%x(3*g%ndc8(j,i)-1)*EIGHTH
+       g%xcentroid(3*m)=g%xcentroid(3*m)+g%x(3*g%ndc8(j,i))*EIGHTH
+    enddo
+enddo
+!
+! read wall and overset boundary nodes
+!
+read(101,*) g%nwbc
+allocate(g%wbcnode(g%nwbc))
+!
+do i=1,g%nwbc
+   read(101,*) g%wbcnode(i)
+enddo
+read(101,*) g%nobc
+allocate(g%obcnode(g%nobc))
+!
+do i=1,g%nobc
+   read(101,*) g%obcnode(i)
+enddo
+!
+close(101)
+!
+return
+!
+end subroutine readGrid_from_file
+
+
 
 !=====================================================================
 !

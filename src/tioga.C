@@ -90,7 +90,7 @@ void tioga::performConnectivity(void)
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
   mb->getCellIblanks();
-  mb->writeCellFile(myid);
+  // mb->writeCellFile(myid);
   //}
   //mb->writeOutput(myid);
   //tracei(myid);

@@ -24,6 +24,8 @@
  *
  *  Jay Sitaraman 02/24/2014 
  */
+#ifndef TIOGA_H
+#define TIOGA_H
 #include "MeshBlock.h"
 #include "CartGrid.h"
 #include "CartBlock.h"
@@ -154,6 +156,4 @@ class tioga
   void outputStatistics(void);
 };
       
-  
-
-
+#endif

@@ -10,10 +10,10 @@ void PyTioga_dealloc(PyTioga* self){
   //
   // Release hold of the python data buffers
   //
-  if(self->initialized){
-    // something
-  }
-  //
+
+  printf("# TIOGA timers: %12.4f s (exchange) %12.f s (connect)", 
+	 self->timers[TIMER_EXCHANGE], self->timers[TIMER_CONNECT]);
+
   delete [] self->tg;
 
   Py_TYPE(self)->tp_free((PyObject*)self);
@@ -55,6 +55,9 @@ int PyTioga_init(PyTioga* self, PyObject* args, PyObject *kwds){
   self->tg = new tioga[1];
 
   self->tg->setCommunicator(comm[0],rank,size);
+
+  self->timers[TIMER_CONNECT]  = 0.0;
+  self->timers[TIMER_EXCHANGE] = 0.0;
 
   return 0;
 
@@ -193,13 +196,15 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
 
 }
 
-PyObject* PyTioga_preprocess(PyTioga* self){
-  self->tg->profile();
-  return Py_BuildValue("i", 0);
-}
-
 PyObject* PyTioga_connect(PyTioga* self){
+
+  self->tick();
+
+  self->tg->profile();
   self->tg->performConnectivity();
+
+  self->timers[TIMER_CONNECT] += self->tock();
+
   return Py_BuildValue("i", 0);
 }
 
@@ -210,6 +215,8 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
   int interptype = 0; // only row implemented here
   double *q;
 
+  self->tick();
+
   if(!PyArg_ParseTuple(args, "Oi", &data, &nq)){
     printf("Missing argument\n");
     return Py_BuildValue("i", 1);
@@ -218,6 +225,8 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
   numpy_to_array(data, &q, &len);
 
   self->tg->dataUpdate(nq,q,interptype);
+
+  self->timers[TIMER_EXCHANGE] += self->tock();
 
   return Py_BuildValue("i", 0);
 

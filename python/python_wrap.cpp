@@ -30,9 +30,8 @@
 // parsed, see pytioga.cpp for example).
 //
 static PyMethodDef PyTioga_methods[] = {
-  {"dummy",            (PyCFunction)PyTioga_dummy,    METH_NOARGS,  "Dummy"},
+  {"dummy",        (PyCFunction)PyTioga_dummy,        METH_NOARGS,  "Dummy"},
   {"register_data",(PyCFunction)PyTioga_register_data,METH_VARARGS, "Register Data"},
-  {"preprocess",   (PyCFunction)PyTioga_preprocess,   METH_NOARGS,  "Pre-process Grids"},
   {"connect",      (PyCFunction)PyTioga_connect,      METH_NOARGS,  "Connect Grids"},
   {"update",       (PyCFunction)PyTioga_update,       METH_VARARGS, "Update Data"},
   {NULL}  /* Sentinel */

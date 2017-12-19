@@ -11,6 +11,7 @@
 #define NTIMERS 5
 #define TIMER_EXCHANGE 0
 #define TIMER_CONNECT 1
+#define TIMER_PROFILE 2
 
 typedef struct {
   PyObject_HEAD

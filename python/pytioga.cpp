@@ -11,8 +11,8 @@ void PyTioga_dealloc(PyTioga* self){
   // Release hold of the python data buffers
   //
 
-  printf("# TIOGA timers: %12.4f s (exchange) %12.f s (connect)", 
-	 self->timers[TIMER_EXCHANGE], self->timers[TIMER_CONNECT]);
+  printf("# TIOGA timers: %12.4f s (exchange) %12.4f s (connect) %12.4f s (profile)\n", 
+	 self->timers[TIMER_EXCHANGE], self->timers[TIMER_CONNECT], self->timers[TIMER_PROFILE]);
 
   delete [] self->tg;
 
@@ -150,6 +150,8 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
   numpy_to_array(data, &tmpbtag, &len);
   btag = tmpbtag[0];
 
+  // printf("# pytioga (%2d) %2d nv = %5d\n", self->mpi_rank, btag,  nv);
+
   // Now we'll look through all the connectivity data and see which
   // one are / aren't used. Keep track of the number of types of
   // connectivity.
@@ -201,6 +203,11 @@ PyObject* PyTioga_connect(PyTioga* self){
   self->tick();
 
   self->tg->profile();
+
+  self->timers[TIMER_PROFILE] += self->tock();
+
+  self->tick();
+
   self->tg->performConnectivity();
 
   self->timers[TIMER_CONNECT] += self->tock();

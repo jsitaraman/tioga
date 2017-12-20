@@ -160,7 +160,7 @@ program testTioga
   enddo
   if (myid==0) write(6,"(A36)") '-- Interpolation error statistics --'
   if (myid==0) write(6,"(A15)") 'ProcId    Error'
-  call flush()
+  call flush(6)
   call mpi_barrier(mpi_comm_world,ierr)
   write(6,"(I4,3x,E15.7)") myid,sqrt(rnorm/g%nv/g%nvar)
   call mpi_barrier(mpi_comm_world,ierr)

@@ -28,11 +28,10 @@ extern "C" {
 
 using namespace tg_funcs;
 
-void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
-			int *wbcnodei,int *obcnodei,
-			int ntypesi,int *nvi,int *nci,int **vconni)
+void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci,
+    int nobci,int *wbcnodei,int *obcnodei,int ntypesi,int *nvi,int *ncfi,
+    int *nci,int **vconni)
 {
-  int i;
   //
   // set internal pointers
   //
@@ -49,6 +48,7 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   //
   nv=nvi;
   nc=nci;
+  ncf=ncfi;
   vconn=vconni;
   //
   //tracei(nnodes);
@@ -58,7 +58,7 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
 }
 
 void MeshBlock::setFaceData(int _gtype, int _nftype, int *_nf, int *_nfv,
-    int **_f2v, int *_f2c, int *_c2f, int *_ib_face, int nOver, int nWall, int nMpi,
+    int **_f2v, int *_f2c, int **_c2f, int *_ib_face, int nOver, int nWall, int nMpi,
     int *oFaces, int *wFaces, int *mFaces, int *procR, int *idR)
 {
   gridType = _gtype;
@@ -140,36 +140,42 @@ void MeshBlock::tagBoundary(void)
       int nvert = nv[n];
       inode.resize(nvert);
       if (nvert > 8) xv2.resize(nvert*3);
+      printf("nvert = %d, nf = %d\n",nvert,ncf[n]);
+      if (nvert > 8)
+        nvert = nNodesToFirstOrder(ncf[n], nv[n]);
 
       for (int i = 0; i < nc[n]; i++)
       {
         double vol = 0.;
 
-        if (nvert > 8)
-        {
-          for (int m = 0; m < nvert; m++)
+          /// TODO: high-order element volumes beyond hexas
+//          for (int m = 0; m < nvert; m++)
+//          {
+//            inode[m] = vconn[n][nvert*i+m]-BASE;
+//            int i3 = 3*inode[m];
+//            for (int j = 0; j < 3; j++)
+//              xv2[m*3+j] = x[i3+j];
+//          }
+//          vol = computeVolume(xv2.data(), nvert, 3);
+//        }
+//        else
+//        {
+          for (int m = 0; m < nv[n]; m++)
           {
-            inode[m] = vconn[n][nvert*i+m]-BASE;
-            int i3 = 3*inode[m];
-            for (int j = 0; j < 3; j++)
-              xv2[m*3+j] = x[i3+j];
+            inode[m] = vconn[n][nv[n]*i+m]-BASE;
+            if (m < nvert)
+            {
+              int i3 = 3*inode[m];
+              for (int j = 0; j < 3; j++)
+                xv[m][j] = x[i3+j];
+            }
           }
-          vol = computeVolume(xv2.data(), nvert, 3);
-        }
-        else
-        {
-          for (int m = 0; m < nvert; m++)
-          {
-            inode[m] = vconn[n][nvert*i+m]-BASE;
-            int i3 = 3*inode[m];
-            for (int j = 0; j < 3; j++)
-              xv[m][j] = x[i3+j];
-          }
-          vol = computeVolume(&xv[0][0], nvert, 3);
-        }
+          //vol = computeVolume(&xv[0][0], nvert, 3);
+          vol = computeCellVolume(xv, nvert);
+//        }
 
         cellRes[k++] = vol*resolutionScale;
-        for (int m = 0; m < nvert; m++)
+        for (int m = 0; m < nv[n]; m++)
         {
           iflag[inode[m]]++;
           nodeRes[inode[m]] += vol*resolutionScale;
@@ -364,11 +370,22 @@ void MeshBlock::rebuildADT(void)
     {
       if (ic < 0) continue;
 
-      int N = 2*nDims;
-      adtEles.insert(ic);
-      for (int j = 0; j < N; j++)
+      int n;
+      int icBT = ic;
+      for (n = 0; n < ntypes; n++)
       {
-        adtEles.insert(c2c[N*ic+j]);
+        icBT -= nc[n];
+        if (icBT > 0) continue;
+
+        icBT += nc[n];
+        break;
+      }
+
+      int nface = ncf[n];
+      adtEles.insert(ic);
+      for (int j = 0; j < nface; j++)
+      {
+        adtEles.insert(c2c[n][nface*icBT+j]);
       }
     }
 
@@ -416,7 +433,7 @@ void MeshBlock::rebuildADT(void)
     xmax[0] = xmax[1] = xmax[2] = -BIGVALUE;
     for (int m = 0; m < nvert; m++)
     {
-      int i3 = 3*(vconn[0][nvert*ic+m]-BASE);
+      int i3 = 3*(vconn[0][nvert*ic+m]-BASE); /// TODO: ncelltypes
       for (int j = 0; j < 3; j++)
       {
         xd[j] = 0;

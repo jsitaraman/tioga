@@ -380,6 +380,7 @@ double computeCellVolume(double xv[8][3],int nvert)
    default:
      printf("Error in computeCellVolume: unknown nvert!\n");
      printf("Unknown nvert = %d!\n",nvert);
+     numverts[-1000][-2000] = 1;
      exit(1);
    }
      

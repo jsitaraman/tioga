@@ -28,6 +28,7 @@ tioga *tg;
 */
 int **vconn = NULL;  /// Cell-to-vertex connectivity
 int *nc = NULL;      /// Number of cells (per cell type)
+int *ncf = NULL;     /// Number of faces per cell (per cell type)
 int *nv = NULL;      /// Number of vertices per cell (per cell type)
 
 int **fconn = NULL;  /// face-to-vertex connectivity

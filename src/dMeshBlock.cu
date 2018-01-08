@@ -205,6 +205,18 @@ void dMeshBlock::dataToDevice(int ndims, int nnodes, int ncells, int ncells_adt,
 
   xlist.assign(xlist_h.data(), xlist_h.size());
   xlistf.assign(xlistf_h.data(), xlistf_h.size());
+
+  /// DEBUGGING
+//  printf("in dataToDevice\n");
+//  if (rank == 0) {
+//    for (int i = 0; i < nsearch; i++)
+//    {
+//      if (xsearch[3*i] > .46)
+//      {
+//        printf("pt %d -> %f, %f, %f\n",i,xsearch[3*i+0],xsearch[3*i+1],xsearch[3*i+2]);
+//      }
+//    }
+//  }
 }
 
 void dMeshBlock::extraDataToDevice(int* vconn)

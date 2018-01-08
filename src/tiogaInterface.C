@@ -24,6 +24,8 @@
 #include "globals.h"
 #include <string.h>
 
+#include "tiogaInterface.h"
+
 //
 // All the interfaces that are 
 // accessible to third party f90 and C
@@ -70,26 +72,33 @@ extern "C" {
   
   void tioga_registergrid_data_(int btag, int nnodes, double *xyz, int *ibl,
                                 int nwbc, int nobc, int *wbcnode, int *obcnode,
-                                int ntypes, int _nv, int _nc, int *_vconn)
+                                int ntypes, int* _nv, int* _ncf, int* _nc, int **_vconn)
   {
     free(nv);
     free(nc);
+    free(ncf);
     free(vconn);
 
     // NOTE: due to SWIG/Python wrapping, removing va_args stuff for now
     nv    = (int *) malloc(sizeof(int)*ntypes);
     nc    = (int *) malloc(sizeof(int)*ntypes);
+    ncf    = (int *) malloc(sizeof(int)*ntypes);
     vconn = (int **)malloc(sizeof(int *)*ntypes);
-    nv[0] = _nv;
-    nc[0] = _nc;
-    vconn[0] = _vconn;
 
-    tg->registerGridData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
+    for (int i = 0; i < ntypes; i++)
+    {
+      nv[i] = _nv[i];
+      ncf[i] = _ncf[i];
+      nc[i] = _nc[i];
+      vconn[i] = _vconn[i];
+    }
+
+    tg->registerGridData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,ncf,nc,vconn);
   }
 
-  void tioga_register_face_data_(int gtype, int *f2c, int *c2f, int *fibl, int nOverFaces,
+  void tioga_register_face_data_(int gtype, int *f2c, int **c2f, int *fibl, int nOverFaces,
       int nWallFaces, int nMpiFaces, int *overFaces, int *wallFaces, int *mpiFaces,
-      int* mpiProcR, int* mpiFidR, int nftype, int _nfv, int _nf, int *_fconn)
+      int* mpiProcR, int* mpiFidR, int nftype, int *_nfv, int *_nf, int **_fconn)
   {
     free(nfv);
     free(nf);
@@ -98,9 +107,13 @@ extern "C" {
     nfv   = (int *) malloc(sizeof(int)*nftype);
     nf    = (int *) malloc(sizeof(int)*nftype);
     fconn = (int **)malloc(sizeof(int *)*nftype);
-    nfv[0] = _nfv;
-    nf[0] = _nf;
-    fconn[0] = _fconn;
+
+    for (int i = 0; i < nftype; i++)
+    {
+      nfv[i] = _nfv[i];
+      nf[i] = _nf[i];
+      fconn[i] = _fconn[i];
+    }
 
     tg->registerFaceConnectivity(gtype, nftype, nf, nfv, fconn, f2c, c2f, fibl,
         nOverFaces, nWallFaces, nMpiFaces, overFaces, wallFaces, mpiFaces,
@@ -284,9 +297,9 @@ extern "C" {
                               double (*gqs)(int ic, int spt, int var),
                               double& (*gqf)(int ff, int fpt, int var),
                               double (*ggs)(int ic, int spt, int dim, int var),
-                              double& (*ggf)(int, int, int, int),
-                              double* (*gqss)(int& es, int& ss, int& vs),
-                              double* (*gdqs)(int& es, int& ss, int& vs, int& ds))
+                              double& (*ggf)(int ff, int fpt, int dim, int var),
+                              double* (*gqss)(int& es, int& ss, int& vs, int etype),
+                              double* (*gdqs)(int& es, int& ss, int& vs, int& ds, int etype))
   {
     tg->set_ab_callback(gnf, gfn, gqs, gqf, ggs, ggf, gqss, gdqs);
   }
@@ -294,8 +307,8 @@ extern "C" {
   void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
                                   void (*h2df)(int* ids, int nf, int grad, double *data),
                                   void (*h2dc)(int* ids, int nc, int grad, double *data),
-                                  double* (*gqd)(int&, int&, int&),
-                                  double* (*gdqd)(int&, int&, int&, int&),
+                                  double* (*gqd)(int& es, int& ss, int& vs, int etype),
+                                  double* (*gdqd)(int& es, int& ss, int& vs, int& ds, int etype),
                                   void (*gfng)(int*, int, int*, double*),
                                   void (*gcng)(int*, int, int*, double*),
                                   int (*gnw)(int),

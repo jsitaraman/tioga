@@ -72,16 +72,16 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
  * register grid data for each mesh block
  */
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
-			     int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn)
+           int *wbcnode,int *obcnode,int ntypes, int *nv, int *ncf, int *nc, int **vconn)
 {
   if (nnodes > 0) nblocks=1;
-  mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
+  mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,ncf,nc,vconn);
   mb->myid=myid;
   mytag=btag;
 }
 
 void tioga::registerFaceConnectivity(int gtype, int nftype, int *nf, int *nfv,
-    int **fconn, int *f2c, int *c2f, int *iblank_face, int nOverFaces,
+    int **fconn, int *f2c, int **c2f, int *iblank_face, int nOverFaces,
     int nWallFaces, int nMpiFaces, int *overFaces, int *wallFaces, int *mpiFaces, 
     int *mpiProcR, int *mpiFidR)
 {
@@ -1417,8 +1417,8 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 {
   int es, ss, vs, ds;
-  double* q_spts = (dataFlag == 0) ? get_q_spts(es, ss, vs) :
-                                     get_dq_spts(es, ss, vs, ds);
+  double* q_spts = (dataFlag == 0) ? get_q_spts(es, ss, vs, 0) :
+                                     get_dq_spts(es, ss, vs, ds, 0); /// TODO: ntypes
 
   int nsend,nrecv;
   int *sndMap,*rcvMap;

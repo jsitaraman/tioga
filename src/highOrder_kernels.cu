@@ -50,6 +50,60 @@ void interp_u_wrapper(double *U_spts, double *U_out, int *donors,
   check_error();
 }
 
+template<unsigned int nVars>
+__global__
+void interp_u_types(const double* const*  U_spts, double *U_out,
+    const int* __restrict__ donors, const double* __restrict__ weights,
+    const char* __restrict__ etypes, const int* __restrict__ wgt_inds,
+    const int* __restrict__ out_inds, int nFringe,
+    const int* __restrict__ nweights, const int* __restrict__ strides)
+{
+  const int fpt = blockDim.x * blockIdx.x + threadIdx.x;
+
+  if (fpt >= nFringe)
+    return;
+
+  const int ind = nVars * out_inds[fpt];
+  const int N = (int)etypes[fpt];
+  const int u_ind = donors[fpt] * strides[3*N+0];
+  const int w_ind = wgt_inds[fpt];
+  const int nSpts = nweights[fpt];
+  const int sstride = strides[3*N+1];
+  const int vstride = strides[3*N+2];
+
+  double sum[nVars] = {0.0};
+
+  for (int spt = 0; spt < nSpts; spt++)
+  {
+    double wt = weights[w_ind+spt];
+    for (int var = 0; var < nVars; var++)
+      sum[var] += wt * U_spts[N][u_ind + spt*sstride + var*vstride];
+  }
+
+  for (int var = 0; var < nVars; var++)
+    U_out[ind+var] = sum[var];
+}
+
+void interp_u_types_wrapper(double **U_spts, double *U_out, int *donors,
+    double *weights, char *etypes, int* wgt_inds, int* out_inds, int nFringe, int* nSpts,
+    int nVars, int *strides, cudaStream_t stream_h)
+{
+  unsigned int threads = 128;
+  unsigned int blocks = (nFringe + threads - 1) / threads;
+check_error();
+  if (nVars == 1)
+    interp_u_types<1><<<blocks, threads, 0, stream_h>>>(U_spts, U_out, donors, weights, etypes,
+        wgt_inds, out_inds, nFringe, nSpts, strides);
+  else if (nVars == 4)
+    interp_u_types<4><<<blocks, threads, 0, stream_h>>>(U_spts, U_out, donors, weights, etypes,
+        wgt_inds, out_inds, nFringe, nSpts, strides);
+  else if (nVars == 5)
+    interp_u_types<5><<<blocks, threads, 0, stream_h>>>(U_spts, U_out, donors, weights, etypes,
+        wgt_inds, out_inds, nFringe, nSpts, strides);
+
+  check_error();
+}
+
 template <unsigned int nDims, unsigned int nVars>
 __global__
 void interp_du(const double* __restrict__ dU_spts, double *dU_out,

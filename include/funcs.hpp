@@ -132,6 +132,9 @@ bool boundingBoxCheck(double *bbox1, double *bbox2, int nDims, double tol = 1e-8
 /*! Get the centroid of a collection of points */
 void getCentroid(double *pts, int nPts, int nDims, double *xc);
 
+/*! Get # of nodes for a first-order element given # of faces/nodes of high-order element */
+int nNodesToFirstOrder(int nf, int nvert);
+
 /*! Create an N-dimensional simplex of size L centered at x0 */
 void getSimplex(int nDims, const std::vector<double> &x0, double L, std::vector<double> &X);
 

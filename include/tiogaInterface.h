@@ -38,11 +38,11 @@ void tioga_init_(MPI_Comm tcomm);
 
 void tioga_registergrid_data_(int btag, int nnodes, double *xyz, int *ibl,
                               int nwbc, int nobc, int *wbcnode, int *obcnode,
-                              int ntypes, int _nv, int _nc, int *_vconn);
+                              int ntypes, int *_nv, int *_ncf, int* _nc, int **_vconn);
 
-void tioga_register_face_data_(int gtype, int *f2c, int *c2f, int *fibl, int nOverFaces,
+void tioga_register_face_data_(int gtype, int *f2c, int **c2f, int *fibl, int nOverFaces,
     int nWallFaces, int nMpiFaces, int *overFaces, int *wallFaces, int *mpiFaces,
-    int* mpiProcR, int* mpiFidR, int nftype, int _nfv, int _nf, int *_fconn);
+    int* mpiProcR, int* mpiFidR, int nftype, int *_nfv, int *_nf, int **_fconn);
 
 void tioga_register_amr_global_data_(int nf, int qstride, double *qnodein,
 				     int *idata,double *rdata,
@@ -93,14 +93,14 @@ void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                             double& (*gqf)(int ff, int fpt, int var),
                             double (*ggs)(int ic, int spt, int dim, int var),
                             double& (*ggf)(int ff, int fpt, int dim, int var),
-                            double* (*gqss)(int&, int&, int&),
-                            double* (*gdqs)(int&, int&, int&, int&));
+                            double* (*gqss)(int& es, int& ss, int& vs, int etype),
+                            double* (*gdqs)(int& es, int& ss, int& vs, int& ds, int etype));
 
 void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
                                 void (*h2df)(int* ids, int nf, int grad, double *data),
                                 void (*h2dc)(int* ids, int nc, int grad, double *data),
-                                double* (*gqd)(int& es, int& ss, int& vs),
-                                double* (*gdqd)(int& es, int& ss, int& vs, int& ds),
+                                double* (*gqd)(int& es, int& ss, int& vs, int etype),
+                                double* (*gdqd)(int& es, int& ss, int& vs, int& ds, int etype),
                                 void (*gfng)(int* ids, int nf, int* nptf, double* xyz),
                                 void (*gcng)(int* ids, int nf, int* nptf, double* xyz),
                                 int (*gnw)(int),

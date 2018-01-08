@@ -327,13 +327,16 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
   int acceptFlag = 1;
   int nvert = nv[n];
 
-  inode.resize(nvert);
   if (nvert > 8)
-    xv2.resize(nvert*3);
+    nvert = nNodesToFirstOrder(ncf[n], nv[n]);
 
-  for (int m = 0; m < nvert; m++)
+  inode.resize(nv[n]);
+  if (nv[n] > 8)
+    xv2.resize(nv[n]*3);
+
+  for (int m = 0; m < nv[n]; m++)
   {
-    inode[m]=vconn[n][nvert*idonor+m]-BASE;
+    inode[m]=vconn[n][nv[n]*idonor+m]-BASE;
     i3 = 3*inode[m];
     //if (iblank[inode[m]] != NORMAL)
     if (iblank[inode[m]] <= 0 && receptorRes2 > 0.0) // || nodeRes[inode[m]] == BIGVALUE)
@@ -343,10 +346,11 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
       if (iblank[inode[m]]==0) acceptFlag=0;
     }
 
-    if (nvert > 8)
-      for (int j = 0; j < 3; j++)
-        xv2[m*3+j] = x[i3+j];
-    else
+    if (nvert > 8) printf("ERROR! Shouldn't have nvert > 8 now.  nvert = %d\n",nvert);
+//      for (int j = 0; j < 3; j++)
+//        xv2[m*3+j] = x[i3+j];
+//    else
+    if (m < nvert)
       for (int j = 0; j < 3; j++)
         xv[m][j] = x[i3+j];
   }
@@ -361,9 +365,9 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
     // go to the end of the list
     if (clist !=NULL) while(clist->next !=NULL) clist=clist->next;
 
-    for (int m = 0; m < nvert; m++)
+    for (int m = 0; m < nv[n]; m++)
     {
-      inode[m] = vconn[n][nvert*idonor+m]-BASE;
+      inode[m] = vconn[n][nv[n]*idonor+m]-BASE;
       if (verbose) tracei(inode[m]);
       if (verbose) traced(nodeRes[inode[m]]);
       if (verbose) {
@@ -398,16 +402,17 @@ void MeshBlock::findInterpData(int &recid,int irecord,double receptorRes2)
   /* Compute the (linear) shape-function interpolation weights of the receptor
    * node within the donor cell */
   frac.resize(nvert);
-  if (nvert <= 8)
-  {
+
+//  if (nvert <= 8)
+//  {
     computeNodalWeights(xv,xp,frac.data(),nvert); /// TODO: support nvert > 8
-  }
-  else
-  {
-    double xref[3];
-    getRefLocNewton(xv2.data(), &xp[0], &xref[0], nvert, 3);
-    shape_hex(point(&xref[0]),frac,nvert);
-  }
+//  }
+//  else
+//  {
+//    double xref[3];
+//    getRefLocNewton(xv2.data(), &xp[0], &xref[0], nvert, 3);  /// TODO: mixed grids; mayabe use callback...?
+//    shape_hex(point(&xref[0]),frac,nvert);
+//  }
 
   interp2donor[irecord] = recid;
   interpList[recid].cancel = 0;

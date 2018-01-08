@@ -36,7 +36,6 @@ SOURCES += src/tioga.C \
     src/get_amr_index_xyz.c \
     src/test_amr_functions.c \
     src/cellVolume.f90 \
-    src/computeCellVolume.f90 \
     src/highOrder_kernels.cu \
     src/kaiser.f \
     src/median.F90 \

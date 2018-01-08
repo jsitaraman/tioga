@@ -53,21 +53,26 @@ using namespace tg_funcs;
 void MeshBlock::extraConn(void)
 {
   // Cell-to-cell connectivity
-  int nface = nDims*2; // Quad or hex only, same as rest of artBnd stuff
-  c2c.assign(ncells*nface,-1);
+  c2c.resize(ntypes);
 
-  for (int ic = 0; ic < ncells; ic++)
+  for (int n = 0; n < ntypes; n++)
   {
-    for (int j = 0; j < nface; j++)
-    {
-      int ff = c2f[nface*ic+j];
-      int ic1 = f2c[2*ff];
-      int ic2 = f2c[2*ff+1];
+    c2c[n].assign(nc[n]*ncf[n],-1);
 
-      if (ic1 == ic)
-        c2c[nface*ic+j] = ic2;
-      else
-        c2c[nface*ic+j] = ic1;
+    int nface = ncf[n];
+    for (int ic = 0; ic < nc[n]; ic++)
+    {
+      for (int j = 0; j < ncf[n]; j++)
+      {
+        int ff = c2f[n][nface*ic+j];
+        int ic1 = f2c[2*ff];
+        int ic2 = f2c[2*ff+1];
+
+        if (ic1 == ic)
+          c2c[n][nface*ic+j] = ic2;
+        else
+          c2c[n][nface*ic+j] = ic1;
+      }
     }
   }
 
@@ -214,9 +219,9 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
 
       // Loop over vertices of this face
       int ff = cutFaces[g][i];
-      for (int n = 0; n < nfv[0]; n++)
+      for (int n = 0; n < nfv[0]; n++) /// TODO: nfacetypes
       {
-        int iv = fconn[0][ff*nfv[0] + n];
+        int iv = fconn[0][ff*nfv[0] + n]; /// TODO: nfacetypes
         for (int d = 0; d < nDims; d++)
         {
           cutBox[6*G+d]   = std::min(cutBox[6*G+d], x[3*iv+d]);
@@ -257,7 +262,7 @@ void MeshBlock::getCutGroupBoxes(std::vector<double> &cutBox, std::vector<std::v
 int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<double> &faceNodesO,
     std::vector<double> &bboxW, std::vector<double> &bboxO)
 {
-  int nvert = nfv[0];
+  int nvert = nfv[0]; /// TODO: nfacetypes
 
   // Generate bounding boxes for each cutting group and face
 
@@ -275,7 +280,7 @@ int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<doub
     int ff = cutFacesW[i];
     for (int n = 0; n < nvert; n++)
     {
-      int iv = fconn[0][ff*nvert + n];
+      int iv = fconn[0][ff*nvert + n]; /// TODO: ncelltypes
       for (int d = 0; d < nDims; d++)
       {
         double val = x[3*iv+d];
@@ -300,7 +305,7 @@ int MeshBlock::getCuttingFaces(std::vector<double> &faceNodesW, std::vector<doub
     int ff = cutFacesO[i];
     for (int n = 0; n < nvert; n++)
     {
-      int iv = fconn[0][ff*nvert + n];
+      int iv = fconn[0][ff*nvert + n]; /// TODO: ncelltypes
       for (int d = 0; d < nDims; d++)
       {
         double val = x[3*iv+d];
@@ -393,14 +398,26 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
       if (checked_cells.count(ic)) continue;
       checked_cells.insert(ic);
 
+      int n;
+      int icBT = ic;
+      for (n = 0; n < ntypes; n++)
+      {
+        icBT -= nc[n];
+        if (icBT > 0) continue;
+
+        icBT += nc[n];
+        break;
+      }
+
       if (cutMap.flag[ic] == DC_CUT)
       {
         /// TODO: this is necessary, but inefficient; think of a better way...
         // Don't need to check this cell, but push all neighboring elements
         // into queue to check status
-        for (int j = 0; j < nface; j++)
+
+        for (int j = 0; j < ncf[n]; j++)
         {
-          int ic2 = c2c[nface*ic+j];
+          int ic2 = c2c[n][ncf[n]*icBT+j];
           if (ic2 > 0 && !checked_cells.count(ic2))
             cellList.push(ic2);
         }
@@ -409,10 +426,10 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
       }
 
       // Load up the cell nodes into an array
-      for (int i = 0; i < nvert; i++)
+      for (int i = 0; i < nv[n]; i++)
         for (int d = 0; d < nDims; d++)
-          xv[nDims*i+d] = x[nDims*vconn[0][ic*nvert+i]+d];
-
+          xv[nDims*i+d] = x[nDims*vconn[n][icBT*nvert+i]+d];
+      /// TODO: nfacetypes / non-constant stride
       // Find distance from face to cell
       Vec3 vec = intersectionCheck(&cutFaces[ff*stride], nvertf, xv.data(), nvert, ic); /// ic --> DEBUGGING
       double dist = vec.norm();
@@ -426,7 +443,7 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
         // Push all neighboring elements into queue to check status
         for (int j = 0; j < nface; j++)
         {
-          int ic2 = c2c[nface*ic+j];
+          int ic2 = c2c[n][ncf[n]*icBT+j]; /// TODO: ncelltypes
           if (ic2 > 0 && !checked_cells.count(ic2))
             cellList.push(ic2);
         }
@@ -434,7 +451,7 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
       else if (cutMap.flag[ic] == DC_UNASSIGNED) // || dist < (cutMap.dist[ic] - tol))
       {
         // Unflagged cell, or have a closer face to use
-        Vec3 norm = faceNormal(&cutFaces[ff*stride], nDims);
+        Vec3 norm = faceNormal(&cutFaces[ff*stride], nDims);/// TODO: nfacetypes / non-constant stride
         if (cutType == 0) norm *= -1;
 
         double dot = norm*vec;
@@ -553,6 +570,17 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
 
     if (ic < 0) continue;
 
+    int n;
+    int icBT = ic;
+    for (n = 0; n < ntypes; n++)
+    {
+      icBT -= nc[n];
+      if (icBT > 0) continue;
+
+      icBT += nc[n];
+      break;
+    }
+
     if (cutMap.flag[ic] == DC_CUT)
     {
       if (cutType == 1) // Solid-boundary surface
@@ -561,9 +589,9 @@ void MeshBlock::directCut(std::vector<double> &cutFaces, int nCut, int nvertf,
         cutMap.flag[ic] = DC_NORMAL;
     }
 
-    for (int j = 0; j < nface; j++)
+    for (int j = 0; j < ncf[n]; j++)
     {
-      int ic2 = c2c[nface*ic+j];
+      int ic2 = c2c[n][ncf[n]*ic+j];
       if (ic2 >= 0 and cutMap.flag[ic2] == DC_UNASSIGNED)
       {
         cutMap.flag[ic2] = cutMap.flag[ic];
@@ -669,180 +697,7 @@ void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
       icell++;
     }
   }
-
-//  if (myid == 0) /// DEBUGGING
-//  {
-//    for (int i = 0; i < ncells; i++)
-//      iblank_cell[i] = NORMAL;
-//  }
-
-//  /// DEBUGGING / TEMPORARY FIX
-//  std::vector<int> ncf(1,6);
-//  std::vector<std::vector<int>> c2c(1);
-//  c2c[0].assign(ncells*6, -1);
-
-//  for (int ic = 0; ic < ncells; ic++)
-//  {
-//    for (int j = 0; j < 6; j++)
-//    {
-//      int ff = c2f[6*ic+j];
-//      int ic1 = f2c[2*ff];
-//      int ic2 = f2c[2*ff+1];
-
-//      if (ic1 == ic)
-//        c2c[0][6*ic+j] = ic2;
-//      else
-//        c2c[0][6*ic+j] = ic1;
-//    }
-//  }
-
-//  // New method to try: Expand hole regions by one layer where possible
-//  // For all cells neighboring a hole cell:
-//  //   If all surrounding cells are hole or fringe, set to hole cell
-//  std::vector<int> iblank_tmp(ncells,0);
-
-//  for (int ic = 0; ic < ncells; ic++)
-//  {
-//    int n = get_cell_type(nc,ntypes,ic);
-//    if (iblank_cell[ic] == HOLE)
-//    {
-//      // Set all surrounding cells to 'HOLE' if no neighbors are 'NORMAL'
-//      for (int j = 0; j < ncf[n]; j++)
-//      {
-//        int ic1 = c2c[n][ic*ncf[n]+j];
-//        if (ic1 < 0 || iblank_cell[ic1] != FRINGE || iblank_tmp[ic1] == 1) // Already set to hole, or not possible to set as hole
-//          continue;
-
-//        bool set_hole = true;
-//        int n1 = get_cell_type(nc,ntypes,ic1);
-//        for (int k = 0; k < ncf[n]; k++)
-//        {
-//          int ic2 = c2c[n1][ic1*ncf[n1]+k];
-//          if (ic2 < 0 || iblank_cell[ic2] == NORMAL)
-//          {
-//            set_hole = false;
-//            break;
-//          }
-//        }
-
-//        if (set_hole)
-//          iblank_tmp[ic1] = 1;
-//      }
-//    }
-//  }
-
-//  for (int ic = 0; ic < ncells; ic++)
-//  {
-//    if (iblank_tmp[ic])
-//      iblank_cell[ic] = HOLE;
-//    else if (iblank_cell[ic] == FRINGE)
-//      iblank_cell[ic] = NORMAL;
-//  }
-
-//  int rank;
-//  MPI_Comm_rank(meshComm, &rank);
 }
-
-/**
-void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
-{
-  /// HACK FOR GOLF BALL CASE: Golf ball radius = .0625, outer radius = .14
-  //double cut_rad2 = .1*.1;
-  double cut_rad2 = .75*.75;
-  //double cut_rad2 = 1*1;
-  if (meshtag == 1) /// MUST BE BACKGROUND GRID
-  {
-    int icell = 0;
-    for (int n = 0; n < ntypes; n++)
-    {
-      int nvert = nv[n];
-      for (int ic = 0; ic < nc[n]; ic++)
-      {
-        iblank_cell[icell] = NORMAL;
-
-        double xc[3] = {0,0,0};
-        for (int nd = 0; nd < 8; nd++)
-        {
-          int ind = 3*vconn[n][nvert*ic+nd];
-//          for (int d = 0; d < 3; d++)
-//            xc[d] += x[ind+d];
-
-          double rad2 = 0;
-          for (int d = 0; d < 3; d++)
-            rad2 += x[ind+d]*x[ind+d];
-
-          if (rad2 < cut_rad2)
-          {
-            iblank_cell[icell] = HOLE;
-            break;
-          }
-        }
-//        for (int d = 0; d < 3; d++)
-//          xc[d] /= 8.;
-
-//        double rad2 = 0;
-//        for (int d = 0; d < 3; d++)
-//          rad2 += xc[d]*xc[d];
-////        rad2 = sqrt(rad2);
-
-//        if (rad2 < cut_rad2)
-//          iblank_cell[icell] = HOLE;
-
-        icell++;
-      }
-    }
-  }
-  else
-  {
-    for (int ic = 0; ic < ncells; ic++)
-      iblank_cell[ic] = NORMAL;
-  }
-}
-*/
-
-//void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
-//{
-//  /// HACK FOR TAYLOR-GREEN VORTEX TEST CASE: INNER BOX (HALF-)LENGTH .25*PI
-//  double safety_fac = .8;
-//  double L = .25*PI * safety_fac;
-
-//  if (meshtag == 1) /// MUST BE BACKGROUND GRID
-//  {
-//    int icell = 0;
-//    for (int n = 0; n < ntypes; n++)
-//    {
-//      int nvert = nv[n];
-//      for (int ic = 0; ic < nc[n]; ic++)
-//      {
-//        iblank_cell[icell] = NORMAL;
-
-//        bool inside = true;
-//        for (int nd = 0; nd < 8 && inside; nd++)
-//        {
-//          int ind = 3*vconn[n][nvert*ic+nd];
-//          for (int d = 0; d < 3; d++)
-//          {
-//            if (std::abs(x[ind+d] - offset[d]) > L)
-//            {
-//              inside = false;
-//              break;
-//            }
-//          }
-//        }
-
-//        if (inside)
-//          iblank_cell[icell] = HOLE;
-
-//        icell++;
-//      }
-//    }
-//  }
-//  else
-//  {
-//    for (int ic = 0; ic < ncells; ic++)
-//      iblank_cell[ic] = NORMAL;
-//  }
-//}
 
 void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
 {
@@ -1174,7 +1029,7 @@ void MeshBlock::getFringeNodes(bool unblanking)
     for (int i = 0; i < nreceptorFaces; i++)
     {
       get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyz[m]));
-      get_face_nodes(&(ftag[i]),&(pointsPerFace[i]),&(rxyzCart[m]));
+      std::copy(&rxyz[m],&rxyz[m+3*pointsPerFace[i]],&rxyzCart[m]);
       m += (3*pointsPerFace[i]);
     }
 #endif
@@ -1229,6 +1084,17 @@ void MeshBlock::getFringeNodes(bool unblanking)
       get_receptor_nodes(&(ctag[i]),&(pointsPerCell[i]),&(rxyz[m]));
       m += (3*pointsPerCell[i]);
     }
+
+    //
+    // kludge rxyzCart now
+    //
+    if (rxyzCart) free(rxyzCart);
+    rxyzCart = (double *)malloc(sizeof(double)*ntotalPoints*3);
+    if (donorIdCart) free(donorIdCart);
+    donorIdCart = (int *)malloc(sizeof(int)*ntotalPoints);
+    ntotalPointsCart = ntotalPoints;
+
+    std::copy(&rxyz[0],&rxyz[3*ntotalPoints],&rxyzCart[0]);
 #endif
   }
   else
@@ -1319,6 +1185,9 @@ void MeshBlock::processPointDonorsGPU(void)
 
   rst.resize(interp2ListSize*nDims);
   donorId.resize(interp2ListSize);
+  std::vector<int> donorsBT_h(interp2ListSize);
+  std::vector<char> etypes_h(interp2ListSize);
+  std::vector<int> nweights_h(interp2ListSize), winds_h(interp2ListSize);
 
   int nWeightsTotal = 0;
   for (int i = 0; i < nsearch; i++)
@@ -1329,12 +1198,36 @@ void MeshBlock::processPointDonorsGPU(void)
     interpList2[ninterp2].receptorInfo[0] = isearch[2*i];   // procID
     interpList2[ninterp2].receptorInfo[1] = isearch[2*i+1]; // pointID
     interpList2[ninterp2].donorID = donorId2[i];
+
+    nweights_h[ninterp2] = interpList2[ninterp2].nweights;
+    winds_h[ninterp2] = nWeightsTotal;
+
     nWeightsTotal += interpList2[ninterp2].nweights;
 
     for (int d = 0; d < 3; d++)
       rst[3*ninterp2+d] = rst2[3*i+d];
 
+    int n = 0;
+    int ele = donorId2[i];
+    for (n = 0; n < ntypes; n++)
+    {
+      ele -= nc[n];
+      if (ele > 0) continue;
+
+      ele += nc[n];
+      break;
+    }
+
+//    if (myid==0 && i==572 || i==573)
+//    {
+//      printf("Pt %d(%d), (%f,%f,%f), donor %d(%d), nwgt %d, rst %f,%f,%f\n",
+//             i,ninterp2,xsearch[3*i+0],xsearch[3*i+1],xsearch[3*i+2],donorId2[i],ele,nweights_h[ninterp2],
+//          rst2[3*i+0],rst2[3*i+1],rst2[3*i+2]);
+//    }
+
     donorId[ninterp2] = donorId2[i];
+    donorsBT_h[ninterp2] = ele;
+    etypes_h[ninterp2] = (char)n;
 
     ninterp2++;
   }
@@ -1343,8 +1236,16 @@ void MeshBlock::processPointDonorsGPU(void)
   donors_d.assign(donorId.data(), donorId.size(), &stream_handle);
   mb_d.rst.assign(rst.data(), rst.size(), &stream_handle);
 
-  weights_d.resize(nWeightsTotal);
-  donor_frac_gpu(donors_d.data(), ninterp2, mb_d.rst.data(), weights_d.data());
+  donorsBT_d.assign(donorsBT_h.data(), donorsBT_h.size());
+  etypes_d.assign(etypes_h.data(), etypes_h.size());
+
+  nweights_d.assign(nweights_h.data(), nweights_h.size());
+  winds_d.assign(winds_h.data(), winds_h.size());
+
+  weights_h.resize(nWeightsTotal);
+  donor_frac_gpu(donorId.data(), ninterp2, rst.data(), weights_h.data());
+
+  weights_d.assign(weights_h.data(), weights_h.size());
 #endif
 }
 
@@ -1656,8 +1557,11 @@ void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
   intData.resize(2*nints);
   realData.resize(nreals);
 
-  int estride, sstride, vstride;
-  double *q_spts = get_q_spts(estride, sstride, vstride);
+  std::vector<double*> q_spts(ntypes);
+  std::vector<int> estride(ntypes), sstride(ntypes), vstride(ntypes);
+
+  for (int n = 0; n < ntypes; n++)
+    q_spts[n] = get_q_spts(estride[n], sstride[n], vstride[n], n);
 
   PUSH_NVTX_RANGE("getInterpU", 4);
   MPI_Pcontrol(1,"get_interpolated_U");
@@ -1667,13 +1571,24 @@ void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
     for (int k = 0; k < nvar; k++)
       realData[nvar*i+k] = 0.;
 
-    double* eptr = q_spts + interpList2[i].donorID*estride;
+    int n;
+    int ele = interpList2[i].donorID;
+    for (n = 0; n < ntypes; n++)
+    {
+      ele -= nc[n];
+      if (ele > 0) continue;
+
+      ele += nc[n];
+      break;
+    }
+
+    double* eptr = q_spts[n] + ele*estride[n];
     for (int spt = 0; spt < interpList2[i].nweights; spt++)
     {
       double weight = interpList2[i].weights[spt];
       for (int k = 0; k < nvar; k++)
       {
-        realData[nvar*i+k] += weight * eptr[spt*sstride + k*vstride];
+        realData[nvar*i+k] += weight * eptr[spt*sstride[n] + k*vstride[n]];
       }
     }
     intData[2*i] = interpList2[i].receptorInfo[0];
@@ -1693,8 +1608,11 @@ void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
   intData.resize(2*nints);
   realData.resize(nreals);
 
-  int estride, sstride, vstride, dstride;
-  double *dq_spts = get_dq_spts(estride, sstride, vstride, dstride);
+  std::vector<double*> dq_spts(ntypes);
+  std::vector<int> estride(ntypes), sstride(ntypes), vstride(ntypes), dstride(ntypes);
+
+  for (int n = 0; n < ntypes; n++)
+    dq_spts[n] = get_dq_spts(estride[n], sstride[n], vstride[n], dstride[n], n);
 
   PUSH_NVTX_RANGE("getInterpGrad", 5);
   MPI_Pcontrol(1, "get_interpolated_grad");
@@ -1705,13 +1623,24 @@ void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
       for (int k = 0; k < nvar; k++)
         realData[nvar*(nDims*i+dim)+k] = 0;
 
-    double *eptr = dq_spts + interpList2[i].donorID*estride;
+    int n;
+    int ele = interpList2[i].donorID;
+    for (n = 0; n < ntypes; n++)
+    {
+      ele -= nc[n];
+      if (ele > 0) continue;
+
+      ele += nc[n];
+      break;
+    }
+
+    double *eptr = dq_spts[n] + ele*estride[n];
     for (int spt = 0; spt < interpList2[i].nweights; spt++)
     {
       double weight = interpList2[i].weights[spt];
       for (int dim = 0; dim < nDims; dim++)
         for (int k = 0; k < nvar; k++)
-          realData[nvar*(nDims*i+dim)+k] += weight * eptr[spt*sstride + k*vstride + dim*dstride];
+          realData[nvar*(nDims*i+dim)+k] += weight * eptr[spt*sstride[n] + k*vstride[n] + dim*dstride[n]];
     }
     intData[2*i] = interpList2[i].receptorInfo[0];
     intData[2*i+1] = interpList2[i].receptorInfo[1];
@@ -1725,13 +1654,42 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
 {
   if (ninterp2 == 0) return;
 
-  int estride, sstride, vstride;
-  double *q_d = get_q_spts_d(estride, sstride, vstride);
+  std::vector<double*> qtd_h(ntypes);
+  std::vector<int> strides_h(3*ntypes);
+
+  for (int n = 0; n < ntypes; n++)
+  {
+    int estride, sstride, vstride;
+    qtd_h[n] = get_q_spts_d(estride, sstride, vstride, n);
+    strides_h[3*n] = estride;
+    strides_h[3*n+1] = sstride;
+    strides_h[3*n+2] = vstride;
+  }
+
+  dvec<double*> qtd_d; qtd_d.resize(ntypes);
+  qtd_d.assign(qtd_h.data(), qtd_h.size());
+
+  dvec<int> strides_d; strides_d.resize(3*ntypes);
+  strides_d.assign(strides_h.data(), strides_h.size());
 
   // Perform the interpolation
-  interp_u_wrapper(q_d, q_out_d, donors_d.data(), weights_d.data(),
-      buf_inds_d.data(), ninterp2, nSpts, nvar, estride, sstride, vstride,
-      stream_handle);
+  /// TODO: split up donors_d and weights_d by element type
+  interp_u_types_wrapper(qtd_d.data(), q_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
+      winds_d.data(), buf_inds_d.data(), ninterp2, nweights_d.data(), nvar, strides_d.data(), stream_handle);
+//  interp_u_wrapper(q_d, q_out_d, donors_d.data(), weights_d.data(),
+//      buf_inds_d.data(), ninterp2, nSpts, nvar, estride, sstride, vstride,
+//      stream_handle);
+
+  qtd_d.free_data();
+  strides_d.free_data();
+
+  std::vector<double> q_h(ninterp2*nvar);
+  cuda_copy_d2h(q_out_d, q_h.data(), ninterp2*nvar);
+
+//  for (int i = 0; i < ninterp2; i++) /// DEBUGGING
+//  {
+//    printf("(%d) %d: %f, %f, %f\n",myid,i,q_h[nvar*i+0],q_h[nvar*i+1],q_h[nvar*i+4]);
+//  }
 }
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
@@ -1739,7 +1697,7 @@ void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
   if (ninterp2 == 0) return;
 
   int estride, sstride, vstride, dstride;
-  double *dq_d = get_dq_spts_d(estride, sstride, vstride, dstride);
+  double *dq_d = NULL; //get_dq_spts_d(estride, sstride, vstride, dstride);
 
   // Perform the interpolation
   interp_du_wrapper(dq_d, dq_out_d, donors_d.data(), weights_d.data(),

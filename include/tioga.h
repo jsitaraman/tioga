@@ -138,8 +138,8 @@ class tioga
   std::vector<double> dblData;
 
   //! Callback functions for solution and gradient data
-  double* (*get_q_spts)(int& ele_stride, int& spt_stride, int& var_stride);
-  double* (*get_dq_spts)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
+  double* (*get_q_spts)(int& ele_stride, int& spt_stride, int& var_stride, int etype);
+  double* (*get_dq_spts)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride, int etype);
 
   /* ---- GPU-Related Variables ---- */
 #ifdef _GPU
@@ -204,11 +204,11 @@ class tioga
    * @param[in] nc : number of elements for each (volume) element type (size ntypes)
    * @param[in] vconn : element-to-vertex connectivity array */
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
-			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
+     int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int* ncf, int **vconn);
 
   /** Register additional face-connectivity arrays for Artificial Boundadry method */
   void registerFaceConnectivity(int gtype, int nftype, int* nf, int *nfv,
-      int** fconn, int *f2c, int *c2f, int* iblank_face, int nOverFaces,
+      int** fconn, int *f2c, int** c2f, int* iblank_face, int nOverFaces,
       int nWallFaces, int nMpi, int* overFaces, int* wallFaces, int* mpiFaces, 
       int *procR, int *idR);
 
@@ -317,8 +317,8 @@ class tioga
                        double& (*gqf)(int ff, int fpt, int var),
                        double (*ggs)(int ic, int spt, int dim, int var),
                        double& (*ggf)(int ff, int fpt, int dim, int var),
-                       double* (*gqss)(int& es, int& ss, int& vs),
-                       double* (*gdqs)(int& es, int& ss, int& vs, int& ds))
+                       double* (*gqss)(int& es, int& ss, int& vs, int etype),
+                       double* (*gdqs)(int& es, int& ss, int& vs, int& ds, int etype))
   {
     mb->setCallbackArtBnd(gnf, gfn, gqs, gqf, ggs, ggf, gqss, gdqs);
 
@@ -331,8 +331,8 @@ class tioga
   void set_ab_callback_gpu(void (*d2h)(int* ids, int nd, int grad),
                            void (*h2df)(int* ids, int nf, int grad, double* data),
                            void (*h2dc)(int* ids, int nc, int grad, double* data),
-                           double* (*gqd)(int&, int&, int&),
-                           double* (*gdqd)(int&, int&, int&, int&),
+                           double* (*gqd)(int& es, int& ss, int& vs, int etype),
+                           double* (*gdqd)(int& es, int& ss, int& vs, int& ds, int etype),
                            void (*gfng)(int*,int,int*,double*),
                            void (*gcng)(int*, int, int*, double*),
                            int (*gnw)(int),

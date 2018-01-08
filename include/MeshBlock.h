@@ -67,7 +67,8 @@ private:
   int nftype;  /** < number of different face types (triangle or quad) */
   int *nv;     /** < number of vertices for each type of cell */
   int *nc;     /** < number of each of different kinds of cells (tets, prism, pyramids, hex etc) */
-  int *nf;     /** < number of faces for each cell type */
+  int *ncf;     /** < number of faces for each cell type */
+  int *nf;     /** < number of faces of each type in grid*/
   int *nfv;    /** < number of vertices per face for each face type (3 or 4) */
   int nobc;    /** < number of overset boundary nodes */
   int nwbc;    /** < number of wall boundary nodes */
@@ -89,7 +90,7 @@ private:
   int **vconn;      /** < connectivity (cell to nodes) for each cell type */
   int **fconn;      /** < Connectivity (face to nodes) for each face type */
   int *f2c;         /** < Face to cell connectivity */
-  int *c2f;         /** < Cell to face connectivity */
+  int **c2f;         /** < Cell to face connectivity */
   int *wbcnode;     /** < wall boundary node indices */
   int *obcnode;     /** < overset boundary node indices */
   //
@@ -109,7 +110,7 @@ private:
   int *mpiFidR;   /** < Matching MPI face IDs on opposite rank */
   int *mpiProcR;  /** < Opposite rank for MPI face */
 
-  std::vector<int> c2c;
+  std::vector<std::vector<int>> c2c;
 
   int nsend, nrecv;
   std::vector<int> sndMap, rcvMap;
@@ -177,12 +178,12 @@ private:
 
   double& (*get_q_fpt)(int ff, int spt, int var);
 
-  double* (*get_q_spts)(int& ele_stride, int& spt_stride, int& var_stride);
-  double* (*get_dq_spts)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
+  double* (*get_q_spts)(int& ele_stride, int& spt_stride, int& var_stride, int etype);
+  double* (*get_dq_spts)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride, int etype);
 
   // GPU-related functions
-  double* (*get_q_spts_d)(int& ele_stride, int& spt_stride, int& var_stride);
-  double* (*get_dq_spts_d)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride);
+  double* (*get_q_spts_d)(int& ele_stride, int& spt_stride, int& var_stride, int etype);
+  double* (*get_dq_spts_d)(int& ele_stride, int& spt_stride, int& var_stride, int& dim_stride, int etype);
 
   void (*get_face_nodes_gpu)(int* fringeIDs, int nFringe, int* nptPerFace, double* xyz);
   void (*get_cell_nodes_gpu)(int* cellIDs, int nCells, int* nptPerCell, double* xyz);
@@ -320,7 +321,10 @@ private:
   dvec<double> weights_d;
   hvec<double> weights_h;
   dvec<int> donors_d;
-  hvec<int> donors_h;
+  dvec<int> donorsBT_d;
+  dvec<char> etypes_d;
+  dvec<int> nweights_d;
+  dvec<int> winds_d;
   dvec<int> buf_inds_d;
   hvec<int> buf_inds;
   std::vector<int> buf_disp;
@@ -386,12 +390,11 @@ private:
 
   void writeFlowFile(int bid,double *q,int nvar,int type);
   
-  void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
-	       int *wbcnodei,int *obcnodei,
-	       int ntypesi, int *nvi, int *nci, int **vconni);
+  void setData(int btag, int nnodesi, double *xyzi, int *ibli, int nwbci, int nobci,
+      int *wbcnodei, int *obcnodei, int ntypesi, int *nvi, int* ncfi, int *nci, int **vconni);
 
   void setFaceData(int _gtype, int _nftype, int* _nf, int* _nfv, int** _f2v,
-      int *_f2c, int *_c2f, int* _ib_face, int nOver, int nWall, int nMpi, int* oFaces,
+      int *_f2c, int **_c2f, int* _ib_face, int nOver, int nWall, int nMpi, int* oFaces,
       int* wFaces, int* mFaces, int* procR, int* idR);
 
   void setResolutions(double *nres,double *cres);    
@@ -548,8 +551,8 @@ private:
                          double& (*gqf)(int ff, int fpt, int var),
                          double (*ggs)(int ic, int spt, int dim, int var),
                          double& (*ggf)(int ff, int fpt, int dim, int var),
-                         double* (*gqss)(int& es, int& ss, int& vs),
-                         double* (*gdqs)(int& es, int& ss, int& vs, int& ds))
+                         double* (*gqss)(int& es, int& ss, int& vs, int etype),
+                         double* (*gdqs)(int& es, int& ss, int& vs, int& ds, int etype))
   {
     // See declaration of functions above for more details
     get_nodes_per_face = gnf;
@@ -567,8 +570,8 @@ private:
   void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd, int grad),
                             void (*h2df)(int* ids, int nf, int grad, double *data),
                             void (*h2dc)(int* ids, int nf, int grad, double *data),
-                            double* (*gqd)(int&, int&, int&),
-                            double* (*gdqd)(int&, int&, int&, int&),
+                            double* (*gqd)(int& es, int& ss, int& vs, int etype),
+                            double* (*gdqd)(int& es, int& ss, int& vs, int& ds, int etype),
                             void (*gfng)(int*, int, int*, double*),
                             void (*gcng)(int*, int, int*, double*),
                             int (*gnw)(int),

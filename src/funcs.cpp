@@ -399,6 +399,24 @@ void getCentroid(double *pts, int nPts, int nDims, double *xc)
       xc[d] += pts[nDims*i+d]/nPts;
 }
 
+int nNodesToFirstOrder(int nf, int nvert)
+{
+  switch (nf)
+  {
+    case 4: // Tet
+      return 4;
+
+    case 5:
+      if (nvert == 6 || nvert == 18 || nvert == 40 || nvert == 75)
+        return 6; // Prism
+      else
+        return 5; // Pyrimid
+
+    case 6: // Hex
+      return 8;
+  }
+}
+
 std::vector<int> gmsh_to_structured_quad(unsigned int nNodes)
 {
   std::vector<int> gmsh_to_ijk(nNodes,0);
@@ -865,11 +883,33 @@ double computeVolume(double *xv, int nNodes, int nDims)
 {
   if (nDims == 2)
   {
-    int order = std::max((int)sqrt(nNodes)-1, 0);
-    if (order != shape_order)
+    switch (nNodes)
     {
-      tmp_loc = getLocSpts(QUAD,order,std::string("Legendre"));
-      shape_order = order;
+      case 4:
+      case 9:
+      case 16:
+      case 25:
+      case 36:
+      case 49:
+      {
+        int order = std::max((int)sqrt(nNodes)-1, 0);
+        if (order != shape_order)
+        {
+          tmp_loc = getLocSpts(QUAD,order,std::string("Legendre"));
+          shape_order = order;
+        }
+
+        break;
+      }
+
+      case 3:
+      case 6:
+      case 10:
+      case 15:
+      case 21:
+      {
+        break;
+      }
     }
   }
   else

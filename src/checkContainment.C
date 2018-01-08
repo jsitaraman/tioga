@@ -55,29 +55,31 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
 
     int nvert = nv[n];
     if (nvert > 8)
-    {
-      /* --- Quadratic or higher-order shape functions - use general func --- */
+      nvert = nNodesToFirstOrder(ncf[n], nv[n]);
+//    if (nvert > 8)
+//    {
+//      /* --- Quadratic or higher-order shape functions - use general func --- */
 
-      std::vector<double> xv2(nvert*3);
-      for (int m = 0; m < nvert; m++)
-      {
-        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
-        for (int j = 0; j < 3; j++)
-          xv2[m*3+j] = x[i3+j];
-      }
+//      std::vector<double> xv2(nvert*3);
+//      for (int m = 0; m < nvert; m++)
+//      {
+//        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+//        for (int j = 0; j < 3; j++)
+//          xv2[m*3+j] = x[i3+j];
+//      }
 
-      double refloc[3];
-      bool isInEle = getRefLocNewton(xv2.data(), xsearch, &refloc[0], nvert, 3);
+//      double refloc[3];
+//      bool isInEle = getRefLocNewton(xv2.data(), xsearch, &refloc[0], nvert, 3);
 
-      if (!isInEle)
-        *cellIndex = -1;
-      else
-        *cellIndex = icell;
+//      if (!isInEle)
+//        *cellIndex = -1;
+//      else
+//        *cellIndex = icell;
 
-      return;
-    }
-    else
-    {
+//      return;
+//    }
+//    else
+//    {
       /* --- Linear shape functions --- */
 
       double xv[8][3];
@@ -85,7 +87,7 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
 
       for (int m = 0; m < nvert; m++)
       {
-        int i3 = 3*(vconn[n][nvert*ic+m]-BASE);
+        int i3 = 3*(vconn[n][nv[n]*ic+m]-BASE);
         for (int j = 0; j < 3; j++)
           xv[m][j] = x[i3+j];
       }
@@ -102,7 +104,7 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
         }
       }
       return;
-    }
+//    }
   }
   else
   {

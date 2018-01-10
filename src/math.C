@@ -210,23 +210,23 @@ void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert)
   double f[8][3];
   double u,v,w;
   double oneminusU,oneminusV,oneminusW,oneminusUV;
- 
+
   switch(nvert)
-    {
+  {
     case 4:
       //
       // tetrahedron
       //
       lhs=(double **)malloc(sizeof(double)*3);
       for(i=0;i<3;i++)
-	lhs[i]=(double *)malloc(sizeof(double)*3);
-      rhs=(double *)malloc(sizeof(double)*3);       
+        lhs[i]=(double *)malloc(sizeof(double)*3);
+      rhs=(double *)malloc(sizeof(double)*3);
       for(k=0;k<3;k++)
-	{
-	  for(j=0;j<3;j++)
-	    lhs[j][k]=xv[k][j]-xv[3][j];
-	  rhs[k]=xp[k]-xv[3][k];
-	}
+      {
+        for(j=0;j<3;j++)
+          lhs[j][k]=xv[k][j]-xv[3][j];
+        rhs[k]=xp[k]-xv[3][k];
+      }
       //
       // invert the 3x3 matrix
       //
@@ -234,105 +234,108 @@ void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert)
       //
       // check if the solution is not degenerate
       //
-      if (isolflag) 
-	{
-	  for(k=0;k<3;k++) frac[k]=rhs[k];
-	  frac[3]=1.-frac[0]-frac[1]-frac[2];
-	}
+      if (isolflag)
+      {
+        for(k=0;k<3;k++) frac[k]=rhs[k];
+        frac[3]=1.-frac[0]-frac[1]-frac[2];
+      }
       else
-	{
-	  frac[0]=1.0;
-	  frac[1]=frac[2]=frac[3]=0;
-	}
+      {
+        frac[0]=1.0;
+        frac[1]=frac[2]=frac[3]=0;
+      }
       for(i=0;i<3;i++) free(lhs[i]);
       free(lhs);
       free(rhs);
       break;
+
     case 5:
       //
       // pyramid
       //
       for(j=0;j<3;j++)
-	{
-	  f[0][j]=xv[0][j]-xp[j];
-	  f[1][j]=xv[1][j]-xv[0][j];
-	  f[2][j]=xv[3][j]-xv[0][j];
-	  f[3][j]=xv[4][j]-xv[0][j];
-	  //
-	  f[4][j]=xv[0][j]-xv[1][j]+xv[2][j]-xv[3][j];
-	  f[5][j]=xv[0][j]-xv[3][j];
-	  f[6][j]=xv[0][j]-xv[1][j];
-	  f[7][j]=-xv[0][j]+xv[1][j]-xv[2][j]+xv[3][j];
-	}
-      //
+      {
+        f[0][j]=xv[0][j]-xp[j];
+        f[1][j]=xv[1][j]-xv[0][j];
+        f[2][j]=xv[3][j]-xv[0][j];
+        f[3][j]=xv[4][j]-xv[0][j];
+        //
+        f[4][j]=xv[0][j]-xv[1][j]+xv[2][j]-xv[3][j];
+        f[5][j]=xv[0][j]-xv[3][j];
+        f[6][j]=xv[0][j]-xv[1][j];
+        f[7][j]=-xv[0][j]+xv[1][j]-xv[2][j]+xv[3][j];
+      }
+
       newtonSolve(f,&u,&v,&w);
       oneminusU=1.0-u;
       oneminusV=1.0-v;
       oneminusW=1.0-w;
-      //
+
       frac[0]=oneminusU*oneminusV*oneminusW;
       frac[1]=u*oneminusV*oneminusW;
       frac[2]=u*v*oneminusW;
       frac[3]=oneminusU*v*oneminusW;
       frac[4]=w;
-      //
+
       break;
+
     case 6:
       //
-      // prizm
+      // prism
       //
       for(j=0;j<3;j++)
-	{
-	  f[0][j]=xv[0][j]-xp[j];
-	  f[1][j]=xv[1][j]-xv[0][j];
-	  f[2][j]=xv[2][j]-xv[0][j];
-	  f[3][j]=xv[3][j]-xv[0][j];
-	  //
-	  f[4][j]=0;
-	  f[5][j]=xv[0][j]-xv[2][j]-xv[3][j]+xv[5][j];
-	  f[6][j]=xv[0][j]-xv[1][j]-xv[3][j]+xv[4][j];
-	  f[7][j]=0.;
-	}
-      //
+      {
+        f[0][j]=xv[0][j]-xp[j];
+        f[1][j]=xv[1][j]-xv[0][j];
+        f[2][j]=xv[2][j]-xv[0][j];
+        f[3][j]=xv[3][j]-xv[0][j];
+        //
+        f[4][j]=0;
+        f[5][j]=xv[0][j]-xv[2][j]-xv[3][j]+xv[5][j];
+        f[6][j]=xv[0][j]-xv[1][j]-xv[3][j]+xv[4][j];
+        f[7][j]=0.;
+      }
+
       newtonSolve(f,&u,&v,&w);
-      //
+
       oneminusUV=1.0-u-v;
       oneminusU=1.0-u;
       oneminusV=1.0-v;
       oneminusW=1.0-w;
-      //
+
       frac[0]=oneminusUV*oneminusW;
       frac[1]=u*oneminusW;
       frac[2]=v*oneminusW;
       frac[3]=oneminusUV*w;
       frac[4]=u*w;
       frac[5]=v*w;
-      //
+
       break;
+
     case 8:
       //
       // hexahedra
       //
       for(j=0;j<3;j++)
-	{
-	  f[0][j]=xv[0][j]-xp[j];
-	  f[1][j]=xv[1][j]-xv[0][j];
-	  f[2][j]=xv[3][j]-xv[0][j];
-	  f[3][j]=xv[4][j]-xv[0][j];
-	  //
-	  f[4][j]=xv[0][j]-xv[1][j]+xv[2][j]-xv[3][j];
-	  f[5][j]=xv[0][j]-xv[3][j]+xv[7][j]-xv[4][j];
-	  f[6][j]=xv[0][j]-xv[1][j]+xv[5][j]-xv[4][j];
-	  f[7][j]=-xv[0][j]+xv[1][j]-xv[2][j]+xv[3][j]+
-	    xv[4][j]-xv[5][j]+xv[6][j]-xv[7][j];
-	}
-      //
+      {
+        f[0][j]=xv[0][j]-xp[j];
+        f[1][j]=xv[1][j]-xv[0][j];
+        f[2][j]=xv[3][j]-xv[0][j];
+        f[3][j]=xv[4][j]-xv[0][j];
+        //
+        f[4][j]=xv[0][j]-xv[1][j]+xv[2][j]-xv[3][j];
+        f[5][j]=xv[0][j]-xv[3][j]+xv[7][j]-xv[4][j];
+        f[6][j]=xv[0][j]-xv[1][j]+xv[5][j]-xv[4][j];
+        f[7][j]=-xv[0][j]+xv[1][j]-xv[2][j]+xv[3][j]+
+            xv[4][j]-xv[5][j]+xv[6][j]-xv[7][j];
+      }
+
       newtonSolve(f,&u,&v,&w);
-      //
+
       oneminusU=1.0-u;
       oneminusV=1.0-v;
       oneminusW=1.0-w;
-      //
+
       frac[0]=oneminusU*oneminusV*oneminusW;
       frac[1]=u*oneminusV*oneminusW;
       frac[2]=u*v*oneminusW;
@@ -340,13 +343,14 @@ void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert)
       frac[4]=oneminusU*oneminusV*w;
       frac[5]=u*oneminusV*w;
       frac[6]=u*v*w;
-      frac[7]=oneminusU*v*w;     
-      //
+      frac[7]=oneminusU*v*w;
+
       break;
+
     default:
       printf("Interpolation not implemented for polyhedra with %d vertices\n",nvert);
       break;
-    }
+  }
 }
 
 double computeCellVolume(double xv[8][3],int nvert)

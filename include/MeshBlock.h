@@ -353,7 +353,7 @@ private:
     nsearch=0;
     cancelList=NULL;
     userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL;
-    nfringe=0;
+    nfringe=2;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;
@@ -596,7 +596,7 @@ private:
     check_intersect_p4est=f2;
   }
 
-  void writeCellFile(int, int* flag);
+  void writeCellFile(int, int* flag = NULL);
 
   /*! Gather a list of all receptor point locations (including for high-order) */
   void getInternalNodes(void);

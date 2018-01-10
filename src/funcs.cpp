@@ -162,6 +162,173 @@ double dLagrange(double* xiGrid, unsigned int npts, double xi, unsigned int mode
   return val/den;
 }
 
+
+double Legendre(unsigned int P, double xi)
+{
+  if (P == 0)
+    return 1.0;
+  else if (P == 1)
+    return xi;
+
+  return ((2.0 * P - 1.0) / P) *xi *Legendre(P-1, xi) - ((P - 1.0) / P) *Legendre(P-2, xi);
+}
+
+double dLegendre(unsigned int P, double xi)
+{
+  if (P == 0)
+    return 0.0;
+  else if (P == 1)
+    return 1.0;
+
+  return ((2.0 * P - 1.0) / P) * (Legendre(P-1, xi) + xi *dLegendre(P-1, xi)) - ((P - 1.0) / P) *dLegendre(P-2, xi);
+}
+
+/* Jacobi polynomial function from HiFiLES */
+double Jacobi(double xi, double a, double b, unsigned int mode)
+{
+  double val;
+
+  if(mode == 0)
+  {
+    double d0 = std::pow(2.0,(-a-b-1));
+    double d1 = std::tgamma(a+b+2);
+    double d2 = std::tgamma(a+1)*std::tgamma(b+1);
+
+    val = std::sqrt(d0*(d1/d2));
+  }
+  else if(mode == 1)
+  {
+    double d0 = std::pow(2.0,(-a-b-1));
+    double d1 = std::tgamma(a+b+2);
+    double d2 = std::tgamma(a+1)*std::tgamma(b+1);
+    double d3 = a+b+3;
+    double d4 = (a+1)*(b+1);
+    double d5 = (xi*(a+b+2)+(a-b));
+
+    val = 0.5*std::sqrt(d0*(d1/d2))*std::sqrt(d3/d4)*d5;
+  }
+  else
+  {
+    double d0 = mode*(mode+a+b)*(mode+a)*(mode+b);
+    double d1 = ((2*mode)+a+b-1)*((2*mode)+a+b+1);
+    double d3 = (2*mode)+a+b;
+
+    double d4 = (mode-1)*((mode-1)+a+b)*((mode-1)+a)*((mode-1)+b);
+    double d5 = ((2*(mode-1))+a+b-1)*((2*(mode-1))+a+b+1);
+    double d6 = (2*(mode-1))+a+b;
+
+    double d7 = -((a*a)-(b*b));
+    double d8 = ((2*(mode-1))+a+b)*((2*(mode-1))+a+b+2);
+
+    double d9 = (2.0/d3)*std::sqrt(d0/d1);
+    double d10 = (2.0/d6)*std::sqrt(d4/d5);
+    double d11 = d7/d8;
+
+    double d12 = xi*Jacobi(xi,a,b,mode-1);
+    double d13 = d10*Jacobi(xi,a,b,mode-2);
+    double d14 = d11*Jacobi(xi,a,b,mode-1);
+
+    val = (1.0/d9)*(d12-d13-d14);
+  }
+
+  return val;
+}
+
+double dJacobi(double xi, double a, double b, unsigned int mode)
+{
+  double val;
+  if (mode == 0)
+    val = 0.0;
+  else
+    val = std::sqrt(mode * (mode + a + b + 1)) * Jacobi(xi, a + 1, b + 1, mode - 1);
+
+  return val;
+}
+
+double Dubiner2D(unsigned int P, double xi, double eta, unsigned int mode)
+{
+  double val;
+  int nModes = (P + 1) * (P + 2) / 2;
+  if (mode >= nModes)
+    ThrowException("ERROR: mode value is too high for given P!")
+
+  double ab[2];
+  ab[0] = (eta == 1.0) ? (-1) : ((2 * (1 + xi) / (1 - eta)) - 1);
+  ab[1] = eta;
+
+  unsigned int m = 0;
+  for (unsigned int k = 0; k <= P; k++)
+  {
+    for (unsigned int j = 0; j <= k; j++)
+    {
+      unsigned int i  = k - j;
+
+      if (m == mode)
+      {
+        double j0 = Jacobi(ab[0], 0, 0, i);
+        double j1 = Jacobi(ab[1], 2*i + 1, 0, j);
+        val =  std::sqrt(2) * j0 * j1 * std::pow(1 - ab[1], i);
+      }
+
+      m++;
+    }
+  }
+
+  return val;
+}
+
+double dDubiner2D(unsigned int P, double xi, double eta, double dim, unsigned int mode)
+{
+  double val;
+  int nModes = (P + 1) * (P + 2) / 2;
+  if (mode >= nModes)
+    ThrowException("ERROR: mode value is too high for given P!")
+
+  double ab[2];
+  ab[0] = (eta == 1.0) ? (-1) : ((2 * (1 + xi) / (1 - eta)) - 1);
+  ab[1] = eta;
+
+  unsigned int m = 0;
+  for (unsigned int k = 0; k <= P; k++)
+  {
+    for (unsigned int j = 0; j <= k; j++)
+    {
+      unsigned int i  = k - j;
+
+      if (m == mode)
+      {
+        if (dim == 0)
+        {
+          double j0 = dJacobi(ab[0], 0, 0, i);
+          double j1 = Jacobi(ab[1], 2*i + 1, 0, j);
+          if (i == 0)
+            val = 0.0;
+          else
+            val =  2.0 * std::sqrt(2) * j0 * j1 * std::pow(1 - ab[1], i-1);
+        }
+        else if (dim == 1)
+        {
+          double j0 = dJacobi(ab[0], 0, 0, i);
+          double j1 = Jacobi(ab[1], 2*i + 1, 0, j);
+          double j2 = Jacobi(ab[0], 0, 0, i);
+          double j3 = dJacobi(ab[1], 2*i + 1, 0, j) * std::pow(1 - ab[1], i);
+          double j4 = Jacobi(ab[1], 2*i + 1, 0, j) * i * std::pow(1 - ab[1], i-1);
+
+          if (i == 0)
+            val = std::sqrt(2) * j2 * j3;
+          else
+            val = std::sqrt(2) * (j0 * j1 * std::pow(1 - ab[1], i-1) * (1 + ab[0]) + j2 * (j3 - j4));
+        }
+      }
+
+      m++;
+    }
+  }
+
+  return val;
+}
+
+
 // See Eigen's 'determinant.h' from 2014-9-18,
 // https://bitbucket.org/eigen/eigen file Eigen/src/LU/determinant.h,
 double det_3x3_part(const double* mat, int a, int b, int c)
@@ -828,11 +995,24 @@ bool getRefLocNewton(double *xv, double *in_xyz, double *out_rst, int nNodes, in
 
   while (norm > tol && iter<iterMax) {
     if (nDims == 2) {
-      shape_quad(loc,shape.data(),nNodes);
-      dshape_quad(loc,dshape.data(),nNodes);
+      if (nNodes == 3 || nNodes == 6) {
+        shape_tri(loc,shape.data(),nNodes);
+        dshape_tri(loc,dshape.data(),nNodes);
+      } else {
+        shape_quad(loc,shape.data(),nNodes);
+        dshape_quad(loc,dshape.data(),nNodes);
+      }
     } else {
-      shape_hex(loc,shape.data(),nNodes);
-      dshape_hex(loc,dshape.data(),nNodes);
+      if (nNodes == 4 || nNodes == 10) {
+        shape_tet(loc,shape.data(),nNodes);
+        dshape_tet(loc,dshape.data(),nNodes);
+      } else if (nNodes == 6 || nNodes == 18) {
+        shape_prism(loc,shape.data(),nNodes);
+        dshape_prism(loc,dshape.data(),nNodes);
+      } else {
+        shape_hex(loc,shape.data(),nNodes);
+        dshape_hex(loc,dshape.data(),nNodes);
+      }
     }
 
     point dx = pos;
@@ -935,18 +1115,52 @@ double computeVolume(double *xv, int nNodes, int nDims)
 
     if (nDims == 2)
     {
-      for (uint spt = 0; spt < nSpts; spt++)
+      if (nNodes == 3 || nNodes == 6)
       {
-        shape_quad(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
-        dshape_quad(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+        for (uint spt = 0; spt < nSpts; spt++)
+        {
+          shape_tri(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
+          dshape_tri(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+        }
+      }
+      else
+      {
+        for (uint spt = 0; spt < nSpts; spt++)
+        {
+          shape_quad(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
+          dshape_quad(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+        }
       }
     }
     else
     {
-      for (uint spt = 0; spt < nSpts; spt++)
+      switch (nNodes)
       {
-        shape_hex(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
-        dshape_hex(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+        case 4:
+        case 10:
+          for (uint spt = 0; spt < nSpts; spt++)
+          {
+            shape_tet(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
+            dshape_tet(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+          }
+          break;
+
+        case 6:
+        case 18:
+          for (uint spt = 0; spt < nSpts; spt++)
+          {
+            shape_prism(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
+            dshape_prism(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+          }
+          break;
+
+        default:
+          for (uint spt = 0; spt < nSpts; spt++)
+          {
+            shape_hex(tmp_loc[spt], &tmp_shape[spt*nNodes], nNodes);
+            dshape_hex(tmp_loc[spt], &tmp_dshape[spt*nNodes*nDims], nNodes);
+          }
+          break;
       }
     }
   }
@@ -1034,6 +1248,40 @@ void shape_line(double xi, double* out_shape, int nNodes)
     out_shape[i] = Lagrange(xlist, xi, i);
 }
 
+void shape_tri(const point &in_rs, std::vector<double> &out_shape, int nNodes)
+{
+  out_shape.resize(nNodes);
+  shape_tri(in_rs, out_shape.data(), nNodes);
+}
+
+void shape_tri(const point &in_rs, double* out_shape, int nNodes)
+{
+  const double r = 0.5*(in_rs.x + 1); // [-1,1] --> [0,1]
+  const double s = 0.5*(in_rs.y + 1);
+  const double t = 1 - r - s;
+
+  switch (nNodes)
+  {
+    case 3:
+      out_shape[0] = r;
+      out_shape[1] = s;
+      out_shape[2] = t;
+      break;
+
+    case 6:
+      out_shape[0] = t*(2*t-1);
+      out_shape[1] = r*(2*r-1);
+      out_shape[2] = s*(2*s-1);
+      out_shape[3] = 4*r*t;
+      out_shape[4] = 4*r*s;
+      out_shape[5] = 4*s*t;
+      break;
+
+    default:
+      ThrowException("Triangle shape functions not implemented for this order.");
+  }
+}
+
 void shape_quad(const point &in_rs, std::vector<double> &out_shape, int nNodes)
 {
   out_shape.resize(nNodes);
@@ -1097,6 +1345,106 @@ void shape_quad(const point &in_rs, double* out_shape, int nNodes)
   // Center node for even-ordered Lagrange quads (odd value of nSide)
   if (isOdd) {
     out_shape[nNodes-1] = lag_i[nSide/2] * lag_j[nSide/2];
+  }
+}
+
+
+void shape_tet(const point &in_rst, std::vector<double> &out_shape, int nNodes)
+{
+  out_shape.resize(nNodes);
+  shape_tet(in_rst, out_shape.data(), nNodes);
+}
+
+void shape_tet(const point &in_rst, double* out_shape, int nNodes)
+{
+  const double r = 0.5*(in_rst.x + 1); // [-1,1] --> [0,1]
+  const double s = 0.5*(in_rst.y + 1);
+  const double t = 0.5*(in_rst.z + 1);
+  const double u = 1 - r - s - t;
+
+  switch (nNodes)
+  {
+    case 4:
+      out_shape[0] = u;
+      out_shape[1] = r;
+      out_shape[2] = s;
+      out_shape[3] = t;
+      break;
+
+    case 10:
+      out_shape[3] = u*(2*u-1);
+      out_shape[0] = r*(2*r-1);
+      out_shape[1] = s*(2*s-1);
+      out_shape[2] = t*(2*t-1);
+      out_shape[6] = 4*r*u;
+      out_shape[4] = 4*r*s;
+      out_shape[8] = 4*s*u;
+      out_shape[9] = 4*t*u;
+      out_shape[7] = 4*s*t;
+      out_shape[5] = 4*r*t;
+      break;
+
+    default:
+      ThrowException("Tet shape functions not implemented for this order.");
+  }
+}
+
+void shape_prism(const point &in_rst, std::vector<double> &out_shape, int nNodes)
+{
+  out_shape.resize(nNodes);
+  shape_prism(in_rst, out_shape.data(), nNodes);
+}
+
+void shape_prism(const point &in_rst, double* out_shape, int nNodes)
+{
+  const double r = 0.5*(in_rst.x + 1); // [-1,1] --> [0,1]
+  const double s = 0.5*(in_rst.y + 1);
+  const double z = 0.5*(in_rst.z + 1);
+  const double t = 1 - r - s;
+
+  // NOTE: Using Gmsh node ordering [corners, edges, faces]
+  switch (nNodes)
+  {
+    case 6:
+      out_shape[0] = t*(1-z);
+      out_shape[1] = r*(1-z);
+      out_shape[2] = s*(1-z);
+      out_shape[3] = t*z;
+      out_shape[4] = r*z;
+      out_shape[5] = s*z;
+      break;
+
+    case 18:
+    {
+      double Z1 = (z-1)*(2*z-1);
+      double Z2 = 4*z*(1-z);
+      double Z3 = z*(2*z-1);
+
+      out_shape[0] = t*(2*t-1) * Z1;
+      out_shape[1] = r*(2*r-1) * Z1;
+      out_shape[2] = s*(2*s-1) * Z1;
+      out_shape[6] = 4*r*t * Z1;
+      out_shape[9] = 4*r*s * Z1;
+      out_shape[7] = 4*s*t * Z1;
+
+      out_shape[8]  = t*(2*t-1) * Z2;
+      out_shape[10] = r*(2*r-1) * Z2;
+      out_shape[11] = s*(2*s-1) * Z2;
+      out_shape[15] = 4*r*t * Z2;
+      out_shape[17] = 4*r*s * Z2;
+      out_shape[16] = 4*s*t * Z2;
+
+      out_shape[3]  = t*(2*t-1) * Z3;
+      out_shape[4]  = r*(2*r-1) * Z3;
+      out_shape[5]  = s*(2*s-1) * Z3;
+      out_shape[12] = 4*r*t * Z3;
+      out_shape[14] = 4*r*s * Z3;
+      out_shape[13] = 4*s*t * Z3;
+      break;
+    }
+
+    default:
+      ThrowException("Tet shape functions not implemented for this order.");
   }
 }
 
@@ -1257,6 +1605,139 @@ void dshape_quad(const point &in_rs, double* out_dshape, int nNodes)
   if (isOdd) {
     out_dshape[2*(nNodes-1)+0] = dlag_i[nSide/2] * lag_j[nSide/2];
     out_dshape[2*(nNodes-1)+1] = lag_i[nSide/2] * dlag_j[nSide/2];
+  }
+}
+
+void dshape_tri(const std::vector<point> &loc_pts, double* out_dshape, int nNodes)
+{
+  for (int i = 0; i < loc_pts.size(); i++)
+    dshape_tri(loc_pts[i], &out_dshape[i*nNodes*2], nNodes);
+}
+
+void dshape_tri(const point &in_rs, double* out_dshape, int nNodes)
+{
+  const double r = 0.5*(in_rs.x + 1); // [-1,1] --> [0,1]
+  const double s = 0.5*(in_rs.y + 1);
+  const double t = 1 - r - s;
+
+  switch (nNodes)
+  {
+    case 3:
+      out_dshape[0] = -1; out_dshape[1] = -1;
+      out_dshape[2] =  1; out_dshape[3] =  0;
+      out_dshape[4] =  0; out_dshape[5] =  1;
+      break;
+
+    case 6:
+      out_dshape[0]  =  1-4*t;   out_dshape[1]  =  1-4*t;
+      out_dshape[2]  =  4*r-1;   out_dshape[3]  =  0;
+      out_dshape[4]  =  0;       out_dshape[5]  =  4*s-1;
+      out_dshape[6]  =  4*t-4*r; out_dshape[7]  = -4*r;
+      out_dshape[8]  =  4*s;     out_dshape[9]  =  4*r;
+      out_dshape[10] = -4*s;     out_dshape[11] =  4*t-4*s;
+      break;
+
+    default:
+      ThrowException("Triangle shape functions not implemented for this order.");
+  }
+}
+
+void dshape_tet(const std::vector<point> &loc_pts, double* out_dshape, int nNodes)
+{
+  for (int i = 0; i < loc_pts.size(); i++)
+    dshape_tet(loc_pts[i], &out_dshape[i*nNodes*3], nNodes);
+}
+
+void dshape_tet(const point &in_rst, double* out_dshape, int nNodes)
+{
+  const double r = 0.5*(in_rst.x + 1); // [-1,1] --> [0,1]
+  const double s = 0.5*(in_rst.y + 1);
+  const double t = 0.5*(in_rst.z + 1);
+  const double u = 1 - r - s - t;
+
+  switch (nNodes)
+  {
+    case 4:
+      out_dshape[0] =  1; out_dshape[1] =  0; out_dshape[2] =  0;
+      out_dshape[3] =  0; out_dshape[4] =  1; out_dshape[5] =  0;
+      out_dshape[6] =  0; out_dshape[7] =  0; out_dshape[8] =  1;
+      out_dshape[9] = -1; out_dshape[10] = -1; out_dshape[11] = -1;
+      break;
+
+    case 10:
+      out_dshape[0]  =  1-4*u;   out_dshape[1]  =  1-4*u;   out_dshape[2]  =  1-4*u;
+      out_dshape[3]  =  4*r-1;   out_dshape[4]  =  0;       out_dshape[5]  =  0;
+      out_dshape[6]  =  0;       out_dshape[7]  =  4*s-1;   out_dshape[8]  =  0;
+      out_dshape[9]  =  0;       out_dshape[10] =  0;       out_dshape[11] =  4*t-1;
+      out_dshape[12] =  4*u-4*r; out_dshape[13] = -4*r;     out_dshape[14] = -4*r;
+      out_dshape[15] =  4*s;     out_dshape[16] =  4*r;     out_dshape[17] =  0;
+      out_dshape[18] = -4*s;     out_dshape[19] =  4*u-4*s; out_dshape[20] = -4*s;
+      out_dshape[21] = -4*t;     out_dshape[22] = -4*t;     out_dshape[23] =  4*u-4*t;
+      out_dshape[24] =  0;       out_dshape[25] =  4*t;     out_dshape[26] =  4*s;
+      out_dshape[27] =  4*t;     out_dshape[28] =  0;       out_dshape[29] =  4*r;
+      break;
+
+    default:
+      ThrowException("Triangle shape functions not implemented for this order.");
+  }
+}
+
+void dshape_prism(const std::vector<point> &loc_pts, double* out_dshape, int nNodes)
+{
+  for (int i = 0; i < loc_pts.size(); i++)
+    dshape_prism(loc_pts[i], &out_dshape[i*nNodes*3], nNodes);
+}
+
+void dshape_prism(const point &in_rst, double* out_dshape, int nNodes)
+{
+  const double r = 0.5*(in_rst.x + 1); // [-1,1] --> [0,1]
+  const double s = 0.5*(in_rst.y + 1);
+  const double z = 0.5*(in_rst.z + 1);
+  const double t = 1 - r - s;
+
+  switch (nNodes)
+  {
+    case 6:
+      out_dshape[0]  =  z-1; out_dshape[1]  =  z-1; out_dshape[2]  = -t;
+      out_dshape[3]  =  1-z; out_dshape[4]  =  0;   out_dshape[5]  = -r;
+      out_dshape[6]  =  0;   out_dshape[7]  =  1-z; out_dshape[8]  = -s;
+      out_dshape[9]  = -z;   out_dshape[10] = -z;   out_dshape[11] =  t;
+      out_dshape[12] =  z;   out_dshape[13] =  0;   out_dshape[14] =  r;
+      out_dshape[15] =  0;   out_dshape[16] =  z;   out_dshape[17] =  s;
+      break;
+
+    case 18:
+    {
+      // NOTE: Gmsh node ordering
+      double Z1 = (z-1)*(2*z-1);  double dZ1 = 4*z - 3;
+      double Z2 = 4*z*(1-z);      double dZ2 = 4 - 8*z;
+      double Z3 = z*(2*z-1);      double dZ3 = 4*z - 1;
+
+      out_dshape[0]  =  (1-4*t)*Z1;   out_dshape[1]  =  (1-4*t)*Z1;   out_dshape[2]  = t*(2*t-1) * dZ1;
+      out_dshape[3]  =  (4*r-1)*Z1;   out_dshape[4]  =   0;           out_dshape[5]  = r*(2*r-1) * dZ1;
+      out_dshape[6]  =   0;           out_dshape[7]  =  (4*s-1)*Z1;   out_dshape[8]  = s*(2*s-1) * dZ1;
+      out_dshape[18] =  (4*t-4*r)*Z1; out_dshape[19] = -(4*r)*Z1;     out_dshape[20] = 4*r*t * dZ1;
+      out_dshape[27] =  (4*s)*Z1;     out_dshape[28] =  (4*r)*Z1;     out_dshape[29] = 4*r*s * dZ1;
+      out_dshape[21] = -(4*s)*Z1;     out_dshape[22] =  (4*t-4*s)*Z1; out_dshape[23] = 4*s*t * dZ1;
+
+      out_dshape[24] =  (1-4*t)*Z2;   out_dshape[25] =  (1-4*t)*Z2;   out_dshape[26] = t*(2*t-1) * dZ2;
+      out_dshape[30] =  (4*r-1)*Z2;   out_dshape[31] =   0;           out_dshape[32] = r*(2*r-1) * dZ2;
+      out_dshape[33] =   0;           out_dshape[34] =  (4*s-1)*Z2;   out_dshape[35] = s*(2*s-1) * dZ2;
+      out_dshape[45] =  (4*t-4*r)*Z2; out_dshape[46] = -(4*r)*Z2;     out_dshape[47] = 4*r*t * dZ2;
+      out_dshape[51] =  (4*s)*Z2;     out_dshape[52] =  (4*r)*Z2;     out_dshape[53] = 4*r*s * dZ2;
+      out_dshape[48] = -(4*s)*Z2;     out_dshape[49] =  (4*t-4*s)*Z2; out_dshape[50] = 4*s*t * dZ2;
+
+      out_dshape[9]  = (1-4*t)*Z3;    out_dshape[10] =  (1-4*t)*Z3;   out_dshape[11] = t*(2*t-1) * dZ3;
+      out_dshape[12] =  (4*r-1)*Z3;   out_dshape[13] =   0;           out_dshape[14] = r*(2*r-1) * dZ3;
+      out_dshape[15] =   0;           out_dshape[16] =  (4*s-1)*Z3;   out_dshape[17] = s*(2*s-1) * dZ3;
+      out_dshape[36] =  (4*t-4*r)*Z3; out_dshape[37] = -(4*r)*Z3;     out_dshape[38] = 4*r*t * dZ3;
+      out_dshape[42] =  (4*s)*Z3;     out_dshape[43] =  (4*r)*Z3;     out_dshape[44] = 4*r*s * dZ3;
+      out_dshape[39] = -(4*s)*Z3;     out_dshape[40] =  (4*t-4*s)*Z3; out_dshape[41] = 4*s*t * dZ3;
+      break;
+    }
+
+    default:
+      ThrowException("Triangle shape functions not implemented for this order.");
   }
 }
 

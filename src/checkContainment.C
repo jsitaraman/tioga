@@ -53,9 +53,7 @@ void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch
       exit(1);
     }
 
-    int nvert = nv[n];
-    if (nvert > 8)
-      nvert = nNodesToFirstOrder(ncf[n], nv[n]);
+    int nvert = nNodesToFirstOrder(ncf[n], nv[n]);
 //    if (nvert > 8)
 //    {
 //      /* --- Quadratic or higher-order shape functions - use general func --- */

@@ -1685,11 +1685,6 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
 
   std::vector<double> q_h(ninterp2*nvar);
   cuda_copy_d2h(q_out_d, q_h.data(), ninterp2*nvar);
-
-//  for (int i = 0; i < ninterp2; i++) /// DEBUGGING
-//  {
-//    printf("(%d) %d: %f, %f, %f\n",myid,i,q_h[nvar*i+0],q_h[nvar*i+1],q_h[nvar*i+4]);
-//  }
 }
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)

@@ -100,6 +100,29 @@ double Lagrange(double* xiGrid, unsigned int npts, double xi, unsigned int mode)
 
 double dLagrange(double* xiGrid, unsigned int npts, double xi, unsigned int mode);
 
+/*! Evaluates the Legendre polynomial of degree P at location xi.
+ *
+ * \param P  Order of the Legendre polynomial
+ * \param xi  Point of evaluation in domain [-1,1].
+ *
+ * \return Value of Legendre polynomial at xi.
+ */
+double Legendre(unsigned int P, double xi);
+
+/*! Evaluates the first derivative of the Legendre polynomial of degree P at location xi.
+ *
+ * \param P  Order of the Legendre polynomial
+ * \param xi  Point of evaluation in domain [-1,1].
+ *
+ * \return Value of derivative of Legendre polynomial at xi.
+ */
+double dLegendre(unsigned int P, double xi);
+
+double Jacobi(double xi, double a, double b, unsigned int mode);
+double dJacobi(double xi, double a, double b, unsigned int mode);
+double Dubiner2D(unsigned int P, double xi, double eta, unsigned int mode);
+double dDubiner2D(unsigned int P, double xi, double eta, double dim, unsigned int mode);
+
 void adjoint_3x3(double *mat, double *adj);
 void adjoint_4x4(double *mat, double *adj);
 
@@ -184,6 +207,30 @@ void shape_quad(const point &in_rs, double* out_shape, int nNodes);
 //! Derivative of shape functions for linear or quadratic quad
 void dshape_quad(const std::vector<point> loc_pts, double* out_dshape, int nNodes);
 void dshape_quad(const point &in_rs, double* out_dshape, int nNodes);
+
+//! Shape function for linear or quadratic triangle
+void shape_tri(const point &in_rs, std::vector<double> &out_shape, int nNodes);
+void shape_tri(const point &in_rs, double* out_shape, int nNodes);
+
+//! Derivative of shape functions for linear or quadratic triangle
+void dshape_tri(const std::vector<point>& loc_pt, double* out_dshape, int nNodes);
+void dshape_tri(const point &in_rs, double* out_dshape, int nNodes);
+
+//! Shape function for linear or quadratic tetrahedron
+void shape_tet(const point &in_rst, std::vector<double> &out_shape, int nNodes);
+void shape_tet(const point &in_rst, double* out_shape, int nNodes);
+
+//! Derivative of shape functions for linear or quadratic tetrahedron
+void dshape_tet(const std::vector<point>& loc_pts, double* out_dshape, int nNodes);
+void dshape_tet(const point &in_rst, double* out_dshape, int nNodes);
+
+//! Shape function for linear or quadratic prism
+void shape_prism(const point &in_rst, std::vector<double> &out_shape, int nNodes);
+void shape_prism(const point &in_rst, double* out_shape, int nNodes);
+
+//! Derivative of shape functions for linear or quadratic tetrahedron
+void dshape_prism(const std::vector<point>& loc_pts, double* out_dshape, int nNodes);
+void dshape_prism(const point &in_rst, double* out_dshape, int nNodes);
 
 //! Shape function for linear or quadratic hexahedron
 void shape_hex(const point &in_rst, std::vector<double> &out_shape, int nNodes);

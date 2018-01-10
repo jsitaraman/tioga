@@ -140,9 +140,8 @@ void MeshBlock::tagBoundary(void)
       int nvert = nv[n];
       inode.resize(nvert);
       if (nvert > 8) xv2.resize(nvert*3);
-      printf("nvert = %d, nf = %d\n",nvert,ncf[n]);
-      if (nvert > 8)
-        nvert = nNodesToFirstOrder(ncf[n], nv[n]);
+
+      nvert = nNodesToFirstOrder(ncf[n], nv[n]);
 
       for (int i = 0; i < nc[n]; i++)
       {
@@ -174,11 +173,11 @@ void MeshBlock::tagBoundary(void)
           vol = computeCellVolume(xv, nvert);
 //        }
 
-        cellRes[k++] = vol*resolutionScale;
+        cellRes[k++] = vol*(resolutionScale+2*meshtag); /// +meshtag DEBUGGING
         for (int m = 0; m < nv[n]; m++)
         {
           iflag[inode[m]]++;
-          nodeRes[inode[m]] += vol*resolutionScale;
+          nodeRes[inode[m]] += vol*(resolutionScale+2*meshtag); /// +meshtag DEBUGGING
         }
       }
     }
@@ -459,7 +458,7 @@ void MeshBlock::rebuildADT(void)
 
   adtEles = newAdtEles;
   ncells_adt = adtEles.size();
-//printf("Rank %d - ncells_adt %d\n",myid,ncells_adt); /// DEBUGGING
+
   elementList.resize(ncells_adt);
   elementBbox.resize(ncells_adt*6);
 

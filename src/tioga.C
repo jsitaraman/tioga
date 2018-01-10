@@ -260,8 +260,9 @@ void tioga::doHoleCutting(bool unblanking)
   /*outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
-  mb->getCellIblanks();
-  mb->writeCellFile(myid);
+  mb->getCellIblanks();*/
+  mb->writeGridFile(myid);
+  outputHoleMap();
   //}
   //mb->writeOutput(myid);
   //tracei(myid);*/

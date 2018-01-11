@@ -198,7 +198,7 @@ uinf=0.5
 pinf=1/1.4
 !
 do i=1,g%nv
-   read(101,*) g%x(3*i-2),g%x(3*i-1),g%x(3*i),junk,g%bodytag(i),qj
+   read(101,*) g%x(3*i-2),g%x(3*i-1),g%x(3*i),junk,g%bodytag(i) !,qj
 enddo
 !
 g%scal=1

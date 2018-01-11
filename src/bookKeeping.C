@@ -160,6 +160,16 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
       iblank[i]=1;
       verbose=0;
       //if (meshtag==1 && myid==9 && i==28487) verbose=1;
+      //if (meshtag==2 && i==240304 && myid==1) verbose=1;
+      //if (meshtag==3 && i==241402 && myid==1) verbose=1;
+      /*
+      if (fabs(x[3*i]-1.68) < 1e-4 && 
+          fabs(x[3*i+1]-0.88) < 1e-4 &&
+          fabs(x[3*i+2]) < 1e-4 && meshtag==3 && myid==1) {
+       verbose=1;
+      }
+      */
+
       if (verbose) TRACEI(i);
       if (verbose) TRACEI(iblank[i]);
       if (verbose) TRACED(nodeRes[i]);
@@ -190,6 +200,9 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
               if (verbose) {
                TRACEI(meshtagdonor);
 	       TRACED(temp->donorRes);
+               TRACEI(temp->donorData[0]);
+               TRACEI(temp->donorData[1]);
+               TRACEI(temp->donorData[2]);
               }
               nodeRes[i]=MAX(nodeRes[i],temp->receptorRes);
 	      temp=temp->next;
@@ -263,16 +276,18 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   for(i=0;i<nnodes;i++)
     {
       verbose=0;
-      //if (meshtag==1 && myid==9 && i==28487) verbose=1;
+      //if (meshtag==3 && myid==1 && i==245609) verbose=1;
+      //if (meshtag==2 && i==240304 && myid==1) verbose=1;
+      //if (meshtag==3 && i==241402 && myid==1) verbose=1;
       //if (meshtag==3 && i==34299) verbose=1;
       if (verbose) {
          TRACEI(i);
          TRACEI(iblank[i]);
+         TRACED(nodeRes[i]);
       }
       if (donorList[i]!=NULL && iblank[i]!=0)
 	{ 
 	  temp=donorList[i];
-          if (verbose) TRACED(nodeRes[i]);
 	  while(temp!=NULL)
 	    {
 	      if (verbose) TRACED(temp->donorRes);
@@ -302,6 +317,9 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   for(i=0;i<nnodes;i++)
     {
       verbose=0;
+      //if (meshtag==3 && myid==1 && i==245609) verbose=1;
+      //if (meshtag==2 && i==240304 && myid==1) verbose=1;
+      //if (meshtag==3 && i==241402 && myid==1) verbose=1;
       //if (meshtag==3 && i==34299) verbose=1;
       if (iblank[i] < 0) 
 	{
@@ -321,6 +339,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
           if (verbose) {
             TRACEI(iblank[i]);           
             TRACEI(m);
+            TRACEI((*donorRecords)[m-3]);
             TRACEI((*donorRecords)[m-1]);
             TRACEI((*donorRecords)[m-2]);
 	    TRACED((*receptorResolution)[k-1]);
@@ -379,7 +398,9 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
   INTEGERLIST *clist;
   //
   verbose=0;
+  //if (myid==3 && irecord==4878 && meshtag==2) verbose=1;
   //if (myid==63 && irecord==3224) verbose=1;
+  //if (myid==1 && irecord==158192 && meshtag==1) verbose=1;
   receptorRes=fabs(receptorRes2);
   procid=isearch[3*irecord];
   pointid=isearch[3*irecord+1];
@@ -389,6 +410,7 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
       TRACEI(procid);
       TRACEI(pointid);
       TRACED(receptorRes);
+      TRACEI(meshtagrecv);
   }
   i3=3*irecord;
   xp[0]=xsearch[i3];
@@ -407,9 +429,17 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
     }
   nvert=nv[n];
   acceptFlag=1;
+  if (verbose) TRACEI(donorId[irecord])
+  if (verbose) TRACEI(n)
+  if (verbose) TRACEI(nvert)
+  if (verbose) TRACEI(i)
+  if (verbose) TRACED(nodeRes[241291]);
   for(m=0;m<nvert;m++)
     {
       inode[m]=vconn[n][nvert*i+m]-BASE;
+      if (verbose) TRACEI(inode[m]);
+      if (verbose) TRACEI(iblank[inode[m]])
+      if (verbose) TRACED(nodeRes[inode[m]])
       i3=3*inode[m];
       if (iblank[inode[m]] <=0 && receptorRes2 > 0.0)
         {
@@ -435,12 +465,14 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
           verbose=0;
           inode[m]=vconn[n][nvert*i+m]-BASE;
           //if (myid==763 && inode[m]==9515) verbose=1;
+          //if (myid==1 && meshtag==2 && inode[m]==240304) verbose=1;
           if (verbose) TRACEI(inode[m]);
           if (verbose) TRACED(nodeRes[inode[m]]);
           if (verbose) {
               TRACEI(procid);
               TRACEI(pointid);
               TRACED(receptorRes);
+              TRACEI(meshtagrecv);
               TRACEI(irecord);
               TRACEI(donorId[irecord]);
           }
@@ -475,6 +507,7 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
   interpList[*recid].receptorInfo[1]=pointid;
   interpList[*recid].receptorInfo[2]=blockid;
   if (verbose) {
+    TRACEI(*recid);
     TRACEI(interpList[*recid].receptorInfo[0]);
     TRACEI(interpList[*recid].receptorInfo[1]);
   }
@@ -522,6 +555,32 @@ void MeshBlock::cancelDonor(int irecord)
   if (iptr > -1) interpList[iptr].cancel=1;
 }
 
+void MeshBlock::resetCoincident(void)
+{
+  int i,iptr;
+  int *ireset;
+
+  ireset=(int *)malloc(sizeof(int)*nsearch);
+  for(i=0;i<nsearch;i++) ireset[i]=1;
+  
+  for(i=0;i<nsearch;i++)
+    {
+      iptr=interp2donor[i];
+      if (iptr > -1) {
+        ireset[xtag[i]]=MIN(ireset[xtag[i]],interpList[iptr].cancel);
+      }
+    }	
+  for(i=0;i<nsearch;i++)
+    {
+      iptr=interp2donor[i];
+      if (iptr > -1) {
+	if (interpList[iptr].cancel==1) {
+	  interpList[iptr].cancel=ireset[xtag[i]];
+	}
+      }
+    }
+  free(ireset);
+}
 void MeshBlock::getInterpData(int *nrecords, int **intData)
 {
   int i,k;

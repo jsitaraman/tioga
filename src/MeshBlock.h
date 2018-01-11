@@ -236,6 +236,8 @@ class MeshBlock
   void getReceptorInfo(int *receptors);
 
   void getReducedOBB(OBB *,double *);
+
+  void resetCoincident();
   //
   // routines for high order connectivity and interpolation
   //
@@ -282,7 +284,7 @@ class MeshBlock
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);
-
+  
   // Getters
   inline int getMeshTag() const { return meshtag + (1 - BASE); }
 

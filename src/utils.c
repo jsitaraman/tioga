@@ -447,7 +447,7 @@ void writePoints(double *x,int nsearch,int bid)
  * them. Find the rtag as max of all duplicate samples. itag contains
  * the hash to the real point
  */
-void uniquenodes(double *x,double *rtag,int *itag,int *nn)
+void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
 {
   int NSUB=101;
   int i,j,k,m,ij,i3,jj,kk,ll,p1,p2,indx,jmax,kmax,lmax,nsblks,jkmax;
@@ -519,7 +519,8 @@ void uniquenodes(double *x,double *rtag,int *itag,int *nn)
 	    p2=ilist[k];
 	    if ( fabs(x[3*p1  ]-x[3*p2  ])+
 		 fabs(x[3*p1+1]-x[3*p2+1])+
-		 fabs(x[3*p1+2]-x[3*p2+2]) < TOL)
+		 fabs(x[3*p1+2]-x[3*p2+2]) < TOL &&
+                 meshtag[p1]==meshtag[p2])
 	      {
 		if (p1 > p2) {
 		  rtag[p2]=MAX(rtag[p1],rtag[p2]);

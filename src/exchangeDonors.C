@@ -226,6 +226,12 @@ void tioga::exchangeDonors(void)
       mblocks[ib]->cancelDonor(recid);
     }
   }
+
+  for (int ib=0;ib<nblocks;ib++) {
+    auto &mb =mblocks[ib];
+    mb->resetCoincident();
+  }
+
   //
   pc->clearPackets(sndPack, rcvPack);
   //

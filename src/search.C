@@ -22,7 +22,7 @@ extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
   void writebbox(OBB *obb,int bid);
   void writePoints(double *x,int nsearch,int bid);
-  void uniquenodes(double *x,double *rtag,int *itag,int *nn);
+  void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn);
 }
 
 
@@ -185,7 +185,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   // create a unique hash
   //
-  uniquenodes(xsearch,res_search,xtag,&nsearch);
+  uniquenodes(xsearch,tagsearch,res_search,xtag,&nsearch);
   //
   donorCount=0;
   ipoint=0; 

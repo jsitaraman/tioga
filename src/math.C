@@ -76,6 +76,8 @@ double cellVolume(double xv[8][3], int numverts[6], int fconn[24],
   }
 
   vol /= 3.;
+
+  return vol;
 }
 
 void solvec(double **a,double *b,int *iflag,int n)
@@ -359,10 +361,11 @@ double computeCellVolume(double xv[8][3],int nvert)
  int itype;
  int nfaces;
  int numverts[4][6]={3,3,3,3,0,0,4,3,3,3,3,0,3,4,4,4,3,0,4,4,4,4,4,4};
- int faceInfo[4][24]={1,2,3,0,1,4,2,0,2,4,3,0,1,3,4,0,0,0,0,0,0,0,0,0,
-                       1,2,3,4,1,5,2,0,2,5,3,0,4,3,5,0,1,4,5,0,0,0,0,0,
-                       1,2,3,0,1,4,5,2,2,5,6,3,1,3,6,4,4,6,5,0,0,0,0,0,
-                       1,2,3,4,1,5,6,2,2,6,7,3,3,7,8,4,1,4,8,5,5,8,7,6};
+ int faceInfo[4][24]={0,1,2,-1,0,3,1,-1,1,3,2,-1,0,2,3,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+                      0,1,2,3,0,4,1,-1,1,4,2,-1,3,2,4,-1,0,3,4,-1,-1,-1,-1,-1,
+                      0,1,2,-1,0,3,4,1,1,4,5,2,0,2,5,3,3,5,4,-1,-1,-1,-1,-1,
+                      0,1,2,3,0,4,5,1,1,5,6,2,2,6,7,3,0,3,7,4,4,7,6,5};
+
  switch(nvert)
    {
    case 4:
@@ -387,7 +390,6 @@ double computeCellVolume(double xv[8][3],int nvert)
      numverts[-1000][-2000] = 1;
      exit(1);
    }
-     
  return cellVolume(xv,numverts[itype],faceInfo[itype],nfaces,nvert);
 }
 

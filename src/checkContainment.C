@@ -24,7 +24,7 @@ extern "C"{
 }
 
 using namespace tg_funcs;
-			   
+
 void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch, double *rst)
 {
   int icell = elementList[adtElement];

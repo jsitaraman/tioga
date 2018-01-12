@@ -172,12 +172,11 @@ void MeshBlock::tagBoundary(void)
           //vol = computeVolume(&xv[0][0], nvert, 3);
           vol = computeCellVolume(xv, nvert);
 //        }
-
-        cellRes[k++] = vol*(resolutionScale+2*meshtag); /// +meshtag DEBUGGING
+        cellRes[k++] = vol*resolutionScale;
         for (int m = 0; m < nv[n]; m++)
         {
           iflag[inode[m]]++;
-          nodeRes[inode[m]] += vol*(resolutionScale+2*meshtag); /// +meshtag DEBUGGING
+          nodeRes[inode[m]] += vol*resolutionScale;
         }
       }
     }

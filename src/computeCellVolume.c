@@ -54,7 +54,7 @@ double computeCellVolume(double xv[8][3],int nvert)
      nfaces=6;
      break;
    }
-     
+
  vol=cellVolume_(xv,&numverts[itype],&faceInfo[itype],&nfaces,&nvert);
  return vol;
 }

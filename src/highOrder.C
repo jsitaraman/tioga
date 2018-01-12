@@ -1591,6 +1591,7 @@ void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
         realData[nvar*i+k] += weight * eptr[spt*sstride[n] + k*vstride[n]];
       }
     }
+
     intData[2*i] = interpList2[i].receptorInfo[0];
     intData[2*i+1] = interpList2[i].receptorInfo[1];
   }

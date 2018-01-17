@@ -1074,7 +1074,6 @@ void MeshBlock::getFringeNodes(bool unblanking)
 
     ntotalPoints = nCellPoints + nFacePoints;
     rxyz.resize(ntotalPoints*3);
-
 #ifdef _GPU
     get_cell_nodes_gpu(ctag,nreceptorCells,pointsPerCell,&(rxyz[3*nFacePoints]));
 #else
@@ -1677,28 +1676,40 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
   /// TODO: split up donors_d and weights_d by element type
   interp_u_types_wrapper(qtd_d.data(), q_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
       winds_d.data(), buf_inds_d.data(), ninterp2, nweights_d.data(), nvar, strides_d.data(), stream_handle);
-//  interp_u_wrapper(q_d, q_out_d, donors_d.data(), weights_d.data(),
-//      buf_inds_d.data(), ninterp2, nSpts, nvar, estride, sstride, vstride,
-//      stream_handle);
 
   qtd_d.free_data();
   strides_d.free_data();
-
-  std::vector<double> q_h(ninterp2*nvar);
-  cuda_copy_d2h(q_out_d, q_h.data(), ninterp2*nvar);
 }
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
 {
   if (ninterp2 == 0) return;
 
-  int estride, sstride, vstride, dstride;
-  double *dq_d = NULL; //get_dq_spts_d(estride, sstride, vstride, dstride);
+  std::vector<double*> qtd_h(ntypes);
+  std::vector<int> strides_h(4*ntypes);
+
+  for (int n = 0; n < ntypes; n++)
+  {
+    int estride, sstride, vstride, dstride;
+    qtd_h[n] = get_dq_spts_d(estride, sstride, vstride, dstride, n);
+    strides_h[4*n] = estride;
+    strides_h[4*n+1] = sstride;
+    strides_h[4*n+2] = vstride;
+    strides_h[4*n+3] = dstride;
+  }
+
+  dvec<double*> dqtd_d; dqtd_d.resize(ntypes);
+  dqtd_d.assign(qtd_h.data(), qtd_h.size());
+
+  dvec<int> strides_d; strides_d.resize(4*ntypes);
+  strides_d.assign(strides_h.data(), strides_h.size());
 
   // Perform the interpolation
-  interp_du_wrapper(dq_d, dq_out_d, donors_d.data(), weights_d.data(),
-      buf_inds_d.data(), ninterp2, nSpts, nvar, nDims, estride, sstride,
-      vstride, dstride, stream_handle);
+  interp_du_types_wrapper(dqtd_d.data(), dq_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
+      winds_d.data(), buf_inds_d.data(), ninterp2, nweights_d.data(), nvar, nDims, strides_d.data(), stream_handle);
+
+  dqtd_d.free_data();
+  strides_d.free_data();
 }
 #endif
 

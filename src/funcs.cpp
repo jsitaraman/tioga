@@ -52,13 +52,97 @@ int shape_order = 0;
 
 #define TOL 1e-10
 
-namespace tg_funcs
-{
 
 point operator/(point a, double b) { return a/=b; }
 point operator*(point a, double b) { return a*=b; }
 
 bool operator<(const point &a, const point &b) { return a.x < b.x; }
+
+Vec3 getFaceNormalTri(std::vector<point> &facePts, point &xc)
+{
+  point pt0 = facePts[0];
+  point pt1 = facePts[1];
+  point pt2 = facePts[2];
+  Vec3 a = pt1 - pt0;
+  Vec3 b = pt2 - pt0;
+  Vec3 norm = a.cross(b);                         // Face normal vector
+  Vec3 dxc = xc - (pt0+pt1+pt2)/3.;  // Face centroid to cell centroid
+  if (norm*dxc > 0) {
+    // Face normal is pointing into cell; flip
+    norm /= -norm.norm();
+  }
+  else {
+    // Face normal is pointing out of cell; keep direction
+    norm /= norm.norm();
+  }
+
+  return norm;
+}
+
+Vec3 getFaceNormalQuad(std::vector<point> &facePts, point &xc)
+{
+  // Get the (approximate) face normal of an arbitrary 3D quadrilateral
+  // by splitting into 2 triangles and averaging
+
+  // Triangle #1
+  point pt0 = facePts[0];
+  point pt1 = facePts[1];
+  point pt2 = facePts[2];
+  Vec3 a = pt1 - pt0;
+  Vec3 b = pt2 - pt0;
+  Vec3 norm1 = a.cross(b);           // Face normal vector
+  Vec3 dxc = xc - (pt0+pt1+pt2)/3.;  // Face centroid to cell centroid
+  if (norm1*dxc > 0) {
+    // Face normal is pointing into cell; flip
+    norm1 *= -1;
+  }
+
+  // Triangle #2
+  pt0 = facePts[3];
+  a = pt1 - pt0;
+  b = pt2 - pt0;
+  Vec3 norm2 = a.cross(b);
+  if (norm2*dxc > 0) {
+    // Face normal is pointing into cell; flip
+    norm2 *= -1;
+  }
+
+  // Average the two triangle's face outward normals
+  Vec3 norm = (norm1+norm2)/2.;
+
+  return norm;
+}
+
+Vec3 getEdgeNormal(std::vector<point> &edge, point &xc)
+{
+  Vec3 dx = edge[1] - edge[0];
+  Vec3 norm = Vec3({-dx.y,dx.x,0});
+  norm /= norm.norm();
+
+  // Face centroid to cell centroid
+  Vec3 dxc = xc - (edge[0]+edge[1])/2.;
+
+  if (norm*dxc > 0) {
+    // Face normal is pointing into cell; flip
+    norm *= -1;
+  }
+
+  return norm;
+}
+
+point getCentroid(std::vector<point> &pts)
+{
+  point xc;
+
+  for (auto &pt : pts)
+    xc += pt;
+  xc /= pts.size();
+
+  return xc;
+}
+
+namespace tg_funcs
+{
 
 std::ostream& operator<<(std::ostream &os, const point &pt)
 {

@@ -105,7 +105,7 @@ struct point
     return pt;
   }
 
-  point operator-(point b) {
+  point operator-(const point b) const {
     struct point c;
     c.x = x - b.x;
     c.y = y - b.y;
@@ -113,7 +113,7 @@ struct point
     return c;
   }
 
-  point operator+(point b) {
+  point operator+(const point b) const {
     struct point c;
     c.x = x + b.x;
     c.y = y + b.y;
@@ -121,7 +121,7 @@ struct point
     return c;
   }
 
-  point operator/(point b) {
+  point operator/(const point b) const {
     struct point c;
     c.x = x / b.x;
     c.y = y / b.y;
@@ -129,14 +129,14 @@ struct point
     return c;
   }
 
-  point& operator+=(point b) {
+  point& operator+=(const point b) {
     x += b.x;
     y += b.y;
     z += b.z;
     return *this;
   }
 
-  point& operator-=(point b) {
+  point& operator-=(const point b) {
     x -= b.x;
     y -= b.y;
     z -= b.z;
@@ -171,7 +171,7 @@ struct point
     return *this;
   }
 
-  double operator*(point b) {
+  double operator*(const point b) {
     return x*b.x + y*b.y + z*b.z;
   }
 
@@ -185,7 +185,7 @@ struct point
     return std::sqrt(x*x+y*y+z*z);
   }
 
-  point cross(point b) {
+  const point cross(const point b) {
     point v;
     v.x = y*b.z - z*b.y;
     v.y = z*b.x - x*b.z;
@@ -197,6 +197,19 @@ struct point
 
 //! For clearer notation when a vector is implied, rather than a point
 typedef struct point Vec3;
+
+struct Edge {
+  point pts[2];
+
+  Edge() { }
+
+  Edge(const point p1, const point p2) {pts[0] = p1; pts[1] = p2;}
+
+  point& operator[](int i)
+  {
+    return pts[i];
+  }
+};
 
 enum ETYPE
 {

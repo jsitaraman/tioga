@@ -133,7 +133,7 @@ void tioga::exchangeBoxes(void)
     sndPack[k].nints = 0;
     sndPack[k].nreals = 6;
     sndPack[k].realData = (double *)malloc(sizeof(double)*sndPack[k].nreals);
-    mb->getReducedOBB(&obblist[k],sndPack[k].realData);
+    mb->getReducedOBB_SuperMesh(&obblist[k],sndPack[k].realData);
   }
 
   pc->sendRecvPackets(sndPack,rcvPack);

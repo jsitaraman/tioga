@@ -71,15 +71,27 @@ void swap(T& a, T& b)
   a = b; b = c;
 }
 
-namespace tg_funcs
-{
-
-/* ---------------------------- Helpful Objects ---------------------------- */
-
 point operator/(point a, double b);
 point operator*(point a, double b);
 
 bool operator<(const point &a, const point &b); // Just a sort of 'dummy' function for sorting purposes
+
+//! Given points for a cell's face and a point inside the cell, get the outward unit normal
+Vec3 getFaceNormalTri(std::vector<point> &facePts, point &xc);
+
+//! Given points for a cell's face and a point inside the cell, get the outward unit normal
+Vec3 getFaceNormalQuad(std::vector<point> &facePts, point &xc);
+
+//! Given a 2D edge and a point inside the cell, get the outward unit normal
+Vec3 getEdgeNormal(std::vector<point> &edge, point &xc);
+
+//! Get the centroid of a list of points
+point getCentroid(std::vector<point> &pts);
+
+namespace tg_funcs
+{
+
+/* ---------------------------- Helpful Objects ---------------------------- */
 
 std::ostream& operator<<(std::ostream &os, const point &pt);
 

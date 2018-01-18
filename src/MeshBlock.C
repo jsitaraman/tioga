@@ -18,6 +18,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "MeshBlock.h"
+#include "superMesh.hpp"
 
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
@@ -1053,7 +1054,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
       bbox[0] = bbox[1] = bbox[2] =  BIGVALUE;
       bbox[3] = bbox[4] = bbox[5] = -BIGVALUE;
 
-      for (int m = 0; m < min(nvert,8); m++) /// HACK-ish...
+      // Get the bbox of the cell in *obc*'s coordinate system
+      for (int m = 0; m < min(nvert,8); m++)
       {
         int i3 = 3*(vconn[n][nvert*i+m]-BASE);
         for (int j = 0; j < 3; j++)
@@ -1070,6 +1072,7 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
         }
       }
 
+      // Check for intersection with the OBB 'obc'
       int iflag = 0;
       for (int j = 0; j < 3; j++)
       {
@@ -1079,7 +1082,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 
       if (iflag) continue;
 
-      for (int m = 0; m < min(nvert,8); m++) /// HACK-ish...
+      // Get extents of bbox in *our* OBB axes
+      for (int m = 0; m < min(nvert,8); m++)
       {
         int i3 = 3*(vconn[n][nvert*i+m]-BASE);
         for (int j = 0; j < 3; j++)
@@ -1098,6 +1102,7 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
     }
   }
 
+  // Get new xc, dxc of reduced OBB in our OBB's axes
   for (int j = 0; j < 6; j++)
     bbox[j] = realData[j];
 
@@ -1105,13 +1110,81 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
   {
     realData[j] = obb->xc[j];
 
-    for (int k = 0; k < 3; k++)
+    for (int k = 0; k < 3; k++) // new centroid of reduced obb
       realData[j] += ((bbox[k]+bbox[k+3])*0.5)*obb->vec[k][j];
 
     realData[j+3] = (bbox[j+3]-bbox[j])*0.51;
   }
 }
-	      
+
+void MeshBlock::getReducedOBB_SuperMesh(OBB *obc,double *realData)
+{
+  /* --- Get corner points of obb --- */
+
+  std::vector<point> bpts(8);
+
+  const int xsgn[8][3] = {{-1,-1,-1}, {1,-1,-1}, {1,1,-1}, {-1,1,-1}, {-1,-1,1}, {1,-1,1}, {1,1,1}, {-1,1,1}};
+
+  // Add in offsets from centroid
+  for (int n = 0; n < 8; n++)
+    for (int i = 0; i < 3; i++)
+      bpts[n][i] = xsgn[n][i]*obb->dxc[i];
+
+  /* --- Get corner points of obc [transform to OBB coordinates] --- */
+
+  // y = R1^T * x1 + c1 - c2
+  std::vector<point> cpts_0(8);
+  for (int i = 0; i < 8; i++)
+    cpts_0[i] = point(obc->xc) - point(obb->xc);
+
+  for (int n = 0; n < 8; n++)
+  {
+    for (int i = 0; i < 3; i++)
+      for (int j = 0; j < 3; j++)
+        cpts_0[n][i] += obc->vec[j][i]*(xsgn[n][j]*obc->dxc[j]);
+  }
+
+  // x2 = R2 * y
+  std::vector<point> cpts(8);
+  for (int n = 0; n < 8; n++)
+  {
+    for (int i = 0; i < 3; i++)
+      for (int j = 0; j < 3; j++)
+          cpts[n][i] += obb->vec[i][j] * cpts_0[n][j];
+  }
+
+  /* --- Use a SuperMesh to find the intersection --- */
+
+  SuperMesh mesh(bpts,cpts,1,3);
+
+  auto Points = mesh.getSuperMeshPoints();
+
+  /* --- Find the final reduced bbox of the intersection region --- */
+
+  double bbox[6];
+  bbox[0] = bbox[1] = bbox[2] =  BIGVALUE;
+  bbox[3] = bbox[4] = bbox[5] = -BIGVALUE;
+  for (auto &pt : Points)
+  {
+    for (int d = 0; d < 3; d++)
+    {
+      bbox[d]   = min(bbox[d],   pt[d]);
+      bbox[d+3] = max(bbox[d+3], pt[d]);
+    }
+  }
+
+  // Get new xc, dxc of reduced OBB in our OBB's axes
+  for (int i = 0; i < 3; i++)
+  {
+    realData[i] = obb->xc[i];
+
+    for (int d = 0; d < 3; d++) // new centroid of reduced obb
+      realData[i] += ((bbox[d]+bbox[d+3])*0.5)*obb->vec[d][i];
+
+    realData[i+3] = (bbox[i+3]-bbox[i])*0.5; // Adding 5% to extents
+  }
+}
+
 void MeshBlock::getQueryPoints(OBB *obc,
 			       int *nints,int **intData,
 			       int *nreals, double **realData)

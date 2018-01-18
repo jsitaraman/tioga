@@ -83,7 +83,7 @@ OBJECTS = $(BINDIR)/buildADTrecursion.o $(BINDIR)/searchADTrecursion.o $(BINDIR)
 	$(BINDIR)/parallelComm.o $(BINDIR)/highOrder.o \
 	$(BINDIR)/cartOps.o $(BINDIR)/CartGrid.o $(BINDIR)/CartBlock.o $(BINDIR)/getCartReceptors.o $(BINDIR)/get_amr_index_xyz.o\
 	$(BINDIR)/exchangeAMRDonors.o $(BINDIR)/funcs.o $(BINDIR)/points.o \
-	$(BINDIR)/tiogaInterface.o
+	$(BINDIR)/superMesh.o $(BINDIR)/tiogaInterface.o
 OBJSWIG = $(BINDIR)/tioga_wrap.o
 
 ifeq ($(strip $(CUDA)),YES)

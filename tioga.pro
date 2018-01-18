@@ -41,7 +41,8 @@ SOURCES += src/tioga.C \
     src/median.F90 \
     src/writeqnode.f90 \
     src/dADT.cu \
-    src/dMeshBlock.cu
+    src/dMeshBlock.cu \
+    src/superMesh.cpp
 
 HEADERS += \
     include/ADT.h \
@@ -60,7 +61,8 @@ HEADERS += \
     include/tioga.i \
     include/tiogaInterface.h \
     include/dADT.h \
-    include/dMeshBlock.h
+    include/dMeshBlock.h \
+    include/superMesh.hpp
 
 DISTFILES += \
     run/tiogaInterface.py

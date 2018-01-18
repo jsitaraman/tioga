@@ -501,6 +501,8 @@ private:
 
   void getReducedOBB(OBB *obc, double *points);
 
+  void getReducedOBB_SuperMesh(OBB *obc, double *points);
+
   //
   // routines for high order connectivity and interpolation
   //

@@ -68,16 +68,11 @@
 /*====================================================================*/
 /*  Numerical Tools                                                   */
 /*====================================================================*/
-// #define Sign(a1,a2)\
-//         (((a2) < ZERO)? - fabs(a1): fabs(a1))
-#define Max(a1,a2)\
-        (((a1) >= (a2))? (a1): (a2))
-#define Min(a1,a2)\
-        (((a1) <= (a2))? (a1): (a2))
-// #define Abs(aa)\
-//         (((aa) >= 0)? (aa): -(aa))
-// #define Round(aa)\
-//         (int) ((fabs((aa) - floor(aa)) >= HALF)? ceil(aa): floor(aa))
+// #define Sign(a1,a2) (((a2) < ZERO)? - fabs(a1): fabs(a1))
+#define Max(a1,a2) (((a1) >= (a2))? (a1): (a2))
+#define Min(a1,a2) (((a1) <= (a2))? (a1): (a2))
+// #define Abs(aa) (((aa) >= 0)? (aa): -(aa))
+// #define Round(aa) (int) ((fabs((aa) - floor(aa)) >= HALF)? ceil(aa): floor(aa))
 // #define swap(a,b) { a=a+b;b=a-b;a=a-b;}
 /*********************************************************************/
 /* Code specific types */

@@ -62,7 +62,8 @@ HEADERS += \
     include/tiogaInterface.h \
     include/dADT.h \
     include/dMeshBlock.h \
-    include/superMesh.hpp
+    include/superMesh.hpp \
+    include/convert.i
 
 DISTFILES += \
     run/tiogaInterface.py

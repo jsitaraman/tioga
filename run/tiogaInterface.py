@@ -112,23 +112,27 @@ class Tioga:
         self.gridData = gridData
         self.callbacks = callbacks
 
-        # Get pointers to grid data
+        # Get pointers to grid data (Intended to be accessed on a per-grid basis)
         btag = gridData['bodyTag'][0]
         xyz = arrayToDblPtr(gridData['grid-coordinates'][0])
-        c2v = arrayToIntPtr(gridData['hexaConn'][0])
+        c2v = arrayToIntPPtr(gridData['c2v'][0])
+
+        nVertCell = arrayToIntPtr(gridData['nVertCell'][0])
+        nFaceCell = arrayToIntPtr(gridData['nFaceCell'][0])
+
         iblank = arrayToIntPtr(gridData['iblanking'][0])
-        print("nwall = {}".format(gridData['wallnode'][0].shape[0]))
-        print("nobc = {}".format(gridData['obcnode'][0].shape[0]))
+#        print("nwall = {}".format(gridData['wallnode'][0].shape[0]))
+#        print("nobc = {}".format(gridData['obcnode'][0].shape[0]))
         #pickle.dump(gridData['wallnode'],open('wallNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         #pickle.dump(gridData['obcnode'],open('obcNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         overNodes = arrayToIntPtr(gridData['obcnode'][0])
         wallNodes = arrayToIntPtr(gridData['wallnode'][0])
 
-        c2f = arrayToIntPtr(gridData['cell2face'][0])
+        c2f = arrayToIntPPtr(gridData['cell2face'][0])
         f2c = arrayToIntPtr(gridData['face2cell'][0])
 
         iblank = arrayToIntPtr(gridData['iblanking'][0])
-        self.q = arrayToDblPtr(gridData['q-variables'][0])
+        self.q = arrayToDblPPtr(gridData['q-variables'][0])
         iblank_face = arrayToIntPtr(gridData['iblank-face'][0])
         iblank_cell = arrayToIntPtr(gridData['iblank-cell'][0])
 
@@ -139,16 +143,15 @@ class Tioga:
         mpiProcR = arrayToIntPtr(gridData['mpi-right-proc'][0])
         mpiFidR = arrayToIntPtr(gridData['mpi-right-id'][0])
 
-        f2v = arrayToIntPtr(gridData['faceConn'][0])
+        f2v = arrayToIntPPtr(gridData['faceConn'][0])
 
         # Extract metadata
-        nCellTypes = 1
-        nFaceTypes = 1
+        nCellTypes = gridData['nCellTypes'][0]
+        nFaceTypes = gridData['nFaceTypes'][0]
         nnodes = gridData['grid-coordinates'][0].shape[0]
-        ncells = gridData['hexaConn'][0].shape[0]
-        nvert = gridData['hexaConn'][0].shape[1]
-        nfaces = gridData['faceConn'][0].shape[0]
-        nvertf = gridData['faceConn'][0].shape[1]
+        ncells = arrayToIntPtr(gridData['nCellsType'][0])
+        nfaces = arrayToIntPtr(gridData['nfaces'][0])
+        nvertf = arrayToIntPtr(gridData['faceConn'][0])
 
         nover = gridData['obcnode'][0].shape[0]
         nwall = gridData['wallnode'][0].shape[0]
@@ -157,11 +160,11 @@ class Tioga:
         nWallFace = gridData['wall-faces'][0].shape[0]
         nMpiFace = gridData['mpi-faces'][0].shape[0]
 
-        gridType = gridData['gridCutType']
+        gridType = gridData['gridCutType'][0]
 
         tg.tioga_registergrid_data_(btag, nnodes, xyz, iblank,
-            nwall, nover, wallNodes, overNodes, nCellTypes, nvert,
-            ncells, c2v)
+            nwall, nover, wallNodes, overNodes, nCellTypes, nVertCell,
+            nFaceCell, ncells, c2v)
 
         tg.tioga_setcelliblank_(iblank_cell)
 

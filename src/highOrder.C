@@ -1802,13 +1802,12 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
   {
     if (iblank_face[ftag[i]-BASE] == FRINGE)
     {
-      int fpt_start = pointsPerFace[0]*nvar*nDims*i;
       for (int j = 0; j < pointsPerFace[i]; j++)
         for (int dim = 0; dim < 3; dim++)
           for (int n = 0; n < nvar; n++)
             get_grad_fpt(ftag[i], j, dim, n) = dqtmp[fpt_start+nvar*(j*3+dim)+n];
     }
-    fpt_start += (pointsPerFace[i]*nvar*3);
+    fpt_start += (pointsPerFace[i]*nvar*nDims);
   }
 #endif
   POP_NVTX_RANGE;

@@ -455,21 +455,21 @@ void MeshBlock::getInterpolatedSolutionAtPointsAMR(int *nints,int *nreals,int **
   int dcount = 0;
   
   for (int i = 0; i < ninterpCart; i++)
+  {
+    qq.assign(nvar,0);
+    int ic = interpListCart[i].donorID;
+    for (int spt = 0; spt < interpListCart[i].nweights; spt++)
     {
-      qq.assign(nvar,0);
-      int ic = interpListCart[i].donorID;
-      for (int spt = 0; spt < interpListCart[i].nweights; spt++)
-	{
-	  double weight = interpListCart[i].weights[spt];
-	  for (int k = 0; k < nvar; k++) {
-	    double val = get_q_spt(ic,spt,k);
-	    qq[k] += val*weight;
-	  }
-	}
-      (*intData)[icount++] = interpListCart[i].receptorInfo[0];
-      (*intData)[icount++] = interpListCart[i].receptorInfo[1];
-      (*intData)[icount++]=interpListCart[i].receptorInfo[2];
-      for (int k = 0; k < nvar; k++)
-	(*realData)[dcount++] = qq[k];
+      double weight = interpListCart[i].weights[spt];
+      for (int k = 0; k < nvar; k++) {
+        double val = get_q_spt(ic,spt,k);  /// TODO: Can use lists of pointers & strides to access data more efficiently
+        qq[k] += val*weight;
+      }
     }
+    (*intData)[icount++] = interpListCart[i].receptorInfo[0];
+    (*intData)[icount++] = interpListCart[i].receptorInfo[1];
+    (*intData)[icount++] = interpListCart[i].receptorInfo[2];
+    for (int k = 0; k < nvar; k++)
+      (*realData)[dcount++] = qq[k];
+  }
 }

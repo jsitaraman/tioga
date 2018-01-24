@@ -21,18 +21,6 @@
 #include <assert.h>
 void tioga::exchangeAMRDonors(int itype)
 {
-  int i,j,k,l,m,n,i3;
-  int nsend_sav,nrecv_sav,nsend,nrecv;
-  PACKET *sndPack,*rcvPack;
-  int *sndMap,*rcvMap,*sndMapAll,*rcvMapAll;
-  int *imap,*icount,*intcount,*realcount;
-  int *obdonors,*obreceptors;
-  int *cancelledData;
-  int *bcount;
-  int gid,procid,localid,meshtag,remoteid,id;
-  int interpCount,donorCount,index,ncancel,ctype;
-  double cellRes;
-  double xtmp[3];
   //FILE *fp;
   //char fname[80];
   //char qstr[2];
@@ -47,99 +35,116 @@ void tioga::exchangeAMRDonors(int itype)
   // FIXME:
   // add sophisticated code later to fix the all_to_all
   // using MPI-2 standard
-  //
+
+  int nsend_sav,nrecv_sav;
+  int *sndMap,*rcvMap;
+
   pc_cart->getMap(&nsend_sav,&nrecv_sav,&sndMap,&rcvMap);
-  sndMapAll=(int *)malloc(sizeof(int)*pc_cart->numprocs);
-  rcvMapAll=(int *)malloc(sizeof(int)*pc_cart->numprocs);
-  nsend=nrecv=pc_cart->numprocs;
-  imap=(int *)malloc(sizeof(int)*pc_cart->numprocs);
-  icount=(int *)malloc(sizeof(int)*pc_cart->numprocs);
-  for(i=0;i<pc_cart->numprocs;i++) {sndMapAll[i]=rcvMapAll[i]=imap[i]=i; icount[i]=0;}
+
+  int* sndMapAll = (int *)malloc(sizeof(int)*pc_cart->numprocs);
+  int* rcvMapAll = (int *)malloc(sizeof(int)*pc_cart->numprocs);
+  int nsend = pc_cart->numprocs;
+  int nrecv = pc_cart->numprocs;
+  int* imap = (int *)malloc(sizeof(int)*pc_cart->numprocs);
+  int* icount = (int *)malloc(sizeof(int)*pc_cart->numprocs);
+
+  for (int i = 0; i < pc_cart->numprocs; i++)
+  {
+    sndMapAll[i] = rcvMapAll[i] = imap[i] = i;
+    icount[i] = 0;
+  }
+
   pc_cart->setMap(nsend,nrecv,sndMapAll,rcvMapAll);
   //
   // create packets to send and receive
   // and initialize them to zero
   //
-  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
-  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
-  obdonors=(int *)malloc(sizeof(int)*nsend);
-  obreceptors=(int *)malloc(sizeof(int)*nsend);
-  //
+  PACKET* sndPack = (PACKET *)malloc(sizeof(PACKET)*nsend);
+  PACKET* rcvPack = (PACKET *)malloc(sizeof(PACKET)*nrecv);
+  int* obdonors = (int *)malloc(sizeof(int)*nsend);
+  int* obreceptors = (int *)malloc(sizeof(int)*nsend);
+
   pc_cart->initPackets(sndPack,rcvPack);
-  //
-  for(i=0;i<nsend;i++) obdonors[i]=obreceptors[i]=0;
-  //
-  if (nblocks > 0) 
+
+  for (int i = 0; i < nsend; i++) obdonors[i] = obreceptors[i] = 0;
+
+  if (nblocks > 0)
+  {
+    //
+    // count data to send
+    //
+    for (int i = 0; i < mb->ntotalPointsCart; i++)
     {
-      //
-      // count data to send
-      //
-      for(i=0;i<mb->ntotalPointsCart;i++) 
-	{ 
-	  if (mb->donorIdCart[i]!=-1)
-	    {
-	      gid=mb->donorIdCart[i];
-              assert((cg->proc_id[gid] < nsend && cg->proc_id[gid]>=0));
-	      obdonors[imap[cg->proc_id[gid]]]++;
-	    }
-	}
-      for(i=0;i<mb->nsearch;i++) 
-	{
-	  if (mb->donorId[i]!=-1) 
-	    {
-              assert((mb->isearch[3*i] < nsend && mb->isearch[3*i]>=0));
-	      obreceptors[imap[mb->isearch[3*i]]]++;
-	    }
-	}
+      if (mb->donorIdCart[i] != -1)
+      {
+        int procid = cg->proc_id[mb->donorIdCart[i]];
+        assert((procid < nsend && procid >= 0));
+        obdonors[imap[procid]]++;
+      }
     }
+
+    for (int i = 0; i < mb->nsearch; i++)
+    {
+      if (mb->donorId[i] != -1)
+      {
+        assert((mb->isearch[3*i] < nsend && mb->isearch[3*i]>=0));
+        obreceptors[imap[mb->isearch[3*i]]]++;
+      }
+    }
+  }
+
   //
   // allocate data packets
   //
-  for(i=0;i<nsend;i++)
-    {
-      sndPack[i].nints=obdonors[i]*2+obreceptors[i]*4+2;
-      sndPack[i].nreals=obdonors[i]*3+obreceptors[i];
-      sndPack[i].intData=(int *)malloc(sizeof(int)*sndPack[i].nints);
-      sndPack[i].realData=(double *)malloc(sizeof(double)*sndPack[i].nreals);
-      sndPack[i].intData[0]=obdonors[i];
-      sndPack[i].intData[1]=obreceptors[i];
-    }
+  for (int i = 0; i < nsend; i++)
+  {
+    sndPack[i].nints = obdonors[i]*2+obreceptors[i]*4+2;
+    sndPack[i].nreals = obdonors[i]*3+obreceptors[i];
+    sndPack[i].intData = (int *)malloc(sizeof(int)*sndPack[i].nints);
+    sndPack[i].realData = (double *)malloc(sizeof(double)*sndPack[i].nreals);
+    sndPack[i].intData[0] = obdonors[i];
+    sndPack[i].intData[1] = obreceptors[i];
+  }
+
   //
   // pack the data
   //
-  intcount=(int *)malloc(sizeof(int)*nsend);
-  realcount=(int *)malloc(sizeof(int)*nsend);
-  for(i=0;i<nsend;i++) { intcount[i]=2; realcount[i]=0;}
-  if (nblocks > 0) 
+  int* intcount = (int *)malloc(sizeof(int)*nsend);
+  int* realcount = (int *)malloc(sizeof(int)*nsend);
+
+  for (int i = 0; i < nsend; i++) { intcount[i]=2; realcount[i]=0; }
+
+  if (nblocks > 0)
+  {
+    for (int i = 0; i < mb->ntotalPointsCart; i++)
     {
-      for(i=0;i<mb->ntotalPointsCart;i++) 
-	{ 
-	  if (mb->donorIdCart[i]!=-1)
-	    {
-	      gid=mb->donorIdCart[i];
-	      procid=imap[cg->proc_id[gid]];
-	      localid=cg->local_id[gid];	  
-	      sndPack[procid].intData[intcount[procid]++]=localid;
-	      sndPack[procid].intData[intcount[procid]++]=i;
-	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i];
-	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i+1];
-	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i+2];	  
-	    }
-	}
-      for(i=0;i<mb->nsearch;i++) 
-	{
-	  if (mb->donorId[i]!=-1) 
-	    {
-	      procid=imap[mb->isearch[3*i]];
-	      sndPack[procid].intData[intcount[procid]++]=mb->isearch[3*i+1];
-	      sndPack[procid].intData[intcount[procid]++]=mb->isearch[3*i+2];
-	      sndPack[procid].intData[intcount[procid]++]=mb->meshtag;
-	      sndPack[procid].intData[intcount[procid]++]=i;
-	      sndPack[procid].realData[realcount[procid]++]=mb->cellRes[mb->donorId[i]];
-	      //      fprintf(fp,"%lf %lf %lf\n",mb->xsearch[3*i],mb->xsearch[3*i+1],mb->xsearch[3*i+2]);
-	    }
-	}
+      if (mb->donorIdCart[i] != -1)
+      {
+        int gid = mb->donorIdCart[i];
+        int procid = imap[cg->proc_id[gid]];
+        int localid = cg->local_id[gid];
+        sndPack[procid].intData[intcount[procid]++] = localid;
+        sndPack[procid].intData[intcount[procid]++] = i;
+        sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i];
+        sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i+1];
+        sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i+2];
+      }
     }
+
+    for (int i = 0; i < mb->nsearch; i++)
+    {
+      if (mb->donorId[i] != -1)
+      {
+        int procid = mb->isearch[3*i];
+        sndPack[procid].intData[intcount[procid]++] = mb->isearch[3*i+1];
+        sndPack[procid].intData[intcount[procid]++] = mb->isearch[3*i+2];
+        sndPack[procid].intData[intcount[procid]++] = mb->meshtag;
+        sndPack[procid].intData[intcount[procid]++] = i;
+        sndPack[procid].realData[realcount[procid]++] = mb->cellRes[mb->donorId[i]];
+        //      fprintf(fp,"%lf %lf %lf\n",mb->xsearch[3*i],mb->xsearch[3*i+1],mb->xsearch[3*i+2]);
+      }
+    }
+  }
   //if (myid==0) {
   //for(i=0;i<nsend;i++)
   //  printf("intcount/intcount=%d %d\n",sndPack[i].nints,intcount[i]);
@@ -154,28 +159,30 @@ void tioga::exchangeAMRDonors(int itype)
   //
   // decode the data now
   //
-  bcount=(int *)malloc(sizeof(int)*ncart);
-  for(i=0;i<ncart;i++) { 
+  int* bcount = (int *)malloc(sizeof(int)*ncart);
+  for (int i = 0; i < ncart; i++)
+  {
     cb[i].clearLists(); 
     cb[i].initializeLists();
-    bcount[i]=0;
+    bcount[i] = 0;
   }
 
-  for(i=0;i<nrecv;i++)
+  double xtmp[3] = {};
+  for (int i = 0; i < nrecv; i++)
   {
     if (rcvPack[i].nreals > 0)
     {
-      m=2;
-      n=0;
-      interpCount=rcvPack[i].intData[0];
-      donorCount=rcvPack[i].intData[1];
-      icount[i]=interpCount+donorCount;
+      int m = 2;
+      int n = 0;
+      int interpCount = rcvPack[i].intData[0];
+      int donorCount = rcvPack[i].intData[1];
+      icount[i] = interpCount+donorCount;
 
       // Get interpolation weights from AMR grid for this grid's receptors
-      for(j=0;j<interpCount;j++)
+      for (int j = 0; j < interpCount; j++)
       {
-        localid=rcvPack[i].intData[m++];
-        remoteid=rcvPack[i].intData[m++];
+        int localid=rcvPack[i].intData[m++];
+        int remoteid=rcvPack[i].intData[m++];
         xtmp[0]=rcvPack[i].realData[n++];
         xtmp[1]=rcvPack[i].realData[n++];
         xtmp[2]=rcvPack[i].realData[n++];
@@ -183,81 +190,87 @@ void tioga::exchangeAMRDonors(int itype)
         bcount[localid]++;
       }
 
-      for(j=0;j<donorCount;j++)
+      for (int j = 0; j < donorCount; j++)
       {
-        localid=rcvPack[i].intData[m++];
-        index=rcvPack[i].intData[m++];
-        meshtag=rcvPack[i].intData[m++];
-        remoteid=rcvPack[i].intData[m++];
-        cellRes=rcvPack[i].realData[n++];
+        int localid = rcvPack[i].intData[m++];
+        int index = rcvPack[i].intData[m++];
+        int meshtag = rcvPack[i].intData[m++];
+        int remoteid = rcvPack[i].intData[m++];
+        int cellRes = rcvPack[i].realData[n++];
         cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,itype);
         bcount[localid]++;
       }
     }
   }
 
-  for(i=0;i<ncart;i++) cb[i].processDonors(holeMap,nmesh,itype);
+  for (int i = 0; i < ncart; i++) cb[i].processDonors(holeMap,nmesh,itype);
 
   pc_cart->clearPackets2(sndPack,rcvPack);  
 
-  for(i=0;i<nsend;i++)
+  for (int i = 0; i < nsend; i++)
+  {
+    if (icount[i] > 0)
     {
-      if (icount[i] > 0) 
-	{
-	  sndPack[i].nints=2*icount[i];
-	  sndPack[i].nreals=0;
-	  sndPack[i].intData=(int *) malloc(sizeof(int)*sndPack[i].nints);
-	}
-        intcount[i]=0;
+      sndPack[i].nints = 2*icount[i];
+      sndPack[i].nreals = 0;
+      sndPack[i].intData = (int *) malloc(sizeof(int)*sndPack[i].nints);
     }
-  cancelledData=NULL;
-  //if (myid==30) {
-  for(i=0;i<ncart;i++) 
+    intcount[i] = 0;
+  }
+
+  int* cancelledData = NULL;
+
+  for (int i = 0; i < ncart; i++)
+  {
+    //tracei(i);
+    free(cancelledData);
+    cancelledData = NULL;
+    int ncancel = bcount[i];
+    if (ncancel > 0)
     {
-      //tracei(i);
-      if (cancelledData) free(cancelledData);
-      cancelledData=NULL;
-      ncancel=bcount[i];
-      if (ncancel > 0) {
-	cancelledData=(int *)malloc(sizeof(int)*3*ncancel);
-	cb[i].getCancellationData(cancelledData,&ncancel,1);
-	for(j=0;j<ncancel;j++)
-	  {
-	    procid=cancelledData[3*j];
-	    ctype=cancelledData[3*j+1];
-	    remoteid=cancelledData[3*j+2];
-	    sndPack[procid].intData[intcount[procid]++]=ctype;
-	    sndPack[procid].intData[intcount[procid]++]=remoteid;
-	    //tracei(intcount[procid]);
-            //tracei(sndPack[procid].nints);
-	  }
+      cancelledData = (int *)malloc(sizeof(int)*3*ncancel);
+      cb[i].getCancellationData(cancelledData,&ncancel,1);
+
+      for (int j = 0; j < ncancel; j++)
+      {
+        int procid = cancelledData[3*j];
+        int ctype = cancelledData[3*j+1];
+        int remoteid = cancelledData[3*j+2];
+        sndPack[procid].intData[intcount[procid]++]=ctype;
+        sndPack[procid].intData[intcount[procid]++]=remoteid;
+        //tracei(intcount[procid]);
+        //tracei(sndPack[procid].nints);
       }
     }
-  for(i=0;i<nsend;i++) sndPack[i].nints=intcount[i];
-  //}
+  }
+
+  for (int i = 0; i < nsend; i++) sndPack[i].nints = intcount[i];
 
   pc_cart->sendRecvPackets(sndPack,rcvPack);
-  for(i=0;i<nrecv;i++)
+
+  for (int i = 0; i < nrecv; i++)
+  {
+    if (rcvPack[i].nints > 0)
     {
-      if (rcvPack[i].nints > 0) 
-	{
-	  m=0;
-	  for(j=0;j<rcvPack[i].nints/2;j++)
-	    {
-	      ctype=rcvPack[i].intData[m++];
-	      id=rcvPack[i].intData[m++];
-	      if (ctype==0) 
-		{
-		  mb->donorIdCart[id]=-1;
-		}
-	      else
-		{
-		  mb->donorId[id]=-1;
-		}
-	    }
-	}
+      int m = 0;
+      for (int j = 0; j < rcvPack[i].nints/2; j++)
+      {
+        int ctype = rcvPack[i].intData[m++];
+        int id = rcvPack[i].intData[m++];
+        if (ctype == 0)
+        {
+          mb->donorIdCart[id]=-1;
+        }
+        else
+        {
+          mb->donorId[id]=-1;
+        }
+      }
     }
-  if (itype==0) mb->setCartIblanks();
+  }
+
+  if (itype == 0) mb->setCartIblanks();
+
   pc_cart->clearPackets2(sndPack,rcvPack);
 
   mb->findInterpListCart();

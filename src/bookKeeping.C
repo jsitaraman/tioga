@@ -451,7 +451,6 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
     }
   //
   if (verbose) TRACEI(acceptFlag);
-  if (acceptFlag==0 && receptorRes!=BIGVALUE) return;
   if (receptorRes==BIGVALUE && resolutionScale==1.0)
     {
       clist=cancelList;
@@ -520,6 +519,7 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
     }
   interpList[*recid].inode[m]=donorId[irecord];
   interpList[*recid].weights[m]=0.0;
+  if (acceptFlag==0 && receptorRes!=BIGVALUE) interpList[*recid].cancel=1;
   (*recid)++;
 }
 

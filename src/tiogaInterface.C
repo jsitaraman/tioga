@@ -165,7 +165,7 @@ extern "C" {
   {
    tg->performConnectivityAMR();
   }
-  void tioga_dataupdate_amr(double *q, int nvar, int interptype)
+  void tioga_dataupdate_amr(double **q, int nvar, int interptype)
   {
     tg->dataUpdate_AMR(nvar,q,interptype);
   }
@@ -193,7 +193,7 @@ extern "C" {
 	  }
 	else
 	  {
-	    tg->dataUpdate_AMR(*nvar,q,interptype);
+	    tg->dataUpdate_AMR(*nvar,&q,interptype);
 	  }
       }
     else

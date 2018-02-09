@@ -439,10 +439,9 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 
 
 void MeshBlock::getInterpolatedSolutionAtPointsAMR(int *nints,int *nreals,int **intData,
-						  double **realData,double *q,
+						  double **realData,double **q,
 						  int nvar, int interptype)
 {
-
   (*nints) = ninterpCart;
   (*nreals) = ninterpCart*nvar;
   if ((*nints) == 0) return;

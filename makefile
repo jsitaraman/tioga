@@ -5,9 +5,9 @@ include $(CONFIG)
 endif
 
 MODULENAME=tioga
-F90= mpif90
+F90= ifort
 #CC = mpicc
-CXX= mpicxx
+CXX= icpc
 ifeq ($(strip $(CUC)),)
 	CUC=nvcc
 endif
@@ -90,7 +90,9 @@ ifeq ($(strip $(CUDA)),YES)
 	OBJECTS += $(BINDIR)/highOrder_kernels.o $(BINDIR)/dADT.o $(BINDIR)/dMeshBlock.o
 endif
 
-LDFLAGS= -L/lib64/ -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
+#LDFLAGS= -L/lib64/ -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
+LDFLAGS= -L$(MPI_LIB_DIR) -lmpich_intel
+LIBS= -L$(MPI_LIB_DIR) -lmpich_intel
 
 lib:	$(OBJECTS) $(OBJF90)
 	@mkdir -p bin
@@ -116,7 +118,7 @@ $(BINDIR)/%_wrap.cpp: $(INCDIR)/%.i $(INCDIR)/tiogaInterface.h
 	$(SWIG) -c++ -python $(SFLAGS) -o $@ $<
 
 $(BINDIR)/%_wrap.o: $(BINDIR)/%_wrap.cpp 
-	$(CXX) $(CFLAGS) $(SFLAGS) -c $< -o $@
+	$(CXX) $(CFLAGS) $(INCS) $(SFLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.cu  $(INCDIR)/*.h $(INCDIR)/*.hpp
 	$(CUC) $(INCS) $(CUFLAGS) $(FLAGS) -c $< -o $@

@@ -657,7 +657,7 @@ void tioga::directCut(void)
     cutTime.stopTimer();
   }
 
-//  cutTime.showTime(3);
+  cutTime.showTime(3);
 
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
@@ -708,7 +708,7 @@ void tioga::performConnectivityAMR(void)
   //MPI_Abort(scomm,ierr);
 }
 
-void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
+void tioga::dataUpdate_AMR(int nvar,double **q,int interptype)
 {
   int i,j,k,m;
   int nints;
@@ -741,8 +741,10 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   integerRecords=NULL;
   realRecords=NULL;
   mb->getInterpolatedSolutionAtPointsAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+
   for(i=0;i<ncart;i++)
     cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar,1);
+
   //
   // populate the packets
   //
@@ -816,7 +818,7 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
         }
         else
         {
-          mb->updateSolnData(ind,&rcvPack[k].realData[m],q,nvar,interptype);
+          mb->updateSolnData(ind,&rcvPack[k].realData[m],q[0],nvar,interptype);
         }
       }
       else // AMR grid

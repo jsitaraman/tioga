@@ -51,13 +51,12 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
   int ploc;
   double *xtmp;
   int *index;
-  double *qq;
+  double qq[7];
   int *tmpint;
   double *tmpreal;
   int icount,dcount;
   int nintold,nrealold;
   int interpCount=0;
-  double weight;
   int ix[3];
 
   listptr=interpList;
@@ -76,6 +75,9 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       tmpreal=(double *)malloc(sizeof(double)*(*nreals));
       for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
       for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
+
+      free(*intData);
+      free(*realData);
     }
     (*nints)+=interpCount;
     (*nreals)+=(interpCount*nvar);
@@ -94,7 +96,6 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
     index = (int *)malloc(sizeof(int)*listptr->nweights);
     ploc=(pdegree)*(pdegree+1)/2;
-    qq=(double *)malloc(sizeof(double)*nvar);
 
     while(listptr!=NULL)
     {
@@ -150,7 +151,6 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       listptr=listptr->next;
     }
     free(index);
-    free(qq);
   }
 }
 

@@ -442,7 +442,7 @@ private:
 				  int nvar, int interptype);
 
   void getInterpolatedSolutionAtPointsAMR(int *nints,int *nreals,int **intData,double **realData,
-					 double *q,
+					 double **q,
 					 int nvar, int interptype);
   
   void getInterpolatedSolutionArtBnd(int &nints, int &nreals,

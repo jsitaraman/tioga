@@ -547,7 +547,7 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
     case 1:
       locQpts.resize(1);
       locQpts[0].x = .25; locQpts[0].y = .25; locQpts[0].z = .25;
-      weights = {1};
+      weights = {{1}};
       break;
 
     case 2: {
@@ -558,7 +558,7 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
       locQpts[1].x = loc2; locQpts[1].y = loc1; locQpts[1].z = loc1;
       locQpts[2].x = loc1; locQpts[2].y = loc2; locQpts[2].z = loc1;
       locQpts[3].x = loc1; locQpts[3].y = loc1; locQpts[3].z = loc2;
-      weights = {.25,.25,.25,.25};
+      weights = {{.25,.25,.25,.25}};
       break;
     }
     case 3: {
@@ -577,7 +577,7 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
       locQpts[7].x = loc1; locQpts[7].y = loc1; locQpts[7].z = loc2;
       double wt1 = .138527966511862;
       double wt2 = .111472033488138;
-      weights = {wt1,wt1,wt1,wt1,wt2,wt2,wt2,wt2};
+      weights = {{wt1,wt1,wt1,wt1,wt2,wt2,wt2,wt2}};
       break;
     }
     case 4: {
@@ -605,7 +605,7 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt1 = .073493043116362;
       double wt2 = .112687925718016;
       double wt3 = .042546020777082;
-      weights = {wt1,wt1,wt1,wt1,wt2,wt2,wt2,wt2,wt3,wt3,wt3,wt3,wt3,wt3};
+      weights = {{wt1,wt1,wt1,wt1,wt2,wt2,wt2,wt2,wt3,wt3,wt3,wt3,wt3,wt3}};
       break;
     }
     case 6: {
@@ -649,10 +649,10 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt2 = .01007721105532064294801323744593686;
       double wt3 = .05535718154365472209515327785372602;
       double wt4 = 27./560.;
-      weights = {wt1,wt1,wt1,wt1,
+      weights = {{wt1,wt1,wt1,wt1,
                  wt2,wt2,wt2,wt2,
                  wt3,wt3,wt3,wt3,
-                 wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4};
+                 wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4,wt4}};
       break;
     }
     case 8: {
@@ -734,13 +734,13 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt5 = .03571961223409918246495096899661762;
       double wt6 = .00718319069785253940945110521980376;
       double wt7 = .01637218194531911754093813975611913;
-      weights = {wt1,wt1,wt1,wt1,
+      weights = {{wt1,wt1,wt1,wt1,
                  wt2,wt2,wt2,wt2,
                  wt3,wt3,wt3,wt3,
                  wt4,wt4,wt4,wt4,
                  wt5,wt5,wt5,wt5,wt5,wt5,
                  wt6,wt6,wt6,wt6,wt6,wt6,wt6,wt6,wt6,wt6,wt6,wt6,
-                 wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7};
+                 wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7}};
       break;
     }
     case 10: {
@@ -863,7 +863,7 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt8 = .01178620679249594711782155323755017;
       double wt9 = .01332022473886650471019828463616468;
       double wt10 = .00615987577565961666092767531756180;
-      weights = {wt1,
+      weights = {{wt1,
                  wt2,wt2,wt2,wt2,
                  wt3,wt3,wt3,wt3,
                  wt4,wt4,wt4,wt4,
@@ -872,7 +872,7 @@ void getQuadRuleTet(int order, std::vector<point> &locQpts, std::vector<double> 
                  wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,wt7,
                  wt8,wt8,wt8,wt8,wt8,wt8,wt8,wt8,wt8,wt8,wt8,wt8,
                  wt9,wt9,wt9,wt9,wt9,wt9,wt9,wt9,wt9,wt9,wt9,wt9,
-                 wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10};
+                 wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10,wt10}};
       break;
     }
     default:  {
@@ -892,7 +892,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
   switch(order) {
     case 1: {
       locQpts = {point({1./3.,1./3.,0.})};
-      weights = {1.};
+      weights = {{1.}};
       break;
     }
     case 2: {
@@ -902,7 +902,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       locQpts[0] = point({loc2,loc1,0});
       locQpts[1] = point({loc1,loc2,0});
       locQpts[2] = point({loc1,loc1,0});
-      weights = {1./3.,1./3.,1./3.};
+      weights = {{1./3.,1./3.,1./3.}};
       break;
     }
     case 3: {
@@ -919,7 +919,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       locQpts[5] = point({loc1, loc1, 0.});
       double wt1 = .2811498024409796;
       double wt2 = .0521835308923537;
-      weights = {wt1,wt1,wt1,wt2,wt2,wt2};
+      weights = {{wt1,wt1,wt1,wt2,wt2,wt2}};
       break;
     }
     case 4: {
@@ -936,7 +936,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       locQpts[5] = point({loc1, loc1, 0.});
       double wt1 = .2233815896780115; // = (620 + sqrt(213125 - 53320 * sqrt(10))) / 3720
       double wt2 = .1099517436553219; // = (620 - sqrt(213125 - 53320 * sqrt(10))) / 3720
-      weights = {wt1,wt1,wt1,wt2,wt2,wt2};
+      weights = {{wt1,wt1,wt1,wt2,wt2,wt2}};
       break;
     }
     case 5: {
@@ -956,7 +956,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt1 = .1259391805448272; // = (155 - sqrt(15)) / 1200
       double wt2 = .1323941527885062; // = (155 + sqrt(15)) / 1200
       double wt3 = 9./40.;
-      weights = {wt1,wt1,wt1,wt2,wt2,wt2,wt3};
+      weights = {{wt1,wt1,wt1,wt2,wt2,wt2,wt3}};
       break;
     }
     case 6: {
@@ -983,7 +983,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt1 = .0508449063702068;
       double wt2 = .1167862757263794;
       double wt3 = .0828510756183736;
-      weights = {wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt3,wt3,wt3};
+      weights = {{wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt3,wt3,wt3}};
       break;
     }
     case 7: {
@@ -1016,7 +1016,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt2 = .0789512544320110;
       double wt3 = .1286079278189061;
       double wt4 = .0561201442833754;
-      weights = {wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt4,wt4,wt4,wt4,wt4,wt4};
+      weights = {{wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt4,wt4,wt4,wt4,wt4,wt4}};
       break;
     }
     case 8: {
@@ -1051,7 +1051,7 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt2 = .0324584976231981;
       double wt3 = .0950916342672846;
       double wt4 = .0272303141744350;
-      weights = {wt0,wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt4,wt4,wt4,wt4,wt4,wt4};
+      weights = {{wt0,wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt4,wt4,wt4,wt4,wt4,wt4}};
       break;
     }
     case 10: {
@@ -1102,8 +1102,8 @@ void getQuadRuleTri(int order, std::vector<point> &locQpts, std::vector<double> 
       double wt4 = 4.292374184832828e-3;
       double wt5 = 3.746885821046764e-2;
       double wt6 = 2.694935259187996e-2;
-      weights = {wt0,wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt4,wt4,wt4,
-                     wt5,wt5,wt5,wt5,wt5,wt5,wt6,wt6,wt6,wt6,wt6,wt6};
+      weights = {{wt0,wt1,wt1,wt1,wt2,wt2,wt2,wt3,wt3,wt3,wt4,wt4,wt4,
+                     wt5,wt5,wt5,wt5,wt5,wt5,wt6,wt6,wt6,wt6,wt6,wt6}};
       break;
     }
     default:  {

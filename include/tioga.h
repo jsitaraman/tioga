@@ -261,7 +261,7 @@ class tioga
 
   void dataUpdate(int nvar,double *q,int interptype) ;
 
-  void dataUpdate_AMR(int nvar,double *q,int interptype) ;
+  void dataUpdate_AMR(int nvar,double **q,int interptype) ;
   
   void dataUpdate_highorder(int nvar,double *q, int interptype) ;
 

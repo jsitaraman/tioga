@@ -68,6 +68,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
   if (interpCount > 0) 
   {
+    // Copy over current data before resizing allocation
     nintold=(*nints);
     nrealold=(*nreals);
     if (nintold > 0) {
@@ -79,10 +80,14 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       free(*intData);
       free(*realData);
     }
+
+    // Resize data arrays
     (*nints)+=interpCount;
     (*nreals)+=(interpCount*nvar);
     (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
     (*realData)=(double *)malloc(sizeof(double)*(*nreals));
+
+    // Copy over existing data
     if (nintold > 0) {
       for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
       for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];
@@ -297,7 +302,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
 
     // -------------------- from cart_interp.cpp --------------------
     const int N = pdegree + 1;
-    double dn = 2. / N;
+    double dn = 2. / pdegree;
 
     // Create a local 'reference element' and perform Lagrange interpolation
     // Element is centered around node i0,j0,k0

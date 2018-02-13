@@ -154,6 +154,12 @@ class tioga
   void exchangeAMRDonors(void);
   void checkComm(void);
   void outputStatistics(void);
+
+  void getiBlankCell(int *ibout)
+  {
+    mb->getiBlankCell(ibout);
+  }
+  
 };
       
 #endif

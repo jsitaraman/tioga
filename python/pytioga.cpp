@@ -1,6 +1,5 @@
 #include "pytioga.h"
 #include "tioga.h"
-#include <mpi4py/mpi4py.h>
 #define NO_IMPORT_ARRAY
 #define PY_ARRAY_UNIQUE_SYMBOL tioga_ARRAY_API
 #include <numpy/ndarrayobject.h>
@@ -21,40 +20,34 @@ void PyTioga_dealloc(PyTioga* self){
 
 int PyTioga_init(PyTioga* self, PyObject* args, PyObject *kwds){
 
-  PyObject* pycom;
   int size, rank;
-  MPI_Comm *comm;
+  int fcom;
+  MPI_Comm comm;
 
   // we haven't done anything yet!
   self->initialized = 0;
 
-  // Check mpi4py is loaded
-  if(import_mpi4py()<0) return 0;
-
-  // Parse the argument as a PyObject ("O")
-  if(!PyArg_ParseTuple(args, "O", &pycom)){
+  // Parse the argument as an int
+  if(!PyArg_ParseTuple(args, "i", &fcom)){
     printf("Missing MPI Comm arg");
     return 1;
   }
 
-  // Try to translate this into an MPI_Comm*
-  comm = PyMPIComm_Get(pycom);
-  if(comm == NULL){
-    printf("Error with the python mpi communicator\n");
-    return 1;
-  }
-
-  MPI_Comm_size(comm[0], &size);
-  MPI_Comm_rank(comm[0], &rank);
-
   // note the use of "self" instead of "this"
-  self->comm     = comm[0];
+  self->comm = MPI_Comm_f2c((MPI_Fint)fcom);
+  
+  MPI_Comm_size(self->comm, &size);
+  MPI_Comm_rank(self->comm, &rank);
+
   self->mpi_size = size;
   self->mpi_rank = rank;
 
   self->tg = new tioga[1];
 
-  self->tg->setCommunicator(comm[0],rank,size);
+  self->iblank     = NULL;
+  self->iblankcell = NULL;
+
+  self->tg->setCommunicator(self->comm,rank,size);
 
   self->timers[TIMER_CONNECT]  = 0.0;
   self->timers[TIMER_EXCHANGE] = 0.0;
@@ -89,13 +82,12 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
   PyObject *dict;
   PyObject *list, *data; // temporary pointers for unpacking the dictionary
 
-  int btag, bid, iblk, nv, nwbc, nobc;
-  double* xyz;
-  int *wbcnode, *obcnode, *iblank;
+  int btag, bid, iblk, nwbc, nobc;
+  int *wbcnode, *obcnode;
   int *tmpbtag;
   int *ndc4, *ndc5, *ndc6, *ndc8;
   int ntypes, count4, count5, count6, count8;
-  int dbg, nq, len;
+  int dbg, nq, len, dummy;
 
   if(!PyArg_ParseTuple(args, "O", &dict)){
     printf("Missing argument\n");
@@ -137,12 +129,17 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
   numpy_to_array(data, &obcnode, &nobc);
 
   data = PyList_GetItem(PyDict_GetItemString(dict, "grid-coordinates"), 0);
-  numpy_to_array(data, &xyz, &len);
+  numpy_to_array(data, &(self->xyz), &len);
+
+  if(PyDict_Contains(dict,Py_BuildValue("s", "iblanking-cell"))){
+    data = PyList_GetItem(PyDict_GetItemString(dict, "iblanking"), 0);
+    numpy_to_array(data, &(self->iblankcell), &dummy);
+  }
 
   data = PyList_GetItem(PyDict_GetItemString(dict, "iblanking"), 0);
-  numpy_to_array(data, &iblank, &nv);
+  numpy_to_array(data, &(self->iblank), &(self->nv));
 
-  if(nv != len/3){
+  if(self->nv != len/3){
     printf("Uh oh... nv != len(xyz)/3 \n");
   }
 
@@ -190,7 +187,7 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
     printf("Error: using tioga without providing data\n");
     return Py_BuildValue("i", 1);
   } else {
-    self->tg->registerGridData(btag,nv,xyz,iblank,nwbc,nobc,
+    self->tg->registerGridData(btag,self->nv,self->xyz,self->iblank,nwbc,nobc,
 			       wbcnode,obcnode,ntypes,self->nv2,self->ncell,self->connptr);
   } 
 
@@ -211,6 +208,10 @@ PyObject* PyTioga_connect(PyTioga* self){
   self->tg->performConnectivity();
 
   self->timers[TIMER_CONNECT] += self->tock();
+
+  if(self->iblankcell != NULL){
+    self->tg->getiBlankCell(self->iblankcell);
+  }
 
   return Py_BuildValue("i", 0);
 }
@@ -238,3 +239,91 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
   return Py_BuildValue("i", 0);
 
 }
+
+PyObject* PyTioga_test_interpolation(PyTioga* self, PyObject* args){
+
+  int j, k, aux, nvartmp=1;
+  int nv = self->nv;
+  double *xyz = self->xyz;
+  int *iblank_node = self->iblank;
+  double l2norm, l2old;
+
+  double *qtmp = (double *)malloc(sizeof(double)*1*nvartmp*nv);
+
+  int myid, nproc;
+
+  int count8  = self->ncell[0];
+  
+  MPI_Comm_rank(MPI_COMM_WORLD,&myid);
+  MPI_Comm_size(MPI_COMM_WORLD,&nproc);
+
+  for (j = 0;  j < nv; j++){
+    if(iblank_node[j] == 1){
+      for (k = 0; k < nvartmp; k++)
+	qtmp[nvartmp*j+k] = xyz[3*j]+xyz[3*j+1]+xyz[3*j+2];
+    } else {
+      for (k = 0; k < nvartmp; k++)
+	qtmp[nvartmp*j+k] = -100.0;
+    }
+  }
+
+  self->tg->dataUpdate(nvartmp,qtmp,0);
+
+  //
+  l2norm=0.;
+  l2old=0.;
+  aux = 1;
+  for (j = 0;  j < nv; j++){
+    if(iblank_node[j] == -1){
+      for (k = 0; k < nvartmp; k++){
+	if(qtmp[nvartmp*j+k] != qtmp[nvartmp*j+k]){
+	  printf("pytioga.cpp: qtmp Nanned out..\n");
+	  printf("Proc %d, k %d, cellID %d\n",myid,k,j);
+	  MPI_Abort(MPI_COMM_WORLD,-124);
+	}
+
+	l2norm += ((qtmp[nvartmp*j+k] - (xyz[3*j]+xyz[3*j+1]+xyz[3*j+2]))*
+		   (qtmp[nvartmp*j+k] - (xyz[3*j]+xyz[3*j+1]+xyz[3*j+2])));
+         
+	// errorcheck similar to cell based formulation but since
+	// l2norm is added, ony change of norm at certain position is
+	// relevant to find bad spots
+	if((l2norm-l2old)>1.e-10){
+	  printf("# l2norm is not zero: %e\n",l2norm);
+	  printf("proc ID is [%d] \n",myid);
+	  printf("node position : %e %e %e\n",xyz[3*j],xyz[3*j+1],xyz[3*j+2]);
+	  printf("q value : %e\n",xyz[3*j]+xyz[3*j+1]+xyz[3*j+2]);
+	  printf("q computed : %e\n\n",qtmp[nvartmp*j+k]);
+	  l2old = l2norm;
+	}
+      }
+    }
+  }
+
+  //
+  // find maximum interpolation error from all processors
+  //
+  // MPI_Gather to proc 0
+  //
+  double *interp_error = (double *)malloc(sizeof(double)*nproc);
+  MPI_Gather(&l2norm,1,MPI_DOUBLE,interp_error,1,MPI_DOUBLE,0,MPI_COMM_WORLD);
+  //
+  if(myid==0){
+    int id_max_interp_error;
+    double max_interp_error=0.0;
+    for(j=0;j<nproc;j++){
+      max_interp_error = max(max_interp_error,interp_error[j]);
+      if(interp_error[j] > 1.0e-10){
+        printf("\n interpol. error per proc= %e at proc %d \n", interp_error[j],j);
+      }
+    }
+    
+    printf("\n#pyTIOGA: ihigh [%d]. Maximum interpolation error: %e \n\n",0,max_interp_error);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  free(qtmp);
+
+  return Py_BuildValue("i", 0);
+}
+

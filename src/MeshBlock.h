@@ -264,4 +264,13 @@ class MeshBlock
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);
+
+  void getiBlankCell(int *iblank_out)
+  {
+    for(int j=0;j<ncells;j++)
+      {
+	iblank_out[j]=iblank_cell[j];
+      }
+  }
+  
 };

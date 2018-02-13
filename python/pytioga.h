@@ -19,6 +19,9 @@ typedef struct {
   int initialized;
   int mpi_size, mpi_rank;
   MPI_Comm comm;
+  double* xyz;
+  int nv;
+  int *iblank, *iblankcell;
   int nv2[4],ncell[4];
   int *connptr[4];
   struct timeval tv1, tv2;
@@ -39,6 +42,7 @@ PyObject* PyTioga_dummy(PyTioga* self);
 PyObject* PyTioga_register_data(PyTioga* self, PyObject *args);
 PyObject* PyTioga_connect(PyTioga* self);
 PyObject* PyTioga_update(PyTioga* self, PyObject *args);
+PyObject* PyTioga_test_interpolation(PyTioga* self, PyObject* args);
 
 
 #endif

@@ -477,7 +477,7 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
           }
 	  if (iblank[inode[m]]<=0 && nodeRes[inode[m]]!=BIGVALUE) 
 	    {
-	      iblank[inode[m]]=1;
+	      if (iblank[inode[m]] < 0) iblank[inode[m]]=1;
 	      if (clist == NULL) 
 		{
 		  clist=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));

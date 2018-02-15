@@ -92,7 +92,7 @@ class tioga
         mb = NULL; cg=NULL; cb=NULL;
         holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
         // obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
-        isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        isym=3;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
         qblock=NULL;
         mblocks.clear();
         mtags.clear();

@@ -18,6 +18,8 @@
 /* License along with this library; if not, write to the Free Software */
 /* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA */
 #include "codetypes.h"
+#include <cmath>
+#include <vector>
 
 #ifdef __cplusplus
 extern "C" {
@@ -428,3 +430,103 @@ void writePoints(double *x,int nsearch,int bid)
 #ifdef __cplusplus
 }
 #endif
+
+/*
+ * Create a unique hash for list of coordinates with duplicates in 
+ * them. Find the rtag as max of all duplicate samples. itag contains
+ * the hash to the real point
+ */
+void uniquenodes(double *x,double *rtag,int *itag,int nn)
+{
+  int NSUB = 101;
+  int nnodes = nn;
+
+  double xmax[3], xmin[3];
+  for (int j = 0; j < 3; j++) xmax[j] = -1E15;
+  for (int j = 0; j < 3; j++) xmin[j] =  1E15;
+
+  for (int i = 0; i < nnodes; i++)
+  {
+    for (int j = 0; j < 3; j++) 
+    {
+      xmax[j] = std::max(xmax[j], x[3*i+j]);
+      xmin[j] = std::min(xmin[j], x[3*i+j]);
+    }
+  }
+
+  double ds = (xmax[0]-xmin[0]+xmax[1]-xmin[1]+xmax[2]-xmin[2])/3.0/NSUB;
+  double dsi = 1.0/ds;
+
+  for (int j = 0; j < 3; j++) xmax[j] += ds;
+  for (int j = 0; j < 3; j++) xmin[j] -= ds;
+
+  int jmax = std::min((int)round((xmax[0]-xmin[0])*dsi),NSUB);
+  double dsx = (xmax[0]-xmin[0])/jmax;
+  double dsxi = 1./dsx;    
+  int kmax = std::min((int)round((xmax[1]-xmin[1])*dsi),NSUB);
+  double dsy = (xmax[1]-xmin[1])/kmax;
+  double dsyi = 1./dsy;
+  int lmax = std::min((int)round((xmax[2]-xmin[2])*dsi),NSUB);
+  double dsz = (xmax[2]-xmin[2])/lmax;
+  double dszi = 1./dsz;
+  int nsblks = jmax*kmax*lmax;
+  int jkmax = jmax*kmax;
+
+  std::vector<int> cft(nsblks+1);
+  std::vector<int> numpts(nsblks);
+  std::vector<int> ilist(nnodes);
+
+  for (int i = 0; i < nsblks; i++) numpts[i]=0;
+  for (int i = 0; i < nnodes; i++)
+  {
+    int i3 = 3*i;
+    int jj = (int)((x[i3]   - xmin[0])*dsxi);
+    int kk = (int)((x[i3+1] - xmin[1])*dsyi);
+    int ll = (int)((x[i3+2] - xmin[2])*dszi);
+    int indx = ll*jkmax + kk*jmax + jj;
+    numpts[indx] = numpts[indx] + 1;
+  }
+
+  cft[0] = 0;
+  for (int i = 0; i < nsblks; i++) 
+    cft[i+1] = cft[i] + numpts[i];
+
+  for (int i = 0; i < nnodes ;i++)
+  {
+    int i3 = 3*i;
+    int jj = (int)((x[i3]-xmin[0])*dsxi);
+    int kk = (int)((x[i3+1]-xmin[1])*dsyi);
+    int ll = (int)((x[i3+2]-xmin[2])*dszi);
+    int indx = ll*jkmax + kk*jmax + jj;
+    ilist[cft[indx] + numpts[indx]-1] = i;
+    numpts[indx]--;
+    itag[i] = i;
+  }
+
+  for (int i = 0; i < nsblks; i++)
+  {
+    for (int j = cft[i]; j < cft[i+1]; j++)
+    {
+      int p1 = ilist[j];
+      for (int k = j+1; k < cft[i+1]; k++)
+      {
+        int p2 = ilist[k];
+        if ( fabs(x[3*p1  ]-x[3*p2  ]) 
+           + fabs(x[3*p1+1]-x[3*p2+1]) 
+           + fabs(x[3*p1+2]-x[3*p2+2]) < TOL )
+        {
+          if (p1 > p2) 
+          {
+            rtag[p2] = std::max(rtag[p1],rtag[p2]);
+            itag[p1] = p2;
+          }
+          else 
+          {
+            rtag[p1] = std::max(rtag[p1],rtag[p2]);
+            itag[p2] = p1;
+          }
+        }
+      }
+    }
+  }
+}

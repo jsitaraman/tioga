@@ -106,11 +106,11 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
     {
       if (itype==0)
       {
-	xtmp = (double *)malloc(sizeof(double)*p3*3);
+	      xtmp = (double *)malloc(sizeof(double)*p3*3);
         get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
             pdegree,dims[0],dims[1],dims[2],nf,
             xlo,dx,&qnode[ploc],index,xtmp);
-	free(xtmp);
+	      free(xtmp);
       }
       else
       {
@@ -353,7 +353,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
 }
   
 void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes,
-                                 int itype)
+                                 double receptorRes,int itype)
 {
   DONORLIST *temp1;
   int ijklmn[6];
@@ -389,10 +389,11 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
     pointid=index;
   }
     
-  temp1->donorData[0]=senderid;
-  temp1->donorData[1]=meshtagdonor;
-  temp1->donorData[2]=remoteid;
-  temp1->donorRes=cellRes;
+  temp1->donorData[0] = senderid;
+  temp1->donorData[1] = meshtagdonor;
+  temp1->donorData[2] = remoteid;
+  temp1->donorRes     = cellRes;
+  temp1->receptorRes  = receptorRes;
   temp1->cancel=0;
   //if (myid!=1) return;
   //printf("%d %d\n",pointid,ndof);
@@ -402,236 +403,256 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
 
 void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
 {
-  int i,j,k,l,m,n,h,p,iadd;
-  int ibcount,idof,meshtagdonor,icount;
   DONORLIST *temp;
-  int *iflag;
-  int holeFlag;
-  double *xtmp;
-  int *index;
-  int ploc,ibindex;
-  //FILE*fp;
   char fname[80];
   char qstr[2];
   char intstring[7];
   int ni,nj,nk,ibcheck;
-  //sprintf(intstring,"%d",100000+myid);
-  //sprintf(fname,"fringes_%s.dat",&(intstring[1]));
-  //if (local_id==0) 
-  //  {
-  //    fp=fopen(fname,"w");
-  //  }
-  //else
-  //  {
-  //    fp=fopen(fname,"a");
-  //  }  
 
-  //
   // first mark hole points
-  //
-  int p3t=(itype==0)?p3:1;
-  iflag=(int *)malloc(sizeof(int)*nmesh);
-  index=(int *)malloc(sizeof(int)*p3t);
-  xtmp=(double *)malloc(sizeof(double)*p3t*3);
-  //
-  ibcount=-1;
-  idof=-1;
+  int p3t = (itype==0)?p3:1;
+  int* iflag = (int *)malloc(sizeof(int)*nmesh);
+  int* index = (int *)malloc(sizeof(int)*p3t);
+  double* xtmp = (double *)malloc(sizeof(double)*p3t*3);
+  
+  int ibcount = -1;
+  int idof = -1;
+  
   //for(i=0;i<(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);i++) ibl[i]=1;
-  ploc=pdegree*(pdegree+1)/2;
+
+  int ploc = pdegree*(pdegree+1)/2;
   //iadd=(itype==0)?0:1;
-  iadd=0;
-  // 
-  for(k=0;k<dims[2]+iadd;k++)
+  int iadd = 0;
+   
+  for (int k=0; k < dims[2]+iadd; k++)
+  {
+    for (int j=0; j < dims[1]+iadd; j++)
+    {
+      for (int i=0; i < dims[0]+iadd; i++)
+      {
+        ibcount++;
+        if (itype==0) 
+        {
+          get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
+              xlo,dx,&qnode[ploc],index,xtmp);
+        }
+        else 
+        {
+          xtmp[0]=xlo[0]+dx[0]*i;
+          xtmp[1]=xlo[1]+dx[1]*j;
+          xtmp[2]=xlo[2]+dx[2]*k;
+        }
+
+        int holeFlag = 1;
+        idof = ibcount*p3t-1;
+        for (int p = 0; p < p3t && holeFlag; p++)
+        {
+          idof++;
+          if (donorList[idof]==NULL)
+          {
+            for (int h = 0; h < nmesh; h++)
+            {
+              if (holemap[h].existWall)
+              {
+                if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
+                {
+                  int ibindex = (dims[0]+2*nf)*((dims[1]+2*nf)*(k+nf)+ j+nf) + i+nf;
+                  // check hole-map
+                  ibl[ibindex]=0;
+                  holeFlag=0;
+                  break;
+                }
+              }
+            }
+          }
+          else
+          {
+            temp = donorList[idof];
+            for (int h = 0; h < nmesh; h++) iflag[h]=0;
+            while(temp!=NULL) 
+            {
+              int meshtagdonor=temp->donorData[1]-BASE;
+              iflag[meshtagdonor]=1;
+              temp=temp->next;
+            }
+            for (int h = 0; h < nmesh; h++)
+            {
+              if (holemap[h].existWall)
+              {
+                if (!iflag[h])
+                  if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
+                  {
+                    int dj = dims[0] + 2*nf;
+                    int dk = dj * (dims[1] + 2*nf);
+                    int ibindex = (k+nf)*dk + (j+nf)*dj + i+nf;
+                    // check hole-map
+                    ibl[ibindex]=0;
+                    holeFlag=0;
+                    break;
+                  }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /// DEBUGGING / HACK FOR INCONSISTENT IBLANK VALUES BETWEEN PROCESSES
+  /*for(k=0;k<dims[2]+iadd;k++)
     for(j=0;j<dims[1]+iadd;j++)
       for(i=0;i<dims[0]+iadd;i++)
 	{
-	  ibcount++;
-          if (itype==0) 
+    int ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+    xtmp[0]=xlo[0]+dx[0]*i;
+    xtmp[1]=xlo[1]+dx[1]*j;
+    xtmp[2]=xlo[2]+dx[2]*k;
+    double R = std::sqrt(xtmp[0]*xtmp[0] + xtmp[1]*xtmp[1] + xtmp[2]*xtmp[2]);
+    if (R > 2.)
+      ibl[ibindex] = -2; /// Force 'normal' status below
+  }*/
+
+  ibcount = -1;
+  idof = -1;    
+  for (int k = 0; k < dims[2]+iadd; k++)
+  {
+    for (int j = 0; j < dims[1]+iadd; j++)
+    {
+      for (int i = 0; i < dims[0]+iadd; i++)
+      {
+        int dj = dims[0] + 2*nf;
+        int dk = dj * (dims[1] + 2*nf);
+        int ibindex = (k+nf)*dk + (j+nf)*dj + i+nf;
+        ibcount++;
+
+        if (itype==0) 
+        {
+          get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
+              xlo,dx,&qnode[ploc],index,xtmp);
+        }
+
+        if (ibl[ibindex] == 0)  // Hole node
+        {
+          idof = ibcount*p3t-1;
+          for (int p = 0; p < p3t; p++)
           {
-	   get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
-			    xlo,dx,&qnode[ploc],index,xtmp);
+            idof++;
+            if (donorList[idof]!=NULL)
+            {
+              temp = donorList[idof];
+              while (temp != NULL)
+              {
+                temp->cancel = 1; // Cancel receptor status
+                temp = temp->next;
+              }
+            }
           }
-          else 
+        }
+        else if (ibl[ibindex] == -2)  // Part of a Cartesian donor cell [Mandatory Donor]
+        {
+          idof = ibcount*p3t-1;
+          for (int p = 0; p < p3t; p++)
           {
-             xtmp[0]=xlo[0]+dx[0]*i;
-             xtmp[1]=xlo[1]+dx[1]*j;
-             xtmp[2]=xlo[2]+dx[2]*k;
+            idof++;
+            if (donorList[idof]!=NULL)
+            {
+              temp = donorList[idof];
+              while (temp != NULL)
+              {
+                temp->cancel = 1; // Cancel receptor status
+                temp = temp->next;
+              }
+            }
           }
-          holeFlag=1;
+          ibl[ibindex] = 1; //min(ibstore[ibindex],1);
+        }
+        else
+        {
+          int icount=0;
           idof=ibcount*p3t-1;
-	  for(p=0;p<p3t && holeFlag;p++)
-	    {
-	      idof++;
-	      if (donorList[idof]==NULL)
-		{
-		  for(h=0;h<nmesh;h++)
-		    if (holemap[h].existWall)
-		      {
-			if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
-			  {
-	                    ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-                            // check hole-map
-			    ibl[ibindex]=0;
-                            holeFlag=0;
-			    break;
-			  }
-		      }
-		}
-	      else
-		{
-		  temp=donorList[idof];
-		  for(h=0;h<nmesh;h++) iflag[h]=0;
-		  while(temp!=NULL) 
-		    {
-		      meshtagdonor=temp->donorData[1]-BASE;
-		      iflag[meshtagdonor]=1;
-		      temp=temp->next;
-		    }
-		  for(h=0;h<nmesh;h++)
-		    {
-		      if (holemap[h].existWall)
-			{
-			  if (!iflag[h])
-			    if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
-			      {
-                                ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-                                // check hole-map
-				ibl[ibindex]=0;
-                                holeFlag=0;
-				break;
-			      }
-			}
-		    }
-		}
-	    }
-	}
-
-    ibcount=-1;
-    idof=-1;    
-    for(k=0;k<dims[2]+iadd;k++)
-      for(j=0;j<dims[1]+iadd;j++)
-	for(i=0;i<dims[0]+iadd;i++)
-	{
-	  ibcount++;
-          ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-	  if (itype==0) 
-	    {
-	      get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
-				xlo,dx,&qnode[ploc],index,xtmp);
-	    }
-
-	  if (ibl[ibindex]==0) 
-	    {
-              idof=ibcount*p3t-1;
-	      for(p=0;p<p3t;p++)
-		{
-		  idof++;
-		  if (donorList[idof]!=NULL)
-		    {
-		      temp=donorList[idof];
-		      while(temp!=NULL)
-			{
-			  temp->cancel=1;
-			  temp=temp->next;
-			}
-		    }
-		}
-	    }
-	  else if (ibl[ibindex]==-2)  // this node was part of a Cartesian donor cell
-	    {
-	      idof=ibcount*p3t-1;
-	      for(p=0;p<p3t;p++)
+          for (int p = 0; p < p3t; p++)
+          {
+            idof++;
+            if (donorList[idof]!=NULL)
+            {
+              temp=donorList[idof];
+              while(temp!=NULL)
+              {
+                if (temp->donorRes < BIGVALUE)
                 {
-                  idof++;
-                  if (donorList[idof]!=NULL)
-                    {
-                      temp=donorList[idof];
-                      while(temp!=NULL)
-                        {
-                          temp->cancel=1;
-                          temp=temp->next;
-                        }
-                    }
+                  icount++;
+                  break;
                 }
-	      ibl[ibindex]=1; //min(ibstore[ibindex],1);
-	    }
-	  else
-	    {
-	      icount=0;
-              idof=ibcount*p3t-1;
-	      for(p=0;p<p3t;p++)
-		{
-		  idof++;
-		  if (donorList[idof]!=NULL)
-		    {
-		      temp=donorList[idof];
-		      while(temp!=NULL)
-			{
-			  if (temp->donorRes < BIGVALUE)
-			    {
-			      icount++;
-			      break;
-			    }
-			  temp=temp->next;
-			}
-		    }
-		}
-	      if (icount==p3t) 
-		{
-                  if (ibstore[ibindex]==1) ibl[ibindex]=-1;
-                  //for(p=0;p<p3t;p++)
-	          // fprintf(fp,"%f %f %f\n",xtmp[3*p],xtmp[3*p+1],xtmp[3*p+2]);
-		}
-	      else
-		{
-                  idof=ibcount*p3t-1;
-		  for(p=0;p<p3t;p++)
-		    {
-		      idof++;
-		      if (donorList[idof]!=NULL)
-			{
-			  temp=donorList[idof];
-			  while(temp!=NULL)
-			    {
-			      temp->cancel=1;
-			      temp=temp->next;
-			    }
-			}
-		    } 
-		}
-	    }
-	}
+                temp=temp->next;
+              }
+            }
+          }
+          if (icount==p3t) 
+          {
+            if (ibstore[ibindex]==1) ibl[ibindex]=-1;
+            //for(p=0;p<p3t;p++)
+            // fprintf(fp,"%f %f %f\n",xtmp[3*p],xtmp[3*p+1],xtmp[3*p+2]);
+          }
+          else
+          {
+            idof=ibcount*p3t-1;
+            for (int p = 0; p < p3t; p++)
+            {
+              idof++;
+              if (donorList[idof]!=NULL)
+              {
+                temp=donorList[idof];
+                while(temp!=NULL)
+                {
+                  temp->cancel=1;
+                  temp=temp->next;
+                }
+              }
+            } 
+          }
+        }
+      }
+    }
+  }
+
   if (itype==0) 
   {
-  for(k=0;k<dims[2]+iadd;k++)
-    for(j=0;j<dims[1]+iadd;j++)
-      for(i=0;i<dims[0]+iadd;i++)
+    for (int k = 0; k < dims[2]+iadd; k++)
+    {
+      for (int j = 0; j < dims[1]+iadd; j++)
+      {
+        for (int i = 0; i < dims[0]+iadd; i++)
         {
-          ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+          int dj = dims[0] + 2*nf;
+          int dk = dj * (dims[1] + 2*nf);
+          int ibindex = (k+nf)*dk + (j+nf)*dj + i+nf;
           if (ibl[ibindex]==1)
-            {
-              ibcheck=1;
-              for(nk=-1;nk<2;nk++)
-                for(nj=-1;nj<2;nj++)
-                  for(ni=-1;ni<2;ni++)
-                    {
-                      ibindex=(k+nf+nk)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf+nj)*(dims[0]+2*nf)+i+nf+ni;
-                      ibcheck=ibcheck && (ibl[ibindex]!=0);
-                    }
-              if (!ibcheck)
+          {
+            int ibcheck = 1;
+            for (int nk = -1; nk < 2; nk++)
+              for (int nj = -1; nj < 2; nj++)
+                for (int ni = -1; ni < 2; ni++)
                 {
-                  printf("fixing orphan: myid/globalid/localid/(i,j,k)=%d %d %d %d %d %d \n",
-                         myid,global_id,local_id,i,j,k);
-		  ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-		  ibl[ibindex]=0;
+                  ibindex = (k+nf+nk)*dk + (j+nf+nj)*dj + i+nf+ni;
+                  ibcheck = ibcheck && (ibl[ibindex]!=0);
                 }
+
+            if (!ibcheck)
+            {
+              printf("fixing orphan: myid/globalid/localid/(i,j,k)=%d %d %d %d %d %d \n",
+                  myid,global_id,local_id,i,j,k);
+              ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+              ibl[ibindex]=0;
             }
+          }
         }
+      }
+    }
   }
- //for(i=0;i<d3nf;i++) ibl[i]=ibstore[i];
- free(xtmp);
- free(index);
- free(iflag);
+  //for(i=0;i<d3nf;i++) ibl[i]=ibstore[i];
+  free(xtmp);
+  free(index);
+  free(iflag);
   // fclose(fp);
 }
 			      

@@ -66,6 +66,7 @@ void tioga::exchangeSearchData(void)
   mb->isearch.resize(2*mb->nsearch);
   mb->donorId.resize(mb->nsearch);
   mb->tagsearch.resize(mb->nsearch);
+  mb->res_search.resize(mb->nsearch);
   if (ihigh)
   {
     mb-> rst.resize(3*mb->nsearch); /// NEEDED HERE?
@@ -76,6 +77,7 @@ void tioga::exchangeSearchData(void)
   int icount = 0;
   int dcount = 0;
   int tcount = 0;
+  int rcount = 0;
   for (int k = 0; k < nrecv; k++)
   {
     int l = 0;
@@ -86,6 +88,7 @@ void tioga::exchangeSearchData(void)
       mb->xsearch[dcount++] = rcvPack[k].realData[l++];
       mb->xsearch[dcount++] = rcvPack[k].realData[l++];
       mb->xsearch[dcount++] = rcvPack[k].realData[l++];
+      //mb->res_search[rcount++] = rcvPack[k].realData[l++]; // Receptor resolution
       mb->tagsearch[tcount++] = obblist[k].meshtag;
     }
   }

@@ -99,7 +99,7 @@ void tioga::exchangeAMRDonors(int itype)
   for (int i = 0; i < nsend; i++)
   {
     sndPack[i].nints = obdonors[i]*2+obreceptors[i]*4+2;
-    sndPack[i].nreals = obdonors[i]*3+obreceptors[i];
+    sndPack[i].nreals = obdonors[i]*3+2*obreceptors[i];
     sndPack[i].intData = (int *)malloc(sizeof(int)*sndPack[i].nints);
     sndPack[i].realData = (double *)malloc(sizeof(double)*sndPack[i].nreals);
     sndPack[i].intData[0] = obdonors[i];
@@ -128,6 +128,7 @@ void tioga::exchangeAMRDonors(int itype)
         sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i];
         sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i+1];
         sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i+2];
+        //sndPack[procid].realData[realcount[procid]++] = BIGVALUE; // Receptor res - N/A
       }
     }
 
@@ -141,6 +142,7 @@ void tioga::exchangeAMRDonors(int itype)
         sndPack[procid].intData[intcount[procid]++] = mb->meshtag;
         sndPack[procid].intData[intcount[procid]++] = i;
         sndPack[procid].realData[realcount[procid]++] = mb->cellRes[mb->donorId[i]];
+        sndPack[procid].realData[realcount[procid]++] = 1.;//mb->res_search[i]; /// DEBUGGING: ADDED 2/23 based on Jay's inter-proc fixes...
         //      fprintf(fp,"%lf %lf %lf\n",mb->xsearch[3*i],mb->xsearch[3*i+1],mb->xsearch[3*i+2]);
       }
     }
@@ -178,7 +180,7 @@ void tioga::exchangeAMRDonors(int itype)
       int donorCount = rcvPack[i].intData[1];
       icount[i] = interpCount+donorCount;
 
-      // Get interpolation weights from AMR grid for this grid's receptors
+      // Get interpolation weights from AMR grid for this mb grid's receptors
       for (int j = 0; j < interpCount; j++)
       {
         int localid=rcvPack[i].intData[m++];
@@ -190,14 +192,16 @@ void tioga::exchangeAMRDonors(int itype)
         bcount[localid]++;
       }
 
+      // Setup lists of mb donors for cb's receptors
       for (int j = 0; j < donorCount; j++)
       {
         int localid = rcvPack[i].intData[m++];
         int index = rcvPack[i].intData[m++];
         int meshtag = rcvPack[i].intData[m++];
         int remoteid = rcvPack[i].intData[m++];
-        int cellRes = rcvPack[i].realData[n++];
-        cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,itype);
+        double cellRes = rcvPack[i].realData[n++];
+        double receptorRes = rcvPack[i].realData[n++];
+        cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,receptorRes,itype);
         bcount[localid]++;
       }
     }
@@ -259,14 +263,24 @@ void tioga::exchangeAMRDonors(int itype)
         int id = rcvPack[i].intData[m++];
         if (ctype == 0)
         {
-          mb->donorIdCart[id]=-1;
+          mb->donorIdCart[id] = -1;
         }
         else
         {
-          mb->donorId[id]=-1;
+          mb->donorId[id] = -1;
+          // Also update duplicate nodes, if exist...
+          mb->donorId[mb->xtag[id]] = -1;
         }
       }
     }
+  }
+
+  // Update donorIDs for any duplicates of recently canceled nodes 
+  for (int i = 0; i < mb->nsearch; i++)
+  {
+    if (mb->donorId[mb->xtag[i]] == -1)
+      mb->donorId[i] = -1;
+    /// TODO: see note below - need to tell CB about new cancels?
   }
 
   if (itype == 0) mb->setCartIblanks();
@@ -275,6 +289,8 @@ void tioga::exchangeAMRDonors(int itype)
 
   mb->findInterpListCart();
 
+  /// TODO: Do we need to tell CartGrid that receptor nodes have been canceled...?
+  
   if (cancelledData) free(cancelledData);
   //fclose(fp);
   free(bcount);

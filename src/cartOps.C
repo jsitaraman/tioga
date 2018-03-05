@@ -301,7 +301,6 @@ void MeshBlock::findInterpListCart(void)
     }
   }
   ninterpCart=interpCount;
-  assert((ninterpCart==interpCount));
 }    
 
 

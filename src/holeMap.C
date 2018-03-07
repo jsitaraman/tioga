@@ -123,7 +123,7 @@ void tioga::getHoleMap(void)
      }
      dsmax = MAX(ds[0], ds[1]);
      dsmax = MAX(dsmax, ds[2]);
-     dsbox = dsmax / 64;
+     dsbox = dsmax / 192;
 
      for (j = 0; j < 3; j++) {
        holeMap[i].extents[j] -= (2 * dsbox);

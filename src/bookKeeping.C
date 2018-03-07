@@ -541,10 +541,13 @@ void MeshBlock::getCancellationData(int *nrecords,int **intData)
       for(clist=cancelList;clist!=NULL;clist=clist->next) 
 	{
 	  inode=clist->inode;
-	  (*intData)[i++]=donorList[inode]->donorData[0];
-	  (*intData)[i++]=donorList[inode]->donorData[2];
-	  (*intData)[i++]=donorList[inode]->donorData[1];
+          if (donorList[inode]!=NULL) {
+      	    (*intData)[i++]=donorList[inode]->donorData[0];
+	    (*intData)[i++]=donorList[inode]->donorData[2];
+	    (*intData)[i++]=donorList[inode]->donorData[1];
+         }
 	}
+      *nrecords=i/3;
     }
 }
 

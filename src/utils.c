@@ -470,13 +470,16 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
   for(j=0;j<3;j++) xmin[j]-=ds;
   
   jmax=MIN(round((xmax[0]-xmin[0])*dsi),NSUB);
-  dsx=(xmax[0]-xmin[0])/jmax;
+  jmax=MAX(jmax,1);
+  dsx=(xmax[0]-xmin[0]+TOL)/jmax;
   dsxi=1./dsx;    
   kmax=MIN(round((xmax[1]-xmin[1])*dsi),NSUB);
-  dsy=(xmax[1]-xmin[1])/kmax;
+  kmax=MAX(kmax,1);
+  dsy=(xmax[1]-xmin[1]+TOL)/kmax;
   dsyi=1./dsy;
   lmax=MIN(round((xmax[2]-xmin[2])*dsi),NSUB);
-  dsz=(xmax[2]-xmin[2])/lmax;
+  lmax=MAX(lmax,1);
+  dsz=(xmax[2]-xmin[2]+TOL)/lmax;
   dszi=1./dsz;
   nsblks=jmax*kmax*lmax;
   jkmax=jmax*kmax;

@@ -132,7 +132,7 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
   numpy_to_array(data, &(self->xyz), &len);
 
   if(PyDict_Contains(dict,Py_BuildValue("s", "iblanking-cell"))){
-    data = PyList_GetItem(PyDict_GetItemString(dict, "iblanking"), 0);
+    data = PyList_GetItem(PyDict_GetItemString(dict, "iblanking-cell"), 0);
     numpy_to_array(data, &(self->iblankcell), &dummy);
   }
 

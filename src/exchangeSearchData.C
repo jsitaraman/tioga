@@ -108,16 +108,26 @@ void tioga::exchangeSearchData(void)
     auto &mb = mblocks[ib];
     mb->nsearch = 0;
 
-    if (mb->xsearch)
+    if (mb->xsearch) {
       free(mb->xsearch);
-    if (mb->isearch)
+      mb->xsearch=NULL;
+    }
+    if (mb->isearch) {
       free(mb->isearch);
-    if (mb->tagsearch)
+      mb->isearch=NULL;
+    }
+    if (mb->tagsearch) {
       free(mb->tagsearch);
-    if (mb->donorId)
+      mb->tagsearch=NULL;
+    }
+    if (mb->donorId) {
       free(mb->donorId);
-    if (mb->res_search)
+      mb->donorId=NULL;
+    }
+    if (mb->res_search) {
       free(mb->res_search);
+      mb->res_search=NULL;
+    }
   }
 
   // Loop through recv packets and estimate search array sizes in MeshBlock data
@@ -274,9 +284,13 @@ void tioga::exchangePointSearchData(void)
   // get rid of them
   //
   if (mb->xsearch) free(mb->xsearch);
+  mb->xsearch=NULL;
   if (mb->isearch) free(mb->isearch);
+  mb->isearch=NULL;
   if (mb->donorId) free(mb->donorId);
+  mb->donorId=NULL;
   if (mb->rst) free(mb->rst);
+  mb->rst=NULL;
   //
   // allocate query point storage
   //

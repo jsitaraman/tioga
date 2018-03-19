@@ -61,6 +61,7 @@
 # define TRACED(x)  printf("#tioga:\t"#x" =%.16e\n",x);
 # define MIN(x,y)  (x) < (y) ? (x) : (y)
 # define MAX(x,y)  (x) > (y) ? (x) : (y)
+# define free(a1)  {free(a1);a1=NULL;}
 // # define debug(x,y)  printf("#tioga:\t"#x"=%d,"#y"=%d\n",x,y);
 // # define stdwrite(x) if (myid==0) printf("#tioga:\t"#x"\n");
 // # define dstr(x) printf("#tioga:\t"#x"\n");

@@ -112,6 +112,7 @@ void tioga::performConnectivity(void)
   {
    auto& mb = mblocks[ib];
    mb->ihigh=0;
+   mb->resetInterpData();
    mb->search();
   }
   exchangeDonors();
@@ -400,7 +401,17 @@ void tioga::writeData(int nvar,int interptype)
 
 void tioga::getDonorCount(int btag, int *dcount,int *fcount)
 {
-  auto idxit=tag_iblk_map.find(btag);
+  int nsend, nrecv;
+  int *sndMap, *rcvMap;
+
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  if (nsend == 0) {
+      *dcount = 0;
+      *fcount = 0;
+      return;
+  }
+
+  auto idxit = tag_iblk_map.find(btag);
   int iblk=idxit->second;
   auto &mb = mblocks[iblk];
   mb->getDonorCount(dcount,fcount);
@@ -412,11 +423,13 @@ void tioga::getDonorInfo(int btag,int *receptors,int *indices,double *frac,int *
   int *sndMap,*rcvMap;
   int i;
 
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  if (nsend == 0) return;
+
   auto idxit=tag_iblk_map.find(btag);
   int iblk=idxit->second;
   auto &mb = mblocks[iblk];
   mb->getDonorInfo(receptors,indices,frac);
-  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap); 
   //
   // change to actual processor id here
   //
@@ -431,6 +444,11 @@ void tioga::getReceptorInfo(std::vector<int>& receptors)
   int *sndMap, *rcvMap;
   PACKET *sndPack, *rcvPack;
   pc->getMap(&nsend, &nrecv, &sndMap, &rcvMap);
+
+  if (nsend == 0) {
+      receptors.clear();
+      return;
+  }
 
   //
   // create packets to send and receive

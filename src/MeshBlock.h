@@ -298,6 +298,25 @@ class MeshBlock
   void getMBDonorPackets(std::vector<int>&,
                          std::vector<int>&,
                          PACKET*);
+
+  /** Reset interpolation list data structure
+   *
+   *  Reset the data structures in situations where the performConnectivity
+   *  method is invoked at every timestep when meshes undergo relative motion.
+   */
+  void resetInterpData() {
+    if (interpList) {
+      for (int i = 0; i < interpListSize; i++) {
+        if (interpList[i].inode)
+          free(interpList[i].inode);
+        if (interpList[i].weights)
+          free(interpList[i].weights);
+      }
+      free(interpList);
+    }
+    ninterp = 0;
+    interpListSize = 0;
+  }
 };
 
 #endif /* MESHBLOCK_H */

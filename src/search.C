@@ -24,6 +24,7 @@ extern "C" {
   void writebbox(OBB *obb,int bid);
   void writePoints(double *x,int nsearch,int bid);
 }
+void uniquenodes(double *x,double *rtag,int *itag,int nn);
 
 void MeshBlock::search(void)
 {
@@ -188,10 +189,21 @@ void MeshBlock::search(void)
     }
   }
 #else
+  // Find duplicated nodes from other grids [to ensure same donor given]
+  // [includes nodes shared on inter-processor boundaries of cart grids]
+  xtag.resize(nsearch);
+  res_search.resize(nsearch); /// should already be sized; just delete this later...
+  uniquenodes(xsearch.data(), res_search.data(), xtag.data(), nsearch);
+
   htime.startTimer();
 //#pragma omp parallel for // CONTAINMENT CHECK MUST BE THREAD-SAFE
   for (int i = 0; i < nsearch; i++)
-    adt->searchADT(this, &donorId[i], &xsearch[3*i], &rst[3*i]);
+  {
+    if (xtag[i]==i)
+      adt->searchADT(this, &donorId[i], &xsearch[3*i], &rst[3*i]);
+    else // NOTE: duplicates will always come after original (i >= xtag[i])
+      donorId[i] = donorId[xtag[i]];
+  }
 
   donorCount = 0;
   for (int i = 0; i < nsearch; i++)

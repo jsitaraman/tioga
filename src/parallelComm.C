@@ -124,45 +124,45 @@ void parallelComm::sendRecvPackets(PACKET *sndPack,PACKET *rcvPack)
   //
   MPI_Waitall(irnum,request,status);
   for(i=0;i<nrecv;i++)
-    {
-      rcvPack[i].nints=rcount[2*i];
-      rcvPack[i].nreals=rcount[2*i+1];
-    }
+  {
+    rcvPack[i].nints=rcount[2*i];
+    rcvPack[i].nreals=rcount[2*i+1];
+  }
   //
   irnum=0;
   for(i=0;i<nrecv;i++)
-    {
-      if (rcvPack[i].nints > 0) {
-  tag=10;
-	rcvPack[i].intData=(int *) malloc(sizeof(int)*rcvPack[i].nints);
-	MPI_Irecv(rcvPack[i].intData,rcvPack[i].nints,
-		  MPI_INT,rcvMap[i],
-		  tag,scomm,&request[irnum++]);
-      }
-      if (rcvPack[i].nreals > 0) {
-  tag=20;
-	rcvPack[i].realData=(REAL *) malloc(sizeof(REAL)*rcvPack[i].nreals);
-	MPI_Irecv(rcvPack[i].realData,rcvPack[i].nreals,
-		  MPI_DOUBLE,rcvMap[i],
-		  tag,scomm,&request[irnum++]);
-      }
+  {
+    if (rcvPack[i].nints > 0) {
+      tag=10;
+      rcvPack[i].intData=(int *) malloc(sizeof(int)*rcvPack[i].nints);
+      MPI_Irecv(rcvPack[i].intData,rcvPack[i].nints,
+          MPI_INT,rcvMap[i],
+          tag,scomm,&request[irnum++]);
     }
+    if (rcvPack[i].nreals > 0) {
+      tag=20;
+      rcvPack[i].realData=(REAL *) malloc(sizeof(REAL)*rcvPack[i].nreals);
+      MPI_Irecv(rcvPack[i].realData,rcvPack[i].nreals,
+          MPI_DOUBLE,rcvMap[i],
+          tag,scomm,&request[irnum++]);
+    }
+  }
   //
   for(i=0;i<nsend;i++)
-    {
-      if (sndPack[i].nints > 0){
-  tag=10;
-	MPI_Isend(sndPack[i].intData,sndPack[i].nints,
-		  MPI_INT,sndMap[i],
-		  tag,scomm,&request[irnum++]);
-      }
-      if (sndPack[i].nreals > 0){
-  tag=20;
-	MPI_Isend(sndPack[i].realData,sndPack[i].nreals,
-		  MPI_DOUBLE,sndMap[i],
-		  tag,scomm,&request[irnum++]);
-      }
+  {
+    if (sndPack[i].nints > 0){
+      tag=10;
+      MPI_Isend(sndPack[i].intData,sndPack[i].nints,
+          MPI_INT,sndMap[i],
+          tag,scomm,&request[irnum++]);
     }
+    if (sndPack[i].nreals > 0){
+      tag=20;
+      MPI_Isend(sndPack[i].realData,sndPack[i].nreals,
+          MPI_DOUBLE,sndMap[i],
+          tag,scomm,&request[irnum++]);
+    }
+  }
   MPI_Pcontrol(1, "tioga_pc_waitall");
   MPI_Waitall(irnum,request,status);
   MPI_Pcontrol(-1, "tioga_pc_waitall");

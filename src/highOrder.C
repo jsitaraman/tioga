@@ -1217,13 +1217,6 @@ void MeshBlock::processPointDonorsGPU(void)
       break;
     }
 
-//    if (myid==0 && i==572 || i==573)
-//    {
-//      printf("Pt %d(%d), (%f,%f,%f), donor %d(%d), nwgt %d, rst %f,%f,%f\n",
-//             i,ninterp2,xsearch[3*i+0],xsearch[3*i+1],xsearch[3*i+2],donorId2[i],ele,nweights_h[ninterp2],
-//          rst2[3*i+0],rst2[3*i+1],rst2[3*i+2]);
-//    }
-
     donorId[ninterp2] = donorId2[i];
     donorsBT_h[ninterp2] = ele;
     etypes_h[ninterp2] = (char)n;

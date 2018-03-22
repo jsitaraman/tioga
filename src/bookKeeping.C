@@ -42,8 +42,8 @@ void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
     if (donorId[i] > -1)
     {
       int k = isearch[2*i];
-      sndPack[k].nints += 3;
-      sndPack[k].nreals++;
+      sndPack[k].nints  += 3;
+      sndPack[k].nreals ++;// 2; // Donor res, receptor res
     }
   }
 
@@ -65,6 +65,9 @@ void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
       sndPack[k].intData[icount[k]++]  = isearch[2*i+1];      // point id from receptor grid
       sndPack[k].intData[icount[k]++]  = i;                   // point id on the donor side
       sndPack[k].realData[dcount[k]++] = cellRes[donorId[i]]; // donor resolution
+      //sndPack[k].realData[dcount[k]++] = res_search[xtag[i]]; // receptor resolution
+      /* FYI, potentially useful stuff was commented out
+       * here in PartFix.patch... */
     }
   }
 
@@ -88,14 +91,15 @@ void MeshBlock::initializeDonorList(void)
 }
 
 void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int remoteid,
-			      double donorRes)
+			      double donorRes, double receptorRes)
 {
   DONORLIST *temp1;
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
-  temp1->donorData[0]=senderid;
-  temp1->donorData[1]=meshtagdonor;
-  temp1->donorData[2]=remoteid;
-  temp1->donorRes=donorRes;
+  temp1->donorData[0] = senderid;
+  temp1->donorData[1] = meshtagdonor;
+  temp1->donorData[2] = remoteid;
+  temp1->donorRes     = donorRes;
+  temp1->receptorRes  = receptorRes;
   insertInList(&donorList[pointid],temp1);
 }
 
@@ -136,6 +140,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
           tracei(meshtagdonor);
           traced(temp->donorRes);
         }
+        //nodeRes[i] = std::max(nodeRes[i], temp->receptorRes);
         temp = temp->next;
       }
       for (int j = 0; j < nmesh; j++)
@@ -259,6 +264,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
         }
       }
       //(*receptorResolution)[k++] = nodeRes[i];
+      //if (temp->donorRes < 0) nodeRes[i] = BIGVALUE;
       (*receptorResolution)[k++] = (resolutionScale > 1.0) ? -nodeRes[i] : nodeRes[i];
       (*donorRecords)[m++] = temp->donorData[0];
       (*donorRecords)[m++] = temp->donorData[2];

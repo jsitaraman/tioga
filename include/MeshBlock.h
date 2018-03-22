@@ -276,6 +276,9 @@ private:
   std::vector<int> isearch;       /** < index of query points in the remote process */
   std::vector<double> xsearch;    /** < coordinates of the query points */
   std::vector<int> tagsearch;    /** < coordinates of the query points */
+  std::vector<int> xtag;    /** < map to find duplicate points */
+  std::vector<double> res_search;    /** < resolution of search points */
+  std::vector<double> res_search0;    /** < resolution of search points */
 
 #ifdef _GPU
   hvec<double> rst;
@@ -473,7 +476,7 @@ private:
 
   void initializeDonorList();
   
-  void insertAndSort(int pointid,int senderid,int meshtag, int remoteid, double donorRes);
+  void insertAndSort(int pointid,int senderid,int meshtag, int remoteid, double donorRes, double receptorRes = 0);
   
   void processDonors(HOLEMAP *holemap, int nmesh,int **donorRecords,double **receptorResolution,
 		     int *nrecords);

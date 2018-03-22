@@ -329,6 +329,9 @@ private:
   hvec<int> buf_inds;
   std::vector<int> buf_disp;
 
+  dvec<double*> qptrs_d;
+  dvec<int> qstrides_d;
+
   //dvec<int> iblank_cell_d;
   //dvec<int> iblank_face_d;
 

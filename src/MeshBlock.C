@@ -112,7 +112,9 @@ void MeshBlock::updateOBB(void)
   free(obb);
   obb = (OBB *) malloc(sizeof(OBB));
 
+  PUSH_NVTX_RANGE("updateOBB",3);
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
+  POP_NVTX_RANGE;
 }
 
 /** Calculate 'cellRes' / 'nodeRes' (cell volume) for each cell / node

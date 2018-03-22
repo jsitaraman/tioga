@@ -1233,7 +1233,7 @@ void MeshBlock::processPointDonorsGPU(void)
 
   // Get the interpolation weights for each of the interpolation points
   donors_d.assign(donorId.data(), donorId.size(), &stream_handle);
-  mb_d.rst.assign(rst.data(), rst.size(), &stream_handle);
+  //mb_d.rst.assign(rst.data(), rst.size(), &stream_handle); /// <-- Pretty sure redundant...?
 
   donorsBT_d.assign(donorsBT_h.data(), donorsBT_h.size());
   etypes_d.assign(etypes_h.data(), etypes_h.size());
@@ -1241,10 +1241,19 @@ void MeshBlock::processPointDonorsGPU(void)
   nweights_d.assign(nweights_h.data(), nweights_h.size());
   winds_d.assign(winds_h.data(), winds_h.size());
 
-  weights_h.resize(nWeightsTotal);
-  donor_frac_gpu(donorId.data(), ninterp2, rst.data(), weights_h.data());
+  if (ntypes == 1)
+  {
+    // Only one cell type - no need to map/unmap data by cell type
+    weights_d.resize(nWeightsTotal);
+    donor_frac_gpu(donors_d.data(), ninterp2, mb_d.rst.data(), weights_d.data());
+  }
+  else
+  {
+    weights_h.resize(nWeightsTotal);
+    donor_frac_gpu(donorId.data(), ninterp2, rst.data(), weights_h.data());
 
-  weights_d.assign(weights_h.data(), weights_h.size());
+    weights_d.assign(weights_h.data(), weights_h.size());
+  }
 #endif
 }
 
@@ -1666,19 +1675,16 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
     strides_h[3*n+2] = vstride;
   }
 
-  dvec<double*> qtd_d; qtd_d.resize(ntypes);
-  qtd_d.assign(qtd_h.data(), qtd_h.size());
+  qptrs_d.resize(ntypes);
+  qptrs_d.assign(qtd_h.data(), qtd_h.size(), &stream_handle);
 
-  dvec<int> strides_d; strides_d.resize(3*ntypes);
-  strides_d.assign(strides_h.data(), strides_h.size());
+  qstrides_d.resize(3*ntypes);
+  qstrides_d.assign(strides_h.data(), strides_h.size(), &stream_handle);
 
   // Perform the interpolation
   /// TODO: split up donors_d and weights_d by element type
-  interp_u_types_wrapper(qtd_d.data(), q_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
-      winds_d.data(), buf_inds_d.data(), ninterp2, nweights_d.data(), nvar, strides_d.data(), stream_handle);
-
-  qtd_d.free_data();
-  strides_d.free_data();
+  interp_u_types_wrapper(qptrs_d.data(), q_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
+      winds_d.data(), buf_inds_d.data(), ninterp2, nweights_d.data(), nvar, qstrides_d.data(), stream_handle);
 }
 
 void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)

@@ -157,6 +157,8 @@ void tioga::performConnectivity(void)
 {
   doHoleCutting();
 
+  mb->calcFaceIblanks(meshcomm);
+
   doPointConnectivity();
 }
 
@@ -216,7 +218,11 @@ void tioga::unblankPart2(int nvar)
   int nunblank = mb->getIterIblanks();
 
   //if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank); /// DEBUGGING
+  //cudaDeviceSynchronize(); /// DEBUGGING
+  PUSH_NVTX_RANGE("FaceIblanks-2",4);
   mb->calcFaceIblanks(meshcomm);
+  POP_NVTX_RANGE;
+  //cudaDeviceSynchronize(); /// DEBUGGING
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
 
@@ -275,7 +281,7 @@ void tioga::doHoleCutting(bool unblanking)
     if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
     {
       // Find artificial boundary faces
-      mb->calcFaceIblanks(meshcomm);
+      //mb->calcFaceIblanks(meshcomm);
     }
   }
   tgTime.stopTimer();
@@ -302,10 +308,10 @@ void tioga::doHoleCutting(bool unblanking)
 
   directCut();
 
-  PUSH_NVTX_RANGE("FaceIblanks", 3);
+  /*PUSH_NVTX_RANGE("FaceIblanks", 3);
   if (!unblanking)
     mb->calcFaceIblanks(meshcomm);
-  POP_NVTX_RANGE;
+  POP_NVTX_RANGE;*/
 
   dcTime.stopTimer();
 #endif
@@ -657,7 +663,7 @@ void tioga::directCut(void)
     cutTime.stopTimer();
   }
 
-  cutTime.showTime(3);
+  //cutTime.showTime(3);
 
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
@@ -1183,7 +1189,7 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
   interpTime.stopTimer();
 
   /* ------------------------------------------------------------------------ */
-  /* Version 1: Wait for D2H transfer to complete and pack separate buffer */
+  /* Version 1: Wait for D2H transfer to complete and pack separate buffer 
   // Wait for device-to-host transfer to complete
   cudaStreamSynchronize(mb->stream_handle);
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
@@ -1225,7 +1231,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   PUSH_NVTX_RANGE("tg_pc_send", 0);
 
   /* ------------------------------------------------------------------------ */
-  /* Version 1.2: Do the waiting and buffer packing here instead
+  /* Version 1.2: Do the waiting and buffer packing here instead */
   // Wait for device-to-host transfer to complete
   cudaStreamSynchronize(mb->stream_handle);
   PUSH_NVTX_RANGE("tg_packBuffers", 3);

@@ -416,8 +416,6 @@ void tioga::directCut(void)
 
   for (int g = 0; g < nGrids; g++)
   {
-    if (g == mytag) continue;
-
     bbox_g[g].resize(2 * nDims);
 
     for (int d = 0; d < nDims; d++)
@@ -487,12 +485,16 @@ void tioga::directCut(void)
     }
   }
 
+  // Also get global AABB for this grid using grid-specific MPI Comm
+  MPI_Allreduce(&bboxW[0], &bbox_g[mytag][0], 3, MPI_DOUBLE, MPI_MIN, meshcomm);
+  MPI_Allreduce(&bboxW[3], &bbox_g[mytag][3], 3, MPI_DOUBLE, MPI_MAX, meshcomm);
+  MPI_Allreduce(&bboxO[0], &bbox_g[mytag][0], 3, MPI_DOUBLE, MPI_MIN, meshcomm);
+  MPI_Allreduce(&bboxO[3], &bbox_g[mytag][3], 3, MPI_DOUBLE, MPI_MAX, meshcomm);
+
   // Get a 'reference length' / error tolerance for each cutting surface
   std::vector<double> href_g(nGrids);
   for (int g = 0; g < nGrids; g++)
   {
-    if (g == mytag) continue;
-
     // 3% of the longest side length of the surface's AABB
     href_g[g] = .03 * max(max(bbox_g[g][3]-bbox_g[g][0], bbox_g[g][4]-bbox_g[g][1]),
                           bbox_g[g][5]-bbox_g[g][2]);
@@ -533,7 +535,7 @@ void tioga::directCut(void)
     }
 
     // Check if other rank's bbox overlaps with our cut-group bbox
-    if (size > 0 && tg_funcs::boundingBoxCheck(Bptr, &aabb_tmp[2*nDims*p], 3))
+    if (size > 0 && tg_funcs::boundingBoxCheck(Bptr, &aabb_tmp[2*nDims*p], 3, href_g[mytag]))
       dcSndMap.push_back(p);
   }
 
@@ -1189,7 +1191,7 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
   interpTime.stopTimer();
 
   /* ------------------------------------------------------------------------ */
-  /* Version 1: Wait for D2H transfer to complete and pack separate buffer 
+  /* Version 1.1: Wait for D2H transfer to complete and pack separate buffer */
   // Wait for device-to-host transfer to complete
   cudaStreamSynchronize(mb->stream_handle);
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
@@ -1202,6 +1204,9 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
   }
   POP_NVTX_RANGE;
   /* ------------------------------------------------------------------------ */
+  PUSH_NVTX_RANGE("tg_pc_send", 0);
+  pc->sendPacketsV(sndVPack,rcvVPack);
+  POP_NVTX_RANGE;
 
   /* ------------------------------------------------------------------------ */
   /* Version 2: Let D2H be async and get pointers into buffer for later send
@@ -1221,17 +1226,17 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
 
-  if (nsend+nrecv == 0) return;
+  if (nsend+nrecv == 0) return; /// NOT COMPATIBLE WITH MPI_ALLREDUCE!!
 
   // get the interpolated solution now
   int stride = nvar;
   if (iartbnd && dataFlag == 1) stride = 3*nvar;
 
   // communicate the data across all partitions
-  PUSH_NVTX_RANGE("tg_pc_send", 0);
+  //PUSH_NVTX_RANGE("tg_pc_send", 0);
 
   /* ------------------------------------------------------------------------ */
-  /* Version 1.2: Do the waiting and buffer packing here instead */
+  /* Version 1.2: Do the waiting and buffer packing here instead 
   // Wait for device-to-host transfer to complete
   cudaStreamSynchronize(mb->stream_handle);
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
@@ -1245,9 +1250,10 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   POP_NVTX_RANGE;
   /* ------------------------------------------------------------------------ */
 
-  pc->sendPacketsV(sndVPack,rcvVPack);
+
+  //pc->sendPacketsV(sndVPack,rcvVPack);
 //  pc->sendPacketsV2(sndPack2,rcvVPack); /// newer method
-  POP_NVTX_RANGE;
+  //POP_NVTX_RANGE;
 
   // Wait on all of the sends/recvs for the interpolated data
   PUSH_NVTX_RANGE("tg_pc_recv", 0);
@@ -1292,7 +1298,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     }
     fp.close();
 
-    MPI_Allreduce(MPI_IN_PLACE, &norphanPoint, 1, MPI_INT, MPI_SUM, scomm);
+    //MPI_Allreduce(MPI_IN_PLACE, &norphanPoint, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
     if (norphanPoint > 0) {
       if (myid == 0) printf("Orphan points found!\n");

@@ -10,8 +10,8 @@ void PyTioga_dealloc(PyTioga* self){
   // Release hold of the python data buffers
   //
 
-  printf("# TIOGA timers: %12.4f s (exchange) %12.4f s (connect) %12.4f s (profile)\n", 
-	 self->timers[TIMER_EXCHANGE], self->timers[TIMER_CONNECT], self->timers[TIMER_PROFILE]);
+  // printf("# TIOGA timers: %12.4f s (exchange) %12.4f s (connect) %12.4f s (profile)\n", 
+  // 	 self->timers[TIMER_EXCHANGE], self->timers[TIMER_CONNECT], self->timers[TIMER_PROFILE]);
 
   delete [] self->tg;
 
@@ -197,12 +197,15 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
 
 PyObject* PyTioga_connect(PyTioga* self){
 
+  MPI_Barrier(self->comm);
   self->tick();
 
   self->tg->profile();
 
   self->timers[TIMER_PROFILE] += self->tock();
 
+
+  MPI_Barrier(self->comm);
   self->tick();
 
   self->tg->performConnectivity();
@@ -223,6 +226,7 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
   int interptype = 0; // only row implemented here
   double *q;
 
+  MPI_Barrier(self->comm);
   self->tick();
 
   if(!PyArg_ParseTuple(args, "Oi", &data, &nq)){
@@ -238,6 +242,43 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
 
   return Py_BuildValue("i", 0);
 
+}
+
+PyObject* PyTioga_timedump(PyTioga* self, PyObject *args){
+
+  int idx1, idx2, offset, len, rank, worldrank;
+  char fname[30], buffer[128];
+  MPI_File file;
+  MPI_Status status;
+
+  if(!PyArg_ParseTuple(args, "ii", &idx1, &idx2)){
+    printf("Missing argument\n");
+    return Py_BuildValue("i", 1);
+  }
+
+  MPI_Comm_rank(MPI_COMM_WORLD, &worldrank);
+  MPI_Comm_rank(self->comm, &rank);
+
+  // length : 4 + 4 + 12*3 + 4 space + 1 nl = 49
+  len = 49;
+  sprintf(buffer, "%4d %4d %12.6f %12.6f %12.6f\n", worldrank, rank,
+	  self->timers[TIMER_EXCHANGE], self->timers[TIMER_CONNECT], self->timers[TIMER_PROFILE]);
+
+  sprintf(fname, "tg_time_%03d_%03d.dat", idx1, idx2);
+
+  offset = len * rank;
+
+  MPI_File_open(self->comm, fname, MPI_MODE_CREATE|MPI_MODE_WRONLY, MPI_INFO_NULL, &file);
+  MPI_File_seek(file, offset, MPI_SEEK_SET);
+  MPI_File_write_all(file,(void*)buffer, len, MPI_BYTE, &status);
+  MPI_File_close(&file);
+
+  self->timers[TIMER_EXCHANGE] = 0.0;
+  self->timers[TIMER_CONNECT]  = 0.0;
+  self->timers[TIMER_PROFILE]  = 0.0;
+
+  return Py_BuildValue("i", 0);
+  
 }
 
 PyObject* PyTioga_test_interpolation(PyTioga* self, PyObject* args){

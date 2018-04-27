@@ -86,8 +86,12 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
   int *wbcnode, *obcnode;
   int *tmpbtag;
   int *ndc4, *ndc5, *ndc6, *ndc8;
+  double *cell_vol, *node_vol;
   int ntypes, count4, count5, count6, count8;
   int dbg, nq, len, dummy;
+
+  cell_vol = NULL;
+  node_vol = NULL;
 
   if(!PyArg_ParseTuple(args, "O", &dict)){
     printf("Missing argument\n");
@@ -147,6 +151,15 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
   numpy_to_array(data, &tmpbtag, &len);
   btag = tmpbtag[0];
 
+  if(PyDict_Contains(dict,Py_BuildValue("s", "volume-cell"))){
+    data = PyList_GetItem(PyDict_GetItemString(dict, "volume-cell"), 0);
+    numpy_to_array(data, &cell_vol, &dummy);
+  }
+  if(PyDict_Contains(dict,Py_BuildValue("s", "volume-node"))){
+    data = PyList_GetItem(PyDict_GetItemString(dict, "volume-node"), 0);
+    numpy_to_array(data, &node_vol, &dummy);
+  }
+
   // printf("# pytioga (%2d) %2d nv = %5d\n", self->mpi_rank, btag,  nv);
 
   // Now we'll look through all the connectivity data and see which
@@ -190,6 +203,10 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
     self->tg->registerGridData(btag,self->nv,self->xyz,self->iblank,nwbc,nobc,
 			       wbcnode,obcnode,ntypes,self->nv2,self->ncell,self->connptr);
   } 
+
+  if(cell_vol and node_vol){
+    self->tg->setResolutions(node_vol, cell_vol);
+  }
 
   return Py_BuildValue("i", 0);
 

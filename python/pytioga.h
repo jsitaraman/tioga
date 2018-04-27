@@ -42,6 +42,7 @@ PyObject* PyTioga_dummy(PyTioga* self);
 PyObject* PyTioga_register_data(PyTioga* self, PyObject *args);
 PyObject* PyTioga_connect(PyTioga* self);
 PyObject* PyTioga_update(PyTioga* self, PyObject *args);
+PyObject* PyTioga_timedump(PyTioga* self, PyObject *args);
 PyObject* PyTioga_test_interpolation(PyTioga* self, PyObject* args);
 
 

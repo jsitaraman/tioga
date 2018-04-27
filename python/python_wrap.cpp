@@ -34,6 +34,7 @@ static PyMethodDef PyTioga_methods[] = {
   {"register_data",      (PyCFunction)PyTioga_register_data,      METH_VARARGS, "Register Data"},
   {"connect",            (PyCFunction)PyTioga_connect,            METH_NOARGS,  "Connect Grids"},
   {"update",             (PyCFunction)PyTioga_update,             METH_VARARGS, "Update Data"},
+  {"timedump",           (PyCFunction)PyTioga_timedump,           METH_VARARGS, "Print Timers"},
   {"test_interpolation", (PyCFunction)PyTioga_test_interpolation, METH_VARARGS, "Test Interp"},
   {NULL}  /* Sentinel */
 };

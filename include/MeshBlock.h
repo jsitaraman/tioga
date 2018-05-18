@@ -110,6 +110,8 @@ private:
   int *mpiFidR;   /** < Matching MPI face IDs on opposite rank */
   int *mpiProcR;  /** < Opposite rank for MPI face */
 
+  std::vector<double> igbpdata; /** < List of x,y,z,ds for inter-grid bndry pts */
+
   std::vector<std::vector<int>> c2c;
 
   int nsend, nrecv;
@@ -654,6 +656,8 @@ private:
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc, int itype=0);
   void setCartIblanks(void);
+
+  void getIgbpData(double *& igbp_ptr);
 
   void setupADT(void);
 

@@ -279,6 +279,10 @@ class Tioga:
             iblankC=arrayToIntPtr(gridData['iblanking'][i])
             tg.tioga_register_amr_local_data_(i,global_id,iblankC,qC)
 
+        # Use Tioga's knowledge of overset boundary nodes to get IGBP list
+        self.igbp_ptr = tg.tioga_get_igbp_list();
+        self.igbpdata = ptrToArray(self.igbp_ptr, self.gridData['obcnode'][0].shape[0], 4)
+
     def performAMRConnectivity(self):
         tg.tioga_performconnectivity_amr_()
         

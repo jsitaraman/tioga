@@ -366,6 +366,8 @@ class tioga
   void checkComm(void);
   void outputStatistics(void);
 
+  void get_igbp_ptr(double *& igbp_ptr);
+
 #ifdef _GPU
   void setupCommBuffersGPU(void);
 

@@ -527,6 +527,23 @@ void MeshBlock::rebuildADT(void)
   POP_NVTX_RANGE;
 }
 
+void MeshBlock::getIgbpData(double *& igbp_ptr)
+{
+  // Setup the Inter-Grid Boundary Point (IGBP) data list
+  igbpdata.resize(nobc*4);
+
+  for (int i = 0; i < nobc; i++)
+  {
+    const int iv = obcnode[i];
+    igbpdata[4*i  ] = x[3*iv  ];
+    igbpdata[4*i+1] = x[3*iv+1];
+    igbpdata[4*i+2] = x[3*iv+2];
+    igbpdata[4*i+3] = nodeRes[iv];
+  }
+
+  igbp_ptr = igbpdata.data();
+}
+
 void MeshBlock::writeGridFile(int bid)
 {
   char fname[80];

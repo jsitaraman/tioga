@@ -1539,6 +1539,10 @@ void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,double 
   cb[ipatch].registerData(ipatch,global_id,iblank,q);
 }
 
+void tioga::get_igbp_ptr(double *& igbp_ptr)
+{
+  mb->getIgbpData(igbp_ptr);
+}
 #ifdef _GPU
 void tioga::set_stream_handle(cudaStream_t handle, cudaEvent_t event)
 {

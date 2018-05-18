@@ -146,6 +146,13 @@ extern "C" {
     tg->register_amr_local_data(ipatch,global_id,iblank,q);
   }
 
+  double* tioga_get_igbp_list(void)
+  {
+    double* igbp_ptr = NULL;
+    tg->get_igbp_ptr(igbp_ptr);
+    return igbp_ptr;
+  }
+
   void tioga_preprocess_grids_(void)
   {
     tg->profile();

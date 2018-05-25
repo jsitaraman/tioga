@@ -42,34 +42,24 @@ extern "C"{
 void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
 {
   int *sndMap,*rcvMap;
-  OBB *obcart;
-  INTEGERLIST2 *head;
-  INTEGERLIST2 *dataPtr;
   double xd[3];
-  //char qstr[2];
-  //char fname[80];
-  //char intstring[7];
-  //FILE *fp;
   int intersectCount=0;
 
-  //sprintf(intstring,"%d",100000+myid);
-  //sprintf(fname,"zsearch_%s.dat",&(intstring[1]));
-  //fp=fopen(fname,"w");
-  
   // limit case we communicate to everybody
   std::vector<int> pmap(pc->numprocs);
   
-  obcart=(OBB *)malloc(sizeof(OBB));
+  OBB* obcart = (OBB *)malloc(sizeof(OBB));
   for (int j = 0;j<3;j++)
     for (int k = 0;k<3;k++)
       obcart->vec[j][k]=0;
   obcart->vec[0][0]=obcart->vec[1][1]=obcart->vec[2][2]=1.0;
   
-  head=(INTEGERLIST2 *) malloc(sizeof(INTEGERLIST2));
-  head->intData=NULL;
-  head->realData=NULL;
-  dataPtr=head;
-  dataPtr->next=NULL;
+  INTEGERLIST2* head = (INTEGERLIST2 *) malloc(sizeof(INTEGERLIST2));
+  head->intData = NULL;
+  head->realData = NULL;
+
+  INTEGERLIST2* dataPtr = head;
+  dataPtr->next = NULL;
   
   nsearch=0;
   
@@ -196,7 +186,7 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
   res_search.resize(nsearch);
   donorId.resize(nsearch);
   rst.resize(3*nsearch);
-  //
+
   dataPtr=head->next;
   int n = 0, p = 0;
   m = 0;
@@ -209,8 +199,6 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
       isearch[m++] = dataPtr->intData[j];
     }
 
-    //for (int j = 0; j < 3*dataPtr->realDataSize; j++)
-    //  xsearch[n++] = dataPtr->realData[j];
     for (int j = 0; j < dataPtr->realDataSize; j++)
     {
       // Point locations
@@ -224,7 +212,6 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
   }
 
   deallocateLinkList3(head);
-  //fclose(fp);
   free(obcart);
   free(sndMap);
   free(rcvMap);

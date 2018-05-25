@@ -143,16 +143,10 @@ void tioga::exchangeAMRDonors(int itype)
         sndPack[procid].intData[intcount[procid]++] = i;
         sndPack[procid].realData[realcount[procid]++] = mb->cellRes[mb->donorId[i]];
         sndPack[procid].realData[realcount[procid]++] = 1.;//mb->res_search[i]; /// DEBUGGING: ADDED 2/23 based on Jay's inter-proc fixes...
-        //      fprintf(fp,"%lf %lf %lf\n",mb->xsearch[3*i],mb->xsearch[3*i+1],mb->xsearch[3*i+2]);
       }
     }
   }
-  //if (myid==0) {
-  //for(i=0;i<nsend;i++)
-  //  printf("intcount/intcount=%d %d\n",sndPack[i].nints,intcount[i]);
-  //for(i=0;i<nsend;i++)
-  //  printf("intcount/intcount=%d %d\n",sndPack[i].nreals,realcount[i]);
-  //}
+
   free(realcount);
   //
   // exchange data

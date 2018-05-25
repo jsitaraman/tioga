@@ -2,11 +2,11 @@ import sys
 import os
 import time as Time
 
-HOME_DIR = '/home/sitaramanja/code/zefr-integration/'
+HOME = '/p/home/jcrabill/'
 
-TIOGA_DIR = HOME_DIR + '/tioga-HighOrderArtBnd/'
-ZEFR_DIR = HOME_DIR + '/zefr-swig/'
-SAMCART_DIR = HOME_DIR + '/SAMCart/'
+TIOGA_DIR = HOME + 'tioga/'
+ZEFR_DIR = HOME + 'zefr/'
+SAMCART_DIR = HOME + '/opt/SAMCart/'
 
 sys.path.append(TIOGA_DIR+'/bin/')
 sys.path.append(TIOGA_DIR+'/run/')
@@ -19,10 +19,10 @@ import numpy as np
 
 from zefrInterface import zefrSolver
 from tiogaInterface import Tioga
-try:
- from samcartInterface import samcartSolver
-except:
- from samcartStandIn import samcartSolver
+#try:
+from samcartInterface import samcartSolver
+#except:
+#  from samcartStandIn import samcartSolver
 
 Comm = MPI.COMM_WORLD
 rank = Comm.Get_rank()
@@ -72,13 +72,13 @@ with open(inputFile) as f:
             except:
                 parameters[line[0]] = line[1]
 
-integer_vals = ['obesubsteps', 'nsave', 'plot-freq', 'report-freq',
-    'restart-freq', 'force-freq']
+integer_vals = ['obesubsteps', 'nsave', 'plot-freq', 'report-freq', 
+    'restart-freq', 'force-freq', 'adapt-freq']
 for val in integer_vals:
-  try:
-    parameters[val] = int(parameters[val])
-  except:
-    pass
+    try:
+        parameters[val] = int(parameters[val])
+    except:
+        parameters[val] = int(0)
 
 expected_conditions = ['meshRefLength','reyNumber','reyRefLength','refMach',
     'dt','Mach','viscosity','gamma','prandtl','from_restart','moving-grid']
@@ -96,9 +96,9 @@ for cond in expected_conditions:
 # ------------------------------------------------------------
 
 try:
-  zefrInput = parameters['zefrInput']
+    zefrInput = parameters['zefrInput']
 except:
-  print('ZEFR input file ("zefrInput") not given in',inputFile)
+    print('ZEFR input file ("zefrInput") not given in',inputFile)
 
 ZEFR    = zefrSolver(zefrInput,gridID,nGrids)
 TIOGA   = Tioga(gridID,nGrids)
@@ -112,37 +112,12 @@ nStages = int(parameters['nstages'])
 moving = parameters['moving-grid'] == 1
 viscous = parameters['viscous'] == 1
 
-try:
-    repFreq = int(parameters['report-freq'])
-except:
-    repFreq = 0
-    parameters['report-freq'] = 0
-    if rank == 0:
-        print('Parameter report-freq not found; disabling residual reporting.')
-
-try:
-    plotFreq = int(parameters['plot-freq'])
-except:
-    plotFreq = 0
-    parameters['plot-freq'] = 0
-    if rank == 0:
-        print('Parameter plot-freq not found; disabling plotting.')
-
-try:
-    restartFreq = int(parameters['restart-freq'])
-except:
-    restartFreq = 0
-    parameters['restart-freq'] = 0
-    if rank == 0:
-        print('Parameter restart-freq not found; disabling SAMCart restart file writing.')
-
-try:
-    forceFreq = int(parameters['force-freq'])
-except:
-    forceFreq = 0
-    parameters['force-freq'] = 0
-    if rank == 0:
-        print('Parameter force-freq not found; disabling force calculation.')
+# Plotting and output parameters
+repFreq = parameters['report-freq']
+plotFreq = parameters['plot-freq']
+restartFreq = parameters['restart-freq']
+adaptFreq = parameters['adapt-freq']
+forceFreq = parameters['force-freq']
 
 # Process high-level simulation inputs
 ZEFR.sifInitialize(parameters, conditions)
@@ -182,6 +157,7 @@ if parameters['from_restart'] == 'yes':
 
         TIOGA.initIGBPs()
         SAMCART.setIGBPs(TIOGA.igbpdata)
+        TIOGA.initAMRData(SAMCART.gridData)
         TIOGA.performAMRConnectivity()
 
         if parameters['use-gpu']:
@@ -212,15 +188,17 @@ for i in range(iter+1,nSteps+1):
 
         TIOGA.performPointConnectivity()
 
-        nadapt = 0  # TODO
-        if nadapt > 0 and mod(i,nadapt)==0:
-            TIOGA.initIGBPs()
-            SAMCART.setIGBPs(TIOGA.igbpdata)
-            SAMCART.adapt()
+        TIOGA.initIGBPs()
+        SAMCART.setIGBPs(TIOGA.igbpdata)
 
-        TIOGA.performConnectivityAMR()
+    if adaptFreq > 0 and (i-1) % adaptFreq == 0:
+        SAMCART.adapt(i,True)
 
-    start = Time.clock_gettime(0)
+    if moving or (adaptFreq > 0 and (i-1) % adaptFreq == 0):
+        TIOGA.initAMRData(SAMCART.gridData)
+        TIOGA.performAMRConnectivity()
+
+    T0 = Time.clock_gettime(0)
     for j in range(0,nStages):
         # Move grids
         if moving and j != 0:
@@ -239,15 +217,13 @@ for i in range(iter+1,nSteps+1):
         # Finish residual calculation and RK stage advancement
         # (Should include rigid_body_update() if doing 6DOF from ZEFR)
         ZEFR.runSubStepFinish(i,j)
-    stop = Time.clock_gettime(0)
-    #if rank == 0:
-    #    print('ZEFR step wall time: {:3.2e}'.format(stop-start))
-    start = Time.clock_gettime(0)
+    T1 = Time.clock_gettime(0)
     TIOGA.exchangeSolutionAMR() # Interpolate 't^{n+1}' data from ZEFR
     SAMCART.runSubSteps(i)
-    stop = Time.clock_gettime(0)
+    T2 = Time.clock_gettime(0)
     #if rank == 0:
-    #    print('SAMCart step wall time: {:3.2e}'.format(stop-start))
+    #  print('ZEFR time step time: {:3.2e}'.format(T1-T0))
+    #  print('SAMCART time step time: {:3.2e}'.format(T2-T1))
     
     time += dt
 
@@ -264,10 +240,7 @@ for i in range(iter+1,nSteps+1):
         if not Plot:
             # ZEFR plot files are also restart files - don't save twice
             ZEFR.writePlotData(i)
-        try:
-            SAMCART.writeRestartData(i)
-        except:
-            pass
+        SAMCART.writeRestartData(i)
 
     if forceFreq > 0 and (i % forceFreq == 0 or i == nSteps):
         ZEFR.computeForces(i)
@@ -279,7 +252,6 @@ for i in range(iter+1,nSteps+1):
 # Cleanup
 # ------------------------------------------------------------
 
-TIOGA.finish()
 SAMCART.finish()
 
 if rank == 0:

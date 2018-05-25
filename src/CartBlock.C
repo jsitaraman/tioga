@@ -183,52 +183,58 @@ void CartBlock::update(double *qval, int index,int nq,int itype)
 
   
 void CartBlock::preprocess(CartGrid *cg,int itype)
-  {
-    int nfrac;
-    FILE *fp;
-    char intstring[7];
-    char fname[20];  
-    myid=cg->myid;
-    //sprintf(intstring,"%d",100000+myid);
-    //sprintf(fname,"cart_block%s.dat",&(intstring[1]));
-    //fp=fopen(fname,"a");
-    for(int n=0;n<3;n++) xlo[n]=cg->xlo[3*global_id+n];
-    for(int n=0;n<3;n++) dx[n]=cg->dx[3*global_id+n];
-    dims[0]=cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
-    dims[1]=cg->ihi[3*global_id+1]-cg->ilo[3*global_id+1]+1;
-    dims[2]=cg->ihi[3*global_id+2]-cg->ilo[3*global_id+2]+1;
-    //fprintf(fp,"%d %d %d\n",dims[0],dims[1],dims[2]);
-    //fclose(fp);
-    pdegree=cg->porder[global_id];
-    p3=(pdegree+1)*(pdegree+1)*(pdegree+1);
-    nf=cg->nf;
-    qstride=cg->qstride;
-    donor_frac=cg->donor_frac;
-    qnode=cg->qnode;
-    d1=dims[0];
-    d2=dims[0]*dims[1];
-    d3=d2*dims[2];
-    d3nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
-    ibstore=(int *)malloc(sizeof(int)*d3nf);
-    for(int i=0;i<d3nf;i++) ibstore[i]=ibl[i];
-    ndof=(itype==0)?(d3*p3):d3;
-  };
+{
+  int nfrac;
+  FILE *fp;
+  char intstring[7];
+  char fname[20];
+  myid = cg->myid;
+
+  for(int n=0;n<3;n++) xlo[n]=cg->xlo[3*global_id+n];
+  for(int n=0;n<3;n++) dx[n]=cg->dx[3*global_id+n];
+  dims[0] = cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
+  dims[1] = cg->ihi[3*global_id+1]-cg->ilo[3*global_id+1]+1;
+  dims[2] = cg->ihi[3*global_id+2]-cg->ilo[3*global_id+2]+1;
+
+  pdegree = cg->porder[global_id];
+  p3 = (pdegree+1)*(pdegree+1)*(pdegree+1);
+  nf = cg->nf;
+  qstride = cg->qstride;
+  donor_frac = cg->donor_frac;
+  qnode = cg->qnode;
+  d1 = dims[0];
+  d2 = dims[0]*dims[1];
+  d3 = d2*dims[2];
+  d3nf =(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
+
+  free(ibstore);
+  ibstore = (int *)malloc(sizeof(int)*d3nf);
+  for (int i=0;i<d3nf;i++) ibstore[i] = ibl[i];
+
+  ndof = (itype==0) ? (d3*p3):d3;
+};
 
 void CartBlock::initializeLists(void)
 {
- donorList=(DONORLIST **)malloc(sizeof(DONORLIST *)*ndof);
- for(int i=0;i<ndof;i++) donorList[i]=NULL;
+  donorList = (DONORLIST **)malloc(sizeof(DONORLIST *)*ndof);
+  for(int i=0;i<ndof;i++) donorList[i]=NULL;
 }
 
 void CartBlock::clearLists(void)
 {
-  int i;
-  if (donorList) {
-  for(i=0;i<ndof;i++) { deallocateLinkList(donorList[i]); donorList[i]=NULL;}
-  free(donorList);
+  if (donorList)
+  {
+    for (int i = 0; i < ndof; i++)
+    {
+      deallocateLinkList(donorList[i]);
+      donorList[i] = NULL;
+    }
+    free(donorList);
+    donorList = NULL;
   }
+
   deallocateLinkList4(interpList);
-  interpList=NULL;
+  interpList = NULL;
 }
 
 
@@ -238,18 +244,17 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
   int i1,j1,k1;
   int ix[3];
   int index[8];
-  double *rst;
-  rst=(double *)malloc(sizeof(double)*3);
+  double *rst = (double *)malloc(sizeof(double)*3);
   if (interpList==NULL) 
-    {
-      interpList=(INTERPLIST2 *)malloc(sizeof(INTERPLIST2));
-      listptr=interpList;
-    }
+  {
+    interpList = (INTERPLIST2 *)malloc(sizeof(INTERPLIST2));
+    listptr = interpList;
+  }
   else
-    {
-      listptr->next=(INTERPLIST2 *)malloc(sizeof(INTERPLIST2));
-      listptr=listptr->next;
-    }
+  {
+    listptr->next = (INTERPLIST2 *)malloc(sizeof(INTERPLIST2));
+    listptr = listptr->next;
+  }
 
   listptr->next=NULL;
   listptr->inode=NULL;
@@ -355,22 +360,17 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
 void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes,
                                  double receptorRes,int itype)
 {
-  DONORLIST *temp1;
   int ijklmn[6];
   int pointid;
-  temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
+
+  DONORLIST* temp1 = (DONORLIST *)malloc(sizeof(DONORLIST));
+
   if (itype==0) 
   {
     amr_index_to_ijklmn(pdegree,dims[0],dims[1],dims[2],nf,qstride,index,ijklmn);
-    //pointid=ijklmn[5]*(pdegree+1)*(pdegree+1)*d3+
-    //        ijklmn[4]*(pdegree+1)*d3+
-    //        ijklmn[3]*d3+
-    //        ijklmn[2]*d2+
-    //        ijklmn[1]*d1+
-    //        ijklmn[0];
-    pointid=(ijklmn[2]*d2+ijklmn[1]*d1+ijklmn[0])*p3+
-        ijklmn[5]*(pdegree+1)*(pdegree+1)+
-        ijklmn[4]*(pdegree+1)+ijklmn[3];
+    pointid = (ijklmn[2]*d2 + ijklmn[1]*d1 + ijklmn[0])*p3 +
+              ijklmn[5]*(pdegree+1)*(pdegree+1) + ijklmn[4]*(pdegree+1)+ijklmn[3];
+
     if (!(pointid >= 0 && pointid < ndof)) {
       tracei(index);
       tracei(nf);
@@ -386,7 +386,7 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   }
   else
   {
-    pointid=index;
+    pointid = index;
   }
     
   temp1->donorData[0] = senderid;
@@ -395,8 +395,6 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   temp1->donorRes     = cellRes;
   temp1->receptorRes  = receptorRes;
   temp1->cancel=0;
-  //if (myid!=1) return;
-  //printf("%d %d\n",pointid,ndof);
   assert((pointid >= 0 && pointid < ndof));
   insertInList(&(donorList[pointid]),temp1);
 }

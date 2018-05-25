@@ -5,11 +5,18 @@ include $(CONFIG)
 endif
 
 MODULENAME=tioga
-F90= ifort
-#CC = mpicc
-CXX= icpc
+ifeq ($(strip $(INTEL)),YES)
+	F90 = ifort
+	CXX = icpc
+	CC  = icc
+else
+	F90 = gfortran
+	CXX = mpicxx
+	CC  = mpicc
+endif
+
 ifeq ($(strip $(CUC)),)
-	CUC=nvcc
+	CUC = nvcc
 endif
 AR = ar -rvs
 
@@ -90,55 +97,61 @@ ifeq ($(strip $(CUDA)),YES)
 	OBJECTS += $(BINDIR)/highOrder_kernels.o $(BINDIR)/dADT.o $(BINDIR)/dMeshBlock.o
 endif
 
-#LDFLAGS= -L/lib64/ -L/usr/local/intel/10.1.011/fce/lib /usr/local/openmpi/openmpi-1.4.3/x86_64/ib/intel10/lib  -lifcore  -limf -ldl
-LDFLAGS= -L$(MPI_LIB_DIR) -lmpich_intel
-LIBS= -L$(MPI_LIB_DIR) -lmpich_intel
+ifeq ($(strip $(INTEL)),YES)
+	LDFLAGS= -L$(MPI_LIB_DIR)/ -lmpich_intel
+	LIBS= -L$(MPI_LIB_DIR)/ -lmpich_intel
+endif
 
 lib:	$(OBJECTS) $(OBJF90)
-	@mkdir -p bin
 	$(AR) $(BINDIR)/lib$(MODULENAME).a $(OBJECTS) $(OBJF90)
 
 shared:	$(OBJECTS) $(OBJF90)
-	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) -fPIC -shared -o $(BINDIR)/lib$(MODULENAME).so -lc $(LIBS)
 
 swig: CFLAGS += $(SFLAGS)
 swig: $(OBJECTS) $(OBJF90) $(OBJSWIG)
-	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(SFLAGS) $(OBJECTS) $(OBJF90) $(OBJSWIG) -shared -fPIC -o $(BINDIR)/_tioga.so -lc $(LIBS)
 
 convert: $(BINDIR)/convert_wrap.o
 	$(CXX) $(CFLAGS) $(SFLAGS) $(BINDIR)/convert_wrap.o -shared -fPIC -o $(BINDIR)/_convert.so
 
 default: $(OBJECTS) $(OBJF90)
-	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(OBJECTS) $(OBJF90) $(OBJEXEC) $(LDFLAGS) -lm -o $(BINDIR)/$(MODULENAME).exe
 
 $(BINDIR)/%_wrap.cpp: $(INCDIR)/%.i $(INCDIR)/tiogaInterface.h
+	@mkdir -p bin
 	$(SWIG) -c++ -python $(SFLAGS) -o $@ $<
 
 $(BINDIR)/%_wrap.o: $(BINDIR)/%_wrap.cpp 
+	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(INCS) $(SFLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.cu  $(INCDIR)/*.h $(INCDIR)/*.hpp
+	@mkdir -p bin
 	$(CUC) $(INCS) $(CUFLAGS) $(FLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.cpp $(INCDIR)/*.h $(INCDIR)/*.hpp
+	@mkdir -p bin
 	$(CXX) $(INCS) $(CFLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.C $(INCDIR)/*.h $(INCDIR)/*.hpp
+	@mkdir -p bin
 	$(CXX) $(INCS) $(CFLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.c $(INCDIR)/*.h $(INCDIR)/*.hpp
+	@mkdir -p bin
 	$(CXX) $(INCS) $(CFLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.F90 $(INCDIR)/*.h $(INCDIR)/*.hpp
+	@mkdir -p bin
 	$(F90) $(FFLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.f90 $(INCDIR)/*.h $(INCDIR)/*.hpp
+	@mkdir -p bin
 	$(F90) $(FFLAGS) -c $< -o $@
 
 $(BINDIR)/%.o: $(SRCDIR)/%.f $(INCDIR)/*.h $(INCDIR)/*.hpp
+	@mkdir -p bin
 	$(F90) $(FFLAGS) -c $< -o $@
 
 .PHONY: clean

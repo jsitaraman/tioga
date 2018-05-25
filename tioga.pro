@@ -66,4 +66,5 @@ HEADERS += \
     include/convert.i
 
 DISTFILES += \
-    run/tiogaInterface.py
+    run/tiogaInterface.py \
+    zefr+samcart/run_zefr.py

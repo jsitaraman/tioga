@@ -121,10 +121,6 @@ class Tioga:
         nFaceCell = arrayToIntPtr(gridData['nFaceCell'][0])
 
         iblank = arrayToIntPtr(gridData['iblanking'][0])
-#        print("nwall = {}".format(gridData['wallnode'][0].shape[0]))
-#        print("nobc = {}".format(gridData['obcnode'][0].shape[0]))
-        #pickle.dump(gridData['wallnode'],open('wallNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
-        #pickle.dump(gridData['obcnode'],open('obcNode'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         overNodes = arrayToIntPtr(gridData['obcnode'][0])
         wallNodes = arrayToIntPtr(gridData['wallnode'][0])
 
@@ -227,8 +223,12 @@ class Tioga:
 
             tb.tioga_set_stream_handle(gridData['cuStream'],gridData['cuEvent'])
             
+    def initIGBPs(self):
+        # Use Tioga's knowledge of overset boundary nodes to get IGBP list
+        self.igbp_ptr = tg.tioga_get_igbp_list();
+        self.igbpdata = ptrToArray(self.igbp_ptr, self.gridData['obcnode'][0].shape[0], 4)
+
     def initAMRData(self,gridData):
-        #pickle.dump(gridData,open('obeGridData'+str(MPI.COMM_WORLD.Get_rank()),'wb'))
         ngrids=len(gridData['gridParam'])
         local2global_tmp=np.zeros((ngrids,),'i')
         local2global=np.zeros((ngrids,),'i')
@@ -244,7 +244,7 @@ class Tioga:
         qnodein=0.0
         qnodeinC=arrayToDblPtr(np.array([qnodein,0.0],'d'))
         qnodesize=1
-        #
+
         idata=np.zeros((ngrids*11),'i')
         rdata=np.zeros((ngrids*6),'d')
         for i in range(ngrids):
@@ -270,7 +270,7 @@ class Tioga:
         idataC=arrayToIntPtr(idata)
         rdataC=arrayToDblPtr(rdata)
         tg.tioga_register_amr_global_data_(nf,qstride,qnodeinC,idataC,rdataC,ngrids,qnodesize)
-        #
+
         npatches=len(gridData['qParam'])
         tg.tioga_register_amr_patch_count_(npatches)
         for i in range(npatches):
@@ -279,12 +279,8 @@ class Tioga:
             iblankC=arrayToIntPtr(gridData['iblanking'][i])
             tg.tioga_register_amr_local_data_(i,global_id,iblankC,qC)
 
-        # Use Tioga's knowledge of overset boundary nodes to get IGBP list
-        self.igbp_ptr = tg.tioga_get_igbp_list();
-        self.igbpdata = ptrToArray(self.igbp_ptr, self.gridData['obcnode'][0].shape[0], 4)
-
     def performAMRConnectivity(self):
         tg.tioga_performconnectivity_amr_()
         
-    def finish(self,step):
+    def finish(self):
         tg.tioga_delete_()

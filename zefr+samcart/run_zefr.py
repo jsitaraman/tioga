@@ -1,17 +1,16 @@
 import sys
 import os
 
-TIOGA_BIN_DIR = '/home/sitaramanja/code/zefr-integration/tioga-HighOrderArtBnd/bin'
-TIOGA_RUN_DIR = '/home/sitaramanja/code/zefr-integration/tioga-HighOrderArtBnd/run'
-ZEFR_BIN_DIR = '/home/sitaramanja/code/zefr-integration/zefr-swig/bin'
-ZEFR_RUN_DIR = '/home/sitaramanja/code/zefr-integration/zefr-swig/run'
-CONVERT_DIR = '/home/sitaramanja/code/zefr-integration/zefr-swig/external/'
-SAMCART_DIR = '/home/sitaramanja/code/zefr-integration/SAMCart/'
-sys.path.append(TIOGA_BIN_DIR)
-sys.path.append(TIOGA_RUN_DIR)
-sys.path.append(ZEFR_BIN_DIR)
-sys.path.append(ZEFR_RUN_DIR)
-sys.path.append(CONVERT_DIR)
+HOME_DIR = '/home/sitaramanja/code/zefr-integration/'
+
+TIOGA_DIR = HOME_DIR + '/tioga-HighOrderArtBnd/'
+ZEFR_DIR = HOME_DIR + '/zefr-swig/'
+SAMCART_DIR = HOME_DIR + '/SAMCart/'
+
+sys.path.append(TIOGA_DIR+'/bin/')
+sys.path.append(TIOGA_DIR+'/run/')
+sys.path.append(ZEFR_DIR+'/bin/')
+sys.path.append(ZEFR_DIR+'/run/')
 sys.path.append(SAMCART_DIR)
 
 from mpi4py import MPI
@@ -74,7 +73,7 @@ with open(inputFile) as f:
                 parameters[line[0]] = line[1]
 
 expected_conditions = ['meshRefLength','reyNumber','reyRefLength','refMach',
-    'reyRefLength','dt','Mach','from_restart','moving-grid']
+    'dt','Mach','viscosity','gamma','prandtl','from_restart','moving-grid']
 
 conditions = {}
 for cond in expected_conditions:
@@ -95,7 +94,7 @@ except:
 
 ZEFR = zefrSolver(zefrInput,gridID,nGrids)
 TIOGA = Tioga(gridID,nGrids)
-SAMCART=samcartSolver()
+SAMCART = samcartSolver()
 dt = parameters['dt']
 
 nSteps = int(parameters['nsteps'])
@@ -119,6 +118,14 @@ except:
     parameters['plot-freq'] = 0
     if rank == 0:
         print('Parameter plot-freq not found; disabling plotting.')
+
+try:
+    restartFreq = int(parameters['restart-freq'])
+except:
+    restartFreq = 0
+    parameters['restart-freq'] = 0
+    if rank == 0:
+        print('Parameter restart-freq not found; disabling SAMCart restart file writing.')
 
 try:
     forceFreq = int(parameters['force-freq'])
@@ -145,7 +152,8 @@ TIOGA.initData(ZEFR.gridData, ZEFR.callbacks)
 # ------------------------------------------------------------
 TIOGA.preprocess()
 TIOGA.performConnectivity()
-#SAMCART.setIGBPs(TIOGA.igbpdata)
+TIOGA.initIGBPs()
+SAMCART.setIGBPs(TIOGA.igbpdata)
 SAMCART.initData()
 TIOGA.initAMRData(SAMCART.gridData)
 TIOGA.performAMRConnectivity()
@@ -163,6 +171,10 @@ if parameters['from_restart'] == 'yes':
         ZEFR.deformPart2(time,initIter)
         TIOGA.unblankPart2()
 
+        TIOGA.initIGBPs()
+        SAMCART.setIGBPs(TIOGA.igbpdata)
+        TIOGA.performAMRConnectivity()
+
         if parameters['use-gpu']:
             ZEFR.updateBlankingGpu()
 else:
@@ -172,9 +184,8 @@ else:
 iter = initIter
 
 ZEFR.writePlotData(iter)
-SAMCART.finish()
-MPI.Finalize()
-sys.exit()
+
+TIOGA.dataUpdateAMR()
 
 # ------------------------------------------------------------
 # Run the simulation
@@ -190,10 +201,13 @@ for i in range(iter+1,nSteps+1):
 
         TIOGA.performPointConnectivity()
 
-    #if mod(i,nadapt)==0:
-       #SAMCART.setIGBPs(TIOGA.igbpdata)
-       #SAMCART.adapt()
-    #TIOGA.performConnectivityAMR()
+        nadapt = 0  # TODO
+        if nadapt > 0 and mod(i,nadapt)==0:
+            TIOGA.initIGBPs()
+            SAMCART.setIGBPs(TIOGA.igbpdata)
+            SAMCART.adapt()
+
+        TIOGA.performConnectivityAMR()
 
     for j in range(0,nStages):
         # Move grids
@@ -201,11 +215,11 @@ for i in range(iter+1,nSteps+1):
             ZEFR.moveGrid(i,j)
             TIOGA.performPointConnectivity()
 
-        # Have ZEFR extrapolate solution so it won't overwrite interpolated data
+        # Have ZEFR extrapolate solution first so it won't overwrite interpolated data
         ZEFR.runSubStepStart(i,j)
 
         # Interpolate solution
-        TIOGA.exchangeSolution()
+        TIOGA.exchangeSolutionAMR()
 
         # Calculate first part of residual, up to corrected gradient
         ZEFR.runSubStepMid(i,j)
@@ -213,21 +227,38 @@ for i in range(iter+1,nSteps+1):
         # Finish residual calculation and RK stage advancement
         # (Should include rigid_body_update() if doing 6DOF from ZEFR)
         ZEFR.runSubStepFinish(i,j)
-    #SAMCART.runSubSteps()
-    #TIOGA.dataUpdateAMR()
+    TIOGA.exchangeSolutionAMR() # Interpolate 't^{n+1}' data from ZEFR
+    SAMCART.runSubSteps(i)
     
     time += dt
 
     if repFreq > 0 and (i % repFreq == 0 or i == nSteps or i == initIter+1):
         ZEFR.reportResidual(i)
+
+    Plot = False
     if plotFreq > 0 and (i % plotFreq == 0 or i == nSteps):
+        Plot = True
         ZEFR.writePlotData(i)
+        SAMCART.writePlotData(i)
+
+    if restartFreq > 0 and (i % restartFreq == 0 or i == nSteps):
+        if Plot == False:
+            # ZEFR Plot files are also restart files - don't save twice
+            ZEFR.writePlotData(i)
+        SAMCART.writeRestartData(i)
+
     if forceFreq > 0 and (i % forceFreq == 0 or i == nSteps):
         ZEFR.computeForces(i)
         forces = ZEFR.getForcesAndMoments()
         if rank == 0:
             print('Iter {0}: Forces {1}'.format(i,forces))
 
+# ------------------------------------------------------------
+# Cleanup
+# ------------------------------------------------------------
+
+TIOGA.finish()
 SAMCART.finish()
+
 if rank == 0:
     print(" ***************** RUN COMPLETE ***************** ")

@@ -560,8 +560,8 @@ float lineSegmentDistance(float *p1, float *p2, float *p3, float *p4, float *dx)
   float s = (den < 1e-7f) ? 0.0f : (uv*vw - vv*uw) / den;
   float t = (den < 1e-7f) ? uw / uv: (uu*vw - uv*uw) / den;
 
-  s = fmin(fmax(s, 0.f), 1.f);
-  t = fmin(fmax(t, 0.f), 1.f);
+  s = fminf(fmaxf(s, 0.f), 1.f);
+  t = fminf(fmaxf(t, 0.f), 1.f);
 
   // vec = closest distance from segment 1 to segment 2
   for (int i = 0; i < 3; i++)
@@ -868,7 +868,7 @@ float triTriDistanceVec(float* __restrict__ T1, float* __restrict__ T2,
   if (s2 < t1 || t2 < s1)
   {
     // No overlap; return min of dt*L and minDist
-    float dt = fmin(fabs(t1-s2), fabs(s1-t2));
+    float dt = fminf(fabs(t1-s2), fabs(s1-t2));
     float dl = 0;
     for (int d = 0; d < 3; d++)
       dl += (dt*L[d])*(dt*L[d]);
@@ -1165,7 +1165,7 @@ float triTriDistance(float* __restrict__ T1, float* __restrict__ T2, float tol)
   if (s2 < t1 || t2 < s1)
   {
     // No overlap; return min of dt*L and minDist
-    float dt = fmin(fabs(t1-s2), fabs(s1-t2));
+    float dt = fminf(fabs(t1-s2), fabs(s1-t2));
     float dl = 0;
     for (int d = 0; d < 3; d++)
       dl += (dt*L[d])*(dt*L[d]);
@@ -1858,7 +1858,7 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
   // Use hole map block size as ref. length [times ~sqrt(3)]
   float href = 0.f;
   for (int i = 0; i < 3; i++)
-    href = fmax(href, 2.f*(mb.hm_extents[i+3]-mb.hm_extents[i]) / mb.hm_nx[i]);
+    href = fmaxf(href, 2.f*(mb.hm_extents[i+3]-mb.hm_extents[i]) / mb.hm_nx[i]);
 
   // Get element nodes
   float xv[nvert*3];
@@ -1948,7 +1948,7 @@ void filterFaces(dMeshBlock mb, dvec<float> ele_bbox, int nCut,
   // Use hole map block size as ref. length [times ~sqrt(3)]
   float href = 0.f;
   for (int i = 0; i < 3; i++)
-    href = fmax(href, 2.f*(mb.hm_extents[i+3]-mb.hm_extents[i]) / mb.hm_nx[i]);
+    href = fmaxf(href, 2.f*(mb.hm_extents[i+3]-mb.hm_extents[i]) / mb.hm_nx[i]);
 
   // Get face nodes
   float fxv[nvertf*3];

@@ -158,6 +158,13 @@ class Tioga:
 
         gridType = gridData['gridCutType'][0]
 
+        # Store some variables for future use
+        self.nover = nover
+        self.nwall = nwall
+        self.ncells = ncells
+        self.nnodes = nnodes
+
+        # Begin setting up Tioga class
         tg.tioga_registergrid_data_(btag, nnodes, xyz, iblank,
             nwall, nover, wallNodes, overNodes, nCellTypes, nVertCell,
             nFaceCell, ncells, c2v)
@@ -226,7 +233,8 @@ class Tioga:
     def initIGBPs(self):
         # Use Tioga's knowledge of overset boundary nodes to get IGBP list
         self.igbp_ptr = tg.tioga_get_igbp_list();
-        self.igbpdata = ptrToArray(self.igbp_ptr, self.gridData['obcnode'][0].shape[0], 4)
+        self.nigbp = tg.tioga_get_n_igbps();
+        self.igbpdata = ptrToArray(self.igbp_ptr, self.nigbp*4)
 
     def initAMRData(self,gridData):
         ngrids=len(gridData['gridParam'])

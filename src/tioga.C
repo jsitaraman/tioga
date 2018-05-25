@@ -77,6 +77,7 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   if (nnodes > 0) nblocks=1;
   mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,ncf,nc,vconn);
   mb->myid=myid;
+  mb->nproc=nproc;
   mytag=btag;
 }
 

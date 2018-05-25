@@ -1,5 +1,6 @@
 import sys
 import os
+import time as Time
 
 HOME_DIR = '/home/sitaramanja/code/zefr-integration/'
 
@@ -16,7 +17,6 @@ sys.path.append(SAMCART_DIR)
 from mpi4py import MPI
 import numpy as np
 
-from convert import *
 from zefrInterface import zefrSolver
 from tiogaInterface import Tioga
 try:
@@ -72,6 +72,14 @@ with open(inputFile) as f:
             except:
                 parameters[line[0]] = line[1]
 
+integer_vals = ['obesubsteps', 'nsave', 'plot-freq', 'report-freq',
+    'restart-freq', 'force-freq']
+for val in integer_vals:
+  try:
+    parameters[val] = int(parameters[val])
+  except:
+    pass
+
 expected_conditions = ['meshRefLength','reyNumber','reyRefLength','refMach',
     'dt','Mach','viscosity','gamma','prandtl','from_restart','moving-grid']
 
@@ -92,9 +100,10 @@ try:
 except:
   print('ZEFR input file ("zefrInput") not given in',inputFile)
 
-ZEFR = zefrSolver(zefrInput,gridID,nGrids)
-TIOGA = Tioga(gridID,nGrids)
+ZEFR    = zefrSolver(zefrInput,gridID,nGrids)
+TIOGA   = Tioga(gridID,nGrids)
 SAMCART = samcartSolver()
+
 dt = parameters['dt']
 
 nSteps = int(parameters['nsteps'])
@@ -184,8 +193,10 @@ else:
 iter = initIter
 
 ZEFR.writePlotData(iter)
+SAMCART.writePlotData(iter)
 
-TIOGA.dataUpdateAMR()
+# Initialize interpolated fringe node data
+TIOGA.exchangeSolutionAMR()
 
 # ------------------------------------------------------------
 # Run the simulation
@@ -209,6 +220,7 @@ for i in range(iter+1,nSteps+1):
 
         TIOGA.performConnectivityAMR()
 
+    start = Time.clock_gettime(0)
     for j in range(0,nStages):
         # Move grids
         if moving and j != 0:
@@ -227,8 +239,15 @@ for i in range(iter+1,nSteps+1):
         # Finish residual calculation and RK stage advancement
         # (Should include rigid_body_update() if doing 6DOF from ZEFR)
         ZEFR.runSubStepFinish(i,j)
+    stop = Time.clock_gettime(0)
+    #if rank == 0:
+    #    print('ZEFR step wall time: {:3.2e}'.format(stop-start))
+    start = Time.clock_gettime(0)
     TIOGA.exchangeSolutionAMR() # Interpolate 't^{n+1}' data from ZEFR
     SAMCART.runSubSteps(i)
+    stop = Time.clock_gettime(0)
+    #if rank == 0:
+    #    print('SAMCart step wall time: {:3.2e}'.format(stop-start))
     
     time += dt
 
@@ -242,10 +261,13 @@ for i in range(iter+1,nSteps+1):
         SAMCART.writePlotData(i)
 
     if restartFreq > 0 and (i % restartFreq == 0 or i == nSteps):
-        if Plot == False:
-            # ZEFR Plot files are also restart files - don't save twice
+        if not Plot:
+            # ZEFR plot files are also restart files - don't save twice
             ZEFR.writePlotData(i)
-        SAMCART.writeRestartData(i)
+        try:
+            SAMCART.writeRestartData(i)
+        except:
+            pass
 
     if forceFreq > 0 and (i % forceFreq == 0 or i == nSteps):
         ZEFR.computeForces(i)

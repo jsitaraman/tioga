@@ -53,6 +53,7 @@ void tioga_register_amr_patch_count_(int npatches);
 void tioga_register_amr_local_data_(int ipatch,int global_id,int *iblank,double *q);
 
 double* tioga_get_igbp_list(void);
+int tioga_get_n_igbps(void);
 
 void tioga_preprocess_grids_(void);
 

@@ -6,6 +6,7 @@ viscous      1
 
 zefrInput  zefr/input_sphere
 porder 3
+pinf   0.7142857142857143
 rinf   1.4
 ainf   1.00
 meshRefLength  1.0
@@ -14,6 +15,7 @@ reyRefLength   1.0
 dt             .0001
 Mach           .2
 refMach        .2
+
 from_restart   no
 restartstep    100
 restart-time   .1
@@ -23,6 +25,8 @@ nstages 4
 
 report-freq   10
 plot-freq     100
+force-freq    0
+restart-freq  100
 
 use-gpu  0
 #

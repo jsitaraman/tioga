@@ -367,6 +367,7 @@ class tioga
   void outputStatistics(void);
 
   void get_igbp_ptr(double *& igbp_ptr);
+  int get_n_igbps() { return mb->getNIgbps(); }
 
 #ifdef _GPU
   void setupCommBuffersGPU(void);

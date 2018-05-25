@@ -153,6 +153,11 @@ extern "C" {
     return igbp_ptr;
   }
 
+  int tioga_get_n_igbps(void)
+  {
+    return tg->get_n_igbps();
+  }
+
   void tioga_preprocess_grids_(void)
   {
     tg->profile();

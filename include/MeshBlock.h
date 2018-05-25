@@ -95,6 +95,7 @@ private:
   int *obcnode;     /** < overset boundary node indices */
   //
   std::vector<double> nodeRes;  /** < node resolution  */
+  std::vector<double> obcRes;  /** < ref. mesh length at overset bndry nodes */
   double *userSpecifiedNodeRes;
   double *userSpecifiedCellRes;
   std::vector<double> elementBbox; /** < bounding box of the elements */
@@ -294,7 +295,7 @@ private:
   bool haveDonors = false;
 
   int donorCount;
-  int myid;
+  int myid,nproc;
   std::vector<double> cellRes;  /** < resolution for each cell */
   int ntotalPoints;        /**  total number of extra points to interpolate */
   int ihigh;               /** High-order flag for current rank */
@@ -658,6 +659,7 @@ private:
   void setCartIblanks(void);
 
   void getIgbpData(double *& igbp_ptr);
+  int getNIgbps(void) { return igbpdata.size()/4; }
 
   void setupADT(void);
 

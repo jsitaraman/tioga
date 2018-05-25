@@ -207,6 +207,11 @@ void MeshBlock::tagBoundary(void)
     iflag[i] = 0;
   }
 
+  // Compute DS for overset boundary nodes
+  obcRes.resize(nobc);
+  for (int i = 0; i < nobc; i++)
+    obcRes[i] = std::cbrt(nodeRes[obcnode[i]]);
+
   // now tag the boundary nodes
   // reuse the iflag array
   if (iartbnd)
@@ -530,16 +535,40 @@ void MeshBlock::rebuildADT(void)
 void MeshBlock::getIgbpData(double *& igbp_ptr)
 {
   // Setup the Inter-Grid Boundary Point (IGBP) data list
-  igbpdata.resize(nobc*4);
+  std::vector<double> loc_igbpdata(nobc*4);
 
   for (int i = 0; i < nobc; i++)
   {
     const int iv = obcnode[i];
-    igbpdata[4*i  ] = x[3*iv  ];
-    igbpdata[4*i+1] = x[3*iv+1];
-    igbpdata[4*i+2] = x[3*iv+2];
-    igbpdata[4*i+3] = nodeRes[iv];
+    loc_igbpdata[4*i  ] = x[3*iv  ];
+    loc_igbpdata[4*i+1] = x[3*iv+1];
+    loc_igbpdata[4*i+2] = x[3*iv+2];
+    loc_igbpdata[4*i+3] = obcRes[i];
   }
+
+  // Get the number of obc nodes on each processor (for later communication)
+  std::vector<int> nobc_proc(nproc);
+  MPI_Allgather(&nobc,1,MPI_INT,nobc_proc.data(),1,MPI_INT,MPI_COMM_WORLD);
+
+  // Counts & Offset data needed for Allgatherv
+  std::vector<int> recvCnts(nproc);
+  std::vector<int> recvDisp(nproc);
+  for (int i = 0; i < nproc; i++)
+  {
+    recvCnts[i] = nobc_proc[i]*4;
+    if (i > 0)
+      recvDisp[i] = recvDisp[i-1] + recvCnts[i-1];
+  }
+
+  // Global array of IGBP data
+  int nobc_g = 0;
+  for (int i = 0; i < nproc; i++)
+    nobc_g += nobc_proc[i];
+
+  igbpdata.resize(nobc_g*4);
+
+  // Get obc nodes from all ranks
+  MPI_Allgatherv(loc_igbpdata.data(), nobc*4, MPI_DOUBLE, igbpdata.data(), recvCnts.data(), recvDisp.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
   igbp_ptr = igbpdata.data();
 }

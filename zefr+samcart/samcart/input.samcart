@@ -7,7 +7,7 @@ GP {
    timeacc        = TRUE
    dt             = 0.0002 
    cfl            = 1.0
-   nsubsteps      = 7
+   nsubsteps      = 0
    from_restart   = FALSE  // whether to start from restart
    restart_step   = -1 // if from_restart=TRUE, step to start from
 
@@ -22,12 +22,12 @@ GP {
 // Settings formerly in input.arc3d in Hv5 and before
 Cart {
    fsmach = 0.2   // Freestream Mach number
-   alpha  = 0.0            // Angle of attack
-   beta   = 0.0             // sideslip
+   alpha  = 0.0   // Angle of attack
+   beta   = 0.0   // sideslip
 
-   ilhs     =  1     //  lhs option (1=lusgs, 2=global gs, 5=expl rk3)
-   irhs     =  0           //  rhs option (0=5th central+4th vis, 2=5thO-weno, 4=3rdO-mscl)
-   nsweeps  = 1             //  if using global lhs option (ilhs=2)
+   ilhs     = 5   //  lhs option (1=lusgs, 2=global gs, 5=expl rk3)
+   irhs     = 4   //  rhs option (0=5th central+4th vis, 2=5thO-weno, 4=3rdO-mscl)
+   nsweeps  = 0   //  if using global lhs option (ilhs=2)
 
    // Boundary conditions
    //    -1 = freestream
@@ -37,14 +37,14 @@ Cart {
    bcs_hi   = -1 , -1 , -1
 
    // Viscous/Turbulence model entries
-   ivis     =  1         // =0 Euler, =1 Navier-Stokes
-   iturb    = 0         //  =0 Laminar, =1 RANS-SA, =2 RANS-DES 
-   refRey   = 1140000.0      // Reference Reynolds number
-   refMach  = 0.2          // Reference Mach number
-   refMu    = 1.78865642077e-05     // Reference dynamic viscosity
-   refPrandtl  = 0.72           // Reference Prandtl number
-   refRgas  = 287.05    // Reference Gas constant
-   mut0     = 0.01               // SA turb model freestream MuT
+   ivis     = 1          // =0 Euler, =1 Navier-Stokes
+   iturb    = 0          // =0 Laminar, =1 RANS-SA, =2 RANS-DES 
+   refRey   = 5000.      // Reference Reynolds number
+   refMach  = 0.2        // Reference Mach number
+   refMu    = 1.78865642077e-05  // Reference dynamic viscosity
+   refPrandtl = 0.72     // Reference Prandtl number
+   refRgas  = 286.9      // Reference Gas constant
+   mut0     = 0.01       // SA turb model freestream MuT
 
 
    // Hover terms
@@ -60,7 +60,7 @@ Cart {
 
 // IO parameters
 IO {
-   viz_file_output_type = "fv"  // options are "overgrid", "fv", "visit"
+   viz_file_output_type = "fv"  // options are "overgrid", "fv"
    viz_file_precision   = 1     // 1=single, 2=double
    viz_write_delq       = FALSE
    viz_write_err        = FALSE
@@ -74,10 +74,10 @@ IO {
 AdaptiveMeshing {
    // coarse level inputs
    coarse_domain = 60 , 40 , 40 // COARSE case 
-   xlo           = -2.0 , -2.0 , -2.0  // lower far-field domain extents
-   xhi           =  4.0 ,  2.0 ,  2.0  // upper far-field domain extents
+   xlo           = -5.0 , -5.0 , -5.0  // lower far-field domain extents
+   xhi           = 10.0 ,  5.0 ,  5.0  // upper far-field domain extents
 
-   max_levels       = 4     // max grid levels
+   max_levels       = 15     // max grid levels
 
    // Adaptation inputs
    adapt         = FALSE  // whether to do dynamic adaptation
@@ -88,52 +88,53 @@ AdaptiveMeshing {
 
    // Geometry refinement
    geom_refinement       = TRUE   // whether to do geometry refinement
-   auto_compute_nlevels  = TRUE  // use igbps to determine finest level
+   auto_compute_nlevels  = TRUE   // use igbps to determine finest level
    addnl_refinement_levels = 1    // optional additional finer levels
                                   // use -1 for coarser
-   geom_max_levels       = 15      // max levels applied for geometry refinement
-   use_finest_for_igbps  = TRUE   // apply finest geom level to all igbps
+   geom_max_levels       = 15     // max levels applied for geometry refinement
+   use_finest_for_igbps  = FALSE  // apply finest geom level to all igbps
                                   // (false means refine to scaled igbp spacing)
-   ds_scale_factor       = 1.0    // igbp ds scale factor (used if above=false)
+   ds_scale_factor       = 0.25   // igbp ds scale factor (used if above=false)
+                                  // With high-order code: set to 1/(porder+1)
 
    // Fixed refinement
-   fixed_refinement      = TRUE  // whether to do fixed refinement
+   fixed_refinement      = FALSE  // whether to do fixed refinement
    num_fixed_regions     = 1
    region_0 {
-   dx = 0.0001
-   xlo = -0.2, -0.2, -0.2
-   xhi = 0.4, 0.2, 0.2
+     dx = 0.0001
+     xlo = -2.0, -2.0, -2.0
+     xhi = 4.0, 2.0, 2.0
    }
 
    // Solution refinement
-   adapt_nstart_soln = 1440     // step to start solution adaptation
-   soln_tagmethod    = -1  // -1=gamr, 3=vorticity, 4=q-crit
+   adapt_nstart_soln = 1440  // step to start solution adaptation
+   soln_tagmethod    = -1    // -1=gamr, 3=vorticity, 4=q-crit
    soln_threshold    = 1.0
    use_gamr          = TRUE
 
    // Tag cutoff inputs
    //tag_cutoff_zlo     = -225.
-   tag_cutoff_xlo         = -3.0
-   tag_cutoff_ylo         = -3.0
-   tag_cutoff_zlo         = -3.0
-   tag_cutoff_xhi          = 4.0
-   tag_cutoff_yhi          = 3.0
-   tag_cutoff_zhi          = 3.0
+   tag_cutoff_xlo       = -3.0
+   tag_cutoff_ylo       = -3.0
+   tag_cutoff_zlo       = -3.0
+   tag_cutoff_xhi       = 4.0
+   tag_cutoff_yhi       = 3.0
+   tag_cutoff_zhi       = 3.0
 
    // grid gen inputs
    periodic             = FALSE, FALSE, FALSE
    max_pts_per_proc     = 2000000 // max allowed points per processor
-   largest_block        = 50 // largest allowed domain block (NxNxN blk)
-   smallest_block       = 8 // smallest   "      "      "
-   cluster_eff          = 0.70    // block cluster control
-   combine_eff          = 0.85    // block merge control
+   largest_block        = 50    // largest allowed domain block (NxNxN blk)
+   smallest_block       = 8     // smallest   "      "      "
+   cluster_eff          = 0.70  // block cluster control
+   combine_eff          = 0.85  // block merge control
    refine_ratio         = 2,2,2,2,2,2,2   // refine ratio between levels
-   tag_buffer           = 4  // size of buffer around solution tags
-   nesting_buffer       = 4  // buffer between grid levels
-   blank_overlap        = TRUE    // blank coarse levels overlapped by finer
+   tag_buffer           = 4     // size of buffer around solution tags
+   nesting_buffer       = 4     // buffer between grid levels
+   blank_overlap        = TRUE  // blank coarse levels overlapped by finer
 
    // orphan checks
-   do_iblank_checks      = TRUE // run checks for orphans, incomplete fringes
+   do_iblank_checks      = TRUE  // run checks for orphans, incomplete fringes
    write_orphans         = FALSE // write to orphans.out.<procid>
    orphans_warning       = 1000  // print a warning if orphans > this number
    do_orphan_averaging   = TRUE  // apply averaging on detected orphans

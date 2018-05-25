@@ -10,7 +10,7 @@ ifeq ($(strip $(INTEL)),YES)
 	CXX = icpc
 	CC  = icc
 else
-	F90 = gfortran
+	F90 = mpif90
 	CXX = mpicxx
 	CC  = mpicc
 endif
@@ -19,13 +19,15 @@ ifeq ($(strip $(CUC)),)
 	CUC = nvcc
 endif
 AR = ar -rvs
+LD = $(CXX)
+ld=$(CXX)
 
 SWIG = $(SWIG_BIN)/swig
 
-CFLAGS = -std=c++11 -fPIC -rdynamic 
-CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
+CFLAGS = --std=c++11 -fPIC -rdynamic 
+CUFLAGS = --std=c++11 --default-stream per-thread -Xcompiler -fPIC
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
-SFLAGS = -I$(PYTHON_INC_DIR)/ -I$(MPI4PY_INC_DIR)/ -I$(NUMPY_INC_DIR)/ -I$(NUMPY_INC_DIR)/
+SFLAGS = -I$(strip $(PYTHON_INC_DIR))/ -I$(strip $(MPI4PY_INC_DIR))/ -I$(strip $(NUMPY_INC_DIR))/
 
 # Intel compiler flags: 
 # Floating-point exception; underflow gives 0.0: -fpe0
@@ -100,6 +102,11 @@ endif
 ifeq ($(strip $(INTEL)),YES)
 	LDFLAGS= -L$(MPI_LIB_DIR)/ -lmpich_intel
 	LIBS= -L$(MPI_LIB_DIR)/ -lmpich_intel
+else
+ifeq ($(CXX),g++)
+	# If CXX is not mpicxx, need to manually add MPI library
+	LIBS += -L$(MPI_LIB_DIR)/ -lmpi -Wl,-rpath=$(MPI_LIB_DIR)/
+endif
 endif
 
 lib:	$(OBJECTS) $(OBJF90)

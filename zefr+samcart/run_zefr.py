@@ -186,8 +186,6 @@ for i in range(iter+1,nSteps+1):
         ZEFR.deformPart2(time,i)
         TIOGA.unblankPart2()        # Set final iblank & do unblanking if needed
 
-        TIOGA.performPointConnectivity()
-
         TIOGA.initIGBPs()
         SAMCART.setIGBPs(TIOGA.igbpdata)
 
@@ -200,11 +198,6 @@ for i in range(iter+1,nSteps+1):
 
     T0 = Time.clock_gettime(0)
     for j in range(0,nStages):
-        # Move grids
-        if moving and j != 0:
-            ZEFR.moveGrid(i,j)
-            TIOGA.performPointConnectivity()
-
         # Have ZEFR extrapolate solution first so it won't overwrite interpolated data
         ZEFR.runSubStepStart(i,j)
 
@@ -230,23 +223,24 @@ for i in range(iter+1,nSteps+1):
     if repFreq > 0 and (i % repFreq == 0 or i == nSteps or i == initIter+1):
         ZEFR.reportResidual(i)
 
-    Plot = False
-    if plotFreq > 0 and (i % plotFreq == 0 or i == nSteps):
-        Plot = True
-        ZEFR.writePlotData(i)
-        SAMCART.writePlotData(i)
-
+    Restart = False
     if restartFreq > 0 and (i % restartFreq == 0 or i == nSteps):
-        if not Plot:
-            # ZEFR plot files are also restart files - don't save twice
-            ZEFR.writePlotData(i)
+        Restart = True
+        ZEFR.writePlotData(i)
         SAMCART.writeRestartData(i)
+
+    if plotFreq > 0 and (i % plotFreq == 0 or i == nSteps):
+        if not Restart:
+            # ZEFR plot files are restart files; and SAMCART dumps 
+            # plot files whenever it dumps restart files
+            ZEFR.writePlotData(i)
+            SAMCART.writePlotData(i)
 
     if forceFreq > 0 and (i % forceFreq == 0 or i == nSteps):
         ZEFR.computeForces(i)
-        forces = ZEFR.getForcesAndMoments()
-        if rank == 0:
-            print('Iter {0}: Forces {1}'.format(i,forces))
+        #forces = ZEFR.getForcesAndMoments()
+        #if rank == 0:
+        #    print('Iter {0}: Forces {1}'.format(i,forces))
 
 # ------------------------------------------------------------
 # Cleanup

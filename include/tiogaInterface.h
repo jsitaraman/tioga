@@ -33,6 +33,11 @@
 //
 extern "C" {
 
+struct callbackFuncs
+{
+  void (*setTransform)(double*, double*, int);
+};
+
 void tioga_init_f90_(int *scomm);
 void tioga_init_(MPI_Comm tcomm);
 
@@ -129,4 +134,7 @@ void tioga_delete_(void);
 void tioga_set_stream_handle(void* stream, void* event);
 
 void tioga_set_device_geo_data(double* xyz, double* coord, int* ibc, int* ibf);
+
+callbackFuncs tioga_get_callbacks(void);
+
 } /* extern "C" */

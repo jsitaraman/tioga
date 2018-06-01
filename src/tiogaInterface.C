@@ -364,6 +364,14 @@ extern "C" {
     tg->unblankPart2(nvar);
   }
 
+  callbackFuncs tioga_get_callbacks(void)
+  {
+    callbackFuncs cbs;
+    cbs.setTransform = tioga_set_transform;
+    printf("PTR = %p\n",cbs.setTransform); /// DEBUGGING
+    return cbs;
+  }
+
   void tioga_delete_(void)
    {
     delete tg;

@@ -290,5 +290,8 @@ class Tioga:
     def performAMRConnectivity(self):
         tg.tioga_performconnectivity_amr_()
         
+    def getCallbacks(self):
+        return tg.tioga_get_callbacks()
+
     def finish(self):
         tg.tioga_delete_()

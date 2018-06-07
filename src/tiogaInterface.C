@@ -368,7 +368,6 @@ extern "C" {
   {
     callbackFuncs cbs;
     cbs.setTransform = tioga_set_transform;
-    printf("PTR = %p\n",cbs.setTransform); /// DEBUGGING
     return cbs;
   }
 

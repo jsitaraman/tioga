@@ -92,6 +92,7 @@ void tioga::registerSolution(int btag,double *q)
 
 void tioga::profile(void)
 {
+  this->myTimer("tioga::profile",0);
   for(int ib=0;ib<nblocks;ib++)
    {
     auto& mb = mblocks[ib];
@@ -101,10 +102,12 @@ void tioga::profile(void)
   //mb->writeOBB(myid);
   //if (myid==4) mb->writeOutput(myid);
   //if (myid==4) mb->writeOBB(myid);
+  this->myTimer("tioga::profile",1);
 }
 
 void tioga::performConnectivity(void)
 {
+  this->myTimer("tioga::performConnectivity",0);
   getHoleMap();
   exchangeBoxes();
   exchangeSearchData();
@@ -131,6 +134,7 @@ void tioga::performConnectivity(void)
   //}
   //mb->writeOutput(myid);
   //TRACEI(myid);
+  this->myTimer("tioga::performConnectivity",1);
 }
 
 void tioga::performConnectivityHighOrder(void)
@@ -688,3 +692,20 @@ void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,double 
 {
   cb[ipatch].registerData(ipatch,global_id,iblank,q);
 }
+
+void tioga::myTimer(char const *info,int type)
+{
+  static double t_start;
+  double t_end;
+
+  MPI_Barrier(scomm);
+  if (type==0) {
+    t_start=MPI_Wtime();
+    if (myid==0) printf("Begin %s\n",info);
+  }
+  if (type==1) {
+   t_end=MPI_Wtime();
+   if (myid==0) printf("End %s, time taken=%lf\n",info,t_end-t_start);
+  }
+}
+

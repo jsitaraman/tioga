@@ -37,6 +37,16 @@ void MeshBlock::getCellIblanks(void)
   int inode[8];
   int ncount,flag;
   int verbose;
+  int *ibl;
+  
+  if (iblank_reduced) 
+    {
+      ibl=iblank_reduced;
+    }
+  else 
+    {
+      ibl=iblank;
+    }
 
   icell=0;
   if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
@@ -58,14 +68,14 @@ void MeshBlock::getCellIblanks(void)
 	      if (verbose) {
                 TRACEI(m);
                 TRACEI(inode[m]);
-                TRACEI(iblank[inode[m]]);
+                TRACEI(ibl[inode[m]]);
               }
-	      if (iblank[inode[m]]==-1) 
+	      if (ibl[inode[m]]==-1) 
 		{
 		  iblank_cell[icell]=-1;
 		  flag=0;
 		}
-	      ncount=ncount+(iblank[inode[m]]==0);
+	      ncount=ncount+(ibl[inode[m]]==0);
 	    }
 	  if (verbose) {
 	    TRACEI(icell);

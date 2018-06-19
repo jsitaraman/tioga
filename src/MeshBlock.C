@@ -428,7 +428,20 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
   FILE *fp;
   int ba;
   int nvert;
-
+  int *ibl;
+  //
+  // if fringes were reduced use
+  // iblank_reduced
+  //
+  if (iblank_reduced) 
+    {
+      ibl=iblank_reduced;
+    }
+  else
+    {
+      ibl=iblank;
+    }
+  //
   sprintf(intstring,"%d",100000+bid);
   sprintf(fname,"flow%s.dat",&(intstring[1]));
   fp=fopen(fname,"w");
@@ -447,7 +460,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
     {
       for(i=0;i<nnodes;i++)
 	{
-	  fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i],meshtag);
+	  fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],ibl[i],meshtag);
 	  for(j=0;j<nvar;j++)
 	    fprintf(fp,"%lf ",q[i*nvar+j]);      
 	  //for(j=0;j<nvar;j++)
@@ -459,7 +472,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
     {
       for(i=0;i<nnodes;i++)
         {
-          fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i],meshtag);
+          fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],ibl[i],meshtag);
           for(j=0;j<nvar;j++)
             fprintf(fp,"%lf ",q[j*nnodes+i]);
           fprintf(fp,"\n");

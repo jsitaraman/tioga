@@ -159,7 +159,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
     {
       iblank[i]=1;
       verbose=0;
-      //if (meshtag==1 && myid==9 && i==28487) verbose=1;
+      //if (meshtag==1 && myid==0 && i==76639) verbose=1;
       //if (meshtag==2 && i==240304 && myid==1) verbose=1;
       //if (meshtag==3 && i==241402 && myid==1) verbose=1;
       /*
@@ -276,7 +276,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   for(i=0;i<nnodes;i++)
     {
       verbose=0;
-      //if (meshtag==3 && myid==1 && i==245609) verbose=1;
+      //if (meshtag==1 && myid==0 && i==76639) verbose=1;
       //if (meshtag==2 && i==240304 && myid==1) verbose=1;
       //if (meshtag==3 && i==241402 && myid==1) verbose=1;
       //if (meshtag==3 && i==34299) verbose=1;
@@ -317,6 +317,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   for(i=0;i<nnodes;i++)
     {
       verbose=0;
+      //if (meshtag==1 && myid==0 && i==76639) verbose=1;
       //if (meshtag==3 && myid==1 && i==245609) verbose=1;
       //if (meshtag==2 && i==240304 && myid==1) verbose=1;
       //if (meshtag==3 && i==241402 && myid==1) verbose=1;
@@ -606,6 +607,11 @@ void MeshBlock::clearIblanks(void)
   int i;
   for(i=0;i<nnodes;i++)
      if (iblank[i] < 0) iblank[i]=1;
+  if (iblank_reduced) {
+   for(i=0;i<nnodes;i++)
+     if (iblank_reduced[i]==0) iblank[i]=0;
+   free(iblank_reduced);
+  }
 }
 
 void MeshBlock::getStats(int mstats[2])
@@ -631,7 +637,117 @@ void MeshBlock::setIblanks(int inode)
 //    }
 }
 
+void MeshBlock::reduce_fringes(void)
+{
+  int *ibltmp;
+  int m,n,nvert,i,flag,ncount,inode[8];
+  int verbose,iter;
+  INTEGERLIST *clist;
+  //
+  if (iblank_reduced) free(iblank_reduced);
+  iblank_reduced=(int *)malloc(sizeof(int)*nnodes);
+  for(int i=0;i< nnodes;i++) iblank_reduced[i]=iblank[i] > 0 ? iblank[i]:0;
+  ibltmp=(int *)malloc(sizeof(int)*nnodes);
+  //
+  // make sure only partial iblank=1 + iblank=-1
+  // cell nodes are tagged
+  //
+  //for(n=0;n<ntypes;n++)
+  //  {
+  //    nvert=nv[n];
+  //    for(i=0;i<nc[n];i++)
+  //	{
+  //        verbose=0;
+  //	  ncount=0;
+  //	  for(m=0;m<nvert;m++)
+  //	    {
+  //	      inode[m]=vconn[n][nvert*i+m]-BASE;
+  //	      ncount=ncount+(iblank[inode[m]] <=0);
+  //	    }
+  //	  if (ncount==nvert) {
+  //	    for(m=0;m<nvert;m++) iblank_reduced[inode[m]]=0;
+  //	  }
+  //	}
+  //  }
+  //
+  // now make sure neighbors of neighbors are tagged
+  // to create a two point depth
+  //
+  for(i=0;i<nnodes;i++) ibltmp[i]=iblank_reduced[i];
+  for(iter=0;iter < nfringe+1 ;iter++) 
+  {
+   for(n=0;n<ntypes;n++)
+    {
+      nvert=nv[n];
+      for(i=0;i<nc[n];i++)
+        {
+          verbose=0;
+          ncount=0;
+          for(m=0;m<nvert;m++)
+            {
+              inode[m]=vconn[n][nvert*i+m]-BASE;
+              ncount=ncount+(iblank_reduced[inode[m]] == 1 || iblank_reduced[inode[m]] < 0);
+            }
+	  if (ncount > 0 && ncount < nvert) {
+	    for(m=0;m<nvert;m++)
+	      if (ibltmp[inode[m]]==0 && iblank[inode[m]] < 0) ibltmp[inode[m]]=iblank[inode[m]];
+	  }
+        }
+    }
+    for(i=0;i<nnodes;i++) iblank_reduced[i]=ibltmp[i];
+  }
 
+  if (cancelList) deallocateLinkList2(cancelList);
+  cancelList=NULL;
+  ncancel=0;
+  clist=cancelList;
+
+  for(i=0;i<nnodes;i++) 
+    {
+      if (iblank[i] < 0 && iblank_reduced[i]==0) 
+	{
+	  if (clist == NULL) 
+	    {
+	      clist=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
+	      clist->inode=i;
+	      clist->next=NULL;
+	      cancelList=clist;
+	    }
+	  else
+	    {
+	      clist->next=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
+	      clist->next->inode=i;
+	      clist->next->next=NULL;
+	      clist=clist->next;
+	    }
+	  ncancel++;	
+	}
+    }
+
+  // int norph=0;
+  // for(n=0;n<ntypes;n++)
+  //   {
+  //     nvert=nv[n];
+  //     for(i=0;i<nc[n];i++)
+  //       {
+  //         verbose=0;
+  //         ncount=0;
+  //         flag=0;
+  //         for(m=0;m<nvert;m++)
+  //           {
+  //             inode[m]=vconn[n][nvert*i+m]-BASE;
+  //             if (iblank_reduced[inode[m]]==1) flag=1;
+  //             ncount=ncount+(iblank_reduced[inode[m]] == 1);
+  //           }
+  //         if (flag &&  ncount < nvert) {
+  //           for(m=0;m<nvert;m++)
+  //             if (iblank_reduced[inode[m]]==0) norph=norph+1;
+  //         }
+  //       }
+  //   }
+  // TRACEI(norph);
+  free(ibltmp);
+}
 
 
 

@@ -212,6 +212,7 @@ class tioga
   void exchangeAMRDonors(void);
   void checkComm(void);
   void outputStatistics(void);
+  void reduce_fringes(void);
 };
       
   

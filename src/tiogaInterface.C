@@ -261,6 +261,12 @@ extern "C" {
     tg->setp4estcallback(f1,f2);
   //jayfixme  tg->set_p4est_search_callback(f1);
   }  
+
+  void tioga_reduce_fringes_(void)
+  {
+    tg->reduce_fringes();
+  }
+
   void tioga_delete_(void)
    {
     delete [] tg;

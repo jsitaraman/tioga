@@ -92,9 +92,11 @@ class MeshBlock
   int nreceptorCellsCart;
   int *ctag_cart;
   int *pickedCart;
+
  	
  public :
   int *iblank;      /** < iblank value for each grid node */
+  int *iblank_reduced;
   int ntotalPointsCart;
   double *rxyzCart;
   int *donorIdCart;
@@ -151,6 +153,7 @@ class MeshBlock
     resolutionScale=1.0;
 
     cellGID = NULL;
+    iblank_reduced=NULL;
   };
 
   /** basic destructor */
@@ -317,6 +320,7 @@ class MeshBlock
     ninterp = 0;
     interpListSize = 0;
   }
+  void reduce_fringes() ;
 };
 
 #endif /* MESHBLOCK_H */

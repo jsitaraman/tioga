@@ -108,6 +108,7 @@ program testTioga
 
   call cpu_time(t1)         
   call tioga_performconnectivity               !< determine iblanking and interpolation patterns
+  call tioga_reduce_fringes()
   call cpu_time(t2)
 
   call mpi_barrier(mpi_comm_world,ierr)
@@ -125,7 +126,7 @@ program testTioga
      enddo
   enddo
   enddo
-
+  if (1==0) then
   do ib=1,nblocks
    call tioga_getdonorcount(ib,dcount,fcount)
    allocate(receptorInfo(4*dcount))
@@ -149,6 +150,7 @@ program testTioga
    call flush(1000+myid)
    deallocate(receptorInfo,inode,frac)
   end do
+  endif
 
   do ib=1,nblocks
     g=>gr(ib)
@@ -178,13 +180,12 @@ program testTioga
      enddo
    enddo
   enddo
-  !if (myid==0) write(6,"(A36)") '-- Interpolation error statistics --'
-  !if (myid==0) write(6,"(A15)") 'ProcId    Error'
+  if (myid==0) write(6,"(A36)") '-- Interpolation error statistics --'
+  if (myid==0) write(6,"(A15)") 'ProcId    Error'
   call flush(6)
   call mpi_barrier(mpi_comm_world,ierr)
-  !write(6,"(I4,3x,E15.7)") myid,sqrt(rnorm/g%nv/g%nvar)
+  write(6,"(I4,3x,E15.7)") myid,sqrt(rnorm/g%nv/g%nvar)
   call mpi_barrier(mpi_comm_world,ierr)
-
   call tioga_writeoutputfiles(g%nvar,'row') !< write output files, if need be
 
 200 continue    

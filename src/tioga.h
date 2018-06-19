@@ -213,6 +213,7 @@ class tioga
   void checkComm(void);
   void outputStatistics(void);
   void myTimer(char const *, int);
+  void reduce_fringes(void);
 };
       
   

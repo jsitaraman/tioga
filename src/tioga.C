@@ -119,7 +119,7 @@ void tioga::performConnectivity(void)
    mb->search();
   }
   exchangeDonors();
-  //outputStatistics();
+  outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
   for (int ib=0;ib<nblocks;ib++) {
@@ -709,3 +709,152 @@ void tioga::myTimer(char const *info,int type)
   }
 }
 
+void tioga::reduce_fringes(void)
+{
+  //
+  int nsend,nrecv;
+  int *sndMap;
+  int *rcvMap;
+  PACKET *sndPack,*rcvPack;
+  //
+  // get the processor map for sending
+  // and receiving
+  //
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  if (nsend == 0) return;  
+
+  for(int ib=0;ib<nblocks;ib++)
+   {
+    auto& mb = mblocks[ib];
+    mb->reduce_fringes();
+   }  
+  //
+  // now redo the process in exchangeDonors to reduce
+  // the data
+  //
+  // TODO make the stuff below into a subroutine to be more modular
+  //
+  // Find cancellation data (based on donor quality)
+  //
+  std::vector<int> nrecords(nblocks,0);
+  int** donorRecords = (int**)malloc(sizeof(int*)*nblocks);
+  //
+  for (int i=0; i<nblocks; i++) {
+    donorRecords[i]=NULL;
+    nrecords[i] = 0;
+    mblocks[i]->getCancellationData(&(nrecords[i]),
+                                    &(donorRecords[i]));
+  }
+  //
+  // create packets to send and receive
+  // and initialize them to zero
+  //
+  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
+  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
+  //
+  pc->initPackets(sndPack,rcvPack);  
+  //
+  std::vector<int> nintsSend(nsend,0);
+  std::vector<int> ixOffset(nsend,0);  
+  std::fill(nintsSend.begin(), nintsSend.end(), 0);
+  std::fill(ixOffset.begin(), ixOffset.end(), 0);
+  //
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k = donorRecords[n][3*i];
+      sndPack[k].nints+=2;
+    }
+  }
+  //
+  for(int k=0;k<nsend;k++)
+    sndPack[k].intData = (int*)malloc(sizeof(int) * sndPack[k].nints);
+  //
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k= donorRecords[n][3*i];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+1];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+2];
+    }
+  }
+  //
+  // communciate cancellation data comm 3
+  //
+  pc->sendRecvPackets(sndPack,rcvPack);
+  //
+  for (int k=0; k<nrecv; k++) {
+    int m = 0;
+    for (int j=0;j<rcvPack[k].nints/2;j++) {
+      int recid=rcvPack[k].intData[m++];
+      int ib = tag_iblk_map[rcvPack[k].intData[m++]];
+      mblocks[ib]->cancelDonor(recid);
+    }
+  }
+  //
+  for (int ib=0;ib<nblocks;ib++) {
+    auto &mb =mblocks[ib];
+    mb->resetCoincident();
+  }
+  //
+  pc->clearPackets(sndPack, rcvPack);
+  //
+  // Find final interpolation data
+  //
+  for (int i=0; i<nblocks; i++) {
+    if (donorRecords[i]) {
+      free(donorRecords[i]);
+      donorRecords[i] = NULL;
+    }
+    nrecords[i] = 0;    
+    mblocks[i]->getInterpData(&(nrecords[i]),
+                              &(donorRecords[i]));
+  }  
+  std::fill(nintsSend.begin(), nintsSend.end(), 0);
+  std::fill(ixOffset.begin(), ixOffset.end(), 0);
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k = donorRecords[n][3*i];
+      sndPack[k].nints+=2;
+    }
+  }
+  for(int k=0;k<nsend;k++)
+    sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k = donorRecords[n][3*i];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+1];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+2];
+    }
+  }
+  //
+  // comm 4
+  // final receptor data to set iblanks
+  //     
+  pc->sendRecvPackets(sndPack,rcvPack);
+  //
+  for(int ib=0;ib<nblocks;ib++)
+    mblocks[ib]->clearIblanks();
+  
+  for (int k=0; k<nrecv; k++) {
+    int m = 0;
+    for(int j=0;j< rcvPack[k].nints/2;j++)
+      {
+	int pointid=rcvPack[k].intData[m++];
+	int ib=rcvPack[k].intData[m++];
+	mblocks[ib]->setIblanks(pointid);
+      }
+  }
+  pc->clearPackets(sndPack,rcvPack);
+  free(sndPack);
+  free(rcvPack);
+  
+  if (donorRecords) {
+    for (int i=0; i<nblocks; i++) {
+      if (donorRecords[i]) free(donorRecords[i]);
+    }
+    free(donorRecords);
+  }
+  outputStatistics();
+  //mb->writeOBB(myid);
+  //if (myid==4) mb->writeOutput(myid);
+  //if (myid==4) mb->writeOBB(myid);
+}

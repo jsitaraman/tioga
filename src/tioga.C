@@ -134,6 +134,7 @@ void tioga::performConnectivity(void)
   //}
   //mb->writeOutput(myid);
   //TRACEI(myid);
+  this->reduce_fringes();
   this->myTimer("tioga::performConnectivity",1);
 }
 
@@ -721,7 +722,7 @@ void tioga::reduce_fringes(void)
   // and receiving
   //
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
-  if (nsend == 0) return;  
+  //if (nsend == 0) return;  
 
   for(int ib=0;ib<nblocks;ib++)
    {

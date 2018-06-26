@@ -227,6 +227,11 @@ extern "C" {
   {
     tg->setResolutions(nres,cres);
   }
+
+  void tioga_setresolutions_multi_(int *btag,double *nres,double *cres)
+  {
+    tg->setResolutions(*btag,nres,cres);
+  }
   
   void tioga_setcelliblank_(int *iblank_cell)
   {

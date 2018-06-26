@@ -134,7 +134,7 @@ void tioga::performConnectivity(void)
   //}
   //mb->writeOutput(myid);
   //TRACEI(myid);
-  this->reduce_fringes();
+  //this->reduce_fringes();
   this->myTimer("tioga::performConnectivity",1);
 }
 

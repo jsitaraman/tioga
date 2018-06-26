@@ -213,7 +213,7 @@ void MeshBlock::tagBoundary(void)
       // mandatory receptors as nodes as not acceptable
       // donors
       //
-      mexclude=3;
+      mexclude=1;
       for(iex=0;iex<mexclude;iex++)
       {
 	k=0;

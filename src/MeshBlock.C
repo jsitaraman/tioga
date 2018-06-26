@@ -108,9 +108,7 @@ void MeshBlock::updateOBB(void)
   free(obb);
   obb = (OBB *) malloc(sizeof(OBB));
 
-  PUSH_NVTX_RANGE("updateOBB",3);
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
-  POP_NVTX_RANGE;
 }
 
 /** Calculate 'cellRes' / 'nodeRes' (cell volume) for each cell / node
@@ -272,7 +270,6 @@ void MeshBlock::tagBoundary(void)
 
 void MeshBlock::setupADT(void)
 {
-  PUSH_NVTX_RANGE("BuildADT", 2);
   for (int d = 0; d < 3; d++)
   {
     aabb[d]   =  BIG_DOUBLE;
@@ -335,7 +332,6 @@ void MeshBlock::setupADT(void)
   }
 
   adt->buildADT(2*nDims, ncells, elementBbox.data());
-  POP_NVTX_RANGE;
 
 #ifdef _GPU
   ncells_adt = ncells;
@@ -355,7 +351,6 @@ void MeshBlock::rebuildADT(void)
 {
   /// TODO: make sure we're including all possible future donors at boundaries where other grids may move in
   /// [Include any elements assigned to 'DC_CUT' from hole cutting]?
-  PUSH_NVTX_RANGE("ReBuildADT", 1);
 
   std::set<int> donorEles, adtEles;
 
@@ -525,7 +520,6 @@ void MeshBlock::rebuildADT(void)
 
   adt_d.copyADT(adt);
 #endif
-  POP_NVTX_RANGE;
 }
 
 void MeshBlock::getIgbpData(double *& igbp_ptr)

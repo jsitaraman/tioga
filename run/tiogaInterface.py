@@ -85,7 +85,7 @@ class Tioga:
     # Interpolate solution and send/receive all data
     def exchangeSolution(self):
         tg.tioga_dataupdate_ab(self.nfields, 0)
-     
+
     def exchangeSolutionAMR(self):
         tg.tioga_dataupdate_amr(self.q,self.nfields,1)
 
@@ -206,7 +206,6 @@ class Tioga:
             tg.tioga_register_moving_grid_data(gridV,offset,Rmat)
 
         if self.useGpu:
-            donorFromDevice = callbacks['donorDataDevice']
             fringeToDevice = callbacks['fringeDataToDevice']
             unblankToDevice = callbacks['unblankToDevice']
             faceNodesGPU = callbacks['faceNodesGPU']
@@ -216,8 +215,8 @@ class Tioga:
             nWeightsGPU = callbacks['nWeightsGPU']
             weightsGPU = callbacks['weightsGPU']
 
-            tg.tioga_set_ab_callback_gpu_(donorFromDevice, fringeToDevice,
-                unblankToDevice, qSpts_d, dqSpts_d, faceNodesGPU, cellNodesGPU,
+            tg.tioga_set_ab_callback_gpu_(fringeToDevice, unblankToDevice,
+                qSpts_d, dqSpts_d, faceNodesGPU, cellNodesGPU,
                 nWeightsGPU, weightsGPU)
 
             coords_d = arrayToDblPtr(gridData['nodesGPU'][0])
@@ -229,7 +228,7 @@ class Tioga:
                 iblankFace_d)
 
             tb.tioga_set_stream_handle(gridData['cuStream'],gridData['cuEvent'])
-            
+
     def initIGBPs(self):
         # Use Tioga's knowledge of overset boundary nodes to get IGBP list
         self.igbp_ptr = tg.tioga_get_igbp_list();
@@ -258,14 +257,14 @@ class Tioga:
         for i in range(ngrids):
             m=i*11
             idata[m]   =gridData['gridParam'][i][0] # global id of patch
-            idata[m+1] =gridData['gridParam'][i][1] # level number of patch 
+            idata[m+1] =gridData['gridParam'][i][1] # level number of patch
             idata[m+2] =gridData['gridParam'][i][3] # proc id containing patch
-            idata[m+3] =3 #gridData['porder']          # porder (order of Lagrange reconstruction to use) 
-            idata[m+4] =local2global[idata[m]]   # local number of patch  
+            idata[m+3] =3 #gridData['porder']          # porder (order of Lagrange reconstruction to use)
+            idata[m+4] =local2global[idata[m]]   # local number of patch
             idata[m+5] =gridData['ilo'][i][0]       # lower left-hand front global numbering (x)
             idata[m+6] =gridData['ilo'][i][1]       # lower left-hand front global numbering (y)
             idata[m+7] =gridData['ilo'][i][2]       # lower left-hand front global numbering (z)
-            idata[m+8] =gridData['ihi'][i][0]       # upper right-hand back global numbering (x) 
+            idata[m+8] =gridData['ihi'][i][0]       # upper right-hand back global numbering (x)
             idata[m+9] =gridData['ihi'][i][1]       # lower right-hand back global numbering (y)
             idata[m+10] =gridData['ihi'][i][2]      # lower left-hand  back global numbering (z)
             m1=i*6
@@ -289,7 +288,7 @@ class Tioga:
 
     def performAMRConnectivity(self):
         tg.tioga_performconnectivity_amr_()
-        
+
     def getCallbacks(self):
         return tg.tioga_get_callbacks()
 

@@ -182,9 +182,7 @@ void tioga::unblankPart2(int nvar)
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
 
-  PUSH_NVTX_RANGE("FaceIblanks-2",4);
   mb->calcFaceIblanks(meshcomm);
-  POP_NVTX_RANGE;
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
 
@@ -206,7 +204,6 @@ void tioga::unblankPart2(int nvar)
 void tioga::doHoleCutting(bool unblanking)
 {
 #ifdef TG_NORMAL
-  PUSH_NVTX_RANGE("TIOGA",2);
   // Generate structured map of solid boundary (hole) locations
   getHoleMap();
 
@@ -228,11 +225,9 @@ void tioga::doHoleCutting(bool unblanking)
     // Calculate cell iblank values from nodal iblank values
     mb->getCellIblanks(meshcomm);
   }
-  POP_NVTX_RANGE;
 #endif
 
 #ifdef TG_DIRECTCUT
-  PUSH_NVTX_RANGE("HoleMaps", 4);
   // Generate structured map of solid boundary (hole) locations
 //  if (holeMap == NULL || overMap.size() == 0)
 //  {
@@ -242,12 +237,9 @@ void tioga::doHoleCutting(bool unblanking)
     getHoleMap();
     getOversetMap();
 //  }
-  POP_NVTX_RANGE;
 
-  PUSH_NVTX_RANGE("ExchangeBoxes", 1);
   if (!unblanking)
     exchangeBoxes();
-  POP_NVTX_RANGE;
 
   directCut();
 #endif
@@ -262,17 +254,12 @@ void tioga::doPointConnectivity(bool unblanking)
 
   // Exchange new list of points, including high-order Artificial Boundary
   // face points or internal points (or fringe nodes for non-high order)
-  PUSH_NVTX_RANGE("TG-COMM", 2);
   exchangePointSearchData();
-  POP_NVTX_RANGE;
 
   // Search for donor cells for all given points
-  PUSH_NVTX_RANGE("TG-ADT",7);
   mb->search();
-  POP_NVTX_RANGE
 
   // Setup interpolation weights and such for final interp-point list
-  PUSH_NVTX_RANGE("CU-MEMCPY", 6);
 #ifdef _GPU
   mb->processPointDonorsGPU();
 #else
@@ -282,7 +269,6 @@ void tioga::doPointConnectivity(bool unblanking)
 #ifdef _GPU
   setupCommBuffersGPU();
 #endif
-  POP_NVTX_RANGE;
 }
 
 #ifdef _GPU
@@ -314,8 +300,6 @@ void tioga::performConnectivityHighOrder(void)
 
 void tioga::directCut(void)
 {
-  PUSH_NVTX_RANGE("DC-PreProc",2);
-
   int nDims = mb->nDims;
 
   /// TODO: Callbacks
@@ -570,8 +554,6 @@ void tioga::directCut(void)
       bbox_g[g][d+nDims] = std::max(bbox_g[g][d+nDims], bbox_tmp[2*nDims*p+d+nDims]);
     }
   }
-
-  POP_NVTX_RANGE;
 
   // Do the cutting
   std::vector<CutMap> cutMap(nGrids);
@@ -1028,20 +1010,17 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 
   interpTime.startTimer();
 
-  PUSH_NVTX_RANGE("Interp", 2);
   if (dataFlag == 0)
     mb->interpSolution_gpu(ubuf_d.data(), nvar);
   else
     mb->interpGradient_gpu(ubuf_d.data(), nvar);
 
   ubuf_h.assign(ubuf_d.data(), ubuf_d.size(), &mb->stream_handle);
-  POP_NVTX_RANGE;
 
   interpTime.stopTimer();
 
   // Wait for D2H transfer to complete and pack separate buffer
   cudaStreamSynchronize(mb->stream_handle);
-  PUSH_NVTX_RANGE("tg_packBuffers", 3);
   // Populate the packets [organize interp data by rank to send to]
   for (int p = 0; p < nsend; p++)
   {
@@ -1049,10 +1028,7 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
       for (int j = 0; j < stride; j++)
         sndVPack[p].realData[i*stride+j] = ubuf_h[(mb->buf_disp[p]+i)*stride+j];
   }
-  POP_NVTX_RANGE;
-  PUSH_NVTX_RANGE("tg_pc_send", 0);
   pc->sendPacketsV(sndVPack,rcvVPack);
-  POP_NVTX_RANGE;
 }
 
 void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
@@ -1070,12 +1046,9 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
   if (iartbnd && dataFlag == 1) stride = 3*nvar;
 
   // Wait on all of the sends/recvs for the interpolated data
-  PUSH_NVTX_RANGE("tg_pc_recv", 0);
   pc->recvPacketsV();
-  POP_NVTX_RANGE;
 
   // Decode the packets and update the values in the solver's data array
-  PUSH_NVTX_RANGE("tg_unpack_data", 1);
   if (ihigh)
   {
     fringebuf_h.resize(mb->ntotalPoints*stride);
@@ -1138,7 +1111,6 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     else
       ThrowException("Not written for non-artificial boundary codes right now");
   }
-  POP_NVTX_RANGE;
 }
 #endif
 

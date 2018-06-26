@@ -602,13 +602,11 @@ void MeshBlock::directCut_gpu(std::vector<double> &cutFaces, int nCut, int nvert
     std::vector<double> &cutBbox, HOLEMAP &holeMap, CutMap &cutMap, int cutType)
 {
 #ifdef _GPU
-  PUSH_NVTX_RANGE("DC-GPU",4);
   cutMap.flag.resize(ncells);
 
   // Call out to the device to perform the cutting
   mb_d.assignHoleMap(holeMap.existWall, holeMap.nx, holeMap.sam, holeMap.extents);
   mb_d.directCut(cutFaces.data(), nCut, nvertf, cutBbox.data(), cutMap.flag.data(), cutType);
-  POP_NVTX_RANGE;
 #endif
 }
 
@@ -1485,7 +1483,6 @@ void MeshBlock::getInterpolatedGradientAtPoints(int &nints, int &nreals,
   int icount = 0;
   int dcount = 0;
 
-  MPI_Pcontrol(1,"get_interp_grad");
   for (int i = 0; i < ninterp2; i++)
   {
     qq.assign(3*nvar,0);
@@ -1508,7 +1505,6 @@ void MeshBlock::getInterpolatedGradientAtPoints(int &nints, int &nreals,
       for (int k = 0; k < nvar; k++)
         realData[dcount++] = qq[dim*nvar+k];
   }
-  MPI_Pcontrol(-1,"get_interp_grad");
 }
 
 #ifdef _GPU
@@ -1627,14 +1623,10 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
     face_data_to_device(ftag, nreceptorFaces, 0, qtmp);
 
   if (nreceptorCells > 0)
-  {
-    printf("nreceptorCells = %d; %d, %d\n",nreceptorCells,ctag[0],ctag[1]); /// DEBUGGING
     cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
-  }
 #else
 
   int fpt_start = 0;
-//#pragma omp parallel for
   for(int i = 0; i < nreceptorFaces; i++)
   {
     if (iblank_face[ftag[i]-BASE] == FRINGE)
@@ -1652,7 +1644,6 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
 {
   if (!ihigh) FatalError("updateFringePointGradient not applicable to non-high order solvers");
 
-  PUSH_NVTX_RANGE("tg_update_fringeGrad", 2);
 #ifdef _GPU
   if (nreceptorFaces > 0)
     face_data_to_device(ftag, nreceptorFaces, 1, dqtmp);
@@ -1672,12 +1663,9 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
     fpt_start += (pointsPerFace[i]*nvar*nDims);
   }
 #endif
-  POP_NVTX_RANGE;
 }
 
 void MeshBlock::sendFringeDataGPU(int gradFlag)
 {
-  MPI_Pcontrol(1, "sendFringeDataGPU");
   face_data_to_device(ftag, nreceptorFaces, gradFlag, NULL);
-  MPI_Pcontrol(-1, "sendFringeDataGPU");
 }

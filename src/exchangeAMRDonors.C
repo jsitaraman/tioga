@@ -98,8 +98,8 @@ void tioga::exchangeAMRDonors(int itype)
   //
   for (int i = 0; i < nsend; i++)
   {
-    sndPack[i].nints = obdonors[i]*2+obreceptors[i]*4+2;
-    sndPack[i].nreals = obdonors[i]*3+2*obreceptors[i];
+    sndPack[i].nints = obdonors[i]*2 + obreceptors[i]*4 + 2;
+    sndPack[i].nreals = obdonors[i]*3 + obreceptors[i]*1;
     sndPack[i].intData = (int *)malloc(sizeof(int)*sndPack[i].nints);
     sndPack[i].realData = (double *)malloc(sizeof(double)*sndPack[i].nreals);
     sndPack[i].intData[0] = obdonors[i];
@@ -128,7 +128,6 @@ void tioga::exchangeAMRDonors(int itype)
         sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i];
         sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i+1];
         sndPack[procid].realData[realcount[procid]++] = mb->rxyzCart[3*i+2];
-        //sndPack[procid].realData[realcount[procid]++] = BIGVALUE; // Receptor res - N/A
       }
     }
 
@@ -142,7 +141,6 @@ void tioga::exchangeAMRDonors(int itype)
         sndPack[procid].intData[intcount[procid]++] = mb->meshtag;
         sndPack[procid].intData[intcount[procid]++] = i;
         sndPack[procid].realData[realcount[procid]++] = mb->cellRes[mb->donorId[i]];
-        sndPack[procid].realData[realcount[procid]++] = 1.;//mb->res_search[i]; /// DEBUGGING: ADDED 2/23 based on Jay's inter-proc fixes...
       }
     }
   }
@@ -194,8 +192,7 @@ void tioga::exchangeAMRDonors(int itype)
         int meshtag = rcvPack[i].intData[m++];
         int remoteid = rcvPack[i].intData[m++];
         double cellRes = rcvPack[i].realData[n++];
-        double receptorRes = rcvPack[i].realData[n++];
-        cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,receptorRes,itype);
+        cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes,1.,itype);
         bcount[localid]++;
       }
     }
@@ -220,7 +217,6 @@ void tioga::exchangeAMRDonors(int itype)
 
   for (int i = 0; i < ncart; i++)
   {
-    //tracei(i);
     free(cancelledData);
     cancelledData = NULL;
     int ncancel = bcount[i];
@@ -231,13 +227,11 @@ void tioga::exchangeAMRDonors(int itype)
 
       for (int j = 0; j < ncancel; j++)
       {
-        int procid = cancelledData[3*j];
-        int ctype = cancelledData[3*j+1];
+        int procid   = cancelledData[3*j];
+        int ctype    = cancelledData[3*j+1];
         int remoteid = cancelledData[3*j+2];
-        sndPack[procid].intData[intcount[procid]++]=ctype;
-        sndPack[procid].intData[intcount[procid]++]=remoteid;
-        //tracei(intcount[procid]);
-        //tracei(sndPack[procid].nints);
+        sndPack[procid].intData[intcount[procid]++] = ctype;
+        sndPack[procid].intData[intcount[procid]++] = remoteid;
       }
     }
   }

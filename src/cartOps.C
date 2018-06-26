@@ -95,11 +95,7 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
   nreceptorCellsCart=0;
   for(i=0;i<ncells;i++)
     if (iflag[i]==-1) ctag_cart[nreceptorCellsCart++]=i+1;
-  //
-  // TODO for JC
-  // mods here to get ZEFR specific outer nodes for
-  // the points on the artificial boundary
-  //  
+
   if (ihigh) 
     {
       if (pointsPerCell!=NULL) free(pointsPerCell);
@@ -117,7 +113,6 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
       //
       if (rxyzCart !=NULL) free(rxyzCart);
       if (donorIdCart !=NULL) free(donorIdCart);
-      //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
       rxyzCart=(double *)malloc(sizeof(double)*ntotalPointsCart*3);
       donorIdCart=(int *)malloc(sizeof(int)*ntotalPointsCart);
       //
@@ -205,7 +200,6 @@ void MeshBlock::findInterpListCart(void)
 
   if (interpListCart)
   {
-    //free(interpListCart);
     delete [] interpListCart;
     interpListCartSize=0;
   }
@@ -213,8 +207,7 @@ void MeshBlock::findInterpListCart(void)
   for(int irecord=0;irecord<nsearch;irecord++)
     if (donorId[irecord]!=-1) interpListCartSize++;
 
-  //interpListCart=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListCartSize);
-  interpListCart=new INTERPLIST[interpListCartSize];
+  interpListCart = new INTERPLIST[interpListCartSize];
 
   int buffsize = NFRAC;
   std::vector<double> frac(buffsize); // COPIED FROM PROCESSPOINTDONORS

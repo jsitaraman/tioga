@@ -182,7 +182,6 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
 
   xsearch.resize(3*nsearch);
   isearch.resize(3*nsearch);
-  res_search.resize(nsearch);
   donorId.resize(nsearch);
   rst.resize(3*nsearch);
 
@@ -203,8 +202,6 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)
       // Point locations
       for (int k = 0; k < 3; k++)
         xsearch[n++] = dataPtr->realData[3*j+k]; //3->4
-      // Receptor resolution
-      //res_search[p++] = dataPtr->realData[4*j+3];
     }
 
     dataPtr = dataPtr->next;

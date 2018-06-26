@@ -262,27 +262,6 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
   {
     ix[n] = (xtmp[n] - xlo[n]) / dx[n];
     rst[n] = (xtmp[n] - xlo[n] - ix[n]*dx[n]) / dx[n];
-      // if (!(ix[n] >=0 && ix[n] < dims[n]) && myid==77) {
-      //  tracei(procid);
-      //  tracei(global_id);
-      //  tracei(local_id);
-      //  tracei(remoteid);
-      //  tracei(myid);
-      //  traced(xtmp[0]);
-      //  traced(xtmp[1]);
-      //  traced(xtmp[2]);
-      //  traced(xlo[0]);
-      //  traced(xlo[1]);
-      //  traced(xlo[2]);
-      //  traced(dx[0]);
-      //  traced(dx[1]);
-      //  traced(dx[2]);
-      //  tracei(ix[n]);
-      //  tracei(n);
-      //  tracei(dims[n]);
-      //  printf("--------------------------\n");
-      // }
-     assert((ix[n] >=0 && ix[n] < dims[n]));
   }
 
   listptr->inode=(int *)malloc(sizeof(int)*3);
@@ -301,7 +280,6 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
     listptr->nweights = p3;
     listptr->weights = (double *)malloc(sizeof(double)*listptr->nweights);
 
-    // -------------------- from cart_interp.cpp --------------------
     const int N = pdegree + 1;
     double dn = 2. / pdegree;
 
@@ -347,7 +325,6 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp,int ityp
           ibl[ind + i + dj*j + dk*k] = -2;
           m++;
         }
-    // --------------------------------------------------------------------
   }
 
   free(rst);
@@ -412,8 +389,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
   int ibcount = -1;
   int idof = -1;
   
-  //for(i=0;i<(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);i++) ibl[i]=1;
-
   int ploc = pdegree*(pdegree+1)/2;
   //iadd=(itype==0)?0:1;
   int iadd = 0;
@@ -491,20 +466,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh,int itype)
       }
     }
   }
-
-  /// DEBUGGING / HACK FOR INCONSISTENT IBLANK VALUES BETWEEN PROCESSES
-  /*for(k=0;k<dims[2]+iadd;k++)
-    for(j=0;j<dims[1]+iadd;j++)
-      for(i=0;i<dims[0]+iadd;i++)
-	{
-    int ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-    xtmp[0]=xlo[0]+dx[0]*i;
-    xtmp[1]=xlo[1]+dx[1]*j;
-    xtmp[2]=xlo[2]+dx[2]*k;
-    double R = std::sqrt(xtmp[0]*xtmp[0] + xtmp[1]*xtmp[1] + xtmp[2]*xtmp[2]);
-    if (R > 2.)
-      ibl[ibindex] = -2; /// Force 'normal' status below
-  }*/
 
   ibcount = -1;
   idof = -1;    

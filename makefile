@@ -29,7 +29,7 @@ CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
 SFLAGS = -I$(strip $(PYTHON_INC_DIR))/ -I$(strip $(MPI4PY_INC_DIR))/ -I$(strip $(NUMPY_INC_DIR))/
 
-# Intel compiler flags: 
+# Intel compiler flags:
 # Floating-point exception; underflow gives 0.0: -fpe0
 
 ifeq ($(strip $(CUDA)),YES)
@@ -54,18 +54,36 @@ INCS += -I$(strip $(MPI_INC_DIR))/
 ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CFLAGS += -Ofast #-D_NVTX
 	CUFLAGS += -O3 -use_fast_math #-D_NVTX
+ifeq ($(strip $(INTEL)),YES)
+	CFLAGS += -fp-model fast=2 -fp-model source
+	FFLAGS += -fp-model fast=2 -fp-model source -fpe0
+	CUFLAGS += -Xcompiler=-fp-model fast=2,-fp-model source
+endif
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),1)
 	CFLAGS += -g -O2 #-D_NVTX
 	CUFLAGS += -g -O2 #-D_NVTX
+ifeq ($(strip $(INTEL)),YES)
+	CFLAGS += -fp-model fast -fp-model source -traceback
+	FFLAGS += -fp-model fast -fp-model source -fpe0 -traceback
+	CUFLAGS += -Xcompiler=-fp-model fast,-traceback
+endif
 endif
 ifeq ($(strip $(DEBUG_LEVEL)),2)
 	CFLAGS += -g -O0 -D_NVTX
 	CUFLAGS += -g -G -O0 -D_NVTX
+ifeq ($(strip $(INTEL)),YES)
+	CFLAGS += -traceback
+	FFLAGS += -fpe0 -traceback
+	CUFLAGS += -Xcompiler=-traceback
+endif
 endif
 
 WARN_ON = -Wall -Wextra -Wconversion
-WARN_OFF = -Wno-narrowing -Wno-unused-result -Wno-narrowing -Wno-literal-suffix
+WARN_OFF = -Wno-narrowing
+ifneq ($(strip $(INTEL)),YES)
+	WARN_OFF += -Wno-unused-result -Wno-literal-suffix
+endif
 
 ifeq ($(strip $(WARNINGS)),ON)
 	CFLAGS += $(WARN_ON)
@@ -89,7 +107,7 @@ FFLAGS += -I$(INCDIR)/
 CUFLAGS += -I$(INCDIR)/
 
 INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h error.hpp points.hpp funcs.hpp
-OBJF90 = $(BINDIR)/kaiser.o $(BINDIR)/median.o 
+OBJF90 = $(BINDIR)/kaiser.o $(BINDIR)/median.o
 OBJECTS = $(BINDIR)/buildADTrecursion.o $(BINDIR)/searchADTrecursion.o $(BINDIR)/ADT.o\
 	$(BINDIR)/MeshBlock.o $(BINDIR)/search.o $(BINDIR)/checkContainment.o $(BINDIR)/bookKeeping.o \
 	$(BINDIR)/dataUpdate.o $(BINDIR)/math_funcs.o $(BINDIR)/utils.o $(BINDIR)/linklist.o\
@@ -134,7 +152,7 @@ $(BINDIR)/%_wrap.cpp: $(INCDIR)/%.i $(INCDIR)/tiogaInterface.h
 	@mkdir -p bin
 	$(SWIG) -c++ -python $(SFLAGS) -o $@ $<
 
-$(BINDIR)/%_wrap.o: $(BINDIR)/%_wrap.cpp 
+$(BINDIR)/%_wrap.o: $(BINDIR)/%_wrap.cpp
 	@mkdir -p bin
 	$(CXX) $(CFLAGS) $(INCS) $(SFLAGS) -c $< -o $@
 
@@ -167,5 +185,5 @@ $(BINDIR)/%.o: $(SRCDIR)/%.f $(INCDIR)/*.h $(INCDIR)/*.hpp
 	$(F90) $(FFLAGS) -c $< -o $@
 
 .PHONY: clean
-clean: 
+clean:
 	rm -rf $(BINDIR)/*.o $(BINDIR)/_$(MODULENAME).so $(BINDIR)/$(MODULENAME).py $(BINDIR)/lib$(MODULENAME).a $(BINDIR)/lib$(MODULENAME).so

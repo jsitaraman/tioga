@@ -37,7 +37,7 @@ class parallelComm
  public :
   int myid;
   int numprocs;
-  MPI_Comm scomm;
+  MPI_Comm scomm = MPI_COMM_WORLD;
 
   /// TESTING SEPARATE SEND/RECV FOR OVERLAP
   std::vector<int> scount, rcount;

@@ -316,8 +316,7 @@ extern "C" {
     tg->set_ab_callback(gnf, gfn, gqs, gqf, ggs, ggf, gqss, gdqs);
   }
 
-  void tioga_set_ab_callback_gpu_(void (*d2h)(int* ids, int nd, int grad),
-                                  void (*h2df)(int* ids, int nf, int grad, double *data),
+  void tioga_set_ab_callback_gpu_(void (*h2df)(int* ids, int nf, int grad, double *data),
                                   void (*h2dc)(int* ids, int nc, int grad, double *data),
                                   double* (*gqd)(int& es, int& ss, int& vs, int etype),
                                   double* (*gdqd)(int& es, int& ss, int& vs, int& ds, int etype),
@@ -326,7 +325,7 @@ extern "C" {
                                   int (*gnw)(int),
                                   void (*dfg)(int*, int, double*, double*))
   {
-    tg->set_ab_callback_gpu(d2h,h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
+    tg->set_ab_callback_gpu(h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
   }
 
   void tioga_register_moving_grid_data(double* grid_vel, double* offset, double* Rmat)
@@ -347,11 +346,6 @@ extern "C" {
   void tioga_do_point_connectivity(void)
   {
     tg->doPointConnectivity();
-  }
-
-  void tioga_set_iter_iblanks(double dt, int nvar)
-  {
-    tg->setIterIblanks(dt, nvar);
   }
 
   void tioga_unblank_part_1(void)

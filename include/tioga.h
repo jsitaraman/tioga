@@ -154,8 +154,6 @@ class tioga
   std::vector<int> buf_disp, buf_inds;
   std::vector<int> recv_itmp;
   dvec<int> buf_inds_d;
-
-//  dMeshBlock *mb_d;
 #endif
 
  public:
@@ -249,7 +247,6 @@ class tioga
   void performConnectivityAMR(void);
   void directCut(void);
 
-  void setIterIblanks(double dt, int nvar);
   void unblankPart1(void);
   void unblankPart2(int nvar);
   void doHoleCutting(bool unblanking = false);
@@ -328,8 +325,7 @@ class tioga
     iartbnd = 1;
   }
 
-  void set_ab_callback_gpu(void (*d2h)(int* ids, int nd, int grad),
-                           void (*h2df)(int* ids, int nf, int grad, double* data),
+  void set_ab_callback_gpu(void (*h2df)(int* ids, int nf, int grad, double* data),
                            void (*h2dc)(int* ids, int nc, int grad, double* data),
                            double* (*gqd)(int& es, int& ss, int& vs, int etype),
                            double* (*gdqd)(int& es, int& ss, int& vs, int& ds, int etype),
@@ -338,7 +334,7 @@ class tioga
                            int (*gnw)(int),
                            void (*dfg)(int*, int, double*, double*))
   {
-    mb->setCallbackArtBndGpu(d2h,h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
+    mb->setCallbackArtBndGpu(h2df,h2dc,gqd,gdqd,gfng,gcng,gnw,dfg);
     gpu = true;
   }
 

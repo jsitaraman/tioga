@@ -28,10 +28,6 @@
 #include "cuda_funcs.h"
 #endif
 
-extern "C"{
-//void writeqnode_(int *myid,double *qnodein,int *qnodesize);
-}
-
 /**
  * Set MPI communicator and initialize a few variables
  */
@@ -48,18 +44,18 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   // but will be a fairly invasive change
   //
   nblocks=0;
-  mb=new MeshBlock[1];
+  mb = new MeshBlock();
   //
   // instantiate the parallel communication class
   //
-  pc=new parallelComm[1];
+  pc = new parallelComm();
   pc->myid=myid;
   pc->scomm=scomm;
   pc->numprocs=nproc;
  
   // instantiate the parallel communication class
   //   
-  pc_cart=new parallelComm[1];
+  pc_cart = new parallelComm();
   pc_cart->myid=myid;
   pc_cart->scomm=scomm;
   pc_cart->numprocs=nproc;
@@ -163,38 +159,6 @@ void tioga::performConnectivity(void)
   doPointConnectivity();
 }
 
-void tioga::setIterIblanks(double dt, int nvar)
-{
-  // Determine blanking status for approximate grid at end of time step
-  mb->calcNextGrid(dt);
-
-  mb->preprocess();
-
-  doHoleCutting();
-
-  // Determine blanking status for current grid
-  mb->resetCurrentGrid();
-
-  mb->preprocess();
-
-  doHoleCutting();
-
-  // Determine final blanking status to use over time step
-  int nunblank = mb->getIterIblanks();
-//if (nunblank > 0) printf("Rank %d unblanking %d elements\n",myid,nunblank);
-  mb->calcFaceIblanks(meshcomm);
-
-  MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
-
-  if (nunblank > 0)
-  {
-    doPointConnectivity(); /// TODO: just do unblank cells only, no faces
-
-    dataUpdate_artBnd(nvar, 0);
-
-    mb->clearUnblanks();
-  }
-}
 
 void tioga::unblankPart1(void)
 {
@@ -218,12 +182,9 @@ void tioga::unblankPart2(int nvar)
   // Determine final blanking status to use over time step
   int nunblank = mb->getIterIblanks();
 
-  //if (nunblank > 0) printf("%d: Unblanking %d elements\n",myid,nunblank); /// DEBUGGING
-  //cudaDeviceSynchronize(); /// DEBUGGING
   PUSH_NVTX_RANGE("FaceIblanks-2",4);
   mb->calcFaceIblanks(meshcomm);
   POP_NVTX_RANGE;
-  //cudaDeviceSynchronize(); /// DEBUGGING
 
   MPI_Allreduce(MPI_IN_PLACE, &nunblank, 1, MPI_INT, MPI_SUM, scomm);
 
@@ -245,8 +206,6 @@ void tioga::unblankPart2(int nvar)
 void tioga::doHoleCutting(bool unblanking)
 {
 #ifdef TG_NORMAL
-  Timer tgTime("Normal Version: ");
-  tgTime.startTimer();
   PUSH_NVTX_RANGE("TIOGA",2);
   // Generate structured map of solid boundary (hole) locations
   getHoleMap();
@@ -264,39 +223,22 @@ void tioga::doHoleCutting(bool unblanking)
   // Exchange found donor data and do final iblank setting
   exchangeDonors();
 
-  /*outputStatistics();
-  MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
-  //if (ihighGlobal) {
-  mb->getCellIblanks();*/
-//  mb->writeGridFile(myid);
-//  outputHoleMap();
-  //}
-  //mb->writeOutput(myid);
-  //tracei(myid);*/
-
   if (ihighGlobal)
   {
     // Calculate cell iblank values from nodal iblank values
     mb->getCellIblanks(meshcomm);
-
-    if (iartbnd)  // Only done by ranks with high-order Artificial Boundary grids
-    {
-      // Find artificial boundary faces
-      //mb->calcFaceIblanks(meshcomm);
-    }
   }
-  tgTime.stopTimer();
   POP_NVTX_RANGE;
 #endif
 
 #ifdef TG_DIRECTCUT
-  Timer dcTime("Direct Cut: ");
-  dcTime.startTimer();
-
   PUSH_NVTX_RANGE("HoleMaps", 4);
   // Generate structured map of solid boundary (hole) locations
 //  if (holeMap == NULL || overMap.size() == 0)
 //  {
+  /// TODO: does this really have to be updated every time,
+  /// or can it be used like the ADT? [requires sending
+  /// Rmat to other grid(s)]
     getHoleMap();
     getOversetMap();
 //  }
@@ -308,13 +250,6 @@ void tioga::doHoleCutting(bool unblanking)
   POP_NVTX_RANGE;
 
   directCut();
-
-  /*PUSH_NVTX_RANGE("FaceIblanks", 3);
-  if (!unblanking)
-    mb->calcFaceIblanks(meshcomm);
-  POP_NVTX_RANGE;*/
-
-  dcTime.stopTimer();
 #endif
 }
 
@@ -348,7 +283,6 @@ void tioga::doPointConnectivity(bool unblanking)
   setupCommBuffersGPU();
 #endif
   POP_NVTX_RANGE;
-  //mb->writeCellFile(myid,NULL);
 }
 
 #ifdef _GPU
@@ -359,13 +293,10 @@ void tioga::setupCommBuffersGPU(void)
   pc->getMap(&nsend, &nrecv, &sndMap, &rcvMap);
 
   sndVPack.resize(nsend);
-//  sndPack2.resize(nsend);
   rcvVPack.resize(nrecv);
 
-//  pc->initPacketsV2(sndPack2,rcvVPack);
   pc->initPacketsV(sndVPack,rcvVPack);
 
-//  mb->setupBuffersGPU(nsend, intData, sndPack2);
   mb->setupBuffersGPU(nsend, intData, sndVPack);
 
   ninterp = mb->ninterp2;
@@ -656,160 +587,104 @@ void tioga::directCut(void)
     if (nFaceTot_g[g] > 0)
     {
       HOLEMAP hm = (gridType == 0) ? overMap[g] : holeMap[g];
-#ifdef _GPU
       mb->directCut_gpu(faceNodes_g[g], nFace_g[g], nVertf_g[g], bbox_g[g], hm, cutMap[ncut], gridType);
-#else
-      mb->directCut(faceNodes_g[g], nFace_p[g], nVertf_g[g], bbox_g[g], cutMap[ncut], gridType);
-#endif
       ncut++;
     }
     cutTime.stopTimer();
   }
 
-  //cutTime.showTime(3);
-
   cutMap.resize(ncut);
   mb->unifyCutFlags(cutMap);
-
-//  if (cutMap.size() > 0)
-//    mb->writeCellFile(myid, cutMap.back().flag.data()); /// DEBUGGING
-//  else
-//    mb->writeCellFile(myid, NULL); /// DEBUGGING
-//  MPI_Barrier(scomm);
-//  exit(0); /// DEBUGGING
 }
 
 void tioga::performConnectivityAMR(void)
 {
-  int i,ierr;
-  int iamr;
+  int iamr = (ncart >0) ? 1:0;
+  MPI_Allreduce(&iamr, &iamrGlobal, 1, MPI_INT, MPI_MAX, scomm);
 
-  iamr=(ncart >0)?1:0;
-  MPI_Allreduce(&iamr,&iamrGlobal,1,MPI_INT,MPI_MAX,scomm);
   cg->preprocess();
-  for(i=0;i<ncart;i++) cb[i].preprocess(cg,1);
-  if (nblocks > 0) 
-    {
-      //mb->getCartReceptors(cg,pc_cart,1);
-      mb->getCartReceptors(cg,pc_cart,1);
-      mb->ihigh=ihigh;
-      mb->search();
-      //
-      // Fringe nodes on the artificial boundary
-      //  
-      mb->getFringeNodes();
-      //mb->getUnresolvedMandatoryReceptors();
-      cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
-    }    
-  //checkComm();
-  exchangeAMRDonors(1);
-  //for(i=0;i<ncart;i++)
-  //  cb[i].writeCellFile(i,1);
-  return;
 
-//  mb->getCellIblanks(meshcomm);
-//  mb->writeCellFile(myid);
-//  for(i=0;i<ncart;i++)
-//    cb[i].writeCellFile(i);
-  //MPI_Barrier(scomm);
-  //printf("Finished performConnectivityAMR in %d\n",myid);
-  //ierr=0;
-  //MPI_Abort(scomm,ierr);
+  for (int i = 0; i < ncart; i++) cb[i].preprocess(cg,1);
+
+  if (nblocks > 0)
+  {
+    // Get Cartesian-grid fringe nodes & search meshblock for donors
+    mb->getCartReceptors(cg,pc_cart,1);
+    mb->ihigh = ihigh;
+    mb->search();
+
+    // Fringe nodes on the artificial boundary
+    mb->getFringeNodes();
+
+    // Find donors for unstructured-grid fringe nodes in Cartesian grid
+    cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
+  }
+
+  exchangeAMRDonors(1);
 }
 
 void tioga::dataUpdate_AMR(int nvar,double **q,int interptype)
 {
-  int i,j,k,m;
-  int nints;
-  int nreals;
-  int *integerRecords;
-  double *realRecords;
+  // initialize send and recv packets
   int nsend,nrecv;
   int *sndMap,*rcvMap;
-  PACKET *sndPack,*rcvPack;
-  int *icount,*dcount;
-  int bid;
-  //
-  // initialize send and recv packets
-  //
-  icount=dcount=NULL;
-  integerRecords=NULL;
-  realRecords=NULL;
-  //
   pc_cart->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
   if (nsend==0) return;
-  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
-  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
-  icount=(int *)malloc(sizeof(int)*nsend);
-  dcount=(int *)malloc(sizeof(int)*nrecv);
-  //
+  PACKET* sndPack = (PACKET *)malloc(sizeof(PACKET)*nsend);
+  PACKET* rcvPack = (PACKET *)malloc(sizeof(PACKET)*nrecv);
+  int* icount = (int *)malloc(sizeof(int)*nsend);
+  int* dcount = (int *)malloc(sizeof(int)*nrecv);
+
   pc_cart->initPackets(sndPack,rcvPack);  
-  //
+
   // get the interpolated solution now
-  //
-  integerRecords=NULL;
-  realRecords=NULL;
+  int nints, nreals;
+  int* integerRecords = NULL;
+  double* realRecords = NULL;
   mb->getInterpolatedSolutionAtPointsAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
 
-  for(i=0;i<ncart;i++)
+  for (int i = 0; i < ncart; i++)
     cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar,1);
 
-  //
   // populate the packets
-  //
-  for(i=0;i<nints;i++)
-    {
-      k=integerRecords[3*i];
-      if (k <0 || k > nsend) {
-	tracei(nsend);
-	tracei(i);
-	tracei(nints);
-	tracei(k);
-      }
-      assert(k < nsend);      
-      sndPack[k].nints+=2;
-      sndPack[k].nreals+=nvar;
-    }
+  for (int i = 0; i < nints; i++)
+  {
+    int k = integerRecords[3*i];
+    sndPack[k].nints+=2;
+    sndPack[k].nreals+=nvar;
+  }
 
-  for(k=0;k<nsend;k++)
-    {
-     sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
-     sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
-     icount[k]=dcount[k]=0;
-    }  
+  for (int k = 0; k < nsend; k++)
+  {
+    sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
+    sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
+    icount[k]=dcount[k]=0;
+  }
 
-  m=0;
-  for(i=0;i<nints;i++)
-    {
-      k=integerRecords[3*i];
-      sndPack[k].intData[icount[k]++]=integerRecords[3*i+1];
-      sndPack[k].intData[icount[k]++]=integerRecords[3*i+2];
-      for(j=0;j<nvar;j++)
-        sndPack[k].realData[dcount[k]++]=realRecords[m++];
-    }
-  //
+  int m = 0;
+  for (int i = 0; i < nints; i++)
+  {
+    int k = integerRecords[3*i];
+    sndPack[k].intData[icount[k]++] = integerRecords[3*i+1];
+    sndPack[k].intData[icount[k]++] = integerRecords[3*i+2];
+    for (int j = 0; j < nvar; j++)
+      sndPack[k].realData[dcount[k]++] = realRecords[m++];
+  }
+
   // communicate the data across
-  //
   pc_cart->sendRecvPackets(sndPack,rcvPack);
-  //
-  // decode the packets and update the data
-  //
 
   int stride = nvar;
 
   // Decode the packets and update the values in the solver's data array
 
   std::vector<double> qtmp;
-  std::vector<int> itmp; /// FOR DEBUGGING ONLY
   if (iartbnd)
-  {
     qtmp.resize(stride*mb->ntotalPoints);
-    itmp.resize(mb->ntotalPoints);
-  }
 
   for (int k = 0; k < nrecv; k++)
   {
-    int m = 0;
+    m = 0;
     for (int i = 0; i < rcvPack[k].nints/2; i++)
     {
       const int bid = rcvPack[k].intData[2*i];
@@ -820,10 +695,7 @@ void tioga::dataUpdate_AMR(int nvar,double **q,int interptype)
         {
           // Pack all data into buffer for use in callback function
           for (int j = 0; j < stride; j++)
-          {
-            itmp[ind] = 1;
             qtmp[ind*stride+j] = rcvPack[k].realData[m+j];
-          }
         }
         else
         {
@@ -839,45 +711,18 @@ void tioga::dataUpdate_AMR(int nvar,double **q,int interptype)
     }
   }
 
+  // Update all fringe data now using callback functions
   if (iartbnd)
-  {
-    // --- Check for orphan points - shouldn't be any!!
-    // DEBUGGING only - shouldn't be needed once all working
-    std::ofstream fp;
-    int norphanPoint = 0;
-    for (int i = 0; i < mb->ntotalPoints; i++) {
-      if (itmp[i] == 0) {
-        if (!fp.is_open()) {
-          std::stringstream ss;
-          ss << "orphan" << myid << ".dat";
-          fp.open(ss.str().c_str(),std::ofstream::out);
-        }
-        mb->outputOrphan(fp,i);
-        norphanPoint++;
-      }
-    }
-    fp.close();
-    if (norphanPoint > 0) {
-      printf("Orphan points found!\n");
-      exit(2);
-    }
-    // --- End orphan printing
-
-    // Update all fringe data now using callback functions
-    /// TODO: make sure this never gets called for gradient interp
     mb->updateFringePointData(qtmp.data(),nvar);
-  }
 
-  //
   // release all memory
-  //
   pc_cart->clearPackets2(sndPack,rcvPack);
   free(sndPack);
   free(rcvPack);
-  if (integerRecords) free(integerRecords);
-  if (realRecords) free(realRecords);
-  if (icount) free(icount);
-  if (dcount) free(dcount);
+  free(integerRecords);
+  free(realRecords);
+  free(icount);
+  free(dcount);
 }
 
 
@@ -1006,20 +851,23 @@ tioga::~tioga()
 {      
   waitTime.showTime();
   interpTime.showTime();
-  int i;
-  if (mb) delete[] mb;
-  if (holeMap) 
-    {
-      for(i=0;i<nmesh;i++)
-	if (holeMap[i].existWall) free(holeMap[i].sam);
-      delete [] holeMap;
-    }
-  if (pc) delete[] pc;
-  if (sendCount) free(sendCount);
-  if (recvCount) free(recvCount);
-  if (obblist) free(obblist);
+
+  delete mb;
+  if (holeMap)
+  {
+    for (int i = 0; i < nmesh; i++)
+      if (holeMap[i].existWall)
+        free(holeMap[i].sam);
+    delete holeMap;
+  }
+  delete pc;
+
+  free(sendCount);
+  free(recvCount);
+  free(obblist);
+
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
-};
+}
 
 void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
 {
@@ -1146,7 +994,6 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   if (dcount) free(dcount);
 }
 
-#ifdef _GPU
 void tioga::dataUpdate_artBnd(int nvar, int dataFlag)
 {
   dataUpdate_artBnd_send(nvar,dataFlag);
@@ -1154,6 +1001,7 @@ void tioga::dataUpdate_artBnd(int nvar, int dataFlag)
   dataUpdate_artBnd_recv(nvar,dataFlag);
 }
 
+#ifdef _GPU
 void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 {
   // initialize send and recv packets
@@ -1191,9 +1039,7 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 
   interpTime.stopTimer();
 
-  /* ------------------------------------------------------------------------ */
-  /* Version 1.1: Wait for D2H transfer to complete and pack separate buffer */
-  // Wait for device-to-host transfer to complete
+  // Wait for D2H transfer to complete and pack separate buffer
   cudaStreamSynchronize(mb->stream_handle);
   PUSH_NVTX_RANGE("tg_packBuffers", 3);
   // Populate the packets [organize interp data by rank to send to]
@@ -1204,19 +1050,9 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
         sndVPack[p].realData[i*stride+j] = ubuf_h[(mb->buf_disp[p]+i)*stride+j];
   }
   POP_NVTX_RANGE;
-  /* ------------------------------------------------------------------------ */
   PUSH_NVTX_RANGE("tg_pc_send", 0);
   pc->sendPacketsV(sndVPack,rcvVPack);
   POP_NVTX_RANGE;
-
-  /* ------------------------------------------------------------------------ */
-  /* Version 2: Let D2H be async and get pointers into buffer for later send
-  PUSH_NVTX_RANGE("tg_packBuffers", 3);
-  // Populate the packets [organize interp data by rank to send to]
-  for (int p = 0; p < nsend; p++)
-    sndPack2[p].realData = ubuf_h.data() + mb->buf_disp[p]*stride;
-  POP_NVTX_RANGE;
-  /* ------------------------------------------------------------------------ */
 }
 
 void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
@@ -1227,34 +1063,11 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
 
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
 
-  if (nsend+nrecv == 0) return; /// NOT COMPATIBLE WITH MPI_ALLREDUCE!!
+  if (nsend+nrecv == 0) return;
 
   // get the interpolated solution now
   int stride = nvar;
   if (iartbnd && dataFlag == 1) stride = 3*nvar;
-
-  // communicate the data across all partitions
-  //PUSH_NVTX_RANGE("tg_pc_send", 0);
-
-  /* ------------------------------------------------------------------------ */
-  /* Version 1.2: Do the waiting and buffer packing here instead 
-  // Wait for device-to-host transfer to complete
-  cudaStreamSynchronize(mb->stream_handle);
-  PUSH_NVTX_RANGE("tg_packBuffers", 3);
-  // Populate the packets [organize interp data by rank to send to]
-  for (int p = 0; p < nsend; p++)
-  {
-    for (int i = 0; i < sndVPack[p].nints; i++)
-      for (int j = 0; j < stride; j++)
-        sndVPack[p].realData[i*stride+j] = ubuf_h[(mb->buf_disp[p]+i)*stride+j];
-  }
-  POP_NVTX_RANGE;
-  /* ------------------------------------------------------------------------ */
-
-
-  //pc->sendPacketsV(sndVPack,rcvVPack);
-//  pc->sendPacketsV2(sndPack2,rcvVPack); /// newer method
-  //POP_NVTX_RANGE;
 
   // Wait on all of the sends/recvs for the interpolated data
   PUSH_NVTX_RANGE("tg_pc_recv", 0);
@@ -1299,8 +1112,6 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     }
     fp.close();
 
-    //MPI_Allreduce(MPI_IN_PLACE, &norphanPoint, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
     if (norphanPoint > 0) {
       if (myid == 0) printf("Orphan points found!\n");
       MPI_Finalize();
@@ -1328,27 +1139,12 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
       ThrowException("Not written for non-artificial boundary codes right now");
   }
   POP_NVTX_RANGE;
-
-  /// TODO: modify for moving grids
-  // release all memory
-  //pc->clearPacketsV(sndVPack, rcvVPack);
 }
 #endif
 
-#ifndef _GPU
-void tioga::dataUpdate_artBnd(int nvar, int dataFlag)
-{
-  dataUpdate_artBnd_send(nvar,dataFlag);
-
-  dataUpdate_artBnd_recv(nvar,dataFlag);
-}
-
+#ifdef _CPU
 void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
 {
-  int es, ss, vs, ds;
-  double* q_spts = NULL; //(dataFlag == 0) ? get_q_spts(es, ss, vs) :
-                         //            get_dq_spts(es, ss, vs, ds);
-
   // initialize send and recv packets
   int nsend,nrecv;
   int *sndMap,*rcvMap;
@@ -1376,27 +1172,27 @@ void tioga::dataUpdate_artBnd_send(int nvar, int dataFlag)
   {
     if (dataFlag == 0)
       mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
-                                          &realRecords,q_spts,nvar,dataFlag);
+                                          &realRecords,NULL,nvar,dataFlag);
     else
       mb->getInterpolatedGradientAtPoints(nints,nreals,integerRecords,
-                                          realRecords,q_spts,nvar);
+                                          realRecords,NULL,nvar);
   }
   else if (ihigh && (ncart == 0))
   {
     mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
-                                        &realRecords,q_spts,nvar,dataFlag);
+                                        &realRecords,NULL,nvar,dataFlag);
   }
   else if (ncart > 0)
   {
     mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,
-                                   q_spts,nvar,dataFlag);
+                                   NULL,nvar,dataFlag);
     for (int i = 0; i < ncart; i++)
       cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
   }
   else
   {
     // Note: same as original func, but using interpList2 instead
-    mb->getInterpolatedSolution2(nints,nreals,integerRecords,realRecords,q_spts,
+    mb->getInterpolatedSolution2(nints,nreals,integerRecords,realRecords,NULL,
                                  nvar,dataFlag);
   }
 

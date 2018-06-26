@@ -322,6 +322,8 @@ inline unsigned getIndAbsMax(const std::vector<double> &vec)
 
 /*! ----------------------------------- Optimization Routines ----------------------------------- */
 
+#ifndef __CUDACC__
+
 static std::vector<double> Xn;  // Point with the highest value of F
 static std::vector<double> X0;  // Centroid of all other points
 static std::vector<double> Xr;  // Reflected point
@@ -768,6 +770,7 @@ double NelderMeadStep_constrained(std::vector<NM_FVAL> &FX, MinFunc minFunc,
 
   return FX[0].f;
 }
+#endif /* __CUDACC__ */
 
 template<int nSide>
 void calcDShape(double* __restrict__ shape, double* __restrict__ dshape,

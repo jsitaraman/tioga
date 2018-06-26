@@ -18,10 +18,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h"
-extern "C" 
-{ 
-  void fillHoleMap(int *holeMap, int ix[3],int isym);
-}
+#include "utils.h"
 
 /**
  * Create hole maps (structured cartesian maps of solid surfaces) for all grids
@@ -136,9 +133,6 @@ void tioga::getHoleMap(void)
   // now fill the holeMap
   for (int i = 0; i < nmesh; i++)
     if (holeMap[i].existWall) fillHoleMap(holeMap[i].sam,holeMap[i].nx,isym);
-
-  // output the hole map
-  //this->outputHoleMap();
 }
 
 /**

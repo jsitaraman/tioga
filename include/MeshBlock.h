@@ -49,7 +49,6 @@ typedef struct CutMap
   std::map<int,int> nMin;    //! # of cut faces that are approx. 'dist' away
   std::map<int,Vec3> norm;   //! Normal vector of cutting face (or avg. of several)
   std::map<int,double> dot;   //! Dot prodcut of Normal vector with separation vector
-  //std::map<int,Vec3> vec;    //! Vector from face to cell (between closest points)
 } CutMap;
 
 // forward declare to instantiate one of the methods
@@ -194,9 +193,6 @@ private:
   int (*get_n_weights)(int cellID);
   void (*donor_frac_gpu)(int* donorIDs, int nFringe, double* rst, double* weights);
 
-  /*! Copy solution/gradient data for the donor elements from device to host */
-  void (*data_from_device)(int* donorIDs, int nDonors, int gradFlag);
-
   /*! Copy updated solution/gradient for fringe faces from host to device */
   void (*face_data_to_device)(int* fringeIDs, int nFringe, int gradFlag, double *data);
 
@@ -248,8 +244,6 @@ private:
 
   int nFacePoints;
   int nCellPoints;
-
-  //std::unordered_set<int> overFaces; /** < List of Artificial Boundary face indices */
 
   std::vector<double> rxyz;            /**  point coordinates */
   int ipoint; 
@@ -337,9 +331,6 @@ private:
 
   dvec<double*> qptrs_d;
   dvec<int> qstrides_d;
-
-  //dvec<int> iblank_cell_d;
-  //dvec<int> iblank_face_d;
 
   cudaStream_t stream_handle;
   cudaEvent_t event_handle;
@@ -454,11 +445,6 @@ private:
 					 double **q,
 					 int nvar, int interptype);
   
-  void getInterpolatedSolutionArtBnd(int &nints, int &nreals,
-           std::vector<int> &intData, std::vector<double> &realData, int nvar);
-
-  void getInterpolatedGradientArtBnd(int& nints, int& nreals, std::vector<int>& intData, std::vector<double>& realData, int nvar);
-
   void checkContainment(int *cellIndex,int adtElement,double *xsearch,double *rst);
 
   void getWallBounds(int *mtag,int *existWall, double wbox[6]);
@@ -479,7 +465,7 @@ private:
 
   void initializeDonorList();
   
-  void insertAndSort(int pointid,int senderid,int meshtag, int remoteid, double donorRes, double receptorRes = 0);
+  void insertAndSort(int pointid, int senderid, int meshtag, int remoteid, double donorRes);
   
   void processDonors(HOLEMAP *holemap, int nmesh,int **donorRecords,double **receptorResolution,
 		     int *nrecords);
@@ -578,8 +564,7 @@ private:
     iartbnd = 1;
   }
 
-  void setCallbackArtBndGpu(void (*d2h)(int* ids, int nd, int grad),
-                            void (*h2df)(int* ids, int nf, int grad, double *data),
+  void setCallbackArtBndGpu(void (*h2df)(int* ids, int nf, int grad, double *data),
                             void (*h2dc)(int* ids, int nf, int grad, double *data),
                             double* (*gqd)(int& es, int& ss, int& vs, int etype),
                             double* (*gdqd)(int& es, int& ss, int& vs, int& ds, int etype),
@@ -588,7 +573,6 @@ private:
                             int (*gnw)(int),
                             void (*dfg)(int*, int, double*, double*))
   {
-    data_from_device = d2h;
     face_data_to_device = h2df;
     cell_data_to_device = h2dc;
     get_q_spts_d = gqd;
@@ -637,9 +621,6 @@ private:
   /*! Update solution gradient at artificial boundary flux points */
   void updateFringePointGradient(double *dqtmp, int nvar);
 
-  /*! Copy donor-cell data from device to host for use in interpolation */
-  void getDonorDataGPU(int dataFlag = 0);
-
   /*! Copy fringe-face data back to device for computation in solver */
   void sendFringeDataGPU(int gradFlag);
 
@@ -665,9 +646,6 @@ private:
 
   //! Rebuild the ADT using knowledge of current donor elements
   void rebuildADT(void);
-
-  /*! Apply blanking algorithm (to nodal iblank?) to get cell & face iblanks */
-  void setArtificialBoundaries(void);
 
   /*! Setup additional helpful connectivity structures */
   void extraConn(void);

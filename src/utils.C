@@ -1,4 +1,3 @@
-
 /* This file is part of the Tioga software library */
 
 /* Tioga  is a tool for overset grid assembly on parallel distributed systems */
@@ -21,11 +20,22 @@
 #include <cmath>
 #include <vector>
 
-#ifdef __cplusplus
 extern "C" {
-#endif
+  void kaiser_wrap_(double *,int *,int *,double *,double *,double *,int *);
+}
 
-extern void kaiser_wrap_(double *,int *,int *,double *,double *,double *,int *);
+int get_cell_type(int* nc, int ntypes, int ic_in)
+{
+  // Return the cell type index and cell index within that type
+  int count = 0;
+  for (int n = 0; n < ntypes; n++)
+  {
+    if (count + nc[n] > ic_in)
+      return n;
+
+    count += nc[n];
+  }
+}
 
 /***
  ** find oriented bounding box for a given set of points
@@ -426,10 +436,6 @@ void writePoints(double *x,int nsearch,int bid)
     fprintf(fp,"%f %f %f\n",x[3*i],x[3*i+1],x[3*i+2]);
   fclose(fp);
 }
-
-#ifdef __cplusplus
-}
-#endif
 
 /*
  * Create a unique hash for list of coordinates with duplicates in 

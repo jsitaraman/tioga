@@ -31,6 +31,9 @@
 #include "highOrder_kernels.h"
 #endif
 
+#include "math_funcs.h"
+#include "utils.h"
+
 #define ROW 0
 #define COLUMN 1
 #define NFRAC 1331
@@ -41,12 +44,6 @@
 
 #define HOLE_CUT 0
 #define FIELD_CUT 1
-
-extern "C" 
-{
-  void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
-  int checkHoleMap(double *x,int *nx,int *sam,double *extents);
-}
 
 using namespace tg_funcs;
 
@@ -633,19 +630,6 @@ void MeshBlock::unifyCutFlags(std::vector<CutMap> &cutMap)
   }
 }
 
-int get_cell_type(int* nc, int ntypes, int ic_in)
-{
-  // Return the cell type index and cell index within that type
-  int count = 0;
-  for (int n = 0; n < ntypes; n++)
-  {
-    if (count + nc[n] > ic_in)
-      return n;
-
-    count += nc[n];
-  }
-}
-
 int get_cell_index(int* nc, int ntypes, int ic_in, int &ic_out)
 {
   // Return the cell type index and cell index within that type
@@ -804,27 +788,6 @@ void MeshBlock::calcFaceIblanks(const MPI_Comm &meshComm)
   for (int ff = 0; ff < nfaces; ff++)
     if (iblank_face[ff] == FRINGE)
       ftag[nreceptorFaces++] = ff;
-}
-
-void MeshBlock::setArtificialBoundaries(void)
-{
-  nreceptorFaces = 0;
-  for (int ff = 0; ff < nfaces; ff++)
-  {
-    if (iblank_face[ff] == FRINGE)
-      nreceptorFaces++;
-  }
-
-  // Setup final storage of A.B. face indices
-  free(ftag);
-  ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
-
-  nreceptorFaces = 0;
-  for (int ff = 0; ff < nfaces; ff++)
-  {
-    if (iblank_face[ff] == FRINGE)
-      ftag[nreceptorFaces++] = ff;
-  }
 }
 
 void MeshBlock::clearOrphans(HOLEMAP *holemap, int nmesh, int *itmp)
@@ -1043,7 +1006,6 @@ void MeshBlock::getFringeNodes(bool unblanking)
     {
       free(ctag);
       ctag = (int*)malloc(sizeof(int)*unblanks.size());
-
       // Gather a list of cell IDs for all receptor (fringe) cells
       for (auto &ic : unblanks)
         ctag[nreceptorCells++] = ic;
@@ -1338,7 +1300,6 @@ void MeshBlock::processPointDonors(void)
 }
 
 #ifdef _GPU
-//void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<PACKET> &sndPack)
 void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vector<VPACKET> &sndPack)
 {
   if (ninterp2 == 0)
@@ -1353,7 +1314,7 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
     {
       sndPack[p].nints = 0;
       sndPack[p].nreals = 0;
-      sndPack[p].intData.resize(0); ///
+      sndPack[p].intData.resize(0);
     }
 
     return;
@@ -1375,10 +1336,7 @@ void MeshBlock::setupBuffersGPU(int nsend, std::vector<int> &intData, std::vecto
   for (int p = 0; p < nsend; p++)
   {
     sndPack[p].nints = n_ints[p];
-//    if (sndPack[p].intData)
-//      delete [] sndPack[p].intData;
-//    sndPack[p].intData = new int[n_ints[p]];
-    sndPack[p].intData.resize(n_ints[p]); ///
+    sndPack[p].intData.resize(n_ints[p]);
   }
 
   buf_disp.assign(nsend, 0);
@@ -1421,17 +1379,22 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints, int *nreals,
 
   if (iartbnd)
   {
+    // Get the pointer(s) to the solution data [per cell type]
+    double* Q[4];
+    int es[4], ss[4], vs[4];
+    for (int n = 0; n < ntypes; n++)
+      Q[n] = get_q_spts(es[n],ss[n],vs[n],n);
+
     for (int i = 0; i < ninterp2; i++)
     {
       qq.assign(nvar,0);
       int ic = interpList2[i].donorID;
+      int n = get_cell_type(nc,ntypes,ic);
       for (int spt = 0; spt < interpList2[i].nweights; spt++)
       {
         double weight = interpList2[i].weights[spt];
-        for (int k = 0; k < nvar; k++) {
-          double val = get_q_spt(ic,spt,k);
-          qq[k] += val*weight;
-        }
+        for (int k = 0; k < nvar; k++)
+          qq[k] += weight * Q[n][ic*es[n]+spt*ss[n]+k*vs[n]];
       }
       (*intData)[icount++] = interpList2[i].receptorInfo[0];
       (*intData)[icount++] = interpList2[i].receptorInfo[1];
@@ -1548,109 +1511,6 @@ void MeshBlock::getInterpolatedGradientAtPoints(int &nints, int &nreals,
   MPI_Pcontrol(-1,"get_interp_grad");
 }
 
-void MeshBlock::getInterpolatedSolutionArtBnd(int &nints, int &nreals,
-                std::vector<int> &intData, std::vector<double> &realData, int nvar)
-{  
-  nints = ninterp2;
-  nreals = ninterp2*nvar;
-  if (nints == 0) return;
-
-  intData.resize(2*nints);
-  realData.resize(nreals);
-
-  std::vector<double*> q_spts(ntypes);
-  std::vector<int> estride(ntypes), sstride(ntypes), vstride(ntypes);
-
-  for (int n = 0; n < ntypes; n++)
-    q_spts[n] = get_q_spts(estride[n], sstride[n], vstride[n], n);
-
-  PUSH_NVTX_RANGE("getInterpU", 4);
-  MPI_Pcontrol(1,"get_interpolated_U");
-#pragma omp parallel for
-  for (int i = 0; i < ninterp2; i++)
-  {
-    for (int k = 0; k < nvar; k++)
-      realData[nvar*i+k] = 0.;
-
-    int n;
-    int ele = interpList2[i].donorID;
-    for (n = 0; n < ntypes; n++)
-    {
-      ele -= nc[n];
-      if (ele > 0) continue;
-
-      ele += nc[n];
-      break;
-    }
-
-    double* eptr = q_spts[n] + ele*estride[n];
-    for (int spt = 0; spt < interpList2[i].nweights; spt++)
-    {
-      double weight = interpList2[i].weights[spt];
-      for (int k = 0; k < nvar; k++)
-      {
-        realData[nvar*i+k] += weight * eptr[spt*sstride[n] + k*vstride[n]];
-      }
-    }
-
-    intData[2*i] = interpList2[i].receptorInfo[0];
-    intData[2*i+1] = interpList2[i].receptorInfo[1];
-  }
-  MPI_Pcontrol(-1,"get_interpolated_U");
-  POP_NVTX_RANGE;
-}
-
-void MeshBlock::getInterpolatedGradientArtBnd(int &nints, int &nreals,
-                std::vector<int> &intData, std::vector<double> &realData, int nvar)
-{
-  nints = ninterp2;
-  nreals = ninterp2*nvar*nDims;
-  if (nints == 0) return;
-
-  intData.resize(2*nints);
-  realData.resize(nreals);
-
-  std::vector<double*> dq_spts(ntypes);
-  std::vector<int> estride(ntypes), sstride(ntypes), vstride(ntypes), dstride(ntypes);
-
-  for (int n = 0; n < ntypes; n++)
-    dq_spts[n] = get_dq_spts(estride[n], sstride[n], vstride[n], dstride[n], n);
-
-  PUSH_NVTX_RANGE("getInterpGrad", 5);
-  MPI_Pcontrol(1, "get_interpolated_grad");
-#pragma omp parallel for
-  for (int i = 0; i < ninterp2; i++)
-  {
-    for (int dim = 0; dim < nDims; dim++)
-      for (int k = 0; k < nvar; k++)
-        realData[nvar*(nDims*i+dim)+k] = 0;
-
-    int n;
-    int ele = interpList2[i].donorID;
-    for (n = 0; n < ntypes; n++)
-    {
-      ele -= nc[n];
-      if (ele > 0) continue;
-
-      ele += nc[n];
-      break;
-    }
-
-    double *eptr = dq_spts[n] + ele*estride[n];
-    for (int spt = 0; spt < interpList2[i].nweights; spt++)
-    {
-      double weight = interpList2[i].weights[spt];
-      for (int dim = 0; dim < nDims; dim++)
-        for (int k = 0; k < nvar; k++)
-          realData[nvar*(nDims*i+dim)+k] += weight * eptr[spt*sstride[n] + k*vstride[n] + dim*dstride[n]];
-    }
-    intData[2*i] = interpList2[i].receptorInfo[0];
-    intData[2*i+1] = interpList2[i].receptorInfo[1];
-  }
-  MPI_Pcontrol(-1, "get_interpolated_grad");
-  POP_NVTX_RANGE;
-}
-
 #ifdef _GPU
 void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
 {
@@ -1675,8 +1535,8 @@ void MeshBlock::interpSolution_gpu(double *q_out_d, int nvar)
   qstrides_d.assign(strides_h.data(), strides_h.size(), &stream_handle);
 
   // Perform the interpolation
-  /// TODO: split up donors_d and weights_d by element type
-  interp_u_types_wrapper(qptrs_d.data(), q_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
+  /// TODO: organize donors_d and weights_d by element type for performance
+  interp_u_wrapper(qptrs_d.data(), q_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
       winds_d.data(), buf_inds_d.data(), ninterp2, nweights_d.data(), nvar, qstrides_d.data(), stream_handle);
 }
 
@@ -1704,7 +1564,7 @@ void MeshBlock::interpGradient_gpu(double *dq_out_d, int nvar)
   strides_d.assign(strides_h.data(), strides_h.size());
 
   // Perform the interpolation
-  interp_du_types_wrapper(dqtd_d.data(), dq_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
+  interp_du_wrapper(dqtd_d.data(), dq_out_d, donorsBT_d.data(), weights_d.data(), etypes_d.data(),
       winds_d.data(), buf_inds_d.data(), ninterp2, nweights_d.data(), nvar, nDims, strides_d.data(), stream_handle);
 
   dqtd_d.free_data();
@@ -1767,7 +1627,10 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
     face_data_to_device(ftag, nreceptorFaces, 0, qtmp);
 
   if (nreceptorCells > 0)
+  {
+    printf("nreceptorCells = %d; %d, %d\n",nreceptorCells,ctag[0],ctag[1]); /// DEBUGGING
     cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
+  }
 #else
 
   int fpt_start = 0;
@@ -1810,23 +1673,6 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
   }
 #endif
   POP_NVTX_RANGE;
-}
-
-void MeshBlock::getDonorDataGPU(int dataFlag)
-{
-  MPI_Pcontrol(1, "getDonorDataGPU");
-
-  // Get a sorted list of all donor cells on this rank
-  std::vector<int> donorIDs(ninterp2);
-  for (int i = 0; i < ninterp2; i++)
-    donorIDs[i] = interpList2[i].donorID;
-
-  std::sort(donorIDs.begin(), donorIDs.end());
-  donorIDs.erase(std::unique(donorIDs.begin(),donorIDs.end()), donorIDs.end());
-
-  data_from_device(donorIDs.data(), donorIDs.size(), dataFlag);
-
-  MPI_Pcontrol(-1, "getDonorDataGPU");
 }
 
 void MeshBlock::sendFringeDataGPU(int gradFlag)

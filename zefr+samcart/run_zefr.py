@@ -190,11 +190,16 @@ for i in range(iter+1,nSteps+1):
         SAMCART.setIGBPs(TIOGA.igbpdata)
 
     if adaptFreq > 0 and (i-1) % adaptFreq == 0:
+        # Do automatic geometry-/solution- based mesh adaption
         SAMCART.adapt(i,True)
 
     if moving or (adaptFreq > 0 and (i-1) % adaptFreq == 0):
+        # Update domain connectivity
         TIOGA.initAMRData(SAMCART.gridData)
         TIOGA.performAMRConnectivity()
+
+        if parameters['use-gpu']:
+            ZEFR.updateBlankingGpu()
 
     T0 = Time.clock_gettime(0)
     for j in range(0,nStages):
@@ -208,7 +213,7 @@ for i in range(iter+1,nSteps+1):
         ZEFR.runSubStepMid(i,j)
 
         # Finish residual calculation and RK stage advancement
-        # (Should include rigid_body_update() if doing 6DOF from ZEFR)
+        # (Includes rigid_body_update() if doing 6DOF from ZEFR)
         ZEFR.runSubStepFinish(i,j)
     T1 = Time.clock_gettime(0)
     TIOGA.exchangeSolutionAMR() # Interpolate 't^{n+1}' data from ZEFR

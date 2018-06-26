@@ -122,7 +122,6 @@ float orderedIntToFloat(int intVal)
 
 __device__ float atomicMaxf(float* address, float val)
 {
-  //int *iaddr = (int*)address;
   int old = __float_as_int(*address);
   int assumed;
   while (val > __int_as_float(old))
@@ -451,7 +450,7 @@ void get_eigenvectors(float mat[3][3], float* __restrict__ evecs)
       evecs[3*i+j] = 0;
   }
 
-  //while (off_norm(mat) < 1.e-8)
+  // 4 steps virtually guarantees good results
   for (int i = 0; i < 4; i++)
   {
     jacobi_rotation(mat, evecs, 0, 1);
@@ -1609,7 +1608,6 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
 
   /* ---- Check against our reduced list of faces ---- */
 
-  /// Or TODO on storing href in global memory instead...
   const float href = eleBbox[16*IC+15];
   const float dtol = .2*href;
 
@@ -1681,12 +1679,12 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
   {
     int ipt = lin2curv[TriPts[2*F+t][p]];
     for (int d = 0; d < 3; d++)
-      TC[3*p+d] = mb.coord[ic+mb.ncells*(d+nDims*ipt)]; /// NOTE: 'row-major' ZEFR layout
+      TC[3*p+d] = mb.coord[ic+mb.ncells*(d+nDims*ipt)]; // NOTE: 'row-major' ZEFR layout
   }
 
-  // Find distance from face to cell
-  /// NOTE: ignoring case of face entirely inside cell, since any valid grid
-  /// will also have a different face which intersects its boundary
+  /* Find distance from face to cell
+   * NOTE: ignoring case of face entirely inside cell, since any valid grid
+   * will also have a different face which intersects its boundary */
   dPointf vec;
   float myDist = intersectionCheckOne<nSideF>(mb, &cutFaces[ff*stride], &vec[0], TC);
   vec /= vec.norm();
@@ -1700,7 +1698,6 @@ void cuttingPass2(dMeshBlock mb, dvec<float> cutFaces, dvec<int> checkFaces,
   outDist[T+nTri*(IC+nEles*FID)] = myDist;
   for (int i = 0; i < 3; i++)
   {
-    //outNorm[IC+nEles*(i+3*FID)] = myNorm[i];
     outVec[T+nTri*(IC+nEles*(FID+NF2*i))] = vec[i];
   }
 }
@@ -1893,7 +1890,7 @@ void filterElements(dMeshBlock mb, dvec<double> cut_bbox, dvec<int> filt,
         xc[d] = x2[d];
     }
 
-    char tag = cuda_funcs::checkHoleMap(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
+    char tag = cuda_funcs::checkHoleMap<float>(xc, mb.hm_sam.data(), mb.hm_nx.data(), mb.hm_extents.data());
 
     if (cutType == 1) // Wall boundary - if any nodes have tag == 1, set as hole
       tag1 = tag1 || (tag == 1);
@@ -1971,7 +1968,7 @@ void filterFaces(dMeshBlock mb, dvec<float> ele_bbox, int nCut,
 
 void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cutBbox_h, int* cutFlag, int cutType)
 {
-  // Setup cutMap TODO: create initialization elsewhere?
+  // Setup cutMap
   cutFlag_d.resize(ncells);
   filt_eles.resize(ncells);
   filt_faces.resize(nCut);

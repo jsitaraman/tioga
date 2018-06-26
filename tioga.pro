@@ -1,7 +1,7 @@
 TEMPLATE = library
 CONFIG -= app_bundle
 CONFIG -= qt
-#DEFINES = _GPU __CUDACC__
+DEFINES = _CPU _GPU __CUDACC__
 
 INCLUDEPATH += include/
 
@@ -18,13 +18,11 @@ SOURCES += src/tioga.C \
     src/exchangeDonors.C \
     src/exchangeSearchData.C \
     src/buildADTrecursion.c \
-    src/computeCellVolume.c \
     src/funcs.cpp \
     src/getCartReceptors.C \
     src/highOrder.C \
     src/holeMap.C \
     src/linklist.C \
-    src/math.C \
     src/MeshBlock.C \
     src/parallelComm.C \
     src/points.cpp \
@@ -42,7 +40,8 @@ SOURCES += src/tioga.C \
     src/writeqnode.f90 \
     src/dADT.cu \
     src/dMeshBlock.cu \
-    src/superMesh.cpp
+    src/superMesh.cpp \
+    src/math_funcs.C
 
 HEADERS += \
     include/ADT.h \
@@ -63,7 +62,10 @@ HEADERS += \
     include/dADT.h \
     include/dMeshBlock.h \
     include/superMesh.hpp \
-    include/convert.i
+    include/convert.i \
+    include/utils.h \
+    include/math_funcs.h \
+    include/linklist.h
 
 DISTFILES += \
     run/tiogaInterface.py \

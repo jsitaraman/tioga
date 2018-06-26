@@ -21,15 +21,13 @@
 #include "CartBlock.h"
 #include "CartGrid.h"
 #include "funcs.hpp"
+#include "linklist.h"
+#include "math_funcs.h"
+#include "utils.h"
 
 #include <assert.h>
 
 extern "C" {
-  void deallocateLinkList(DONORLIST *temp);
-  void deallocateLinkList2(INTEGERLIST *temp);
-  void deallocateLinkList3(INTEGERLIST2 *temp);
-  void deallocateLinkList4(INTERPLIST2 *temp);
-  void insertInList(DONORLIST **donorList,DONORLIST *temp1);
   void get_amr_index_xyz( int nq,int i,int j,int k,
 			  int pBasis,
 			  int nX,int nY,int nZ,
@@ -39,8 +37,6 @@ extern "C" {
 			  int* index, double* xyz);
     void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf, int nq,
 			     int index, int* ijklmn);
-    int checkHoleMap(double *x,int *nx,int *sam,double *extents);
-    //void writeqnode_(int *myid,double *qnodein,int *qnodesize);
 }
 
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,

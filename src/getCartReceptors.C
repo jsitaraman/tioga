@@ -25,10 +25,10 @@
 #include "MeshBlock.h"
 #include "parallelComm.h"
 #include "CartGrid.h"
-extern "C"{
-  int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
-                        double vB[3][3],double xB[3],double dxB[3]);
+#include "linklist.h"
+#include "utils.h"
 
+extern "C"{
   void get_amr_index_xyz(int nq,int i,int j,int k,
 			 int pBasis,
 			 int nX,int nY,int nZ,
@@ -36,7 +36,6 @@ extern "C"{
 			 double *xlo,double *dx,
 			 double *qnodes,
 			 int* index, double* xyz);
-  void deallocateLinkList3(INTEGERLIST2 *);
 }
 
 void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc,int itype)

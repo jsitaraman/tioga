@@ -19,13 +19,9 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "MeshBlock.h"
 #include "superMesh.hpp"
-
-extern "C" {
-  void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
-  double computeCellVolume(double xv[8][3],int nvert);
-  void deallocateLinkList(DONORLIST *temp);
-  void deallocateLinkList2(INTEGERLIST *temp);  
-}
+#include "utils.h"
+#include "math_funcs.h"
+#include "linklist.h"
 
 using namespace tg_funcs;
 

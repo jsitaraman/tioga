@@ -18,14 +18,9 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "MeshBlock.h"
-extern "C" 
-{
-  void insertInList(DONORLIST **donorList,DONORLIST *temp1);
-  void deallocateLinkList(DONORLIST *temp);
-  void deallocateLinkList2(INTEGERLIST *temp);  
-  int checkHoleMap(double *x,int *nx,int *sam,double *extents);
-  void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
-}
+#include "utils.h"
+#include "math_funcs.h"
+#include "linklist.h"
 
 #define verbose false
 
@@ -43,7 +38,7 @@ void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
     {
       int k = isearch[2*i];
       sndPack[k].nints  += 3;
-      sndPack[k].nreals ++;// 2; // Donor res, receptor res
+      sndPack[k].nreals ++; // Donor res
     }
   }
 
@@ -65,9 +60,6 @@ void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
       sndPack[k].intData[icount[k]++]  = isearch[2*i+1];      // point id from receptor grid
       sndPack[k].intData[icount[k]++]  = i;                   // point id on the donor side
       sndPack[k].realData[dcount[k]++] = cellRes[donorId[i]]; // donor resolution
-      //sndPack[k].realData[dcount[k]++] = res_search[xtag[i]]; // receptor resolution
-      /* FYI, potentially useful stuff was commented out
-       * here in PartFix.patch... */
     }
   }
 
@@ -91,7 +83,7 @@ void MeshBlock::initializeDonorList(void)
 }
 
 void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int remoteid,
-			      double donorRes, double receptorRes)
+            double donorRes)
 {
   DONORLIST *temp1;
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
@@ -99,7 +91,6 @@ void MeshBlock::insertAndSort(int pointid,int senderid,int meshtagdonor, int rem
   temp1->donorData[1] = meshtagdonor;
   temp1->donorData[2] = remoteid;
   temp1->donorRes     = donorRes;
-  temp1->receptorRes  = receptorRes;
   insertInList(&donorList[pointid],temp1);
 }
 
@@ -140,7 +131,6 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
           tracei(meshtagdonor);
           traced(temp->donorRes);
         }
-        //nodeRes[i] = std::max(nodeRes[i], temp->receptorRes);
         temp = temp->next;
       }
       for (int j = 0; j < nmesh; j++)

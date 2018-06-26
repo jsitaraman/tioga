@@ -24,8 +24,8 @@ ld=$(CXX)
 
 SWIG = $(SWIG_BIN)/swig
 
-CFLAGS = --std=c++11 -fPIC -rdynamic 
-CUFLAGS = --std=c++11 --default-stream per-thread -Xcompiler -fPIC
+CFLAGS = -std=c++11 -fPIC -rdynamic
+CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
 SFLAGS = -I$(strip $(PYTHON_INC_DIR))/ -I$(strip $(MPI4PY_INC_DIR))/ -I$(strip $(NUMPY_INC_DIR))/
 
@@ -37,11 +37,16 @@ ifeq ($(strip $(CUDA)),YES)
 	CUFLAGS += -D_GPU
 	SFLAGS += -D_GPU
 	LIBS += -L$(strip $(CUDA_LIB_DIR))/ -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_LIB_DIR))/
+	# If compiling on Ubuntu 16.04 with default GCC, this might be needed:
+	CUFLAGS += -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES
 ifeq ($(strip $(CU_SM)),)
 	CUFLAGS += -arch=sm_20
 else
 	CUFLAGS += -arch=sm_$(CU_SM)
 endif
+else
+  CFLAGS += -D_CPU
+  SFLAGS += -D_CPU
 endif
 INCS += -I$(strip $(CUDA_INC_DIR))/
 INCS += -I$(strip $(MPI_INC_DIR))/
@@ -87,7 +92,7 @@ INCLUDES = codetypes.h MeshBlock.h ADT.h tioga.h globals.h error.hpp points.hpp 
 OBJF90 = $(BINDIR)/kaiser.o $(BINDIR)/median.o 
 OBJECTS = $(BINDIR)/buildADTrecursion.o $(BINDIR)/searchADTrecursion.o $(BINDIR)/ADT.o\
 	$(BINDIR)/MeshBlock.o $(BINDIR)/search.o $(BINDIR)/checkContainment.o $(BINDIR)/bookKeeping.o \
-	$(BINDIR)/dataUpdate.o $(BINDIR)/math.o $(BINDIR)/utils.o $(BINDIR)/linklist.o\
+	$(BINDIR)/dataUpdate.o $(BINDIR)/math_funcs.o $(BINDIR)/utils.o $(BINDIR)/linklist.o\
 	$(BINDIR)/tioga.o $(BINDIR)/holeMap.o $(BINDIR)/exchangeBoxes.o $(BINDIR)/exchangeSearchData.o $(BINDIR)/exchangeDonors.o\
 	$(BINDIR)/parallelComm.o $(BINDIR)/highOrder.o \
 	$(BINDIR)/cartOps.o $(BINDIR)/CartGrid.o $(BINDIR)/CartBlock.o $(BINDIR)/getCartReceptors.o $(BINDIR)/get_amr_index_xyz.o\

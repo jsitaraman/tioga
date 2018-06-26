@@ -19,10 +19,6 @@
 /* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA */
 #include "codetypes.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 void deallocateLinkList(DONORLIST *temp)
 {
   if (temp!=NULL) 
@@ -106,7 +102,3 @@ void insertInList(DONORLIST **donorList,DONORLIST *temp1)
        }
     }
 }
-
-#ifdef __cplusplus
-}
-#endif

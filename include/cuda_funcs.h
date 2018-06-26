@@ -836,28 +836,9 @@ float dLagrange_gpu(const float* __restrict__ xiGrid, unsigned int npts,
   return val/den;
 }
 
+template<typename T>
 __device__ __forceinline__
-char checkHoleMap(const double* __restrict__ pt, const char* __restrict__ sam,
-    const int* __restrict__ nx, const double* __restrict__ extents)
-{
-  double dx[3];
-  int ix[3];
-
-  for (int i = 0; i < 3; i++)
-    dx[i] = (extents[i+3]-extents[i]) / nx[i];
-
-  for (int i = 0; i < 3; i++)
-  {
-    ix[i] = (pt[i]-extents[i])/dx[i];
-    if (ix[i] < 0 || ix[i] > nx[i]-1) return 0;
-  }
-
-  return sam[ix[0] + nx[0]*(ix[1] + nx[1]*ix[2])];
-}
-
-
-__device__ __forceinline__
-char checkHoleMap(const float* __restrict__ pt, const char* __restrict__ sam,
+char checkHoleMap(const T* __restrict__ pt, const char* __restrict__ sam,
     const int* __restrict__ nx, const double* __restrict__ extents)
 {
   double dx[3];

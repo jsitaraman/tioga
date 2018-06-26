@@ -1,4 +1,3 @@
-
 /* This file is part of the Tioga software library */
 
 /* Tioga  is a tool for overset grid assembly on parallel distributed systems */
@@ -20,10 +19,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /** box product of vectors, a,b,c */
 double scalarProduct(double a[3], double b[3], double c[3])
@@ -392,7 +387,3 @@ double computeCellVolume(double xv[8][3],int nvert)
    }
  return cellVolume(xv,numverts[itype],faceInfo[itype],nfaces,nvert);
 }
-
-#ifdef __cplusplus
-}
-#endif

@@ -19,12 +19,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h" /// DEBUGGING (profiling - timer)
 #include "MeshBlock.h"
-extern "C" {
-  void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
-  void writebbox(OBB *obb,int bid);
-  void writePoints(double *x,int nsearch,int bid);
-}
-void uniquenodes(double *x,double *rtag,int *itag,int nn);
+#include "utils.h"
 
 void MeshBlock::search(void)
 {

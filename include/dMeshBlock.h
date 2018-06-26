@@ -15,7 +15,6 @@ typedef struct dCutMap
   dvec<int> nMin;    //! # of cut faces that are approx. 'dist' away
   dvec<double> norm;   //! Normal vector of cutting face (or avg. of several)
   dvec<double> dot;   //! Dot prodcut of Normal vector with separation vector
-  //std::map<int,Vec3> vec;    //! Vector from face to cell (between closest points)
 } dCutMap;
 
 class dMeshBlock
@@ -76,7 +75,6 @@ public:
   dvec<int> hm_nx;          //! # of Cartesian cells in each direction of map
   dvec<double> hm_dx;       //! Size of Cartesian cells (extents / nx)
   dvec<double> hm_extents;  //! Hole map bounding extents [bounding box]
-  /// TODO: float?
 
   /* ------ Misc. Variables ------ */
 

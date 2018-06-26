@@ -18,16 +18,14 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "MeshBlock.h"
+#include "utils.h"
+#include "math_funcs.h"
+
 #include <assert.h>
+
 #define ROW 0
 #define COLUMN 1
 #define NFRAC 1331
-
-extern "C" 
-{
-  void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
-//  void writeqnode_(int *myid,double *qnodein,int *qnodesize);
-}
 
 void MeshBlock::setCartIblanks(void)
 {
@@ -451,11 +449,18 @@ void MeshBlock::getInterpolatedSolutionAtPointsAMR(int *nints,int *nreals,int **
   std::vector<double> qq(nvar,0);
   int icount = 0;
   int dcount = 0;
-  
+
+  // Get the pointer(s) to the solution data [per cell type]
+  double* Q[4];
+  int es[4], ss[4], vs[4];
+  for (int n = 0; n < ntypes; n++)
+    Q[n] = get_q_spts(es[n],ss[n],vs[n],n);
+
   for (int i = 0; i < ninterpCart; i++)
   {
     qq.assign(nvar,0);
     int ic = interpListCart[i].donorID;
+    int n = get_cell_type(nc,ntypes,ic);
     for (int spt = 0; spt < interpListCart[i].nweights; spt++)
     {
       double weight = interpListCart[i].weights[spt];

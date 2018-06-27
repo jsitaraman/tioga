@@ -82,6 +82,7 @@ class tioga
   int ihigh;
   int ihighGlobal;
   int iamrGlobal;
+  int mexclude,nfringe;
   /** basic constuctor */
   tioga()
     /*
@@ -93,6 +94,7 @@ class tioga
         holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
         // obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
         isym=3;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        mexclude=3,nfringe=1;
         qblock=NULL;
         mblocks.clear();
         mtags.clear();
@@ -164,6 +166,16 @@ class tioga
     int iblk = idxit->second;
     auto& mb = mblocks[iblk];
     mb->setResolutions(nres, cres);
+  }
+  
+  void setMexclude(int *mexclude_input)
+  {
+    mexclude=*mexclude_input;
+  }
+
+  void setNfringe(int *nfringe_input)
+  {
+    nfringe=*nfringe_input;
   }
 
   void set_cell_iblank(int *iblank_cell)

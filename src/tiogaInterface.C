@@ -272,6 +272,16 @@ extern "C" {
     tg->reduce_fringes();
   }
 
+  void tioga_setnfringe_(int *nfringe)
+  {
+    tg->setNfringe(nfringe);
+  }
+
+  void tioga_setmexclude_(int *mexclude)
+  {
+   tg->setMexclude(mexclude);
+  }
+
   void tioga_delete_(void)
    {
     delete [] tg;
@@ -282,4 +292,5 @@ extern "C" {
        if (idata[i].vconn) free(idata[i].vconn);
      }
    }
+
 }

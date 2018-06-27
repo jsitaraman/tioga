@@ -103,6 +103,7 @@ class MeshBlock
   int donorListLength;
 
   int nfringe;
+  int mexclude;
   int meshtag; /** < tag of the mesh that this block belongs to */
   double resolutionScale;
   //
@@ -145,6 +146,7 @@ class MeshBlock
     interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; tagsearch=NULL;
     res_search=NULL;xsearch=NULL; donorId=NULL;xtag=NULL;
     adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=1;
+    mexclude=3;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;

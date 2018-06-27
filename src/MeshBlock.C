@@ -86,7 +86,7 @@ void MeshBlock::tagBoundary(void)
   char intstring[7];
   char fname[80];  
   int *iextmp,*iextmp1; 
-  int iex,mexclude;
+  int iex;
   //
   // do this only once
   // i.e. when the meshblock is first 
@@ -213,7 +213,6 @@ void MeshBlock::tagBoundary(void)
       // mandatory receptors as nodes as not acceptable
       // donors
       //
-      mexclude=1;
       for(iex=0;iex<mexclude;iex++)
       {
 	k=0;

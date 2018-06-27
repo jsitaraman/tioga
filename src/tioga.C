@@ -96,6 +96,8 @@ void tioga::profile(void)
   for(int ib=0;ib<nblocks;ib++)
    {
     auto& mb = mblocks[ib];
+    mb->mexclude=mexclude;
+    mb->nfringe=nfringe;
     mb->preprocess();
     //mb->writeGridFile(myid);
    }

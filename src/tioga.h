@@ -30,6 +30,9 @@
 #include "CartGrid.h"
 #include "CartBlock.h"
 #include "parallelComm.h"
+#ifdef USE_CUDA
+#include "cuda_functions.h"
+#endif
 
 class tioga
 {
@@ -92,6 +95,9 @@ class tioga
   /** update data */
 
   void dataUpdate(int nvar,double *q,int interptype) ;
+#ifdef USE_CUDA
+  void dataUpdate(GPUvec<double> *vec) ;
+#endif
 
   void dataUpdate_AMR(int nvar,double *q,int interptype) ;
   

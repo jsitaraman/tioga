@@ -115,6 +115,7 @@ void MeshBlock::tagBoundary(void)
 	      nvert=nv[n];
 	      for(i=0;i<nc[n];i++)
 		{
+
 		  for(m=0;m<nvert;m++)
 		    {
 		      inode[m]=vconn[n][nvert*i+m]-BASE;
@@ -144,7 +145,7 @@ void MeshBlock::tagBoundary(void)
 		}
 	    }
 	  for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
-	}	  
+	}
       //
       // compute nodal resolution as the average of 
       // all the cells associated with it. This takes care
@@ -159,7 +160,7 @@ void MeshBlock::tagBoundary(void)
       // now tag the boundary nodes
       // reuse the iflag array
       //
-      //tracei(nobc);
+      // tracei(nobc);
       for(i=0;i<nobc;i++)
         { 
           ii=(obcnode[i]-BASE);

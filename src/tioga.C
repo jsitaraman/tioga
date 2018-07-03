@@ -19,6 +19,9 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tioga.h"
 #include <assert.h>
+#ifdef USE_CUDA
+#include "cuda_functions.h"
+#endif
 /**
  * set communicator
  * and initialize a few variables
@@ -330,6 +333,106 @@ void tioga::dataUpdate(int nvar,double *q,int interptype)
   if (icount) free(icount);
   if (dcount) free(dcount);
 }
+
+#ifdef USE_CUDA
+void tioga::dataUpdate(GPUvec<double> *vec)
+{
+  int i,j,k,m;
+  int nints;
+  int nreals;
+  int *integerRecords;
+  double *realRecords;
+  int nsend,nrecv;
+  int *sndMap,*rcvMap;
+  PACKET *sndPack,*rcvPack;
+  int *icount,*dcount;
+
+  int interptype = 0;
+  double* q = new double[vec->nvar*vec->pts];
+  vec->to_cpu(q);
+  int nvar  = vec->nvar;
+
+  printf("CALLING GPU VERSION OF DATAUPDAT\n");
+  tmp_update(5, NULL);
+
+  //
+  // initialize send and recv packets
+  //
+  icount=dcount=NULL;
+  integerRecords=NULL;
+  realRecords=NULL;
+  //
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  if (nsend==0) return;
+  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
+  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
+  icount=(int *)malloc(sizeof(int)*nsend);
+  dcount=(int *)malloc(sizeof(int)*nrecv);
+  //
+  pc->initPackets(sndPack,rcvPack);  
+  //
+  // get the interpolated solution now
+  //
+  integerRecords=NULL;
+  realRecords=NULL;
+  mb->getInterpolatedSolution(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+
+  //
+  // populate the packets
+  //
+  for(i=0;i<nints;i++)
+    {
+      k=integerRecords[2*i];
+      sndPack[k].nints++;
+      sndPack[k].nreals+=nvar;
+    }
+
+  for(k=0;k<nsend;k++)
+    {
+     sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
+     sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
+     icount[k]=dcount[k]=0;
+    }  
+
+  m=0;
+  for(i=0;i<nints;i++)
+    {
+      k=integerRecords[2*i];
+      sndPack[k].intData[icount[k]++]=integerRecords[2*i+1];
+      for(j=0;j<nvar;j++)
+	sndPack[k].realData[dcount[k]++]=realRecords[m++];
+    }
+  //
+  // communicate the data across
+  //
+  pc->sendRecvPackets(sndPack,rcvPack);
+  //
+  // decode the packets and update the data
+  //
+  for(k=0;k<nrecv;k++)
+    {
+      m=0;
+      for(i=0;i<rcvPack[k].nints;i++)
+	{
+	  mb->updateSolnData(rcvPack[k].intData[i],&rcvPack[k].realData[m],q,nvar,interptype);
+	  m+=nvar;
+	}
+    }
+  //
+  // release all memory
+  //
+  pc->clearPackets2(sndPack,rcvPack);
+  free(sndPack);
+  free(rcvPack);
+  if (integerRecords) free(integerRecords);
+  if (realRecords) free(realRecords);
+  if (icount) free(icount);
+  if (dcount) free(dcount);
+
+  vec->to_gpu(q);
+  delete q;
+}
+#endif
 
 void tioga::writeData(int nvar,double *q,int interptype)
 {

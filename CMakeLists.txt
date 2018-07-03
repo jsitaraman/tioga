@@ -5,7 +5,8 @@ project(TIOGA CXX C Fortran)
 option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" off)
 option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" off)
 option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" off)
-option(BUILD_PYTHON "Build Boost-Python wrapper" off)
+option(BUILD_PYTHON "Build Python wrapper" off)
+option(BUILD_CUDA_SUPPORT "Build with support for GPU memory exchange" on)
 
 #
 # Find Libraries
@@ -41,7 +42,6 @@ if (BUILD_PYTHON)
 endif()
 
 # CMake installation configuration
-
 install(EXPORT TIOGALibraries
   DESTINATION lib/cmake/TIOGA
   FILE TIOGALibraries.cmake)

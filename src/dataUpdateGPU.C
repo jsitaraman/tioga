@@ -37,25 +37,21 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
     allocGPUInterpList(&d_interpList, ninterp, interpList);
   }
 
-  //
-  //
   (*nints)=(*nreals)=0;
   for(i=0;i<ninterp;i++)
     {
       if (!interpList[i].cancel)
-	{
-	  (*nints)++;
-	  (*nreals)=(*nreals)+nvar;
-	}
+  	{
+  	  (*nints)++;
+  	  (*nreals)=(*nreals)+nvar;
+  	}
     }
   if ((*nints)==0) return;
 
-  interpolateVectorGPU(vec, (*nints), (*nreals), ninterp, intData, realData, interpList);
+  interpolateVectorGPU(vec, (*nints), (*nreals), ninterp, intData, realData, d_interpList);
 
 }
 
-	
-  
 #endif
 	   
     

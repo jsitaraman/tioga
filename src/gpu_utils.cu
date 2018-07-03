@@ -32,8 +32,8 @@ void freeGPUInterpList(INTERPLIST* d_interpList){
 
 void allocGPUInterpList(INTERPLIST** d_interplist, int ninterp, INTERPLIST* interplist){
 
-  int *d_inode;
-  double *d_weights;
+  int *d_inode, *h_inode;
+  double *d_weights, *h_weights;
   INTERPLIST* tmplist;
   int count;
 
@@ -50,17 +50,22 @@ void allocGPUInterpList(INTERPLIST** d_interplist, int ninterp, INTERPLIST* inte
   HANDLE_ERROR( cudaMalloc((void**)d_interplist, ninterp*sizeof(INTERPLIST)) );
   HANDLE_ERROR( cudaMalloc((void**)&d_inode,   count*sizeof(int)) );
   HANDLE_ERROR( cudaMalloc((void**)&d_weights, count*sizeof(double)) );
+  h_inode   = new int[count];
+  h_weights = new double[count];
 
-  // the first item in the list points to the full array
-  tmplist[0].inode   = d_inode;
-  tmplist[0].weights = d_weights;
-  // each item after that points to an offset of the array
-  count = tmplist[0].nweights;
-  for(int i=1; i<ninterp; i++){
+  count = 0;
+  for(int i=0; i<ninterp; i++){
     tmplist[i].inode   = &d_inode[count];
     tmplist[i].weights = &d_weights[count];
+    for(int k=0; k<interplist[i].nweights; k++){
+      h_inode[count+k]   = interplist[i].inode[k];
+      h_weights[count+k] = interplist[i].weights[k];
+    }
     count += tmplist[i].nweights;
   }
+
+  HANDLE_ERROR( cudaMemcpy(d_inode,   h_inode,   count*sizeof(int), cudaMemcpyHostToDevice) );
+  HANDLE_ERROR( cudaMemcpy(d_weights, h_weights, count*sizeof(double), cudaMemcpyHostToDevice) );
 
   // now copy the whole list to the GPU:
   HANDLE_ERROR( cudaMemcpy((*d_interplist), tmplist, ninterp*sizeof(INTERPLIST),
@@ -68,60 +73,149 @@ void allocGPUInterpList(INTERPLIST** d_interplist, int ninterp, INTERPLIST* inte
 
   // and cleanup
   free(tmplist);
+  free(h_inode);
+  free(h_weights);
 }
 
-//__global__ interp_vec(double* q, int nvar, INTERPLIST* interplist
+__global__ void interp_vec(double* q, int nvar, int ninterp, INTERPLIST* interplist, 
+		      int* intData, double* realData, int* cntr){
+
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  int idx, m, k, inode;
+  double weight;
+  if(i < ninterp && !interplist[i].cancel){
+
+    // Atomic operations on global memory are faster now with CUDA
+    // 9. No need to do fancy warp stuff:
+    // https://devblogs.nvidia.com/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/
+    // atomicAdd returns the old number and increments the pointer contents
+    idx = atomicAdd(cntr, 1); 
+
+    m = 0;
+    // assignment, not +=
+    inode=interplist[i].inode[m];
+    weight=interplist[i].weights[m];
+    for(k=0;k<nvar;k++){
+      realData[idx*nvar+k]=q[inode*nvar+k]*weight; 
+    }
+    // now we use the += operator
+    for(m=1;m<interplist[i].nweights;m++){
+      inode=interplist[i].inode[m];
+      weight=interplist[i].weights[m];
+      for(k=0;k<nvar;k++){
+      	realData[idx*nvar+k]+=q[inode*nvar+k]*weight;
+      }
+    }
+
+    intData[idx*2+0]=interplist[i].receptorInfo[0];
+    intData[idx*2+1]=interplist[i].receptorInfo[1];
+
+  } // end if
+
+}
+
+__global__ void update_vec(double* q, int nvar, int nupdate, int* idata, double* ddata){
+
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  int m;
+
+  if(i<nupdate){
+    for(m=0; m<nvar; m++){
+      // printf("_g_ q[%d] = q[%d]\n", idata[i]*nvar+m, i*nvar+m);
+      q[idata[i]*nvar+m] = ddata[i*nvar+m];
+    }
+  }
+
+}
+
+__global__ void idbg_kernel(int* vec, int n){
+  for(int i=0; i<n; i++){
+    printf("_dbggpu__ %2d : %7d\n", vec[i]);
+  }
+}
+__global__ void ddbg_kernel(double* vec, int n){
+  for(int i=0; i<n; i++){
+    printf("_dbggpu__ %2d : %16.8e\n", vec[i]);
+  }
+}
 
 void interpolateVectorGPU(GPUvec<double> *vec, int nints, int nreals, int ninterp,
 			  int** intData, double** realData, INTERPLIST* interpList){
 
-  int i;
-  int k,m,inode;
-  double weight;
-  double *qq, *q;
-  int icount,dcount;
+  int* cntr;
+  dim3 blocks(1,1,1), threads(256,1,1);
+  blocks.x = (ninterp-1)/threads.x+1;
+
+  int *d_intData;
+  double *d_realData;
+  HANDLE_ERROR( cudaMalloc((void**)&d_intData, 2*nints*sizeof(int)) );
+  HANDLE_ERROR( cudaMalloc((void**)&d_realData, nreals*sizeof(double)) );
+  HANDLE_ERROR( cudaMalloc((void**)&cntr, sizeof(int)) );
+  HANDLE_ERROR( cudaMemset(cntr, 0, sizeof(int)) );
+
+  interp_vec<<<blocks,threads>>>(vec->data,vec->nvar,ninterp,interpList,d_intData,d_realData,cntr);
+
+  // Allocate on CPU
+  if((*intData) == NULL){
+    (*intData)=(int *)malloc(sizeof(int)*2*nints);
+    (*realData)=(double *)malloc(sizeof(double)*nreals);
+  } else {
+    printf("skipping alloc, assuming ok\n");
+  }
+
+  // Transfer to CPU
+  HANDLE_ERROR( cudaMemcpy( (*intData),  d_intData, 2*nints*sizeof(int)   , cudaMemcpyDeviceToHost) );
+  HANDLE_ERROR( cudaMemcpy( (*realData), d_realData, nreals*sizeof(double), cudaMemcpyDeviceToHost) );
+
+  HANDLE_ERROR( cudaFree(d_intData) );
+  HANDLE_ERROR( cudaFree(d_realData) );
+  HANDLE_ERROR( cudaFree(cntr) );
+}
+
+
+void updateSolnGPU(int nrecv, PACKET *rcvPack, GPUvec<double> *vec){
+
+  int i, k, m, count;
+  int *h_idata, *d_idata;
+  double *h_ddata, *d_ddata;
+  dim3 blocks(1,1,1), threads(256,1,1);
   int nvar = vec->nvar;
 
-  // int *d_intData;
-  // double *d_realData;
-  // HANDLE_ERROR( cudaMalloc((void**)&d_intData, 2*nints*sizeof(int)) );
-  // HANDLE_ERROR( cudaMalloc((void**)&d_realData, nreals*sizeof(double)) );
+  count = 0;
+  for(k=0; k<nrecv; k++){
+    count += rcvPack[k].nints;
+  }
+  if(count == 0) return;
 
-  q  = new double[vec->nvar*vec->pts];
-  qq = new double[nvar];
-  vec->to_cpu(q);
+  blocks.x = (count-1)/threads.x+1;
 
-  //
-  (*intData)=(int *)malloc(sizeof(int)*2*nints);
-  (*realData)=(double *)malloc(sizeof(double)*nreals);
-  icount=dcount=0;
-  //
-  for(i=0;i<ninterp;i++)
-    {
-      if (!interpList[i].cancel)
-	{
-	  for(k=0;k<nvar;k++) qq[k]=0;
-	  for(m=0;m<interpList[i].nweights;m++)
-	    {
-	      inode=interpList[i].inode[m];
-	      weight=interpList[i].weights[m];
-	      if (weight < -TOL || weight > 1.0+TOL) {
-		traced(weight);
-		printf("warning: weights are not convex 1\n");
-	      }
-	      for(k=0;k<nvar;k++)
-		qq[k]+=q[inode*nvar+k]*weight;
-	    }
-	  (*intData)[icount++]=interpList[i].receptorInfo[0];
-	  (*intData)[icount++]=interpList[i].receptorInfo[1];
-	  for(k=0;k<nvar;k++)
-	    (*realData)[dcount++]=qq[k];
-	}
+  h_idata = new int[count];
+  h_ddata = new double[count*nvar];
+
+  HANDLE_ERROR( cudaMalloc((void**)&d_idata, count*sizeof(int)) );
+  HANDLE_ERROR( cudaMalloc((void**)&d_ddata, count*nvar*sizeof(double)) );
+
+  count = 0;
+  for(k=0; k<nrecv; k++){
+    for(i=0; i<rcvPack[k].nints; i++){
+      h_idata[count+i] = rcvPack[k].intData[i];
+      for(m=0; m<nvar; m++){
+  	h_ddata[(count+i)*nvar+m] = rcvPack[k].realData[i*nvar+m];
+      }
     }
+    count += rcvPack[k].nints;
+  }
 
-  delete qq;
-  delete q;
+  HANDLE_ERROR( cudaMemcpy(d_idata, h_idata, count*sizeof(int), 
+  			   cudaMemcpyHostToDevice) );
+  HANDLE_ERROR( cudaMemcpy(d_ddata, h_ddata, count*nvar*sizeof(double), 
+  			   cudaMemcpyHostToDevice) );
 
-  // HANDLE_ERROR( cudaFree(d_intData) );
-  // HANDLE_ERROR( cudaFree(d_realData) );
+  update_vec<<<blocks,threads>>>(vec->data, nvar, count, d_idata, d_ddata);
+
+  HANDLE_ERROR( cudaFree(d_idata) );
+  HANDLE_ERROR( cudaFree(d_ddata) );
+  delete h_idata;
+  delete h_ddata;
+
 }

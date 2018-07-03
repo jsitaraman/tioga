@@ -25,7 +25,7 @@ GPUvec<T>::GPUvec(int p, int nv, T* d){
 template<typename T>
 GPUvec<T>::~GPUvec(){
   if(this->owndata){
-    printf("deallocating gpuvec\n");
+    // printf("deallocating gpuvec\n");
 #ifdef REAL_GPU
     HANDLE_ERROR( cudaFree(this->data) );
 #else

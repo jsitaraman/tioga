@@ -179,6 +179,7 @@ class MeshBlock
 			       int nvar, int interptype);
 #ifdef USE_CUDA
   void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,GPUvec<double> *ve);
+  void updateSolnData(PACKET* p, GPUvec<double> *v);
 #endif
 
   void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,

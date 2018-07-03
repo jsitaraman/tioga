@@ -105,8 +105,9 @@ void MeshBlock::updateSolnData(int inode,double *qvar,double *q,int nvar,int int
 
   if (interptype==ROW)
     {
-      for(k=0;k<nvar;k++)
+      for(k=0;k<nvar;k++){
 	q[inode*nvar+k]=qvar[k];
+      }
     }
   if (interptype==COLUMN)
     {

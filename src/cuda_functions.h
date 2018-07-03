@@ -38,6 +38,6 @@ void allocGPUInterpList(INTERPLIST** d_interplist, int ninterp, INTERPLIST* inte
 void interpolateVectorGPU(GPUvec<double> *vec, int nints, int nreals, int ninterp,
 			  int** intData, double** realData, INTERPLIST* interplist);
 
-
+void updateSolnGPU(int nrecv, PACKET *rcvPack, GPUvec<double> *vec);
 
 #endif

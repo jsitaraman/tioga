@@ -340,20 +340,19 @@ void tioga::dataUpdate(GPUvec<double> *vec)
   int i,j,k,m;
   int nints;
   int nreals;
-  int *integerRecords;
-  double *realRecords;
+  int *integerRecords = NULL;
+  double *realRecords = NULL;
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   PACKET *sndPack,*rcvPack;
   int *icount,*dcount;
 
   int interptype = 0;
-  double* q = new double[vec->nvar*vec->pts];
-  vec->to_cpu(q);
   int nvar  = vec->nvar;
+  // double* q = new double[vec->nvar*vec->pts];
+  // vec->to_cpu(q);
 
   printf("CALLING GPU VERSION OF DATAUPDATE\n");
-  tmp_update(5, NULL);
 
   //
   // initialize send and recv packets
@@ -375,6 +374,7 @@ void tioga::dataUpdate(GPUvec<double> *vec)
   //
   integerRecords=NULL;
   realRecords=NULL;
+
   // mb->getInterpolatedSolution(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
   mb->getInterpolatedSolution(&nints,&nreals,&integerRecords,&realRecords,vec);
 
@@ -403,22 +403,27 @@ void tioga::dataUpdate(GPUvec<double> *vec)
       for(j=0;j<nvar;j++)
 	sndPack[k].realData[dcount[k]++]=realRecords[m++];
     }
+
   //
   // communicate the data across
   //
   pc->sendRecvPackets(sndPack,rcvPack);
+
   //
   // decode the packets and update the data
   //
-  for(k=0;k<nrecv;k++)
-    {
-      m=0;
-      for(i=0;i<rcvPack[k].nints;i++)
-	{
-	  mb->updateSolnData(rcvPack[k].intData[i],&rcvPack[k].realData[m],q,nvar,interptype);
-	  m+=nvar;
-	}
-    }
+  // for(k=0;k<nrecv;k++)
+  //   {
+  //     m=0;
+  //     for(i=0;i<rcvPack[k].nints;i++)
+  // 	{
+  // 	  printf("_c_ q[%d] = q[%d]\n", rcvPack[k].intData[i]*nvar+k, m);
+  // 	  mb->updateSolnData(rcvPack[k].intData[i],&rcvPack[k].realData[m],q,nvar,interptype);
+  // 	  m+=nvar;
+  // 	}
+  //   }
+  updateSolnGPU(nrecv, rcvPack, vec);
+
   //
   // release all memory
   //
@@ -430,8 +435,8 @@ void tioga::dataUpdate(GPUvec<double> *vec)
   if (icount) free(icount);
   if (dcount) free(dcount);
 
-  vec->to_gpu(q);
-  delete q;
+  // vec->to_gpu(q);
+  // delete q;
 }
 #endif
 

@@ -1,6 +1,7 @@
 #ifndef TIOGA_CUDA_FUNCTIONS_H
 #define TIOGA_CUDA_FUNCTIONS_H
 #include <stdio.h>
+#include "codetypes.h"
 
 #ifdef __NVCC__
 //#ifdef __CUDACC__
@@ -29,5 +30,14 @@ public:
 };
 
 void tmp_update(int pts, double* q);
+
+void freeGPUInterpList(INTERPLIST* d_interplist);
+void allocGPUInterpList(INTERPLIST** d_interplist, int ninterp, INTERPLIST* interplist);
+
+
+void interpolateVectorGPU(GPUvec<double> *vec, int nints, int nreals, int ninterp,
+			  int** intData, double** realData, INTERPLIST* interplist);
+
+
 
 #endif

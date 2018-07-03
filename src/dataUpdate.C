@@ -23,8 +23,8 @@
 #define ROW 0
 #define COLUMN 1
 
-void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,double *q,
-					int nvar, int interptype)
+void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,
+					double *q, int nvar, int interptype)
 {
   int i;
   int k,m,inode;
@@ -95,6 +95,8 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 	    }
 	}
     }
+
+  free(qq);
 }
 	
 void MeshBlock::updateSolnData(int inode,double *qvar,double *q,int nvar,int interptype)

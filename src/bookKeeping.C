@@ -299,6 +299,12 @@ void MeshBlock::initializeInterpList(int ninterp_input)
       }
     free(interpList);
   }
+#ifdef USE_CUDA
+  if( d_interpList){
+    freeGPUInterpList(d_interpList);
+    d_interpList = NULL;
+  }
+#endif
   ninterp=ninterp_input;   
   interpListSize=ninterp_input;
   interpList=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interpListSize);

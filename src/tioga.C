@@ -352,7 +352,7 @@ void tioga::dataUpdate(GPUvec<double> *vec)
   vec->to_cpu(q);
   int nvar  = vec->nvar;
 
-  printf("CALLING GPU VERSION OF DATAUPDAT\n");
+  printf("CALLING GPU VERSION OF DATAUPDATE\n");
   tmp_update(5, NULL);
 
   //
@@ -375,7 +375,8 @@ void tioga::dataUpdate(GPUvec<double> *vec)
   //
   integerRecords=NULL;
   realRecords=NULL;
-  mb->getInterpolatedSolution(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+  // mb->getInterpolatedSolution(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+  mb->getInterpolatedSolution(&nints,&nreals,&integerRecords,&realRecords,vec);
 
   //
   // populate the packets

@@ -818,6 +818,9 @@ MeshBlock::~MeshBlock()
       }
     free(interpList);
   }
+#ifdef USE_CUDA
+  if(d_interpList) freeGPUInterpList(d_interpList);
+#endif
   return;
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)

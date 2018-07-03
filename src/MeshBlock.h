@@ -25,6 +25,9 @@
  */
 #include "codetypes.h"
 #include "ADT.h"
+#ifdef USE_CUDA
+#include "cuda_functions.h"
+#endif
 // forward declare to instantiate one of the methods
 class parallelComm;
 class CartGrid;
@@ -63,6 +66,9 @@ class MeshBlock
   int interpListSize;
   INTERPLIST *interpList;   /**< list of donor nodes in my grid, with fractions and information of
                                  who they donate to */ 
+#ifdef USE_CUDA
+  INTERPLIST *d_interpList;
+#endif
   int *interp2donor;
 
   INTEGERLIST *cancelList;  /** receptors that need to be cancelled because of */
@@ -131,6 +137,9 @@ class MeshBlock
     obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
     interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; xsearch=NULL; donorId=NULL;
     adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=2;
+#ifdef USE_CUDA
+    d_interpList=NULL;
+#endif
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
@@ -169,8 +178,7 @@ class MeshBlock
   void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,double *q,
 			       int nvar, int interptype);
 #ifdef USE_CUDA
-  void getInterpolatedSolutionGPU(int *nints,int *nreals,int **intData,double **realData,double *q,
-				  int nvar, int interptype);
+  void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,GPUvec<double> *ve);
 #endif
 
   void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,

@@ -4,6 +4,9 @@
 #define PY_ARRAY_UNIQUE_SYMBOL tioga_ARRAY_API
 #include <numpy/ndarrayobject.h>
 #include "utils.h"
+#ifdef USE_CUDA
+#include "cuda_functions.h"
+#endif
 
 void PyTioga_dealloc(PyTioga* self){
   //
@@ -74,6 +77,19 @@ bool check_python_data(PyObject* d){
   if(not PyDict_Contains(d,Py_BuildValue("s", "iblanking"       ))){ printf("missing iblanking key\n");        return 1;}
   if(not PyDict_Contains(d,Py_BuildValue("s", "bodyTag"         ))){ printf("missing bodyTag key\n");          return 1;}
   if(not PyDict_Contains(d,Py_BuildValue("s", "grid-coordinates"))){ printf("missing grid-coordinates key\n"); return 1;}
+  return 0;
+}
+
+bool check_gpu_dict(PyObject* d, const char* type){
+  if(not PyDict_Contains(d,Py_BuildValue("s", "pts"    ))){ printf("missing pts key\n");          return 1;}
+  if(not PyDict_Contains(d,Py_BuildValue("s", "ptr"    ))){ printf("missing ptr key\n");          return 1;}
+  if(not PyDict_Contains(d,Py_BuildValue("s", "nvar"   ))){ printf("missing nvar key\n");         return 1;}  
+  if(not PyDict_Contains(d,Py_BuildValue("s", "type"   ))){ printf("missing type key\n");         return 1;}  
+  char *gottype;
+  gottype = PyString_AsString(PyDict_GetItemString(d, "type"));
+  if(strstr(gottype, type) == NULL){ printf("wrong data type\n"); }
+  if(PyInt_AsLong(PyDict_GetItemString(d,"pts"))  == -1){ printf("incorrect type for pts\n");}
+  if(PyInt_AsLong(PyDict_GetItemString(d,"nvar")) == -1){ printf("incorrect type for nvar\n");}
   return 0;
 }
 
@@ -221,7 +237,6 @@ PyObject* PyTioga_connect(PyTioga* self){
 
   self->timers[TIMER_PROFILE] += self->tock();
 
-
   MPI_Barrier(self->comm);
   self->tick();
 
@@ -251,9 +266,27 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
     return Py_BuildValue("i", 1);
   }
 
-  numpy_to_array(data, &q, &len);
-
-  self->tg->dataUpdate(nq,q,interptype);
+  //
+  // Simple Numpy array of CPU data
+  //
+  if(PyArray_Check(data)){
+    numpy_to_array(data, &q, &len);
+    self->tg->dataUpdate(nq,q,interptype);
+  } 
+#ifdef USE_CUDA
+  //
+  // Dict with info about GPU data
+  //
+  else if(PyDict_Check(data) and !check_gpu_dict(data, "double")){
+    q   = reinterpret_cast<double*>(PyCapsule_GetPointer(PyDict_GetItemString(data, "ptr"), "q_gpu"));
+    len = PyInt_AsLong(PyDict_GetItemString(data,"pts"));
+    GPUvec<double> v(len, nq, q);
+    self->tg->dataUpdate(&v);
+  } 
+#endif
+  else {
+    printf("No Exchange Done!!! %d %d\n", PyDict_Check(data), check_gpu_dict(data, "double"));
+  }
 
   self->timers[TIMER_EXCHANGE] += self->tock();
 

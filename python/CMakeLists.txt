@@ -20,9 +20,16 @@ set(INCLUDE_DIRS ${MPI_C_INCLUDE_PATH}
 
 file(GLOB PYTIOGA_SRC *.cpp)
 
+if(BUILD_CUDA_SUPPORT)
+  list(APPEND PYTIOGA_DEFINITIONS "-DUSE_CUDA")
+endif()
+
+message(STATUS "defs: ${PYTIOGA_DEFINITIONS}")
+
 add_library(pytioga SHARED ${PYTIOGA_SRC})
 target_link_libraries(pytioga tioga ${MPI_LIBRARIES} ${PYTHON_LIBRARIES})
 target_include_directories(pytioga PUBLIC ${INCLUDE_DIRS})
+target_compile_definitions(pytioga PRIVATE ${PYTIOGA_DEFINITIONS})
 set_target_properties(pytioga PROPERTIES
   ARCHIVE_OUTPUT_DIRECOTY ${TIOGA_BINARY_DIR}/lib
   LIBRARY_OUTPUT_DIRECOTY ${TIOGA_BINARY_DIR}/lib

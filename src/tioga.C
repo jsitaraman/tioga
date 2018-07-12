@@ -352,7 +352,7 @@ void tioga::dataUpdate(GPUvec<double> *vec)
   // double* q = new double[vec->nvar*vec->pts];
   // vec->to_cpu(q);
 
-  printf("CALLING GPU VERSION OF DATAUPDATE\n");
+  // printf("CALLING GPU VERSION OF DATAUPDATE\n");
 
   //
   // initialize send and recv packets

@@ -275,10 +275,18 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
   } 
 #ifdef USE_CUDA
   //
-  // Dict with info about GPU data
+  // Raw Capsule containing GPU data
+  //
+  else if(PyCapsule_CheckExact(data)){
+    q   = reinterpret_cast<double*>(PyCapsule_GetPointer(data, "gpudata"));
+    GPUvec<double> v(self->nv, nq, q);
+    self->tg->dataUpdate(&v);
+  } 
+  //
+  // Dictionary with info about GPU data (deprecated)
   //
   else if(PyDict_Check(data) and !check_gpu_dict(data, "double")){
-    q   = reinterpret_cast<double*>(PyCapsule_GetPointer(PyDict_GetItemString(data, "ptr"), "q_gpu"));
+    q   = reinterpret_cast<double*>(PyCapsule_GetPointer(PyDict_GetItemString(data, "ptr"),"gpudata"));
     len = PyInt_AsLong(PyDict_GetItemString(data,"pts"));
     GPUvec<double> v(len, nq, q);
     self->tg->dataUpdate(&v);

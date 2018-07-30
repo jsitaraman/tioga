@@ -256,6 +256,7 @@ void MeshBlock::processPointDonors(void)
   int i,j,m,n;
   int isum,nvert,i3,ivert;
   double *frac;
+  int *tmpnode;
   int icell;
   int ndim;
   int ierr;
@@ -265,6 +266,7 @@ void MeshBlock::processPointDonors(void)
   //
   ndim=NFRAC;
   frac=(double *) malloc(sizeof(double)*ndim);
+  tmpnode=(int *) malloc(sizeof(double)*ndim);
   interp2ListSize = ninterp2;
   ninterp2=0;
   //
@@ -287,7 +289,6 @@ void MeshBlock::processPointDonors(void)
       interpList2[i].weights=NULL;
    }
   //  
-  //printf("nsearch=%d %d\n",nsearch,myid);
   m=0;
   for(i=0;i<nsearch;i++)
     {
@@ -296,17 +297,19 @@ void MeshBlock::processPointDonors(void)
 	  if (ihigh) 
 	    {
 	      icell=donorId[i]+BASE;
-	      interpList2[m].inode=(int *) malloc(sizeof(int));		  
 	      interpList2[m].nweights=0;
 	      donor_frac(&(icell),
 			 &(xsearch[3*i]),
 			 &(interpList2[m].nweights),
-			 &(interpList2[m].inode[0]),
+			 tmpnode,
 			 frac,
 			 &(rst[3*i]),&ndim);
 	      interpList2[m].weights=(double *)malloc(sizeof(double)*interpList2[m].nweights);
-	      for(j=0;j<interpList2[m].nweights;j++)
+	      interpList2[m].inode=(int *) malloc(sizeof(int)*interpList2[m].nweights);
+	      for(j=0;j<interpList2[m].nweights;j++){
 		interpList2[m].weights[j]=frac[j];
+		interpList2[m].inode[j]=tmpnode[j];
+	      }
 	      interpList2[m].receptorInfo[0]=isearch[2*i];
 	      interpList2[m].receptorInfo[1]=isearch[2*i+1];
 	      m++;
@@ -347,6 +350,7 @@ void MeshBlock::processPointDonors(void)
 	}
     }
   free(frac);
+  free(tmpnode);
 }
 
 void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **intData,

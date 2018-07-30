@@ -73,8 +73,8 @@ void allocGPUInterpList(INTERPLIST** d_interplist, int ninterp, INTERPLIST* inte
 
   // and cleanup
   free(tmplist);
-  free(h_inode);
-  free(h_weights);
+  delete[] h_inode;
+  delete[] h_weights;
 }
 
 __global__ void interp_vec(double* q, int nvar, int ninterp, INTERPLIST* interplist, 
@@ -215,7 +215,7 @@ void updateSolnGPU(int nrecv, PACKET *rcvPack, GPUvec<double> *vec){
 
   HANDLE_ERROR( cudaFree(d_idata) );
   HANDLE_ERROR( cudaFree(d_ddata) );
-  delete h_idata;
-  delete h_ddata;
+  delete[] h_idata;
+  delete[] h_ddata;
 
 }

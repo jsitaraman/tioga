@@ -29,7 +29,7 @@ GPUvec<T>::~GPUvec(){
 #ifdef REAL_GPU
     HANDLE_ERROR( cudaFree(this->data) );
 #else
-    delete this->data;
+    delete[] this->data;
 #endif
   }
   this->data = NULL;

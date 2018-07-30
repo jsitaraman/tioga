@@ -65,8 +65,8 @@ void MeshBlock::preprocess(void)
   //
   // find oriented bounding boxes
   //
-  if (obb) free(obb);
-  obb=(OBB *) malloc(sizeof(OBB));
+  if(obb) free(obb);
+  obb=(OBB *)malloc(sizeof(OBB));
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
   tagBoundary();
 }
@@ -821,7 +821,6 @@ MeshBlock::~MeshBlock()
 #ifdef USE_CUDA
   if(d_interpList) freeGPUInterpList(d_interpList);
 #endif
-  return;
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
@@ -838,12 +837,15 @@ MeshBlock::~MeshBlock()
       }
     free(interpListCart);
   }
-  if (!ihigh) {
-   if (iblank_cell) free(iblank_cell);
-  }
+  // if (!ihigh) {
+  if (iblank_cell) free(iblank_cell);
+  // }
   if (obb) free(obb);
+  // if(obb) delete[] obb;
   if (isearch) free(isearch);
   if (xsearch) free(xsearch);
+  if (donorId) free(donorId);
+  if (tagsearch) free(tagsearch);
   if (rst) free(rst);
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);

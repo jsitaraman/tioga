@@ -477,6 +477,7 @@ tioga::~tioga()
       delete [] holeMap;
     }
   if (pc) delete[] pc;
+  if (pc_cart) delete[] pc_cart;
   if (sendCount) free(sendCount);
   if (recvCount) free(recvCount);
   if (obblist) free(obblist);
@@ -508,6 +509,10 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   realRecords=NULL;
   //
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+
+
+
+
   if (nsend==0) return;
   sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
   rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
@@ -520,8 +525,10 @@ void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
   //
   integerRecords=NULL;
   realRecords=NULL;
+
   mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
 				      &realRecords,q,nvar,interptype);
+
   //
   // populate the packets
   //

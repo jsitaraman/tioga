@@ -27,7 +27,11 @@ endif()
 message(STATUS "defs: ${PYTIOGA_DEFINITIONS}")
 
 add_library(pytioga SHARED ${PYTIOGA_SRC})
-target_link_libraries(pytioga tioga ${MPI_LIBRARIES} ${PYTHON_LIBRARIES})
+if(BUILD_CUDA_SUPPORT)
+  target_link_libraries(pytioga tioga ${MPI_LIBRARIES} ${PYTHON_LIBRARIES} ${CUDA_LIBRARIES})
+else()
+  target_link_libraries(pytioga tioga ${MPI_LIBRARIES} ${PYTHON_LIBRARIES})
+endif()
 target_include_directories(pytioga PUBLIC ${INCLUDE_DIRS})
 target_compile_definitions(pytioga PRIVATE ${PYTIOGA_DEFINITIONS})
 set_target_properties(pytioga PROPERTIES

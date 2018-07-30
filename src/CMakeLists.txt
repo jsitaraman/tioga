@@ -66,21 +66,39 @@ if(BUILD_CUDA_SUPPORT)
   file(GLOB cu_sources "*.cu")
   message(STATUS "sources: ${cu_sources}")
   cuda_include_directories( ${MPI_C_INCLUDE_PATH} )
-  cuda_add_library(gpufunc STATIC ${cu_sources} OPTIONS ${CUDA_OPTS} ${TIOGA_DEFINITIONS})
-  set_target_properties(gpufunc PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY ${TIOGA_BINARY_DIR}/lib
-    LIBRARY_OUTPUT_DIRECTORY ${TIOGA_BINARY_DIR}/lib
+  # cuda_add_library(gpufunc STATIC ${cu_sources} OPTIONS ${CUDA_OPTS} ${TIOGA_DEFINITIONS})
+  # set_target_properties(gpufunc PROPERTIES
+  #   ARCHIVE_OUTPUT_DIRECTORY ${TIOGA_BINARY_DIR}/lib
+  #   LIBRARY_OUTPUT_DIRECTORY ${TIOGA_BINARY_DIR}/lib
+  #   )
+
+  cuda_add_library(tioga STATIC ${TIOGA_SOURCES} ${cu_sources} OPTIONS ${CUDA_OPTS} ${TIOGA_DEFINITIONS})
+  set_target_properties(tioga PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY ${TIOGA_BINARY_DIR}/src
+    LIBRARY_OUTPUT_DIRECTORY ${TIOGA_BINARY_DIR}/src
     )
+  target_compile_definitions(tioga PRIVATE ${TIOGA_DEFINITIONS})
+  target_include_directories(tioga PUBLIC ${MPI_C_INCLUDE_PATH})
+  message(STATUS "cudalibs: ${CUDA_LIBRARIES}")
+  #
+  # Static libraries dont actually link to external libraries... BUT
+  # if you tell cmake it does, cmake will remember and add those
+  # libraries when the ".a" file is linked somewhere else. If the ".a"
+  # file is linked externally (like form another project), just make
+  # sure the shared object or executable also links these libraries:
+  #
+  target_link_libraries(tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS} ${CUDA_LIBRARIES})
+
+else()
+
+  # add_library(tioga SHARED ${TIOGA_SOURCES})
+  add_library(tioga ${TIOGA_SOURCES})
+  target_compile_definitions(tioga PRIVATE ${TIOGA_DEFINITIONS})
+  target_include_directories(tioga PUBLIC ${MPI_C_INCLUDE_PATH})
+  target_link_libraries(tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+
 endif()
 
-add_library(tioga SHARED ${TIOGA_SOURCES})
-target_compile_definitions(tioga PRIVATE ${TIOGA_DEFINITIONS})
-target_include_directories(tioga PUBLIC ${MPI_C_INCLUDE_PATH})
-if(BUILD_CUDA_SUPPORT)
-  target_link_libraries(tioga gpufunc ${MPI_LIBRARIES} ${CMAKE_DL_LIBS} ${CUDA_LIBRARIES})
-else()
-  target_link_libraries(tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
-endif()
 
 
 # set_target_properties(tioga PROPERTIES COMPILE_FLAGS "-std=c++11 -fPIC")
@@ -95,19 +113,19 @@ if(MPI_LINK_FLAGS)
     LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif()
 
-if(BUILD_CUDA_SUPPORT)
-  install(TARGETS tioga gpufunc
-    EXPORT "${CMAKE_PROJECT_NAME}Libraries"
-    RUNTIME DESTINATION bin
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib)
-else()
+# if(BUILD_CUDA_SUPPORT)
+#   install(TARGETS tioga gpufunc
+#     EXPORT "${CMAKE_PROJECT_NAME}Libraries"
+#     RUNTIME DESTINATION bin
+#     ARCHIVE DESTINATION lib
+#     LIBRARY DESTINATION lib)
+# else()
   install(TARGETS tioga
     EXPORT "${CMAKE_PROJECT_NAME}Libraries"
     RUNTIME DESTINATION bin
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib)
-endif()
+# endif()
 
 install(FILES ${TIOGA_HEADERS}
   DESTINATION include)

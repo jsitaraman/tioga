@@ -845,7 +845,6 @@ MeshBlock::~MeshBlock()
       }
     free(interpList);
   }
-  return;
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
@@ -862,9 +861,10 @@ MeshBlock::~MeshBlock()
       }
     free(interpListCart);
   }
-  if (!ihigh) {
-   if (iblank_cell) free(iblank_cell);
-  }
+  // For nalu-wind API the iblank_cell array is managed on the nalu side
+  // if (!ihigh) {
+  //  if (iblank_cell) free(iblank_cell);
+  // }
   if (obb) free(obb);
   if (isearch) free(isearch);
   if (xsearch) free(xsearch);
@@ -881,6 +881,9 @@ MeshBlock::~MeshBlock()
   if (donorIdCart) free(donorIdCart);
   if (pickedCart) free(pickedCart);
   if (ctag_cart) free(ctag_cart);
+
+  if (tagsearch) free(tagsearch);
+  if (donorId) free(donorId);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

@@ -519,7 +519,7 @@ tioga::~tioga()
   if (sendCount) free(sendCount);
   if (recvCount) free(recvCount);
 
-  if (qblock) delete[] qblock;
+  if (qblock) free(qblock);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 

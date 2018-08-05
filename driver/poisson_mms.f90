@@ -121,7 +121,7 @@ program poissonMMS
      do ib =1, ngrids
         if (ib==1) then
            xlo=[-0.5d0,   0d0, -0.5d0]     ! hard coded corners of coarse grid
-           xhi=[ 1.50, 1d0/16,  1.5d0]
+           xhi=[ 1.5d0, 1d0/16,  1.5d0]
            jmax=rfac**(irefine-1)*32+1
            mdim=[jmax,3,jmax]
         else if (ib==2) then

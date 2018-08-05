@@ -533,17 +533,18 @@ void tioga::getReceptorInfo(std::vector<int>& receptors)
 tioga::~tioga()
 {      
   int i;
-  //if (mb) delete[] mb;
-  if (holeMap) 
+  if (holeMap)
     {
       for(i=0;i<nmesh;i++)
 	if (holeMap[i].existWall) free(holeMap[i].sam);
       delete [] holeMap;
     }
   if (pc) delete[] pc;
+  if (pc_cart) delete[] pc_cart;
   if (sendCount) free(sendCount);
   if (recvCount) free(recvCount);
-  //if (obblist) free(obblist);
+
+  if (qblock) free(qblock);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 

@@ -281,7 +281,7 @@ void parallelComm::getMap(int *ns, int *nr, int **snd,int **rcv)
   return;
 }
   
-void parallelComm::clearPackets(PACKET *sndPack, PACKET *rcvPack)
+void parallelComm::clearPackets2(PACKET *sndPack, PACKET *rcvPack)
 {
   int i;
   //
@@ -306,7 +306,7 @@ void parallelComm::clearPackets(PACKET *sndPack, PACKET *rcvPack)
   //
 }
 
-void parallelComm::clearPackets2(PACKET *sndPack, PACKET *rcvPack)
+void parallelComm::clearPackets(PACKET *sndPack, PACKET *rcvPack)
 {
   int i;
   //

@@ -189,6 +189,14 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
     {
       ix[n]=(xtmp[n]-xlo[n])/dx[n];
       rst[n]=(xtmp[n]-xlo[n]-ix[n]*dx[n])/dx[n];
+      if (ix[n]==dims[n])
+       {
+        if (fabs(rst[n]) < TOL)
+         {
+         ix[n]--;
+          rst[n]=(xtmp[n]-xlo[n]-ix[n]*dx[n])/dx[n];
+         }
+       }
       // if (!(ix[n] >=0 && ix[n] < dims[n]) && myid==77) {
       //  tracei(procid);
       //  tracei(global_id);
@@ -437,6 +445,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
                   for(ni=-1;ni<2;ni++)
                     {
                       ibindex=(k+nf+nk)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf+nj)*(dims[0]+2*nf)+i+nf+ni;
+                      if ((ibindex < 0) || (ibindex >= dims[0]*dims[1]*dims[2])) continue;
                       ibcheck=ibcheck && (ibl[ibindex]!=0);
                     }
               if (!ibcheck)

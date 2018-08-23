@@ -86,11 +86,11 @@ void tioga::performConnectivity(void)
   mb->ihigh=0;
   mb->search();
   exchangeDonors();
-  outputStatistics();
+  // outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
   mb->getCellIblanks();
-  mb->writeCellFile(myid);
+  // mb->writeCellFile(myid);
   //}
   //mb->writeOutput(myid);
   //tracei(myid);
@@ -127,9 +127,9 @@ void tioga::performConnectivityAMR(void)
   //checkComm();
   exchangeAMRDonors();
   mb->getCellIblanks();
-  //mb->writeCellFile(myid);
-  //for(i=0;i<ncart;i++)
-	//cb[i].writeCellFile(i);
+  // mb->writeCellFile(myid);
+  // for(i=0;i<ncart;i++)
+  //   cb[i].writeCellFile(i);
   //MPI_Barrier(scomm);
   //printf("Finished performConnectivityAMR in %d\n",myid);
   //ierr=0;

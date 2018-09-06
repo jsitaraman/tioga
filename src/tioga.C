@@ -170,7 +170,7 @@ void tioga::performConnectivityAMR(void)
   
   if (nblocks > 0) 
     {
-     for(ib=0;ib<nblocks;ib++)
+     for(int ib=0;ib<nblocks;ib++)
      {
       auto& mb = mblocks[ib];
       mb->getCartReceptors(cg,pc_cart);
@@ -182,7 +182,7 @@ void tioga::performConnectivityAMR(void)
     }    
   //checkComm();
   exchangeAMRDonors();
-  for(ib=0;ib<nblocks;ib++)
+  for(int ib=0;ib<nblocks;ib++)
    {
     auto &mb = mblocks[ib];
     mb->getCellIblanks();
@@ -237,9 +237,9 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   // TODO : verify for nblocks > 1
   //
   nints=nreals=0;
-  for(ib=0;ib<nblocks;ib++) {
+  for(int ib=0;ib<nblocks;ib++) {
    auto & mb = mblocks[ib];
-   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblocks[ib],nvar,interptype);
+   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblock[ib],nvar,interptype);
   }
   for(i=0;i<ncart;i++)
     cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
@@ -291,7 +291,7 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
 	  bid=rcvPack[k].intData[2*i];
 	  if (bid < 0) 
 	    {
-	      mblocks[-(bid+1)]->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],qblocks[ib],nvar,interptype);
+	      mblocks[-(bid+1)]->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],qblock[-(bid+1)],nvar,interptype);
 	    }
 	  else
 	    {
@@ -465,7 +465,7 @@ void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
   { 
     auto &mb = mblocks[ib];
     mb->clearOrphans(holeMap,nmesh,itmp[ib]);
-    mb->updatePointData(qblocks[ib],qtmp[ib],nvar,interptype);
+    mb->updatePointData(qblock[ib],qtmp[ib],nvar,interptype);
   }
   //
   // release all memory

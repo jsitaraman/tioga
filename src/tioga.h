@@ -17,22 +17,31 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-/**
- * Topology Indpendent Overset Grid Assembler (TIOGA)
- * Base class and dependencies
- * The methods of this class are invoked from tiogaInterface.C
- *
- *  Jay Sitaraman 02/24/2014 
- */
+
+#ifndef TIOGA_H
+#define TIOGA_H
+
+#include <vector>
+#include <map>
+#include <memory>
+#include <stdint.h>
 #include "MeshBlock.h"
 #include "CartGrid.h"
 #include "CartBlock.h"
 #include "parallelComm.h"
 
+/**
+ * Topology Indpendent Overset Grid Assembler (TIOGA)
+ * Base class and dependencies
+ * The methods of this class are invoked from tiogaInterface.C
+ *
+ *  Jay Sitaraman 02/24/2014
+ */
 class tioga
 {
  private :
   int nblocks;
+  int nblocksq;
   int ncart;
   MeshBlock *mb;
   CartGrid *cg;
@@ -48,17 +57,49 @@ class tioga
   int myid,numprocs;
   int *sendCount;
   int *recvCount;
-  OBB *obblist;
+  //OBB *obblist;
+  std::vector<OBB> obblist;
   int iorphanPrint;
+
+  //! Mesh blocks in this processor 
+  std::vector<std::unique_ptr<MeshBlock> > mblocks;
+  //! Solver assigned mesh tags for the mesh blocks
+  std::vector<int> mtags;
+  //! Mesh tag to local block index lookup mapping
+  std::map<int, int> tag_iblk_map;
+
+  //! Intersect block unique ID to index lookup mapping
+  std::map<int, int> intBoxMap;
+
+  //! Parallel comms to obblist indicies
+  std::vector<int> ibsPerProc;
+  std::vector<std::vector<int>> ibProcMap;
+  //! q-variables registered
+  double **qblock;
+
 
  public:
   int ihigh;
   int ihighGlobal;
   int iamrGlobal;
+  int mexclude,nfringe;
   /** basic constuctor */
-  tioga() { mb = NULL; cg=NULL; cb=NULL; 
-    holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
-    obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;};
+  tioga()
+    /*
+    : mblocks(0),
+      mtags(0)
+    */
+    {
+        mb = NULL; cg=NULL; cb=NULL;
+        holeMap=NULL; pc=NULL; sendCount=NULL; recvCount=NULL;
+        pc_cart = NULL;
+        // obblist=NULL; isym=2;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        isym=3;ihigh=0;nblocks=0;ncart=0;ihighGlobal=0;iamrGlobal=0;
+        mexclude=3,nfringe=1;
+        qblock=NULL;
+        mblocks.clear();
+        mtags.clear();
+    }
  
   /** basic destructor */
   ~tioga(); 
@@ -69,15 +110,16 @@ class tioga
   /** registerGrid data */
 
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
-			       int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn);
+                        int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
+                        uint64_t* cell_gid=NULL);
+
+  void registerSolution(int btag,double *q);
 
   void profile(void);
 
   void exchangeBoxes(void);
 
-  void exchangeSearchData(void);
-
-  void exchangePointSearchData(void);
+  void exchangeSearchData(int itype=0);
 
   void exchangeDonors(void);
     
@@ -89,7 +131,7 @@ class tioga
 
   /** update data */
 
-  void dataUpdate(int nvar,double *q,int interptype) ;
+  void dataUpdate(int nvar,int interptype) ;
 
   void dataUpdate_AMR(int nvar,double *q,int interptype) ;
   
@@ -103,20 +145,50 @@ class tioga
   
   void outputHoleMap(void);
 
-  void writeData(int nvar,double *q,int interptype);
+  void writeData(int nvar,int interptype);
 
-  void getDonorCount(int *dcount, int *fcount);
+  void getDonorCount(int btag, int *dcount, int *fcount);
   
-  void getDonorInfo(int *receptors,int *indices,double *frac,int *dcount);
+  void getDonorInfo(int btag, int *receptors,int *indices,double *frac,int *dcount);
+
+  void getReceptorInfo(std::vector<int>&);
+
   /** set symmetry bc */
   void setSymmetry(int syminput) { isym=syminput;};
   /** set resolutions for nodes and cells */
   void setResolutions(double *nres,double *cres)
-  { mb->setResolutions(nres,cres);}    
+  { mb->setResolutions(nres,cres);}
+
+  void setResolutions(int btag, double *nres,double *cres)
+  {
+    auto idxit = tag_iblk_map.find(btag);
+    int iblk = idxit->second;
+    auto& mb = mblocks[iblk];
+    mb->setResolutions(nres, cres);
+  }
+  
+  void setMexclude(int *mexclude_input)
+  {
+    mexclude=*mexclude_input;
+  }
+
+  void setNfringe(int *nfringe_input)
+  {
+    nfringe=*nfringe_input;
+  }
 
   void set_cell_iblank(int *iblank_cell)
   {
+   auto& mb = mblocks[0];
    mb->set_cell_iblank(iblank_cell);
+  }
+
+  void set_cell_iblank(int btag, int* ib_cell)
+  {
+    auto idxit = tag_iblk_map.find(btag);
+    int iblk = idxit->second;
+    auto& mb = mblocks[iblk];
+    mb->set_cell_iblank(ib_cell);
   }
 
   void setcallback(void (*f1)(int*, int*),
@@ -125,20 +197,32 @@ class tioga
 		    void (*f4)(int *,double *,int *,int *,double *,double *,int *),
 		   void (*f5)(int *,int *,double *,int *,int*,double *))
   {
+   for(int ib=0;ib<nblocks;ib++)
+   {
+    auto& mb = mblocks[ib];
     mb->setcallback(f1,f2,f3,f4,f5);
-    ihigh=1;
+   }   
+   ihigh=1;
   }
 
   void setp4estcallback(void (*f1)(double *,int *,int *,int *),
 			void (*f2) (int *,int *))
   {
-    mb->setp4estcallback(f1,f2);
+   for(int ib=0;ib<nblocks;ib++)
+    { 
+     auto& mb = mblocks[ib];
+     mb->setp4estcallback(f1,f2);
+    } 
   }
 
   void set_p4est(void)
   {
     mytag=-mytag;
-    mb->resolutionScale=1000.0;
+    for(int ib=0;ib < nblocks;ib++)
+    {
+      auto& mb = mblocks[ib];
+      mb->resolutionScale=1000.0;
+    }
   }
   
   void set_amr_callback(void (*f1)(int *,double *,int *,double *))
@@ -152,8 +236,11 @@ class tioga
   void exchangeAMRDonors(void);
   void checkComm(void);
   void outputStatistics(void);
+  void myTimer(char const *, int);
+  void reduce_fringes(void);
 };
       
   
 
 
+#endif /* TIOGA_H */

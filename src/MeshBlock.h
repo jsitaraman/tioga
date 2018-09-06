@@ -17,17 +17,25 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-/**
- * MeshBlock class - container and functions for generic unstructured grid partition in 3D
- *         
- * Jay Sitaraman
- * 02/20/2014
- */
+
+#ifndef MESHBLOCK_H
+#define MESHBLOCK_H
+
+#include <vector>
+#include <stdint.h>
+
 #include "codetypes.h"
 #include "ADT.h"
 // forward declare to instantiate one of the methods
 class parallelComm;
 class CartGrid;
+
+/**
+ * MeshBlock class - container and functions for generic unstructured grid partition in 3D
+ *
+ * Jay Sitaraman
+ * 02/20/2014
+ */
 class MeshBlock
 {
  private:
@@ -40,12 +48,12 @@ class MeshBlock
   int nwbc;    /** < number of wall boundary nodes */
   //
   double *x;        /** < grid nodes x[3*nnodes] */
-  int *iblank;      /** < iblank value for each grid node */
   int *iblank_cell; /** < iblank value at each grid cell */
   //
   int **vconn;        /** < connectivity of each kind of cell */
   int *wbcnode;     /** < wall boundary node indices */
   int *obcnode;     /** < overset boundary node indices */
+  uint64_t *cellGID;     /**< Global ID of the cell */
   //
   double *nodeRes;  /** < node resolution  */
   double *userSpecifiedNodeRes;
@@ -84,14 +92,18 @@ class MeshBlock
   int nreceptorCellsCart;
   int *ctag_cart;
   int *pickedCart;
+
  	
  public :
+  int *iblank;      /** < iblank value for each grid node */
+  int *iblank_reduced;
   int ntotalPointsCart;
   double *rxyzCart;
   int *donorIdCart;
   int donorListLength;
 
   int nfringe;
+  int mexclude;
   int meshtag; /** < tag of the mesh that this block belongs to */
   double resolutionScale;
   //
@@ -101,6 +113,9 @@ class MeshBlock
   //
   int nsearch;        /** < number of query points to search in this block */
   int *isearch;       /** < index of query points in the remote process */
+  int *tagsearch;       /** < index of query points in the remote process */
+  double *res_search;   /** < resolution of search points */
+  int *xtag;            /** < hash to determine if there are duplicates */
   double *xsearch;    /** < coordinates of the query points */
   double *rst;            /**  natrural coordinates */
   int *donorId;       /** < donor indices for those found */
@@ -115,7 +130,6 @@ class MeshBlock
   int ninterpCart;
   int interpListCartSize;
   INTERPLIST *interpListCart; 
-  int *tagsearch;
 
   //
   // call back functions to use p4est to search
@@ -129,14 +143,19 @@ class MeshBlock
   /** basic constructor */
   MeshBlock() { nv=NULL; nc=NULL; x=NULL;iblank=NULL;iblank_cell=NULL;vconn=NULL;wbcnode=NULL;
     obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
-    interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; xsearch=NULL; donorId=NULL;
-    adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=2;
+    interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; tagsearch=NULL;
+    res_search=NULL;xsearch=NULL; donorId=NULL;xtag=NULL;
+    adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=1;
+    mexclude=3;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
     interpList2=NULL;picked=NULL;ctag_cart=NULL;rxyzCart=NULL;donorIdCart=NULL;pickedCart=NULL;ntotalPointsCart=0;
-    nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;tagsearch=NULL;
+    nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;
     resolutionScale=1.0;
+
+    cellGID = NULL;
+    iblank_reduced=NULL;
   };
 
   /** basic destructor */
@@ -152,7 +171,9 @@ class MeshBlock
   
   void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 	       int *wbcnodei,int *obcnodei,
-	       int ntypesi, int *nvi, int *nci, int **vconni);
+               int ntypesi, int *nvi, int *nci, int **vconni,
+               uint64_t* cell_gid=NULL);
+
 
   void setResolutions(double *nres,double *cres);    
 	       
@@ -188,7 +209,7 @@ class MeshBlock
 
   void initializeDonorList();
   
-  void insertAndSort(int pointid,int senderid,int meshtag, int remoteid, double donorRes);
+  void insertAndSort(int pointid,int senderid,int meshtag, int remoteid, double donorRes,double receptorRes);
   
   void processDonors(HOLEMAP *holemap, int nmesh,int **donorRecords,double **receptorResolution,
 		     int *nrecords);
@@ -217,7 +238,11 @@ class MeshBlock
 
   void getDonorInfo(int *receptors,int *indices, double *frac);
 
+  void getReceptorInfo(int *receptors);
+
   void getReducedOBB(OBB *,double *);
+
+  void resetCoincident();
   //
   // routines for high order connectivity and interpolation
   //
@@ -264,4 +289,40 @@ class MeshBlock
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
   void setCartIblanks(void);
+  
+  // Getters
+  inline int getMeshTag() const { return meshtag + (1 - BASE); }
+
+  /**
+   * Get donor packet for multi-block/partition setups
+   *
+   */
+  void getMBDonorPktSizes(std::vector<int>&,
+                          std::vector<int>&);
+
+  void getMBDonorPackets(std::vector<int>&,
+                         std::vector<int>&,
+                         PACKET*);
+
+  /** Reset interpolation list data structure
+   *
+   *  Reset the data structures in situations where the performConnectivity
+   *  method is invoked at every timestep when meshes undergo relative motion.
+   */
+  void resetInterpData() {
+    if (interpList) {
+      for (int i = 0; i < interpListSize; i++) {
+        if (interpList[i].inode)
+          free(interpList[i].inode);
+        if (interpList[i].weights)
+          free(interpList[i].weights);
+      }
+      free(interpList);
+    }
+    ninterp = 0;
+    interpListSize = 0;
+  }
+  void reduce_fringes() ;
 };
+
+#endif /* MESHBLOCK_H */

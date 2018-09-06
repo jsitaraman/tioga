@@ -28,7 +28,8 @@ extern "C" {
 
 void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 			int *wbcnodei,int *obcnodei,
-			int ntypesi,int *nvi,int *nci,int **vconni)
+                        int ntypesi,int *nvi,int *nci,int **vconni,
+                        uint64_t* cell_gid)
 {
   int i;
   //
@@ -48,9 +49,10 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   nv=nvi;
   nc=nci;
   vconn=vconni;
+  cellGID = cell_gid;
   //
-  //tracei(nnodes);
-  //for(i=0;i<ntypes;i++) tracei(nc[i]);
+  //TRACEI(nnodes);
+  //for(i=0;i<ntypes;i++) TRACEI(nc[i]);
   ncells=0;
   for(i=0;i<ntypes;i++) ncells+=nc[i];
 }
@@ -83,8 +85,8 @@ void MeshBlock::tagBoundary(void)
   FILE *fp;
   char intstring[7];
   char fname[80];  
-  
-
+  int *iextmp,*iextmp1; 
+  int iex;
   //
   // do this only once
   // i.e. when the meshblock is first 
@@ -101,6 +103,8 @@ void MeshBlock::tagBoundary(void)
       // this is a local array
       //
       iflag=(int *)malloc(sizeof(int)*nnodes);
+      iextmp=(int *) malloc(sizeof(double)*nnodes);
+      iextmp1=(int *) malloc(sizeof(double)*nnodes);
       // 
       for(i=0;i<nnodes;i++) iflag[i]=0;
       //
@@ -154,12 +158,13 @@ void MeshBlock::tagBoundary(void)
 	{
           if (iflag[i]!=0)  nodeRes[i]/=iflag[i];
 	  iflag[i]=0;
+	  iextmp[i]=iextmp1[i]=0;
 	}
       //
       // now tag the boundary nodes
       // reuse the iflag array
       //
-      //tracei(nobc);
+      //TRACEI(nobc);
       for(i=0;i<nobc;i++)
         { 
           ii=(obcnode[i]-BASE);
@@ -186,6 +191,7 @@ void MeshBlock::tagBoundary(void)
 		    {
 		      //iflag[inode[m]]=1;
 		      nodeRes[inode[m]]=BIGVALUE;
+                      iextmp[inode[m]]=iextmp1[inode[m]]=1;
 		    }
 		}
 	    }
@@ -206,25 +212,39 @@ void MeshBlock::tagBoundary(void)
       // now tag all the cells which have 
       // mandatory receptors as nodes as not acceptable
       // donors
-      k=0;
-      for(n=0;n<ntypes;n++)
-	{
-	  nvert=nv[n];
-	  for(i=0;i<nc[n];i++)
-	    {
-	      for(m=0;m<nvert;m++)
-		{
-		  inode[m]=vconn[n][nvert*i+m]-BASE;
-		  if (nodeRes[inode[m]]==BIGVALUE) //(iflag[inode[m]]) 
-		    {
-		      cellRes[k]=BIGVALUE;
-		      break;
-		    }
-		}
-	      k++;
-	    }
-	}
+      //
+      for(iex=0;iex<mexclude;iex++)
+      {
+	k=0;
+	for(n=0;n<ntypes;n++)
+	  {
+	    nvert=nv[n];
+	    for(i=0;i<nc[n];i++)
+	      {
+		for(m=0;m<nvert;m++)
+		  {
+		    inode[m]=vconn[n][nvert*i+m]-BASE;
+		    if (iextmp[inode[m]]==1) //(iflag[inode[m]]) 
+		      {
+			cellRes[k]=BIGVALUE;
+			break;
+		      }		    
+		  }
+		if (cellRes[k]==BIGVALUE) 
+		  {
+		    for(m=0;m<nvert;m++) {
+                      inode[m]=vconn[n][nvert*i+m]-BASE;
+                      if (iextmp[inode[m]]!=1) iextmp1[inode[m]]=1;
+                    }
+		  }
+		k++;
+	      }
+	  }
+	for(i=0;i<nnodes;i++) iextmp[i]=iextmp1[i];	
+      }
       free(iflag);
+      free(iextmp);
+      free(iextmp1);
 }
 
 void MeshBlock::writeGridFile(int bid)
@@ -407,12 +427,25 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
   FILE *fp;
   int ba;
   int nvert;
-
+  int *ibl;
+  //
+  // if fringes were reduced use
+  // iblank_reduced
+  //
+  if (iblank_reduced) 
+    {
+      ibl=iblank_reduced;
+    }
+  else
+    {
+      ibl=iblank;
+    }
+  //
   sprintf(intstring,"%d",100000+bid);
   sprintf(fname,"flow%s.dat",&(intstring[1]));
   fp=fopen(fname,"w");
   fprintf(fp,"TITLE =\"Tioga output\"\n");
-  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK\" ");
+  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK\",\"BTAG\" ");
   for(i=0;i<nvar;i++)
     {
       sprintf(qstr,"Q%d",i);
@@ -426,7 +459,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
     {
       for(i=0;i<nnodes;i++)
 	{
-	  fprintf(fp,"%lf %lf %lf %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i]);
+	  fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],ibl[i],meshtag);
 	  for(j=0;j<nvar;j++)
 	    fprintf(fp,"%lf ",q[i*nvar+j]);      
 	  //for(j=0;j<nvar;j++)
@@ -438,7 +471,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
     {
       for(i=0;i<nnodes;i++)
         {
-          fprintf(fp,"%lf %lf %lf %d ",x[3*i],x[3*i+1],x[3*i+2],iblank[i]);
+          fprintf(fp,"%lf %lf %lf %d %d ",x[3*i],x[3*i+1],x[3*i+2],ibl[i],meshtag);
           for(j=0;j<nvar;j++)
             fprintf(fp,"%lf ",q[j*nnodes+i]);
           fprintf(fp,"\n");
@@ -500,6 +533,12 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
 	    }
 	}
     }
+  fprintf(fp,"%d\n",nwbc);
+  for(i=0;i<nwbc;i++)
+    fprintf(fp,"%d\n",wbcnode[i]);
+  fprintf(fp,"%d\n",nobc);
+  for(i=0;i<nobc;i++)
+    fprintf(fp,"%d\n",obcnode[i]);
   fclose(fp);
   return;
 }
@@ -510,15 +549,15 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   int inode;
 
   *mtag=meshtag+(1-BASE); 
+  if (nwbc <=0) {
+    *existWall=0;
+    for(i=0;i<6;i++) wbox[i]=0;
+    return;
+  }
+
   *existWall=1;
   wbox[0]=wbox[1]=wbox[2]=BIGVALUE;
   wbox[3]=wbox[4]=wbox[5]=-BIGVALUE;
-
-  if (nwbc <=0) {
-    *existWall=0;
-    //for(i=0;i<6;i++) wbox[i]=0;
-    return;
-  }
 
   for(i=0;i<nwbc;i++)
     {
@@ -526,8 +565,8 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
       i3=3*inode;
       for(j=0;j<3;j++)
 	{
-	  wbox[j]=min(wbox[j],x[i3+j]);
-	  wbox[j+3]=max(wbox[j+3],x[i3+j]);
+	  wbox[j]=MIN(wbox[j],x[i3+j]);
+	  wbox[j+3]=MAX(wbox[j+3],x[i3+j]);
 	}
     }
   
@@ -614,14 +653,14 @@ void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
 		    {
 		      xv=x[i3+k];
 		      iv=floor((xv-extents[k])/ds[k]);
-		      imin[k]=min(imin[k],iv);
-		      imax[k]=max(imax[k],iv);
+		      imin[k]=MIN(imin[k],iv);
+		      imax[k]=MAX(imax[k],iv);
 		    }
 		}
 	     for(j=0;j<3;j++)
               {
-	       imin[j]=max(imin[j],0);
-               imax[j]=min(imax[j],nx[j]-1);
+	       imin[j]=MAX(imin[j],0);
+               imax[j]=MIN(imax[j],nx[j]-1);
               }
 	      //
 	      // mark sam to 1
@@ -668,8 +707,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 	      for(j=0;j<3;j++)
 		for(k=0;k<3;k++)
 		  xd[j]+=(x[i3+k]-obc->xc[k])*obc->vec[j][k];
-	      for(j=0;j<3;j++) bbox[j]=min(bbox[j],xd[j]);
-	      for(j=0;j<3;j++) bbox[j+3]=max(bbox[j+3],xd[j]);
+	      for(j=0;j<3;j++) bbox[j]=MIN(bbox[j],xd[j]);
+	      for(j=0;j<3;j++) bbox[j+3]=MAX(bbox[j+3],xd[j]);
 	    }
 	  iflag=0;
 	  for(j=0;j<3;j++) iflag=(iflag || (bbox[j] > obc->dxc[j]));
@@ -684,8 +723,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 	      for(j=0;j<3;j++)
 		for(k=0;k<3;k++)
 		  xd[j]+=(x[i3+k]-obb->xc[k])*obb->vec[j][k];
-	      for(j=0;j<3;j++) realData[j]=min(realData[j],xd[j]);
-	      for(j=0;j<3;j++) realData[j+3]=max(realData[j+3],xd[j]);
+	      for(j=0;j<3;j++) realData[j]=MIN(realData[j],xd[j]);
+	      for(j=0;j<3;j++) realData[j+3]=MAX(realData[j+3],xd[j]);
 	    }
 	}
     }
@@ -727,7 +766,7 @@ void MeshBlock::getQueryPoints(OBB *obc,
 	{
 	  inode[*nints]=i;
 	  (*nints)++;
-	  (*nreals)+=3;
+	  (*nreals)+=4;
 
 	}
     }
@@ -743,6 +782,7 @@ void MeshBlock::getQueryPoints(OBB *obc,
       (*realData)[m++]=x[i3];
       (*realData)[m++]=x[i3+1];
       (*realData)[m++]=x[i3+2];
+      (*realData)[m++]=nodeRes[inode[i]];
     }
   //
   free(inode);
@@ -817,7 +857,6 @@ MeshBlock::~MeshBlock()
       }
     free(interpList);
   }
-  return;
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
@@ -834,12 +873,15 @@ MeshBlock::~MeshBlock()
       }
     free(interpListCart);
   }
-  if (!ihigh) {
-   if (iblank_cell) free(iblank_cell);
-  }
+  // For nalu-wind API the iblank_cell array is managed on the nalu side
+  // if (!ihigh) {
+  //  if (iblank_cell) free(iblank_cell);
+  // }
   if (obb) free(obb);
   if (isearch) free(isearch);
   if (xsearch) free(xsearch);
+  if (res_search) free(res_search);
+  if (xtag) free(xtag);
   if (rst) free(rst);
   if (interp2donor) free(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);
@@ -851,6 +893,9 @@ MeshBlock::~MeshBlock()
   if (donorIdCart) free(donorIdCart);
   if (pickedCart) free(pickedCart);
   if (ctag_cart) free(ctag_cart);
+
+  if (tagsearch) free(tagsearch);
+  if (donorId) free(donorId);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

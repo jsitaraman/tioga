@@ -49,9 +49,12 @@ extern "C" {
     MPI_Comm_size(tcomm,&nprocs);
     //
     tg->setCommunicator(tcomm,id_proc,nprocs);
-    nc=NULL;
-    nv=NULL;
-    vconn=NULL;
+    for(int i=0;i<MAXBLOCKS;i++)
+     {
+      idata[i].nc=NULL;
+      idata[i].nv=NULL;
+      idata[i].vconn=NULL;
+     }
   }
 
   void tioga_init_(MPI_Comm tcomm)
@@ -69,34 +72,37 @@ extern "C" {
     MPI_Comm_size(tcomm,&nprocs);
     //
     tg->setCommunicator(tcomm,id_proc,nprocs);
-    nc=NULL;
-    nv=NULL;
-    vconn=NULL;
+    for (int i=0;i<MAXBLOCKS;i++)
+     {
+      idata[i].nc=NULL;
+      idata[i].nv=NULL;
+      idata[i].vconn=NULL;
+     }
   }
   
 
-  void tioga_registergrid_data_(int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
+  void tioga_registergrid_data_(int *bid, int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
 			       int *obcnode,int *ntypes,...)
   {
     va_list arguments;
     int i;
+    int iblk=*bid-BASE;
 
     va_start(arguments, ntypes);
 
-    if(nv) free(nv);
-    if(nc) free(nc);
-    if(vconn) free(vconn);
-
-    nv=(int *) malloc(sizeof(int)*(*ntypes));    
-    nc=(int *) malloc(sizeof(int)*(*ntypes));
-    vconn=(int **)malloc(sizeof(int *)*(*ntypes));
+    if(idata[iblk].nv) free(idata[iblk].nv);
+    if(idata[iblk].nc) free(idata[iblk].nc);
+    if(idata[iblk].vconn) free(idata[iblk].vconn);
+    idata[iblk].nv=(int *) malloc(sizeof(int)*(*ntypes));    
+    idata[iblk].nc=(int *) malloc(sizeof(int)*(*ntypes));
+    idata[iblk].vconn=(int **)malloc(sizeof(int *)*(*ntypes));
     for(i=0;i<*ntypes;i++)
      {
-      nv[i]=*(va_arg(arguments, int *));
-      nc[i]=*(va_arg(arguments, int *));
-      vconn[i]=va_arg(arguments, int *);
+      idata[iblk].nv[i]=*(va_arg(arguments, int *));
+      idata[iblk].nc[i]=*(va_arg(arguments, int *));
+      idata[iblk].vconn[i]=va_arg(arguments, int *);
      }
-    tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,nv,nc,vconn);
+    tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,idata[iblk].nv,idata[iblk].nc,idata[iblk].vconn);
   }
 
   void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
@@ -137,46 +143,13 @@ extern "C" {
    tg->performConnectivityAMR();
   }
 
-  void tioga_dataupdate_(double *q,int *nvar,char *itype)
+  void tioga_registersolution_(int *bid,double *q)
   {
-    int interptype;
-    if (strstr(itype,"row")) 
-      {
-	interptype=0;
-      }
-    else if (strstr(itype,"column")) 
-      {
-	interptype=1;
-      }
-    else
-      {
-	printf("#tiogaInterface.C:dataupdate_:unknown data orientation\n");
-	return;
-      }
-    if (tg->ihighGlobal==0) 
-      {
-	if (tg->iamrGlobal==0) 
-	  {
-	    tg->dataUpdate(*nvar,q,interptype);
-	  }
-	else
-	  {
-	    tg->dataUpdate_AMR(*nvar,q,interptype);
-	  }
-      }
-    else
-      {
-	if (tg->iamrGlobal==0) 
-	  {
-	    tg->dataUpdate_highorder(*nvar,q,interptype);
-	  }
-	else
-	  {
-	    printf("Data udpate between high-order near-body and AMR cartesian Not implemented yet\n");
-	  }
-      }
+    tg->registerSolution(*bid,q);
   }
-  void tioga_writeoutputfiles_(double *q,int *nvar,char *itype)
+
+
+  void tioga_dataupdate_(int *nvar,char *itype)
   {
     int interptype;
     if (strstr(itype,"row")) 
@@ -192,15 +165,57 @@ extern "C" {
 	printf("#tiogaInterface.C:dataupdate_:unknown data orientation\n");
 	return;
       }
-    tg->writeData(*nvar,q,interptype);
+
+    tg->dataUpdate(*nvar,interptype);
+
+    // if (tg->ihighGlobal==0) 
+    //   {
+    // 	if (tg->iamrGlobal==0) 
+    // 	  {
+    // 	    tg->dataUpdate(*nvar,interptype);
+    // 	  }
+    // 	else
+    // 	  {
+    // 	    tg->dataUpdate_AMR(*nvar,q,interptype);
+    // 	  }
+    //   }
+    // else
+    //   {
+    // 	if (tg->iamrGlobal==0) 
+    // 	  {
+    // 	    tg->dataUpdate_highorder(*nvar,q,interptype);
+    // 	  }
+    // 	else
+    // 	  {
+    // 	    printf("Data udpate between high-order near-body and AMR cartesian Not implemented yet\n");
+    // 	  }
+    //   }
+  }
+  void tioga_writeoutputfiles_(int *nvar,char *itype)
+  {
+    int interptype;
+    if (strstr(itype,"row")) 
+      {
+	interptype=0;
+      }
+    else if (strstr(itype,"column")) 
+      {
+	interptype=1;
+      }
+    else
+      {
+	printf("#tiogaInterface.C:dataupdate_:unknown data orientation\n");
+	return;
+      }
+    tg->writeData(*nvar,interptype);
   }    
-  void tioga_getdonorcount_(int *dcount,int *fcount)
+  void tioga_getdonorcount_(int *btag,int *dcount,int *fcount)
   {
-    tg->getDonorCount(dcount,fcount);
+    tg->getDonorCount(*btag,dcount,fcount);
   }
-  void tioga_getdonorinfo_(int *receptors,int *indices,double *frac,int *dcount)
+  void tioga_getdonorinfo_(int *btag,int *receptors,int *indices,double *frac,int *dcount)
   {
-    tg->getDonorInfo(receptors,indices,frac,dcount);
+    tg->getDonorInfo(*btag,receptors,indices,frac,dcount);
   }
 
   void tioga_setsymmetry_(int *isym)
@@ -211,6 +226,11 @@ extern "C" {
   void tioga_setresolutions_(double *nres,double *cres)
   {
     tg->setResolutions(nres,cres);
+  }
+
+  void tioga_setresolutions_multi_(int *btag,double *nres,double *cres)
+  {
+    tg->setResolutions(*btag,nres,cres);
   }
   
   void tioga_setcelliblank_(int *iblank_cell)
@@ -246,11 +266,31 @@ extern "C" {
     tg->setp4estcallback(f1,f2);
   //jayfixme  tg->set_p4est_search_callback(f1);
   }  
+
+  void tioga_reduce_fringes_(void)
+  {
+    tg->reduce_fringes();
+  }
+
+  void tioga_setnfringe_(int *nfringe)
+  {
+    tg->setNfringe(nfringe);
+  }
+
+  void tioga_setmexclude_(int *mexclude)
+  {
+   tg->setMexclude(mexclude);
+  }
+
   void tioga_delete_(void)
    {
     delete [] tg;
-    if (nc) free(nc);
-    if (nv) free(nv);
-    if (vconn) free(vconn);
+    for(int i=0;i<MAXBLOCKS;i++)
+     {
+       if (idata[i].nc) free(idata[i].nc);
+       if (idata[i].nv) free(idata[i].nv);
+       if (idata[i].vconn) free(idata[i].vconn);
+     }
    }
+
 }

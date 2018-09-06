@@ -37,6 +37,16 @@ void MeshBlock::getCellIblanks(void)
   int inode[8];
   int ncount,flag;
   int verbose;
+  int *ibl;
+  
+  if (iblank_reduced) 
+    {
+      ibl=iblank_reduced;
+    }
+  else 
+    {
+      ibl=iblank;
+    }
 
   icell=0;
   if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
@@ -56,25 +66,25 @@ void MeshBlock::getCellIblanks(void)
 	    {
 	      inode[m]=vconn[n][nvert*i+m]-BASE;
 	      if (verbose) {
-                tracei(m);
-                tracei(inode[m]);
-                tracei(iblank[inode[m]]);
+                TRACEI(m);
+                TRACEI(inode[m]);
+                TRACEI(ibl[inode[m]]);
               }
-	      if (iblank[inode[m]]==0) 
+	      if (ibl[inode[m]]==-1) 
 		{
-		  iblank_cell[icell]=0;
+		  iblank_cell[icell]=-1;
 		  flag=0;
 		}
-	      ncount=ncount+(iblank[inode[m]]==-1);
+	      ncount=ncount+(ibl[inode[m]]==0);
 	    }
 	  if (verbose) {
-	    tracei(icell);
-            tracei(ncount);
-            tracei(nvert);
+	    TRACEI(icell);
+            TRACEI(ncount);
+            TRACEI(nvert);
            } 
 	  if (flag) 
 	    {
-	      if (ncount ==nvert) iblank_cell[icell]=-1;
+	      if (ncount ==nvert) iblank_cell[icell]=0;
 //	      if (ncount > 0)  iblank_cell[icell]=-1;
 //	      if (ncount >= nvert/2) iblank_cell[icell]=-1;
 	    }
@@ -163,7 +173,7 @@ void MeshBlock::getInternalNodes(void)
 	{
 	  get_nodes_per_cell(&(ctag[i]),&(pointsPerCell[i]));
 	  ntotalPoints+=pointsPerCell[i];
-	  maxPointsPerCell=max(maxPointsPerCell,pointsPerCell[i]);
+	  maxPointsPerCell=MAX(maxPointsPerCell,pointsPerCell[i]);
       }
       //
       if (rxyz !=NULL) free(rxyz);
@@ -230,7 +240,7 @@ void MeshBlock::getExtraQueryPoints(OBB *obc,
 	{
 	  inode[*nints]=i;
 	  (*nints)++;
-	  (*nreals)+=3;
+	  (*nreals)+=4;
 
 	}
     }
@@ -246,6 +256,7 @@ void MeshBlock::getExtraQueryPoints(OBB *obc,
       (*realData)[m++]=rxyz[i3];
       (*realData)[m++]=rxyz[i3+1];
       (*realData)[m++]=rxyz[i3+2];
+      (*realData)[m++]=BIGVALUE;
     }
   //
   free(inode);
@@ -307,8 +318,9 @@ void MeshBlock::processPointDonors(void)
 	      interpList2[m].weights=(double *)malloc(sizeof(double)*interpList2[m].nweights);
 	      for(j=0;j<interpList2[m].nweights;j++)
 		interpList2[m].weights[j]=frac[j];
-	      interpList2[m].receptorInfo[0]=isearch[2*i];
-	      interpList2[m].receptorInfo[1]=isearch[2*i+1];
+	      interpList2[m].receptorInfo[0]=isearch[3*i];
+	      interpList2[m].receptorInfo[1]=isearch[3*i+1];
+	      interpList2[m].receptorInfo[2]=isearch[3*i+2];
 	      m++;
 	    }
 	  else
@@ -340,8 +352,9 @@ void MeshBlock::processPointDonors(void)
 	      computeNodalWeights(xv,xp,frac2,nvert);
 	      for(j=0;j<nvert;j++)
 		interpList2[m].weights[j]=frac2[j];
-	      interpList2[m].receptorInfo[0]=isearch[2*i];
-	      interpList2[m].receptorInfo[1]=isearch[2*i+1];
+	      interpList2[m].receptorInfo[0]=isearch[3*i];
+	      interpList2[m].receptorInfo[1]=isearch[3*i+1];
+	      interpList2[m].receptorInfo[2]=isearch[3*i+2];
 	      m++;
 	    }
 	}
@@ -369,7 +382,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 	return;
   }
   //
-  (*intData)=(int *)malloc(sizeof(int)*2*(*nints));
+  (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
   icount=dcount=0;
   //
@@ -385,7 +398,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		{
 		  weight=interpList2[i].weights[m];
 		  //if (weight < 0 || weight > 1.0) {
-		  //	traced(weight);
+		  //	TRACED(weight);
 		  //	printf("warning: weights are not convex\n");
 		  //    }
 		  for(k=0;k<nvar;k++)
@@ -393,6 +406,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		}
 	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList2[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
@@ -410,7 +424,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		  inode=interpList2[i].inode[m];
 		  weight=interpList2[i].weights[m];
 		  if (weight < -TOL || weight > 1.0+TOL) {
-                    traced(weight);
+                    TRACED(weight);
                     printf("warning: weights are not convex 2\n");
                    }
 		  for(k=0;k<nvar;k++)
@@ -418,6 +432,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		}
 	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList2[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
@@ -436,6 +451,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		}
 	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList2[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }

@@ -207,7 +207,7 @@ void tioga::exchangeAMRDonors(void)
   //if (myid==30) {
   for(i=0;i<ncart;i++) 
     {
-      //tracei(i);
+      //TRACEI(i);
       if (cancelledData) free(cancelledData);
       cancelledData=NULL;
       ncancel=bcount[i];
@@ -221,8 +221,8 @@ void tioga::exchangeAMRDonors(void)
 	    remoteid=cancelledData[3*j+2];
 	    sndPack[procid].intData[intcount[procid]++]=ctype;
 	    sndPack[procid].intData[intcount[procid]++]=remoteid;
-	    //tracei(intcount[procid]);
-            //tracei(sndPack[procid].nints);
+	    //TRACEI(intcount[procid]);
+            //TRACEI(sndPack[procid].nints);
 	  }
       }
     }

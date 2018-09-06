@@ -22,6 +22,7 @@ extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
   void writebbox(OBB *obb,int bid);
   void writePoints(double *x,int nsearch,int bid);
+  void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn);
 }
 
 
@@ -32,17 +33,18 @@ void MeshBlock::search(void)
   int iptr,isum,nvert;
   OBB *obq;
   int *icell;
+  int *itag;
   int cell_count; 
   int cellindex;
   double xd[3];
   double dxc[3];
   double xmin[3];
   double xmax[3];
+  int *dId;
   //
   // form the bounding box of the 
   // query points
   //
-
   if (nsearch == 0) {
     donorCount=0;
     return;
@@ -83,8 +85,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 		  xd[j]=0;
 		  for(k=0;k<3;k++)
 		    xd[j]+=(x[i3+k]-obq->xc[k])*obq->vec[j][k];
-		  xmin[j]=min(xmin[j],xd[j]);
-		  xmax[j]=max(xmax[j],xd[j]);
+		  xmin[j]=MIN(xmin[j],xd[j]);
+		  xmax[j]=MAX(xmax[j],xd[j]);
 		}
 	      for(j=0;j<3;j++)
 		{
@@ -145,8 +147,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	  i3=3*(vconn[n][nvert*i+m]-BASE);
 	  for(j=0;j<3;j++)
 	    {
-	      xmin[j]=min(xmin[j],x[i3+j]);
-	      xmax[j]=max(xmax[j],x[i3+j]);
+	      xmin[j]=MIN(xmin[j],x[i3+j]);
+	      xmax[j]=MAX(xmax[j],x[i3+j]);
 	    }
 	}
       //
@@ -178,17 +180,32 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   if (donorId) free(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
+  if (xtag) free(xtag);
+  xtag=(int *)malloc(sizeof(int)*nsearch);
+  //
+  // create a unique hash
+  //
+  uniquenodes(xsearch,tagsearch,res_search,xtag,&nsearch);
   //
   donorCount=0;
-  ipoint=0;
+  ipoint=0; 
+  dId=(int *) malloc(sizeof(int) *2);
   for(i=0;i<nsearch;i++)
     {
-      adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
-      if (donorId[i] > -1) {
-	donorCount++;
+     if (xtag[i]==i) {
+	//adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
+	adt->searchADT(this,dId,&(xsearch[3*i]));
+        donorId[i]=dId[0];
       }
-      ipoint+=3;
+      else {
+	donorId[i]=donorId[xtag[i]];
+      }
+      if (donorId[i] > -1) {
+	  donorCount++;
+	}
+       ipoint+=3;
     }
+  free(dId);
   //
   free(icell);
   free(obq);

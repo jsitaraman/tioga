@@ -133,7 +133,7 @@ void newtonSolve(double f[7][3],double *u1,double *v1,double *w1)
     }
   if (iter==itmax) {u=2.0;v=w=0.;}
   if (isolflag==0) {
-    u=1.0;
+    u=2.0;
     v=w=0.;
   }
   *u1=u;
@@ -292,6 +292,8 @@ void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert)
       break;
     }
 }
+
+void cellvolume_(double*, double[][3], int[][6], int[][24], int*, int*);
 
 double computeCellVolume(double xv[8][3],int nvert)
 {

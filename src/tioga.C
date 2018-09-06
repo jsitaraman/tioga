@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
 #include "tioga.h"
 #include <assert.h>
 /**
@@ -38,8 +39,8 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
   // this can be changed at a later date
   // but will be a fairly invasive change
   //
-  nblocks=0;
-  mb=new MeshBlock[1];
+  // nblocks=0;
+  // mb=new MeshBlock[1];
   //
   // instantiate the parallel communication class
   //
@@ -60,49 +61,100 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
  * register grid data for each mesh block
  */
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
-			     int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn)
+                             int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
+                             uint64_t* cell_gid)
 {
-  if (nnodes > 0) nblocks=1;
-  mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
+  int iblk;
+
+  auto idxit = tag_iblk_map.find(btag);
+  if (idxit == tag_iblk_map.end()) {
+    mtags.push_back(btag);
+    mblocks.push_back(std::unique_ptr<MeshBlock>(new MeshBlock));
+    nblocks = mblocks.size();
+    iblk = nblocks - 1;
+    tag_iblk_map[btag] = iblk;
+  } else {
+    iblk = idxit->second;
+  }
+
+  auto& mb = mblocks[iblk];
+  mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn, cell_gid);
   mb->myid=myid;
-  mytag=btag;
+
+}
+
+void tioga::registerSolution(int btag,double *q)
+{
+  auto idxit=tag_iblk_map.find(btag);
+  int iblk=idxit->second;
+  qblock[iblk]=q;
 }
 
 void tioga::profile(void)
 {
-
-  mb->preprocess();
-  //mb->writeGridFile(myid);
+  this->myTimer("tioga::profile",0);
+  for(int ib=0;ib<nblocks;ib++)
+   {
+    auto& mb = mblocks[ib];
+    mb->mexclude=mexclude;
+    mb->nfringe=nfringe;
+    mb->preprocess();
+    //mb->writeGridFile(myid);
+   }
   //mb->writeOBB(myid);
   //if (myid==4) mb->writeOutput(myid);
   //if (myid==4) mb->writeOBB(myid);
+  this->myTimer("tioga::profile",1);
 }
 
 void tioga::performConnectivity(void)
 {
+  this->myTimer("tioga::performConnectivity",0);
   getHoleMap();
   exchangeBoxes();
   exchangeSearchData();
-  mb->ihigh=0;
-  mb->search();
+  for(int ib=0;ib < nblocks;ib++)
+  {
+   auto& mb = mblocks[ib];
+   mb->ihigh=0;
+   mb->resetInterpData();
+   mb->search();
+  }
   exchangeDonors();
   outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
-  mb->getCellIblanks();
-  mb->writeCellFile(myid);
+  for (int ib=0;ib<nblocks;ib++) {
+    auto& mb = mblocks[ib];
+    mb->getCellIblanks();
+    // mb->writeGridFile(100*myid+mtags[ib]);
+  }
+  if (qblock) free(qblock);
+  qblock=(double **)malloc(sizeof(double *)*nblocks);
+  for(int ib=0;ib<nblocks;ib++)
+    qblock[ib]=NULL;
   //}
   //mb->writeOutput(myid);
-  //tracei(myid);
+  //TRACEI(myid);
+  //this->reduce_fringes();
+  this->myTimer("tioga::performConnectivity",1);
 }
 
 void tioga::performConnectivityHighOrder(void)
 {
+ for(int ib=0;ib<nblocks;ib++)
+ {
+  auto& mb = mblocks[ib];
   mb->ihigh=ihigh;
   mb->getInternalNodes();
-  exchangePointSearchData();
-  mb->search();
-  mb->processPointDonors();
+ }
+ exchangeSearchData(1);
+ for(int ib=0;ib<nblocks;ib++)
+  { 
+   auto& mb = mblocks[ib];
+   mb->search();
+   mb->processPointDonors();
+  }
   iorphanPrint=0;
 }  
 
@@ -118,15 +170,23 @@ void tioga::performConnectivityAMR(void)
   
   if (nblocks > 0) 
     {
+     for(ib=0;ib<nblocks;ib++)
+     {
+      auto& mb = mblocks[ib];
       mb->getCartReceptors(cg,pc_cart);
       mb->ihigh=ihigh;
       mb->search();
       mb->getUnresolvedMandatoryReceptors();
       cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
+     }
     }    
   //checkComm();
   exchangeAMRDonors();
-  mb->getCellIblanks();
+  for(ib=0;ib<nblocks;ib++)
+   {
+    auto &mb = mblocks[ib];
+    mb->getCellIblanks();
+   }
   //mb->writeCellFile(myid);
   //for(i=0;i<ncart;i++)
 	//cb[i].writeCellFile(i);
@@ -168,7 +228,10 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   //
   integerRecords=NULL;
   realRecords=NULL;
-  mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+  for(ib=0;ib<nblocks;ib++) {
+   auto & mb = mblocks[ib];
+   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+  }
   for(i=0;i<ncart;i++)
     cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
   //
@@ -178,10 +241,10 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
     {
       k=integerRecords[3*i];
       if (k <0 || k > nsend) {
-	tracei(nsend);
-	tracei(i);
-	tracei(nints);
-	tracei(k);
+	TRACEI(nsend);
+	TRACEI(i);
+	TRACEI(nints);
+	TRACEI(k);
       }
       assert(k < nsend);      
       sndPack[k].nints+=2;
@@ -242,21 +305,22 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
 }
 
 
-void tioga::dataUpdate(int nvar,double *q,int interptype)
+void tioga::dataUpdate(int nvar,int interptype)
 {
-  int i,j,k,m;
-  int nints;
-  int nreals;
-  int *integerRecords;
-  double *realRecords;
+  int **integerRecords;
+  double **realRecords;
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   PACKET *sndPack,*rcvPack;
-  int *icount,*dcount;
+  //
+  for(int ib=0;ib<nblocks;ib++)
+    if (qblock[ib]==NULL) {
+     printf("Solution data not set, cannot update \n");
+     return;
+    } 
   //
   // initialize send and recv packets
   //
-  icount=dcount=NULL;
   integerRecords=NULL;
   realRecords=NULL;
   //
@@ -264,40 +328,57 @@ void tioga::dataUpdate(int nvar,double *q,int interptype)
   if (nsend==0) return;
   sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
   rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
-  icount=(int *)malloc(sizeof(int)*nsend);
-  dcount=(int *)malloc(sizeof(int)*nrecv);
   //
   pc->initPackets(sndPack,rcvPack);  
   //
   // get the interpolated solution now
   //
-  integerRecords=NULL;
-  realRecords=NULL;
-  mb->getInterpolatedSolution(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
-  //
-  // populate the packets
-  //
-  for(i=0;i<nints;i++)
+  integerRecords=(int **)malloc(sizeof(int*)*nblocks);
+  realRecords=(double **)malloc(sizeof(double*)*nblocks);
+  for(int ib=0;ib<nblocks;ib++)
     {
-      k=integerRecords[2*i];
-      sndPack[k].nints++;
-      sndPack[k].nreals+=nvar;
+     integerRecords[ib]=NULL;
+     realRecords[ib]=NULL;
     }
+   
+  std::vector<int> nints(nblocks,0), nreals(nblocks,0);
+  std::vector<int> icount(nsend,0),dcount(nsend,0);
 
-  for(k=0;k<nsend;k++)
+  for(int ib=0;ib<nblocks;ib++)
+    {
+      auto &mb =mblocks[ib];
+      double *q  =qblock[ib];
+      mb->getInterpolatedSolution(&(nints[ib]),&(nreals[ib]),&(integerRecords[ib]),&(realRecords[ib]),
+				  q,nvar,interptype);
+      //
+      // populate the packets
+      //
+      for(int i=0;i<nints[ib];i++)
+	{
+	  int k=integerRecords[ib][3*i];
+	  sndPack[k].nints+=2;
+	  sndPack[k].nreals+=nvar;
+	}
+    }
+  //
+  for(int k=0;k<nsend;k++)
     {
      sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
      sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
      icount[k]=dcount[k]=0;
     }  
 
-  m=0;
-  for(i=0;i<nints;i++)
+  for(int ib=0;ib<nblocks;ib++)
     {
-      k=integerRecords[2*i];
-      sndPack[k].intData[icount[k]++]=integerRecords[2*i+1];
-      for(j=0;j<nvar;j++)
-	sndPack[k].realData[dcount[k]++]=realRecords[m++];
+      int m=0;
+      for(int i=0;i<nints[ib];i++)
+	{
+	  int k=integerRecords[ib][3*i];
+	  sndPack[k].intData[icount[k]++]=integerRecords[ib][3*i+1];
+	  sndPack[k].intData[icount[k]++]=integerRecords[ib][3*i+2];
+          for(int j=0;j<nvar;j++)
+	    sndPack[k].realData[dcount[k]++]=realRecords[ib][m++];
+        }
     }
   //
   // communicate the data across
@@ -306,12 +387,17 @@ void tioga::dataUpdate(int nvar,double *q,int interptype)
   //
   // decode the packets and update the data
   //
-  for(k=0;k<nrecv;k++)
+  for(int k=0;k<nrecv;k++)
     {
-      m=0;
-      for(i=0;i<rcvPack[k].nints;i++)
+      int l=0;
+      int m=0;
+      for(int i=0;i<rcvPack[k].nints/2;i++)
 	{
-	  mb->updateSolnData(rcvPack[k].intData[i],&rcvPack[k].realData[m],q,nvar,interptype);
+	  int pointid=rcvPack[k].intData[l++];
+	  int ib=rcvPack[k].intData[l++];
+	  auto &mb = mblocks[ib];
+          double *q  = qblock[ib];
+	  mb->updateSolnData(pointid,&rcvPack[k].realData[m],q,nvar,interptype);
 	  m+=nvar;
 	}
     }
@@ -321,52 +407,163 @@ void tioga::dataUpdate(int nvar,double *q,int interptype)
   pc->clearPackets2(sndPack,rcvPack);
   free(sndPack);
   free(rcvPack);
-  if (integerRecords) free(integerRecords);
-  if (realRecords) free(realRecords);
-  if (icount) free(icount);
-  if (dcount) free(dcount);
+  if (integerRecords) {
+    for(int ib=0;ib<nblocks;ib++) if (integerRecords[ib]) free(integerRecords[ib]);
+    free(integerRecords);
+  }
+  if (realRecords) {
+    for(int ib=0;ib<nblocks;ib++)
+      if (realRecords[ib]) free(realRecords[ib]);
+    free(realRecords);
+  }
 }
 
-void tioga::writeData(int nvar,double *q,int interptype)
+void tioga::writeData(int nvar,int interptype)
 {
   //mb->writeGridFile(myid);
-  mb->writeFlowFile(myid,q,nvar,interptype);
+  for(int ib=0;ib<nblocks;ib++)
+     mblocks[ib]->writeFlowFile(100*myid+ib,qblock[ib],nvar,interptype);
 }
 
-void tioga::getDonorCount(int *dcount,int *fcount)
+void tioga::getDonorCount(int btag, int *dcount,int *fcount)
 {
+  int nsend, nrecv;
+  int *sndMap, *rcvMap;
+
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  if (nsend == 0) {
+      *dcount = 0;
+      *fcount = 0;
+      return;
+  }
+
+  auto idxit = tag_iblk_map.find(btag);
+  int iblk=idxit->second;
+  auto &mb = mblocks[iblk];
   mb->getDonorCount(dcount,fcount);
 }
 
-void tioga::getDonorInfo(int *receptors,int *indices,double *frac,int *dcount)
+void tioga::getDonorInfo(int btag,int *receptors,int *indices,double *frac,int *dcount)
 {
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   int i;
+
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  if (nsend == 0) return;
+
+  auto idxit=tag_iblk_map.find(btag);
+  int iblk=idxit->second;
+  auto &mb = mblocks[iblk];
   mb->getDonorInfo(receptors,indices,frac);
-  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap); 
   //
   // change to actual processor id here
   //
-  for(i=0;i<3*(*dcount);i+=3)
+  for(i=0;i<4*(*dcount);i+=4)
     receptors[i]=sndMap[receptors[i]];
       
+}
+
+void tioga::getReceptorInfo(std::vector<int>& receptors)
+{
+  int nsend, nrecv;
+  int *sndMap, *rcvMap;
+  PACKET *sndPack, *rcvPack;
+  pc->getMap(&nsend, &nrecv, &sndMap, &rcvMap);
+
+  if (nsend == 0) {
+      receptors.clear();
+      return;
+  }
+
+  //
+  // create packets to send and receive
+  // and initialize them to zero
+  //
+  sndPack = (PACKET*)malloc(sizeof(PACKET) * nsend);
+  rcvPack = (PACKET*)malloc(sizeof(PACKET) * nrecv);
+
+  for (int i = 0; i < nsend; i++) {
+    sndPack[i].nints = sndPack[i].nreals = 0;
+    sndPack[i].intData = NULL;
+    sndPack[i].realData = NULL;
+  }
+  //
+  for (int i = 0; i < nrecv; i++) {
+    rcvPack[i].nints = rcvPack[i].nreals = 0;
+    rcvPack[i].intData = NULL;
+    rcvPack[i].realData = NULL;
+  }
+
+  std::vector<int> dcount(nblocks), fcount(nblocks);
+  std::vector<std::vector<int> > fringeSend(nblocks);
+
+  for (int ib=0; ib < nblocks; ib++) {
+    mblocks[ib]->getDonorCount(&dcount[ib], &fcount[ib]);
+    fringeSend[ib].resize(4 * dcount[ib]);
+    mblocks[ib]->getReceptorInfo(fringeSend[ib].data());
+
+    std::vector<int>& fringeData = fringeSend[ib];
+    for (int i=0; i<(4*dcount[ib]); i+=4) {
+      int k = fringeData[i];
+      sndPack[k].nints += 3;
+    }
+  }
+
+  // Allocate buffers for data send
+  for (int k=0; k<nsend; k++) {
+    sndPack[k].intData = (int*) malloc(sizeof(int) * sndPack[k].nints);
+  }
+
+  std::vector<int> ix(nsend, 0);
+  for (int ib=0; ib<nblocks; ib++) {
+    std::vector<int>& fringeData = fringeSend[ib];
+
+    for(size_t i=0; i<fringeData.size(); i+=4) {
+      int k = fringeData[i];
+      sndPack[k].intData[ix[k]++] = fringeData[i+1];  // nodeID
+      sndPack[k].intData[ix[k]++] = fringeData[i+2];  // local block index at receiver
+      sndPack[k].intData[ix[k]++] = fringeData[i+3];  // Global Donor ID
+    }
+  }
+
+  pc->sendRecvPackets(sndPack, rcvPack);
+
+  int rsize=0;
+  for (int k=0; k<nrecv; k++) {
+    rsize += rcvPack[k].nints;
+  }
+  receptors.resize(rsize);
+
+  size_t idx=0;
+  for (int k=0; k<nrecv; k++) {
+    for (int j=0; j<rcvPack[k].nints; j+=3) {
+      receptors[idx++] = rcvPack[k].intData[j];
+      receptors[idx++] = mtags[rcvPack[k].intData[j+1]];
+      receptors[idx++] = rcvPack[k].intData[j+2];
+    }
+  }
+
+  pc->clearPackets(sndPack, rcvPack);
+  free(sndPack);
+  free(rcvPack);
 }
 
 tioga::~tioga()
 {      
   int i;
-  if (mb) delete[] mb;
-  if (holeMap) 
+  if (holeMap)
     {
       for(i=0;i<nmesh;i++)
 	if (holeMap[i].existWall) free(holeMap[i].sam);
       delete [] holeMap;
     }
   if (pc) delete[] pc;
+  if (pc_cart) delete[] pc_cart;
   if (sendCount) free(sendCount);
   if (recvCount) free(recvCount);
-  if (obblist) free(obblist);
+
+  if (qblock) free(qblock);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 
@@ -517,4 +714,170 @@ void tioga::set_amr_patch_count(int npatchesin)
 void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,double *q)
 {
   cb[ipatch].registerData(ipatch,global_id,iblank,q);
+}
+
+void tioga::myTimer(char const *info,int type)
+{
+  static double t_start;
+  double t_end;
+
+  MPI_Barrier(scomm);
+  if (type==0) {
+    t_start=MPI_Wtime();
+    if (myid==0) printf("Begin %s\n",info);
+  }
+  if (type==1) {
+   t_end=MPI_Wtime();
+   if (myid==0) printf("End %s, time taken=%lf\n",info,t_end-t_start);
+  }
+}
+
+void tioga::reduce_fringes(void)
+{
+  //
+  int nsend,nrecv;
+  int *sndMap;
+  int *rcvMap;
+  PACKET *sndPack,*rcvPack;
+  //
+  // get the processor map for sending
+  // and receiving
+  //
+  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
+  //if (nsend == 0) return;  
+
+  for(int ib=0;ib<nblocks;ib++)
+   {
+    auto& mb = mblocks[ib];
+    mb->reduce_fringes();
+   }  
+  //
+  // now redo the process in exchangeDonors to reduce
+  // the data
+  //
+  // TODO make the stuff below into a subroutine to be more modular
+  //
+  // Find cancellation data (based on donor quality)
+  //
+  std::vector<int> nrecords(nblocks,0);
+  int** donorRecords = (int**)malloc(sizeof(int*)*nblocks);
+  //
+  for (int i=0; i<nblocks; i++) {
+    donorRecords[i]=NULL;
+    nrecords[i] = 0;
+    mblocks[i]->getCancellationData(&(nrecords[i]),
+                                    &(donorRecords[i]));
+  }
+  //
+  // create packets to send and receive
+  // and initialize them to zero
+  //
+  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
+  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
+  //
+  pc->initPackets(sndPack,rcvPack);  
+  //
+  std::vector<int> nintsSend(nsend,0);
+  std::vector<int> ixOffset(nsend,0);  
+  std::fill(nintsSend.begin(), nintsSend.end(), 0);
+  std::fill(ixOffset.begin(), ixOffset.end(), 0);
+  //
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k = donorRecords[n][3*i];
+      sndPack[k].nints+=2;
+    }
+  }
+  //
+  for(int k=0;k<nsend;k++)
+    sndPack[k].intData = (int*)malloc(sizeof(int) * sndPack[k].nints);
+  //
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k= donorRecords[n][3*i];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+1];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+2];
+    }
+  }
+  //
+  // communciate cancellation data comm 3
+  //
+  pc->sendRecvPackets(sndPack,rcvPack);
+  //
+  for (int k=0; k<nrecv; k++) {
+    int m = 0;
+    for (int j=0;j<rcvPack[k].nints/2;j++) {
+      int recid=rcvPack[k].intData[m++];
+      int ib = tag_iblk_map[rcvPack[k].intData[m++]];
+      mblocks[ib]->cancelDonor(recid);
+    }
+  }
+  //
+  for (int ib=0;ib<nblocks;ib++) {
+    auto &mb =mblocks[ib];
+    mb->resetCoincident();
+  }
+  //
+  pc->clearPackets(sndPack, rcvPack);
+  //
+  // Find final interpolation data
+  //
+  for (int i=0; i<nblocks; i++) {
+    if (donorRecords[i]) {
+      free(donorRecords[i]);
+      donorRecords[i] = NULL;
+    }
+    nrecords[i] = 0;    
+    mblocks[i]->getInterpData(&(nrecords[i]),
+                              &(donorRecords[i]));
+  }  
+  std::fill(nintsSend.begin(), nintsSend.end(), 0);
+  std::fill(ixOffset.begin(), ixOffset.end(), 0);
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k = donorRecords[n][3*i];
+      sndPack[k].nints+=2;
+    }
+  }
+  for(int k=0;k<nsend;k++)
+    sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
+  for (int n=0; n < nblocks; n++) {
+    for (int i=0; i<nrecords[n]; i++) {
+      int k = donorRecords[n][3*i];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+1];
+      sndPack[k].intData[ixOffset[k]++]=donorRecords[n][3*i+2];
+    }
+  }
+  //
+  // comm 4
+  // final receptor data to set iblanks
+  //     
+  pc->sendRecvPackets(sndPack,rcvPack);
+  //
+  for(int ib=0;ib<nblocks;ib++)
+    mblocks[ib]->clearIblanks();
+  
+  for (int k=0; k<nrecv; k++) {
+    int m = 0;
+    for(int j=0;j< rcvPack[k].nints/2;j++)
+      {
+	int pointid=rcvPack[k].intData[m++];
+	int ib=rcvPack[k].intData[m++];
+	mblocks[ib]->setIblanks(pointid);
+      }
+  }
+  pc->clearPackets(sndPack,rcvPack);
+  free(sndPack);
+  free(rcvPack);
+  
+  if (donorRecords) {
+    for (int i=0; i<nblocks; i++) {
+      if (donorRecords[i]) free(donorRecords[i]);
+    }
+    free(donorRecords);
+  }
+  outputStatistics();
+  //mb->writeOBB(myid);
+  //if (myid==4) mb->writeOutput(myid);
+  //if (myid==4) mb->writeOBB(myid);
 }

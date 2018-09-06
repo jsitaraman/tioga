@@ -32,7 +32,8 @@ void ADT::searchADT(MeshBlock *mb, int *cellIndex,double *xsearch)
   // the ADT
   //
   rootNode=0;
-  *cellIndex=-1;
+  cellIndex[0]=-1;
+  cellIndex[1]=0;
   //
   flag=1;
   for(i=0;i<ndim/2;i++)
@@ -67,7 +68,7 @@ void searchIntersections(MeshBlock *mb,int *cellIndex,int *adtIntegers,double *a
   if (flag)
     {
       mb->checkContainment(cellIndex,adtIntegers[4*node],xsearch);
-      if (*cellIndex > -1) return;
+      if (cellIndex[0] > -1 && cellIndex[1]==0) return;
     }
   //
   // check the left and right children
@@ -91,7 +92,7 @@ void searchIntersections(MeshBlock *mb,int *cellIndex,int *adtIntegers,double *a
 	  {
 	    searchIntersections(mb,cellIndex,adtIntegers,adtReals,coord,level+1,
 			       nodeChild,xsearch,nelem,ndim);
-	    if (*cellIndex > -1) return; 
+	    if (cellIndex[0] > -1 && cellIndex[1]==0) return; 
 	  }
       }
     }

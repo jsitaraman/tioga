@@ -109,7 +109,7 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
 	{
 	  get_nodes_per_cell(&(ctag_cart[i]),&(pointsPerCell[i]));
 	  ntotalPointsCart+=pointsPerCell[i];
-	  maxPointsPerCell=max(maxPointsPerCell,pointsPerCell[i]);
+	  maxPointsPerCell=MAX(maxPointsPerCell,pointsPerCell[i]);
       }
       //
       if (rxyzCart !=NULL) free(rxyzCart);
@@ -317,7 +317,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  inode=interpList[i].inode[m];
 		  weight=interpList[i].weights[m];
 		  if (weight < 0 || weight > 1.0) {
-                    traced(weight);
+                    TRACED(weight);
                     printf("warning: weights are not convex 3\n");
                    }
 		  for(k=0;k<nvar;k++)
@@ -340,7 +340,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  inode=interpListCart[i].inode[m];
 		  weight=interpListCart[i].weights[m];
 		  if (weight < 0 || weight > 1.0) {
-                    traced(weight);
+                    TRACED(weight);
                     printf("warning: weights are not convex 4\n");
                    }
 		  for(k=0;k<nvar;k++)

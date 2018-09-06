@@ -63,9 +63,9 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
 	}
       else if (nnodes==2)
 	{
-	  dxc[0]=max(1e-3,fabs(x[3]-x[0]))*0.5;
-	  dxc[1]=max(1e-3,fabs(x[4]-x[1]))*0.5;
-	  dxc[2]=max(1e-3,fabs(x[5]-x[2]))*0.5;
+	  dxc[0]=MAX(1e-3,fabs(x[3]-x[0]))*0.5;
+	  dxc[1]=MAX(1e-3,fabs(x[4]-x[1]))*0.5;
+	  dxc[2]=MAX(1e-3,fabs(x[5]-x[2]))*0.5;
           return;
 	}
       else
@@ -74,7 +74,7 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
           {
            i3=3*i;
            for(j=0;j<3;j++)
-            dxc[j]=max(1e-3,fabs(x[i3+j]-x[0]));
+            dxc[j]=MAX(1e-3,fabs(x[i3+j]-x[0]));
           }
 	 return;
         }
@@ -137,8 +137,8 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
       //
       for(j=0;j<3;j++)
 	{
-	  xmax[j]=max(xmax[j],xd[j]);
-	  xmin[j]=min(xmin[j],xd[j]);
+	  xmax[j]=MAX(xmax[j],xd[j]);
+	  xmin[j]=MIN(xmin[j],xd[j]);
 	}
     }
   //
@@ -442,4 +442,111 @@ void writePoints(double *x,int nsearch,int bid)
     fprintf(fp,"%f %f %f\n",x[3*i],x[3*i+1],x[3*i+2]);
   fclose(fp);
 }
+/*
+ * Create a unique hash for list of coordinates with duplicates in 
+ * them. Find the rtag as max of all duplicate samples. itag contains
+ * the hash to the real point
+ */
+void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
+{
+  int NSUB=101;
+  int i,j,k,m,ij,i3,jj,kk,ll,p1,p2,indx,jmax,kmax,lmax,nsblks,jkmax;
+  double xmax[3],xmin[3],ds,dsi,dsx,dsxi,dsy,dsyi,dsz,dszi;
+  int *cft,*numpts,*ilist;
+  int nnodes=*nn;
 
+  for(j=0;j<3;j++) xmax[j]=-1E15;
+  for(j=0;j<3;j++) xmin[j]=1E15;
+  
+  for(i=0;i<nnodes;i++)
+    for(j=0;j<3;j++) {
+      xmax[j]=MAX(xmax[j],x[3*i+j]);
+      xmin[j]=MIN(xmin[j],x[3*i+j]);
+    }
+
+  ds=(xmax[0]-xmin[0]+xmax[1]-xmin[1]+xmax[2]-xmin[2])/3.0/NSUB;
+  dsi=1.0/ds;
+  for(j=0;j<3;j++) xmax[j]+=ds;
+  for(j=0;j<3;j++) xmin[j]-=ds;
+  
+  jmax=MIN(round((xmax[0]-xmin[0])*dsi),NSUB);
+  jmax=MAX(jmax,1);
+  dsx=(xmax[0]-xmin[0]+TOL)/jmax;
+  dsxi=1./dsx;    
+  kmax=MIN(round((xmax[1]-xmin[1])*dsi),NSUB);
+  kmax=MAX(kmax,1);
+  dsy=(xmax[1]-xmin[1]+TOL)/kmax;
+  dsyi=1./dsy;
+  lmax=MIN(round((xmax[2]-xmin[2])*dsi),NSUB);
+  lmax=MAX(lmax,1);
+  dsz=(xmax[2]-xmin[2]+TOL)/lmax;
+  dszi=1./dsz;
+  nsblks=jmax*kmax*lmax;
+  jkmax=jmax*kmax;
+  cft=(int *)malloc(sizeof(int)*nsblks+1);
+  numpts=(int *)malloc(sizeof(int)*nsblks);
+  ilist=(int *)malloc(sizeof(int)*nnodes);
+
+  for(i=0;i<nsblks;i++) numpts[i]=0;
+  for(i=0;i<nnodes;i++)
+    {
+      i3=3*i;
+      jj=(int)((x[i3]-xmin[0])*dsxi);
+      kk=(int)((x[i3+1]-xmin[1])*dsyi);
+      ll=(int)((x[i3+2]-xmin[2])*dszi);
+      indx=ll*jkmax+kk*jmax+jj;
+      numpts[indx]=numpts[indx]+1;
+    }
+
+  cft[0]=0;
+  for(i=0;i<nsblks;i++) cft[i+1]=cft[i]+numpts[i];
+  
+  for(i=0;i<nnodes;i++)
+    {
+      i3=3*i;
+      jj=(int)((x[i3]-xmin[0])*dsxi);
+      kk=(int)((x[i3+1]-xmin[1])*dsyi);
+      ll=(int)((x[i3+2]-xmin[2])*dszi);
+      indx=ll*jkmax+kk*jmax+jj;
+      ilist[cft[indx]+numpts[indx]-1]=i;
+      numpts[indx]--;
+      itag[i]=i;
+    }
+  
+  for(i=0;i<nsblks;i++)
+    for(j=cft[i];j<cft[i+1];j++)
+      {
+	p1=ilist[j];
+	for(k=j+1;k<cft[i+1];k++)
+	  {
+	    p2=ilist[k];
+	    if ( fabs(x[3*p1  ]-x[3*p2  ])+
+		 fabs(x[3*p1+1]-x[3*p2+1])+
+		 fabs(x[3*p1+2]-x[3*p2+2]) < TOL &&
+                 meshtag[p1]==meshtag[p2])
+	      {
+		if (p1 > p2) {
+		  rtag[p2]=MAX(rtag[p1],rtag[p2]);
+		  itag[p1]=p2;
+		}
+		else {
+		  rtag[p1]=MAX(rtag[p1],rtag[p2]);
+		  itag[p2]=p1;
+		}
+	      }
+	  }
+      }
+  /*
+  m=0;
+  for(i=0;i<nnodes;i++)
+    if (itag[i]==i+1) {
+     m++;
+   }
+  */
+  free(ilist);
+  free(cft);
+  free(numpts);
+}
+  
+		 
+    

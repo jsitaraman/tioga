@@ -196,7 +196,7 @@ void tioga::performConnectivityAMR(void)
   //MPI_Abort(scomm,ierr);
 }
 
-void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
+void tioga::dataUpdate_AMR(int nvar,int interptype)
 {
   int i,j,k,m;
   int nints;

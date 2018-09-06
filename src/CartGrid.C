@@ -127,11 +127,14 @@ void CartGrid::search(double *x,int *donorid,int npts)
 	      if (level_num[j]==l) 
 		{
 		  flag=1;
-		  for(n=0;n<3;n++) flag=flag && (x[3*i+n] >=xlo[3*j+n]);
-		  for(n=0;n<3;n++) flag=flag && (x[3*i+n] <=xlo[3*j+n]+
-						 dx[3*j+n]*(dims[3*j+n]));
+		  // for(n=0;n<3;n++) flag=flag && (x[3*i+n] >=xlo[3*j+n]);
+		  // for(n=0;n<3;n++) flag=flag && (x[3*i+n] <=xlo[3*j+n]+
+		  //   			 dx[3*j+n]*(dims[3*j+n]));
 		  //for(n=0;n<3;n++) flag = flag && (il[n] >=ilo[3*j+n]);
 		  //for(n=0;n<3;n++) flag = flag && (il[n] <=ihi[3*j+n]);
+          for(n=0;n<3;n++) flag=flag && ((x[3*i+n]-xlo[3*j+n]) > -TOL);
+          for(n=0;n<3;n++) flag=flag && ((x[3*i+n]- (xlo[3*j+n]+
+                                                     dx[3*j+n]*(dims[3*j+n]))) < TOL);
 		  if (flag) { 
 		    dcount++; 
 		    donorid[i]=j; 

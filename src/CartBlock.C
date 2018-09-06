@@ -189,11 +189,18 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
   listptr->weights=NULL;
   listptr->receptorInfo[0]=procid;
   listptr->receptorInfo[1]=remoteid;
-  listptr->receptorInfo[2]=remoteblockid;
   for(n=0;n<3;n++)
     {
       ix[n]=(xtmp[n]-xlo[n])/dx[n];
       rst[n]=(xtmp[n]-xlo[n]-ix[n]*dx[n])/dx[n];
+      if (ix[n]==dims[n])
+       {
+        if (fabs(rst[n]) < TOL)
+         {
+         ix[n]--;
+          rst[n]=(xtmp[n]-xlo[n]-ix[n]*dx[n])/dx[n];
+         }
+       }
       // if (!(ix[n] >=0 && ix[n] < dims[n]) && myid==77) {
       //  TRACEI(procid);
       //  TRACEI(global_id);

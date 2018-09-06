@@ -131,7 +131,7 @@ class tioga
 
   /** update data */
 
-  void dataUpdate(int nvar,int interptype) ;
+  void dataUpdate(int nvar,int interptype,int at_points=0) ;
 
   void dataUpdate_AMR(int nvar,double *q,int interptype) ;
   

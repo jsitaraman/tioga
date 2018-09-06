@@ -312,14 +312,17 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   if (dcount) free(dcount);
 }
 
-void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
+void tioga::dataUpdate(int nvar,int interptype, int at_points)
 {
   int **integerRecords;
   double **realRecords;
   double **qtmp;
+  int **itmp;
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   PACKET *sndPack,*rcvPack;
+  char ofname[100];
+  FILE *fp;
   //
   for(int ib=0;ib<nblocks;ib++)
     if (qblock[ib]==NULL) {
@@ -331,6 +334,9 @@ void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
   //
   integerRecords=NULL;
   realRecords=NULL;
+  itmp=NULL;
+  qtmp=NULL;
+  fp=NULL;
   //
   pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
   if (nsend==0) return;
@@ -404,11 +410,11 @@ void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
   if (at_points) {
    qtmp=(double **)malloc(sizeof(double*)*nblocks);
    itmp=(int **)malloc(sizeof(double*)*nblocks);
-   for(ib=0;ib<nblocks;ib++) 
+   for(int ib=0;ib<nblocks;ib++) 
     {
      qtmp[ib]=(double *)malloc(sizeof(double)*mblocks[ib]->ntotalPoints*nvar);
      itmp[ib]=(int *)malloc(sizeof(int)*mblocks[ib]->ntotalPoints);
-     for(int i=0;i < mblocks[ib]->ntotalPoints;i++) itmp[ib][i]=0
+     for(int i=0;i < mblocks[ib]->ntotalPoints;i++) itmp[ib][i]=0;
     }
   }
   //
@@ -421,7 +427,7 @@ void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
 	  int pointid=rcvPack[k].intData[l++];
 	  int ib=rcvPack[k].intData[l++];
 	  auto &mb = mblocks[ib];
-          if (at_point==0) {
+          if (at_points==0) {
            double *q  = qblock[ib];
 	   mb->updateSolnData(pointid,&rcvPack[k].realData[m],q,nvar,interptype);
           }
@@ -438,7 +444,7 @@ void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
    for(int ib=0;ib < nblocks;ib++)
     {
      auto &mb = mblocks[ib];
-     for(i=0;i<mb->ntotalPoints;i++)
+     for(int i=0;i<mb->ntotalPoints;i++)
       {
        if (itmp[ib][i]==0 && iorphanPrint) {
         if (fp==NULL) 
@@ -461,7 +467,7 @@ void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
   //
   // change the state of cells/nodes who are orphans
   //
-  for (ib=0;ib<nblocks;ib++)
+  for (int ib=0;ib<nblocks;ib++)
   { 
     auto &mb = mblocks[ib];
     mb->clearOrphans(holeMap,nmesh,itmp[ib]);

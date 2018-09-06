@@ -286,7 +286,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
   //
   qq=(double *)malloc(sizeof(double)*nvar);
   //
-  nintsold=(*nints);
+  nintold=(*nints);
   nrealold=(*nreals); 
   interpCount=0;
   //
@@ -430,5 +430,5 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 	    }
 	}
     }
-  if (qq) free(qq)
+  if (qq) free(qq);
 }

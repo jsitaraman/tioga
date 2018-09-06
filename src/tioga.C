@@ -155,7 +155,7 @@ void tioga::performConnectivityHighOrder(void)
    mb->search();
    mb->processPointDonors();
   }
-  iorphanPrint=0;
+  iorphanPrint=1;
 }  
 
 void tioga::performConnectivityAMR(void)
@@ -211,6 +211,11 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   //
   // initialize send and recv packets
   //
+  for(int ib=0;ib<nblocks;ib++)
+    if (qblock[ib]==NULL) {
+     printf("Solution data not set, cannot update \n");
+     return;
+    }   
   icount=dcount=NULL;
   integerRecords=NULL;
   realRecords=NULL;
@@ -228,9 +233,13 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   //
   integerRecords=NULL;
   realRecords=NULL;
+  //
+  // TODO : verify for nblocks > 1
+  //
+  nints=nreals=0;
   for(ib=0;ib<nblocks;ib++) {
    auto & mb = mblocks[ib];
-   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,q,nvar,interptype);
+   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblocks[ib],nvar,interptype);
   }
   for(i=0;i<ncart;i++)
     cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
@@ -280,14 +289,13 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
       for(i=0;i<rcvPack[k].nints/2;i++)
 	{
 	  bid=rcvPack[k].intData[2*i];
-	  if (bid< 0) 
+	  if (bid < 0) 
 	    {
-	      mb->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],q,nvar,interptype);
+	      mblocks[-(bid+1)]->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],qblocks[ib],nvar,interptype);
 	    }
 	  else
 	    {
-
-	      cb[bid].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
+	      cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
 	      m+=nvar;
 	    }
 	}
@@ -304,11 +312,11 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
   if (dcount) free(dcount);
 }
 
-
-void tioga::dataUpdate(int nvar,int interptype)
+void tioga::dataUpdate(int nvar,int interptype, int itype, int at_points)
 {
   int **integerRecords;
   double **realRecords;
+  double **qtmp;
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   PACKET *sndPack,*rcvPack;
@@ -348,8 +356,14 @@ void tioga::dataUpdate(int nvar,int interptype)
     {
       auto &mb =mblocks[ib];
       double *q  =qblock[ib];
-      mb->getInterpolatedSolution(&(nints[ib]),&(nreals[ib]),&(integerRecords[ib]),&(realRecords[ib]),
-				  q,nvar,interptype);
+      if (at_points==0) {
+        mb->getInterpolatedSolution(&(nints[ib]),&(nreals[ib]),&(integerRecords[ib]),&(realRecords[ib]),
+	     			  q,nvar,interptype);
+      }
+      else {
+        mb->getInterpolatedSolutionAtPoints(&(nints[ib]),&(nreals[ib]),&(integerRecords[ib]),
+                                      &(realRecords[ib]),q,nvar,interptype);
+      }
       //
       // populate the packets
       //
@@ -387,6 +401,17 @@ void tioga::dataUpdate(int nvar,int interptype)
   //
   // decode the packets and update the data
   //
+  if (at_points) {
+   qtmp=(double **)malloc(sizeof(double*)*nblocks);
+   itmp=(int **)malloc(sizeof(double*)*nblocks);
+   for(ib=0;ib<nblocks;ib++) 
+    {
+     qtmp[ib]=(double *)malloc(sizeof(double)*mblocks[ib]->ntotalPoints*nvar);
+     itmp[ib]=(int *)malloc(sizeof(int)*mblocks[ib]->ntotalPoints);
+     for(int i=0;i < mblocks[ib]->ntotalPoints;i++) itmp[ib][i]=0
+    }
+  }
+  //
   for(int k=0;k<nrecv;k++)
     {
       int l=0;
@@ -396,11 +421,52 @@ void tioga::dataUpdate(int nvar,int interptype)
 	  int pointid=rcvPack[k].intData[l++];
 	  int ib=rcvPack[k].intData[l++];
 	  auto &mb = mblocks[ib];
-          double *q  = qblock[ib];
-	  mb->updateSolnData(pointid,&rcvPack[k].realData[m],q,nvar,interptype);
+          if (at_point==0) {
+           double *q  = qblock[ib];
+	   mb->updateSolnData(pointid,&rcvPack[k].realData[m],q,nvar,interptype);
+          }
+          else {
+            for (int j=0;j<nvar;j++)
+               qtmp[ib][pointid*nvar+j]=rcvPack[k].realData[m+k];
+            itmp[ib][pointid]=1;
+          }  
 	  m+=nvar;
 	}
     }
+   int norphanPoint=0;
+   int ntotalPoints=0;
+   for(int ib=0;ib < nblocks;ib++)
+    {
+     auto &mb = mblocks[ib];
+     for(i=0;i<mb->ntotalPoints;i++)
+      {
+       if (itmp[ib][i]==0 && iorphanPrint) {
+        if (fp==NULL) 
+          {
+            sprintf(ofname,"orphan%d.%d.dat",myid,ib);
+            fp=fopen(ofname,"w");
+          }
+        mb->outputOrphan(fp,i);
+        norphanPoint++;
+       }
+      } 
+     ntotalPoints+=mb->ntotalPoints;
+    }
+  if (fp!=NULL) fclose(fp);
+  if (norphanPoint > 0 && iorphanPrint) {
+   printf("Warning::number of orphans in %d = %d of %d\n",myid,norphanPoint,
+        ntotalPoints);
+    iorphanPrint=0;
+   }
+  //
+  // change the state of cells/nodes who are orphans
+  //
+  for (ib=0;ib<nblocks;ib++)
+  { 
+    auto &mb = mblocks[ib];
+    mb->clearOrphans(holeMap,nmesh,itmp[ib]);
+    mb->updatePointData(qblocks[ib],qtmp[ib],nvar,interptype);
+  }
   //
   // release all memory
   //
@@ -415,6 +481,16 @@ void tioga::dataUpdate(int nvar,int interptype)
     for(int ib=0;ib<nblocks;ib++)
       if (realRecords[ib]) free(realRecords[ib]);
     free(realRecords);
+  }
+  if (qtmp) {
+    for (int ib =0;ib<nblocks;ib++)
+      if (qtmp[ib]) free(qtmp[ib]);
+      free(qtmp);
+  }
+  if (itmp) {
+    for(int ib=0;ib<nblocks;ib++)
+     if (itmp[ib]) free(itmp[ib]);
+    free(itmp);
   }
 }
 
@@ -566,132 +642,6 @@ tioga::~tioga()
   if (qblock) free(qblock);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
-
-void tioga::dataUpdate_highorder(int nvar,double *q,int interptype)
-{
-  int i,j,k,m;
-  int nints;
-  int nreals;
-  int *integerRecords;
-  double *realRecords;
-  int nsend,nrecv;
-  int *sndMap,*rcvMap;
-  PACKET *sndPack,*rcvPack;
-  int *icount,*dcount;
-  double *qtmp;
-  int norphanPoint;
-  int *itmp;
-  FILE *fp;
-  char ofname[100];
-  //
-  // initialize send and recv packets
-  //
-  fp=NULL;
-  icount=dcount=NULL;
-  integerRecords=NULL;
-  realRecords=NULL;
-  //
-  pc->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
-  if (nsend==0) return;
-  sndPack=(PACKET *)malloc(sizeof(PACKET)*nsend);
-  rcvPack=(PACKET *)malloc(sizeof(PACKET)*nrecv);
-  icount=(int *)malloc(sizeof(int)*nsend);
-  dcount=(int *)malloc(sizeof(int)*nrecv);
-  //
-  pc->initPackets(sndPack,rcvPack);  
-  //
-  // get the interpolated solution now
-  //
-  integerRecords=NULL;
-  realRecords=NULL;
-  mb->getInterpolatedSolutionAtPoints(&nints,&nreals,&integerRecords,
-				      &realRecords,q,nvar,interptype);
-  //
-  // populate the packets
-  //
-  for(i=0;i<nints;i++)
-    {
-      k=integerRecords[2*i];
-      sndPack[k].nints++;
-      sndPack[k].nreals+=nvar;
-    }
-
-  for(k=0;k<nsend;k++)
-    {
-     sndPack[k].intData=(int *)malloc(sizeof(int)*sndPack[k].nints);
-     sndPack[k].realData=(double *)malloc(sizeof(double)*sndPack[k].nreals);
-     icount[k]=dcount[k]=0;
-    }  
-
-  m=0;
-  for(i=0;i<nints;i++)
-    {
-      k=integerRecords[2*i];
-      sndPack[k].intData[icount[k]++]=integerRecords[2*i+1];
-      for(j=0;j<nvar;j++)
-	sndPack[k].realData[dcount[k]++]=realRecords[m++];
-    }
-  //
-  // communicate the data across
-  //
-  pc->sendRecvPackets(sndPack,rcvPack);
-  //
-  // decode the packets and update the data
-  //
-  qtmp=(double *)malloc(sizeof(double)*nvar*mb->ntotalPoints);
-  itmp=(int *) malloc(sizeof(int)*mb->ntotalPoints);
-  for(i=0;i<mb->ntotalPoints;i++) itmp[i]=0;
-  //
-  for(k=0;k<nrecv;k++)
-    {
-      m=0;
-      for(i=0;i<rcvPack[k].nints;i++)
-	{
-	  for(j=0;j<nvar;j++)
-	    {
-	      itmp[rcvPack[k].intData[i]]=1;
-	      qtmp[rcvPack[k].intData[i]*nvar+j]=rcvPack[k].realData[m];
-	      m++;
-	    }
-         //if (myid==12) printf("rcvPack[k].intData[i]=%d %d\n",rcvPack[k].intData[i],mb->ntotalPoints);
-	}
-    }
-  norphanPoint=0;
-  for(i=0;i<mb->ntotalPoints;i++)
-    {
-      if (itmp[i]==0 && iorphanPrint) {
-	if (fp==NULL) 
-	  {
-	    sprintf(ofname,"orphan%d.dat",myid);
-	    fp=fopen(ofname,"w");
-	  }
-	mb->outputOrphan(fp,i);
-	norphanPoint++;
-      }
-    }
-  if (fp!=NULL) fclose(fp);
-  if (norphanPoint > 0 && iorphanPrint) {
-   printf("Warning::number of orphans in %d = %d of %d\n",myid,norphanPoint,
-	mb->ntotalPoints);
-    iorphanPrint=0;
-   }
-  // change the state of cells/nodes who are orphans
-  mb->clearOrphans(holeMap,nmesh,itmp);
-  //
-  mb->updatePointData(q,qtmp,nvar,interptype);
-  //
-  // release all memory
-  //
-  pc->clearPackets2(sndPack,rcvPack);
-  free(sndPack);
-  free(rcvPack);
-  free(qtmp);
-  free(itmp);
-  if (integerRecords) free(integerRecords);
-  if (realRecords) free(realRecords);
-  if (icount) free(icount);
-  if (dcount) free(dcount);
-}
 
 void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *idata,
 				     double *rdata,int ngridsin,

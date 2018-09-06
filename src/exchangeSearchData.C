@@ -23,7 +23,7 @@
 
 #include "tioga.h"
 
-void tioga::exchangeSearchData(int itype)
+void tioga::exchangeSearchData(int at_points)
 {
   int i;
   int nsend, nrecv;
@@ -65,7 +65,7 @@ void tioga::exchangeSearchData(int itype)
   for (int ii=0; ii < nobb; ii++) {
     int ib = obblist[ii].iblk_local;
     auto& mb = mblocks[ib];
-    if (itype==0) 
+    if (at_points==0) 
     {
      mb->getQueryPoints(
       &obblist[ii], &nintsSend[ii], &int_data[ii], &nrealsSend[ii],
@@ -137,7 +137,7 @@ void tioga::exchangeSearchData(int itype)
       free(mb->res_search);
       mb->res_search=NULL;
     }
-   if (itype==1) {
+   if (at_points==1) {
      if (mb->rst) {
        free(mb->rst);
        mb->rst=NULL;
@@ -176,7 +176,7 @@ void tioga::exchangeSearchData(int itype)
     mb->isearch = (int*)malloc(3 * sizeof(int) * mb->nsearch);
     mb->tagsearch = (int*)malloc(sizeof(int) * mb->nsearch);
     mb->donorId = (int*)malloc(sizeof(int) * mb->nsearch);
-    if (itype==1) mb->rst = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
+    if (at_points==1) mb->rst = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
   }
   //
   // Update search arrays in mesh blocks from recv packets

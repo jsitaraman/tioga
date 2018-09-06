@@ -64,8 +64,8 @@ class CartBlock
   void update(double *qval,int index,int nq);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
-  void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes);
-  void insertInInterpList(int procid,int remoteid,double *xtmp);
+  void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid,double cellRes);
+  void insertInInterpList(int procid,int remoteid,int remoteblockid,double *xtmp);
   void writeCellFile(int bid);
   void clearLists(void);
   void initializeLists(void);

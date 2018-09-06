@@ -119,7 +119,7 @@ class tioga
 
   void exchangeBoxes(void);
 
-  void exchangeSearchData(int itype=0);
+  void exchangeSearchData(int at_points=0);
 
   void exchangeDonors(void);
     

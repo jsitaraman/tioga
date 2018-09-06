@@ -279,31 +279,60 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
   double weight;
   double *qq;
   int icount,dcount;
+  int nintold,nrealold;
+  int interpCount;
+  int *tmpint;
+  double *tmpreal;
   //
   qq=(double *)malloc(sizeof(double)*nvar);
   //
-  (*nints)=(*nreals)=0;
+  nintsold=(*nints);
+  nrealold=(*nreals); 
+  interpCount=0;
+  //
   for(i=0;i<ninterp;i++)
     {
       if (!interpList[i].cancel)
 	{
-	  (*nints)++;
-	  (*nreals)=(*nreals)+nvar;
+          interpCount++;
 	}
     }
   for(i=0;i<ninterpCart;i++)
     {
       if (!interpListCart[i].cancel)
 	{
-	  (*nints)++;
-	  (*nreals)=(*nreals)+nvar;
+         interpCount++;
 	}
     }	          
-  if ((*nints)==0) return;
+  if (interpCount==0) {
+   return;
+  }
+  if (nintold > 0) 
+   {
+     tmpint=(int *)malloc(sizeof(int)*3*(*nints));
+     tmpreal=(double *)malloc(sizeof(double)*(*nreals));
+     for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
+     for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
+     //
+     free((*intData));
+     free((*realData)); // didnt free this before ??
+     //
+   }
+   (*nints)+=interpCount;
+   (*nreals)+=(interpCount*nvar);
+   (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
+   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
+   if (nintold > 0) 
+    {
+      for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
+      for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];
+      free(tmpint);
+      free(tmpreal);
+   }
   //
-  (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
-  (*realData)=(double *)malloc(sizeof(double)*(*nreals));
-  icount=dcount=0;
+  icount=3*nintold;
+  dcount=nrealold;
+  //
   //
   if (interptype==ROW)
     {    
@@ -324,7 +353,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		    qq[k]+=q[inode*nvar+k]*weight;
 		}
 	      (*intData)[icount++]=interpList[i].receptorInfo[0];
-	      (*intData)[icount++]=-1;
+	      (*intData)[icount++]=-1-interpList[i].receptorInfo[2];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
@@ -353,7 +382,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		}
 	      //writeqnode_(&myid,qq,&nvar);
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[0];
-	      (*intData)[icount++]=interpListCart[i].receptorInfo[2];
+	      (*intData)[icount++]=1+interpListCart[i].receptorInfo[2];
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[1];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
@@ -375,7 +404,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		    qq[k]+=q[k*nnodes+inode]*weight;
 		}
 	      (*intData)[icount++]=interpList[i].receptorInfo[0];
-	      (*intData)[icount++]=-1;
+	      (*intData)[icount++]=-1-interpList[i].receptorInfo[2];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
@@ -394,11 +423,12 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		    qq[k]+=q[k*nnodes+inode]*weight;
 		}
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[0];
-	      (*intData)[icount++]=interpListCart[i].receptorInfo[1];
+	      (*intData)[icount++]=1+interpListCart[i].receptorInfo[1];
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
 	}
     }
+  if (qq) free(qq)
 }

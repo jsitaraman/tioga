@@ -65,20 +65,24 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       nintold=(*nints);
       nrealold=(*nreals);
       if (nintold > 0) {
-      tmpint=(int *)malloc(sizeof(int)*3*(*nints));
-      tmpreal=(double *)malloc(sizeof(double)*(*nreals));
-      for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
-      for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
+       tmpint=(int *)malloc(sizeof(int)*3*(*nints));
+       tmpreal=(double *)malloc(sizeof(double)*(*nreals));
+       for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
+       for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
+       //
+       free((*intData));
+       free((*realData)); // didnt free this before ??
+       //  
       }
       (*nints)+=interpCount;
       (*nreals)+=(interpCount*nvar);
       (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
       (*realData)=(double *)malloc(sizeof(double)*(*nreals));
       if (nintold > 0) {
-      for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
-      for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];      
-      free(tmpint);
-      free(tmpreal);
+       for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
+       for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];      
+       free(tmpint);
+       free(tmpreal);
       }
       listptr=interpList;
       icount=3*nintold;
@@ -93,7 +97,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 			    pdegree,dims[0],dims[1],dims[2],nf,
 			    xlo,dx,&qnode[ploc],index,xtmp);
 	  (*intData)[icount++]=listptr->receptorInfo[0];
-	  (*intData)[icount++]=-1;
+	  (*intData)[icount++]=-1-listptr->receptorInfo[2];
 	  (*intData)[icount++]=listptr->receptorInfo[1];	  
 	  for(n=0;n<nvar;n++)
            {
@@ -164,7 +168,7 @@ void CartBlock::clearLists(void)
 }
 
 
-void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
+void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,double *xtmp)
 {
   int i,n;
   int ix[3];
@@ -185,6 +189,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
   listptr->weights=NULL;
   listptr->receptorInfo[0]=procid;
   listptr->receptorInfo[1]=remoteid;
+  listptr->receptorInfo[2]=remoteblockid;
   for(n=0;n<3;n++)
     {
       ix[n]=(xtmp[n]-xlo[n])/dx[n];
@@ -221,7 +226,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
   free(rst);
 }
   
-void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes)
+void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid, double cellRes)
 {
   DONORLIST *temp1;
   int ijklmn[6];
@@ -253,6 +258,7 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   temp1->donorData[0]=senderid;
   temp1->donorData[1]=meshtagdonor;
   temp1->donorData[2]=remoteid;
+  temp1->donorData[3]=remoteblockid;
   temp1->donorRes=cellRes;
   temp1->cancel=0;
   insertInList(&(donorList[pointid]),temp1);
@@ -477,6 +483,7 @@ void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
 		      cancelledData[m++]=temp->donorData[0];
 		      cancelledData[m++]=1;
 		      cancelledData[m++]=temp->donorData[2];
+		      cancelledData[m++]=temp->donorData[3];
 		    }
 	            temp=temp->next;
 		  }

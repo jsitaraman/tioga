@@ -103,7 +103,7 @@ typedef struct OBB
 }OBB;
 typedef struct DONORLIST
 {
-  int donorData[3];
+  int donorData[4];
   double donorRes;
   double receptorRes;
   int cancel;

@@ -29,7 +29,7 @@ void tioga::exchangeAMRDonors(void)
   int *obdonors,*obreceptors;
   int *cancelledData;
   int *bcount;
-  int gid,procid,localid,meshtag,remoteid,id;
+  int gid,procid,localid,meshtag,remoteid,remoteblockid,id;
   int interpCount,donorCount,index,ncancel,ctype;
   double cellRes;
   double xtmp[3];
@@ -74,6 +74,9 @@ void tioga::exchangeAMRDonors(void)
       //
       // count data to send
       //
+    for(int ib=0;ib<nblocks;ib++)
+      {
+      auto& mb = mblocks[ib];
       for(i=0;i<mb->ntotalPointsCart;i++) 
 	{ 
 	  if (mb->donorIdCart[i]!=-1)
@@ -83,7 +86,7 @@ void tioga::exchangeAMRDonors(void)
 	      obdonors[imap[cg->proc_id[gid]]]++;
 	    }
 	}
-      for(i=0;i<mb->nsearch;i++) 
+       for(i=0;i<mb->nsearch;i++) 
 	{
 	  if (mb->donorId[i]!=-1) 
 	    {
@@ -91,13 +94,14 @@ void tioga::exchangeAMRDonors(void)
 	      obreceptors[imap[mb->isearch[3*i]]]++;
 	    }
 	}
+      } 
     }
   //
   // allocate data packets
   //
   for(i=0;i<nsend;i++)
     {
-      sndPack[i].nints=obdonors[i]*2+obreceptors[i]*4+2;
+      sndPack[i].nints=obdonors[i]*3+obreceptors[i]*5+2;
       sndPack[i].nreals=obdonors[i]*3+obreceptors[i];
       sndPack[i].intData=(int *)malloc(sizeof(int)*sndPack[i].nints);
       sndPack[i].realData=(double *)malloc(sizeof(double)*sndPack[i].nreals);
@@ -112,6 +116,9 @@ void tioga::exchangeAMRDonors(void)
   for(i=0;i<nsend;i++) { intcount[i]=2; realcount[i]=0;}
   if (nblocks > 0) 
     {
+     for(int ib=0;ib<nblocks;ib++)
+     { 
+      auto & mb = mblocks[ib];
       for(i=0;i<mb->ntotalPointsCart;i++) 
 	{ 
 	  if (mb->donorIdCart[i]!=-1)
@@ -121,6 +128,7 @@ void tioga::exchangeAMRDonors(void)
 	      localid=cg->local_id[gid];	  
 	      sndPack[procid].intData[intcount[procid]++]=localid;
 	      sndPack[procid].intData[intcount[procid]++]=i;
+	      sndPack[procid].intData[intcount[procid]++]=ib;
 	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i];
 	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i+1];
 	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i+2];	  
@@ -135,10 +143,12 @@ void tioga::exchangeAMRDonors(void)
 	      sndPack[procid].intData[intcount[procid]++]=mb->isearch[3*i+2];
 	      sndPack[procid].intData[intcount[procid]++]=mb->meshtag;
 	      sndPack[procid].intData[intcount[procid]++]=i;
+	      sndPack[procid].intData[intcount[procid]++]=ib;
 	      sndPack[procid].realData[realcount[procid]++]=mb->cellRes[mb->donorId[i]];
 	      //      fprintf(fp,"%lf %lf %lf\n",mb->xsearch[3*i],mb->xsearch[3*i+1],mb->xsearch[3*i+2]);
 	    }
 	}
+      }
     }
   //if (myid==0) {
   //for(i=0;i<nsend;i++)
@@ -173,10 +183,11 @@ void tioga::exchangeAMRDonors(void)
 	    {
      	      localid=rcvPack[i].intData[m++];
 	      remoteid=rcvPack[i].intData[m++];
+	      remoteblockid=rcvPack[i].intData[m++];
 	      xtmp[0]=rcvPack[i].realData[n++];
 	      xtmp[1]=rcvPack[i].realData[n++];
 	      xtmp[2]=rcvPack[i].realData[n++];	      
-	      cb[localid].insertInInterpList(i,remoteid,xtmp);
+	      cb[localid].insertInInterpList(i,remoteid,remoteblockid,xtmp);
 	      bcount[localid]++;
 	    }
 	  for(j=0;j<donorCount;j++)
@@ -185,8 +196,9 @@ void tioga::exchangeAMRDonors(void)
 	      index=rcvPack[i].intData[m++];
 	      meshtag=rcvPack[i].intData[m++];
 	      remoteid=rcvPack[i].intData[m++];
+              remoteblockid=rcvPack[i].intData[m++];
 	      cellRes=rcvPack[i].realData[n++];
- 	      cb[localid].insertInDonorList(i,index,meshtag,remoteid,cellRes);
+ 	      cb[localid].insertInDonorList(i,index,meshtag,remoteid,remoteblockid,cellRes);
 	      bcount[localid]++;
 	    }
 	}
@@ -197,7 +209,7 @@ void tioga::exchangeAMRDonors(void)
     {
       if (icount[i] > 0) 
 	{
-	  sndPack[i].nints=2*icount[i];
+	  sndPack[i].nints=3*icount[i];
 	  sndPack[i].nreals=0;
 	  sndPack[i].intData=(int *) malloc(sizeof(int)*sndPack[i].nints);
 	}
@@ -212,15 +224,17 @@ void tioga::exchangeAMRDonors(void)
       cancelledData=NULL;
       ncancel=bcount[i];
       if (ncancel > 0) {
-	cancelledData=(int *)malloc(sizeof(int)*3*ncancel);
+	cancelledData=(int *)malloc(sizeof(int)*4*ncancel);
 	cb[i].getCancellationData(cancelledData,&ncancel);
 	for(j=0;j<ncancel;j++)
 	  {
-	    procid=cancelledData[3*j];
-	    ctype=cancelledData[3*j+1];
-	    remoteid=cancelledData[3*j+2];
+	    procid=cancelledData[4*j];
+	    ctype=cancelledData[4*j+1];
+	    remoteid=cancelledData[4*j+2];
+            remoteblockid=cancelledData[4*j+3];
 	    sndPack[procid].intData[intcount[procid]++]=ctype;
 	    sndPack[procid].intData[intcount[procid]++]=remoteid;
+	    sndPack[procid].intData[intcount[procid]++]=remoteblockid;
 	    //TRACEI(intcount[procid]);
             //TRACEI(sndPack[procid].nints);
 	  }
@@ -239,21 +253,25 @@ void tioga::exchangeAMRDonors(void)
 	    {
 	      ctype=rcvPack[i].intData[m++];
 	      id=rcvPack[i].intData[m++];
+              int ib = rcvPack[i].intData[m++];
 	      if (ctype==0) 
 		{
-		  mb->donorIdCart[id]=-1;
+		  mblocks[ib]->donorIdCart[id]=-1;
 		}
 	      else
 		{
-		  mb->donorId[id]=-1;
+		  mblocks[ib]->donorId[id]=-1;
 		}
 	    }
 	}
     }
-  mb->setCartIblanks();
+
+  for(int ib=0;ib<nblocks;ib++)
+    mblocks[ib]->setCartIblanks();
   pc_cart->clearPackets2(sndPack,rcvPack);
   //
-  mb->findInterpListCart();
+  for(int ib=0;ib<nblocks;ib++)
+   mblocks[ib]->findInterpListCart();
   if (cancelledData) free(cancelledData);
   //fclose(fp);
   free(bcount);

@@ -483,7 +483,7 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
   dszi=1./dsz;
   nsblks=jmax*kmax*lmax;
   jkmax=jmax*kmax;
-  cft=(int *)malloc(sizeof(int)*nsblks+1);
+  cft=(int *)malloc(sizeof(int)*(nsblks+1));
   numpts=(int *)malloc(sizeof(int)*nsblks);
   ilist=(int *)malloc(sizeof(int)*nnodes);
 

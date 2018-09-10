@@ -157,7 +157,7 @@ class tioga
   void setSymmetry(int syminput) { isym=syminput;};
   /** set resolutions for nodes and cells */
   void setResolutions(double *nres,double *cres)
-  { mb->setResolutions(nres,cres);}
+  { auto & mb = mblocks[0]; mb->setResolutions(nres,cres);}
 
   void setResolutions(int btag, double *nres,double *cres)
   {

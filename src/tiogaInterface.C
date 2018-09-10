@@ -80,8 +80,31 @@ extern "C" {
      }
   }
   
+  void tioga_registergrid_data_(int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode,
+                               int *obcnode,int *ntypes,...)
+   {
+    va_list arguments;
+    int i;
+    int iblk=0;
+    va_start(arguments, ntypes);
 
-  void tioga_registergrid_data_(int *bid, int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
+    if(idata[iblk].nv) free(idata[iblk].nv);
+    if(idata[iblk].nc) free(idata[iblk].nc);
+    if(idata[iblk].vconn) free(idata[iblk].vconn);
+    idata[iblk].nv=(int *) malloc(sizeof(int)*(*ntypes));    
+    idata[iblk].nc=(int *) malloc(sizeof(int)*(*ntypes));
+    idata[iblk].vconn=(int **)malloc(sizeof(int *)*(*ntypes));
+    for(i=0;i<*ntypes;i++)
+     {
+      idata[iblk].nv[i]=*(va_arg(arguments, int *));
+      idata[iblk].nc[i]=*(va_arg(arguments, int *));
+      idata[iblk].vconn[i]=va_arg(arguments, int *);
+     }
+    tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,idata[iblk].nv,idata[iblk].nc,idata[iblk].vconn);
+  }
+
+
+  void tioga_registergrid_data_mb_(int *bid, int *btag,int *nnodes,double *xyz,int *ibl,int *nwbc, int *nobc,int *wbcnode, 
 			       int *obcnode,int *ntypes,...)
   {
     va_list arguments;

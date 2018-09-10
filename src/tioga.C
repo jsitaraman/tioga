@@ -127,7 +127,7 @@ void tioga::performConnectivity(void)
   for (int ib=0;ib<nblocks;ib++) {
     auto& mb = mblocks[ib];
     mb->getCellIblanks();
-    // mb->writeGridFile(100*myid+mtags[ib]);
+    mb->writeGridFile(100*myid+mtags[ib]);
   }
   if (qblock) free(qblock);
   qblock=(double **)malloc(sizeof(double *)*nblocks);
@@ -187,13 +187,13 @@ void tioga::performConnectivityAMR(void)
     auto &mb = mblocks[ib];
     mb->getCellIblanks();
    }
-  //mb->writeCellFile(myid);
+  //  mb->writeCellFile(myid);
   //for(i=0;i<ncart;i++)
 	//cb[i].writeCellFile(i);
-  //MPI_Barrier(scomm);
+  MPI_Barrier(scomm);
   //printf("Finished performConnectivityAMR in %d\n",myid);
   //ierr=0;
-  //MPI_Abort(scomm,ierr);
+  MPI_Abort(scomm,ierr);
 }
 
 void tioga::dataUpdate_AMR(int nvar,int interptype)

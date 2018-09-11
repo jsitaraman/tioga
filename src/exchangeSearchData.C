@@ -20,9 +20,9 @@
 
 #include <algorithm>
 #include <vector>
-
+#include "codetypes.h"
 #include "tioga.h"
-
+using namespace TIOGA;
 void tioga::exchangeSearchData(int at_points)
 {
   int i;

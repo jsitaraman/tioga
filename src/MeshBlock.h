@@ -24,7 +24,7 @@
 #include <vector>
 #include <stdint.h>
 
-#include "codetypes.h"
+//#include "codetypes.h"
 #include "ADT.h"
 // forward declare to instantiate one of the methods
 class parallelComm;

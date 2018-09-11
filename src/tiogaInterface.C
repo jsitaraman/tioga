@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include "codetypes.h"
 #include "tioga.h"
 #include "globals.h"
 #include <string.h>

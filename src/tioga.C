@@ -17,9 +17,10 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-
+#include "codetypes.h"
 #include "tioga.h"
 #include <assert.h>
+using namespace TIOGA;
 /**
  * set communicator
  * and initialize a few variables
@@ -467,11 +468,13 @@ void tioga::dataUpdate(int nvar,int interptype, int at_points)
   //
   // change the state of cells/nodes who are orphans
   //
+  if (at_points) {
   for (int ib=0;ib<nblocks;ib++)
-  { 
+   { 
     auto &mb = mblocks[ib];
     mb->clearOrphans(holeMap,nmesh,itmp[ib]);
     mb->updatePointData(qblock[ib],qtmp[ib],nvar,interptype);
+   }
   }
   //
   // release all memory

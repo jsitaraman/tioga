@@ -37,6 +37,9 @@
  *
  *  Jay Sitaraman 02/24/2014
  */
+
+namespace TIOGA {
+
 class tioga
 {
  private :
@@ -241,6 +244,6 @@ class tioga
 };
       
   
-
+}
 
 #endif /* TIOGA_H */

@@ -20,7 +20,7 @@
 
 #ifndef PARALLELCOMM_H
 #define PARALLELCOMM_H
-
+#include "codetypes.h"
 #include <cstdlib>
 #include "mpi.h"
 

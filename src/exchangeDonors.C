@@ -19,8 +19,9 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <algorithm>
+#include "codetypes.h"
 #include "tioga.h"
-
+using namespace TIOGA;
 void tioga::exchangeDonors(void)
 {
   int nsend,nrecv;

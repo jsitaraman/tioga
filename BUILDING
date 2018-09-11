@@ -1,11 +1,8 @@
-To build the library "libtioga.a"
+To build the library "libtioga.so"
 ---------------------------------
-[user@machine tioga]$ cd src;make;cd ..
-
-To build the tools for standalone testing
-----------------------------
-[user@machine tioga]$ cd driver;make;cd ..
-[user@machine tioga]$ cd gridGen;make;cd ..
+[user@machine tioga]$ cd build
+[user@machine tioga]$ cmake ..
+[user@machine tioga]$ make
 
 To run the test the case
 ---------------------------
@@ -21,13 +18,10 @@ run.sh does two things:
 2. performs connectivity using tioga and verifies that
    the interpolation accuracy for a linear field
 
-To visualize
----------------------
-[user@machine tioga/case]$ tec360 iblank.lay
+To run the accuracy test
+-------------------------
+[user@machine tioga]$ cd case; ../build/driver/poisson_mms.exe
 
-NOTE:
-I use intel fortran for f90 and gcc/g++ for C/C++
-the build system is setup for that. If you use another
-compiler change the FFLAGS in various Makefiles to match
-the flags you need to use. I have tested with gfortran and
-it seems to work OK
+Default option will check if 2nd order accuracy is obtained with
+grid refinement for the 5-point Laplacian using method of manufactured 
+solutions (MMS)

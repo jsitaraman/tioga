@@ -26,7 +26,7 @@
 #define GLOBALS_H
 
 #include "tioga.h"
-
+using namespace TIOGA;
 #define MAXBLOCKS 100
 tioga *tg;
 /*

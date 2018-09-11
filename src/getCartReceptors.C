@@ -22,6 +22,7 @@
 // have to unify both routines here 
 // FIX later ...
 //
+#include "codetypes.h"
 #include "MeshBlock.h"
 #include "parallelComm.h"
 #include "CartGrid.h"

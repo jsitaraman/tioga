@@ -122,12 +122,18 @@ void tioga::performConnectivity(void)
    mb->search();
   }
   exchangeDonors();
+  //this->reduce_fringes();
   outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
   for (int ib=0;ib<nblocks;ib++) {
     auto& mb = mblocks[ib];
-    mb->getCellIblanks();
+    if (ihighGlobal) {
+      mb->getCellIblanks2();
+    }
+    else {
+      mb->getCellIblanks();
+    }
     mb->writeGridFile(100*myid+mtags[ib]);
   }
   if (qblock) free(qblock);
@@ -137,7 +143,6 @@ void tioga::performConnectivity(void)
   //}
   //mb->writeOutput(myid);
   //TRACEI(myid);
-  //this->reduce_fringes();
   this->myTimer("tioga::performConnectivity",1);
 }
 
@@ -434,7 +439,7 @@ void tioga::dataUpdate(int nvar,int interptype, int at_points)
           }
           else {
             for (int j=0;j<nvar;j++)
-               qtmp[ib][pointid*nvar+j]=rcvPack[k].realData[m+k];
+               qtmp[ib][pointid*nvar+j]=rcvPack[k].realData[m+j];
             itmp[ib][pointid]=1;
           }  
 	  m+=nvar;

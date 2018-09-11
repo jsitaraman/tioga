@@ -30,6 +30,61 @@ extern "C"
   int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
 
+void MeshBlock::getCellIblanks2(void)
+{
+  int i;
+  int n,nvert,m;
+  int icell;
+  int inode[8];
+  int ncount,flag;
+  int verbose;
+
+  icell=0;
+  if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
+  for(n=0;n<ntypes;n++)
+    {
+      nvert=nv[n];
+      for(i=0;i<nc[n];i++)
+        {
+          flag=1;
+          iblank_cell[icell]=1;
+          verbose=0;
+          //if (myid==763 && icell==7975) {
+          // verbose=1;
+          //}
+          ncount=0;
+          for(m=0;m<nvert && flag;m++)
+            {
+              inode[m]=vconn[n][nvert*i+m]-BASE;
+              if (verbose) {
+                TRACEI(m);
+                TRACEI(inode[m]);
+                TRACEI(iblank[inode[m]]);
+              }
+              if (iblank[inode[m]]==0)
+                {
+                  iblank_cell[icell]=0;
+                  flag=0;
+                }
+              ncount=ncount+(iblank[inode[m]]==-1);
+            }
+          if (verbose) {
+            TRACEI(icell);
+            TRACEI(ncount);
+            TRACEI(nvert);
+	  }
+          if (flag)
+            {
+              if (ncount ==nvert) iblank_cell[icell]=-1;
+	      //            if (ncount > 0)  iblank_cell[icell]=-1;
+	      //            if (ncount >= nvert/2) iblank_cell[icell]=-1;
+            }
+          icell++;
+        }
+    }
+}
+
+
 void MeshBlock::getCellIblanks(void)
 {
   int i;

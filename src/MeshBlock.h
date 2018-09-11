@@ -247,6 +247,7 @@ class MeshBlock
   // routines for high order connectivity and interpolation
   //
   void getCellIblanks(void);
+  void getCellIblanks2(void);
   void set_cell_iblank(int *iblank_cell_input)
   {
     iblank_cell=iblank_cell_input;

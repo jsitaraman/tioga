@@ -188,7 +188,7 @@ void tioga::exchangeDonors(void)
   //
   for (int i=0; i<nblocks; i++) {
     if (donorRecords[i]) {
-      free(donorRecords[i]);
+      TIOGA_FREE(donorRecords[i]);
       donorRecords[i] = NULL;
     }
     nrecords[i] = 0;
@@ -240,7 +240,7 @@ void tioga::exchangeDonors(void)
   //
   for (int i=0; i<nblocks; i++) {
     if (donorRecords[i]) {
-      free(donorRecords[i]);
+      TIOGA_FREE(donorRecords[i]);
       donorRecords[i] = NULL;
     }
     nrecords[i] = 0;    
@@ -283,20 +283,20 @@ void tioga::exchangeDonors(void)
       }
   }
   pc->clearPackets(sndPack,rcvPack);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
   
   if (donorRecords) {
     for (int i=0; i<nblocks; i++) {
-      if (donorRecords[i]) free(donorRecords[i]);
+      if (donorRecords[i]) TIOGA_FREE(donorRecords[i]);
     }
-    free(donorRecords);
+    TIOGA_FREE(donorRecords);
   }
   if (receptorResolution) {
     for (int i=0; i<nblocks; i++) {
-      if (receptorResolution[i]) free(receptorResolution[i]);
+      if (receptorResolution[i]) TIOGA_FREE(receptorResolution[i]);
     }
-    free(receptorResolution);
+    TIOGA_FREE(receptorResolution);
   }   
 }
   

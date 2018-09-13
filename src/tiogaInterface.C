@@ -89,9 +89,9 @@ extern "C" {
     int iblk=0;
     va_start(arguments, ntypes);
 
-    if(idata[iblk].nv) free(idata[iblk].nv);
-    if(idata[iblk].nc) free(idata[iblk].nc);
-    if(idata[iblk].vconn) free(idata[iblk].vconn);
+    if(idata[iblk].nv) TIOGA_FREE(idata[iblk].nv);
+    if(idata[iblk].nc) TIOGA_FREE(idata[iblk].nc);
+    if(idata[iblk].vconn) TIOGA_FREE(idata[iblk].vconn);
     idata[iblk].nv=(int *) malloc(sizeof(int)*(*ntypes));    
     idata[iblk].nc=(int *) malloc(sizeof(int)*(*ntypes));
     idata[iblk].vconn=(int **)malloc(sizeof(int *)*(*ntypes));
@@ -114,9 +114,9 @@ extern "C" {
 
     va_start(arguments, ntypes);
 
-    if(idata[iblk].nv) free(idata[iblk].nv);
-    if(idata[iblk].nc) free(idata[iblk].nc);
-    if(idata[iblk].vconn) free(idata[iblk].vconn);
+    if(idata[iblk].nv) TIOGA_FREE(idata[iblk].nv);
+    if(idata[iblk].nc) TIOGA_FREE(idata[iblk].nc);
+    if(idata[iblk].vconn) TIOGA_FREE(idata[iblk].vconn);
     idata[iblk].nv=(int *) malloc(sizeof(int)*(*ntypes));    
     idata[iblk].nc=(int *) malloc(sizeof(int)*(*ntypes));
     idata[iblk].vconn=(int **)malloc(sizeof(int *)*(*ntypes));
@@ -319,9 +319,9 @@ extern "C" {
     delete [] tg;
     for(int i=0;i<MAXBLOCKS;i++)
      {
-       if (idata[i].nc) free(idata[i].nc);
-       if (idata[i].nv) free(idata[i].nv);
-       if (idata[i].vconn) free(idata[i].vconn);
+       if (idata[i].nc) TIOGA_FREE(idata[i].nc);
+       if (idata[i].nv) TIOGA_FREE(idata[i].nv);
+       if (idata[i].vconn) TIOGA_FREE(idata[i].vconn);
      }
    }
 

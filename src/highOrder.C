@@ -211,7 +211,7 @@ void MeshBlock::getInternalNodes(void)
   //
   nreceptorCells=0;
   //
-  if (ctag!=NULL) free(ctag);
+  if (ctag!=NULL) TIOGA_FREE(ctag);
   ctag=(int *)malloc(sizeof(int)*ncells);
   //
   for(i=0;i<ncells;i++)
@@ -219,7 +219,7 @@ void MeshBlock::getInternalNodes(void)
   //
   if (ihigh) 
     {
-      if (pointsPerCell!=NULL) free(pointsPerCell);
+      if (pointsPerCell!=NULL) TIOGA_FREE(pointsPerCell);
       pointsPerCell=(int *)malloc(sizeof(int)*nreceptorCells);
       //
       maxPointsPerCell=0;
@@ -229,10 +229,10 @@ void MeshBlock::getInternalNodes(void)
 	{
 	  get_nodes_per_cell(&(ctag[i]),&(pointsPerCell[i]));
 	  ntotalPoints+=pointsPerCell[i];
-	  maxPointsPerCell=MAX(maxPointsPerCell,pointsPerCell[i]);
+	  maxPointsPerCell=TIOGA_MAX(maxPointsPerCell,pointsPerCell[i]);
       }
       //
-      if (rxyz !=NULL) free(rxyz);
+      if (rxyz !=NULL) TIOGA_FREE(rxyz);
       //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
       rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
       //
@@ -246,7 +246,7 @@ void MeshBlock::getInternalNodes(void)
   else
     {
       ntotalPoints=0;      
-      if (picked !=NULL) free(picked);
+      if (picked !=NULL) TIOGA_FREE(picked);
       picked=(int *) malloc(sizeof(int)*nnodes);
       for(i=0;i<nnodes;i++) {
         picked[i]=0;
@@ -256,7 +256,7 @@ void MeshBlock::getInternalNodes(void)
          }
       }
   
-      if (rxyz !=NULL) free(rxyz);
+      if (rxyz !=NULL) TIOGA_FREE(rxyz);
       rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
       m=0;
       for(i=0;i<nnodes;i++)
@@ -315,7 +315,7 @@ void MeshBlock::getExtraQueryPoints(OBB *obc,
       (*realData)[m++]=BIGVALUE;
     }
   //
-  free(inode);
+  TIOGA_FREE(inode);
 }  
 
 void MeshBlock::processPointDonors(void)
@@ -341,10 +341,10 @@ void MeshBlock::processPointDonors(void)
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
-	if (interpList2[i].inode) free(interpList2[i].inode);
-	if (interpList2[i].weights) free(interpList2[i].weights);
+	if (interpList2[i].inode) TIOGA_FREE(interpList2[i].inode);
+	if (interpList2[i].weights) TIOGA_FREE(interpList2[i].weights);
       }
-    free(interpList2);
+    TIOGA_FREE(interpList2);
   } 
   interp2ListSize = ninterp2;
   interpList2=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
@@ -415,7 +415,7 @@ void MeshBlock::processPointDonors(void)
 	    }
 	}
     }
-  free(frac);
+  TIOGA_FREE(frac);
 }
 
 void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **intData,
@@ -434,7 +434,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
   (*nints)=ninterp2;
   (*nreals)=ninterp2*nvar;
   if ((*nints)==0) {
-	free(qq);
+	TIOGA_FREE(qq);
 	return;
   }
   //
@@ -516,7 +516,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
   //
   // no column-wise storage for high-order data
   //
-  free(qq);
+  TIOGA_FREE(qq);
 }
 	
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
@@ -549,7 +549,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
 	    }
 	  m+=(pointsPerCell[i]*nvar);
 	}
-      free(qout);
+      TIOGA_FREE(qout);
     }
   else
     {

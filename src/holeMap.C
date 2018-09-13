@@ -69,7 +69,7 @@ void tioga::getHoleMap(void)
  if (holeMap) 
    {
      for(i=0;i<nmesh;i++)
-       if (holeMap[i].existWall) free(holeMap[i].sam);
+       if (holeMap[i].existWall) TIOGA_FREE(holeMap[i].sam);
      delete [] holeMap;
    }
  holeMap=new HOLEMAP[maxtag];
@@ -122,15 +122,15 @@ void tioga::getHoleMap(void)
        holeMap[i].extents[j + 3] = bboxGlobal[3 * i + j + 3 * maxtag];
        ds[j] = holeMap[i].extents[j + 3] - holeMap[i].extents[j];
      }
-     dsmax = MAX(ds[0], ds[1]);
-     dsmax = MAX(dsmax, ds[2]);
+     dsmax = TIOGA_MAX(ds[0], ds[1]);
+     dsmax = TIOGA_MAX(dsmax, ds[2]);
      dsbox = dsmax / 192;
 
      for (j = 0; j < 3; j++) {
        holeMap[i].extents[j] -= (2 * dsbox);
        holeMap[i].extents[j + 3] += (2 * dsbox);
        holeMap[i].nx[j] = floor(
-         MAX((holeMap[i].extents[j + 3] - holeMap[i].extents[j]) / dsbox, 1));
+         TIOGA_MAX((holeMap[i].extents[j + 3] - holeMap[i].extents[j]) / dsbox, 1));
      }
      bufferSize = holeMap[i].nx[0] * holeMap[i].nx[1] * holeMap[i].nx[2];
      holeMap[i].sam = (int*)malloc(sizeof(int) * bufferSize);
@@ -164,7 +164,7 @@ void tioga::getHoleMap(void)
    }
  //
  for(i=0;i<maxtag;i++)
-   if (holeMap[i].existWall) free(holeMap[i].samLocal);
+   if (holeMap[i].existWall) TIOGA_FREE(holeMap[i].samLocal);
  //
  // set the global number of meshes to maxtag
  //
@@ -181,10 +181,10 @@ void tioga::getHoleMap(void)
  //
  // free local memory
  //
- free(existHoleLocal);
- free(existHole);
- free(bboxLocal);
- free(bboxGlobal);
+ TIOGA_FREE(existHoleLocal);
+ TIOGA_FREE(existHole);
+ TIOGA_FREE(bboxLocal);
+ TIOGA_FREE(bboxGlobal);
 }
 
 /**

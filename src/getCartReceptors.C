@@ -156,8 +156,8 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 		      dataPtr->next=NULL;
 		    }
 		}
-	  free(xtm);
-	  free(itm);
+	  TIOGA_FREE(xtm);
+	  TIOGA_FREE(itm);
 	}
     }
   //
@@ -182,10 +182,10 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
   // if these were already allocated
   // get rid of them
   //
-  if (xsearch) free(xsearch);
-  if (isearch) free(isearch);
-  if (donorId) free(donorId);
-  if (rst) free(rst);
+  if (xsearch) TIOGA_FREE(xsearch);
+  if (isearch) TIOGA_FREE(isearch);
+  if (donorId) TIOGA_FREE(donorId);
+  if (rst) TIOGA_FREE(rst);
   //
   xsearch=(double *)malloc(sizeof(double)*3*nsearch);
   isearch=(int *)malloc(3*sizeof(int)*nsearch);
@@ -208,10 +208,10 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
     }
   deallocateLinkList3(head);
   //fclose(fp);
-  free(obcart);
-  free(pmap);
-  free(sndMap);
-  free(rcvMap);
+  TIOGA_FREE(obcart);
+  TIOGA_FREE(pmap);
+  TIOGA_FREE(sndMap);
+  TIOGA_FREE(rcvMap);
 }
 
   

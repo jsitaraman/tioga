@@ -24,7 +24,7 @@ void deallocateLinkList(DONORLIST *temp)
   if (temp!=NULL) 
     {
       deallocateLinkList(temp->next);
-      free(temp);
+      TIOGA_FREE(temp);
     }
 }
 
@@ -33,7 +33,7 @@ void deallocateLinkList2(INTEGERLIST *temp)
   if (temp!=NULL) 
     {
       deallocateLinkList2(temp->next);
-      free(temp);
+      TIOGA_FREE(temp);
     }
 }
 
@@ -41,10 +41,10 @@ void deallocateLinkList3(INTEGERLIST2 *temp)
 {
   if (temp!=NULL)
     {
-      if (temp->intData) free(temp->intData);
-      if (temp->realData) free(temp->realData);
+      if (temp->intData) TIOGA_FREE(temp->intData);
+      if (temp->realData) TIOGA_FREE(temp->realData);
       deallocateLinkList3(temp->next);
-      free(temp);
+      TIOGA_FREE(temp);
     }
 }
 
@@ -52,10 +52,10 @@ void deallocateLinkList4(INTERPLIST2 *temp)
 {
   if (temp!=NULL)
     {
-      if (temp->inode) free(temp->inode);
-      if (temp->weights) free(temp->weights);
+      if (temp->inode) TIOGA_FREE(temp->inode);
+      if (temp->weights) TIOGA_FREE(temp->weights);
       deallocateLinkList4(temp->next);
-      free(temp);
+      TIOGA_FREE(temp);
     }
 }
 

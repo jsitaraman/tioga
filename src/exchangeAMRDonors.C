@@ -158,7 +158,7 @@ void tioga::exchangeAMRDonors(void)
   //for(i=0;i<nsend;i++)
   //  printf("intcount/intcount=%d %d\n",sndPack[i].nreals,realcount[i]);
   //}
-  free(realcount);
+  TIOGA_FREE(realcount);
   //
   // exchange data
   //
@@ -222,7 +222,7 @@ void tioga::exchangeAMRDonors(void)
   for(i=0;i<ncart;i++) 
     {
       //TRACEI(i);
-      if (cancelledData) free(cancelledData);
+      if (cancelledData) TIOGA_FREE(cancelledData);
       cancelledData=NULL;
       ncancel=bcount[i];
       if (ncancel > 0) {
@@ -274,16 +274,16 @@ void tioga::exchangeAMRDonors(void)
   //
   for(int ib=0;ib<nblocks;ib++)
    mblocks[ib]->findInterpListCart();
-  if (cancelledData) free(cancelledData);
+  if (cancelledData) TIOGA_FREE(cancelledData);
   //fclose(fp);
-  free(bcount);
-  free(intcount);
-  free(sndMapAll);
-  free(rcvMapAll);
-  free(imap);
-  free(icount);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(bcount);
+  TIOGA_FREE(intcount);
+  TIOGA_FREE(sndMapAll);
+  TIOGA_FREE(rcvMapAll);
+  TIOGA_FREE(imap);
+  TIOGA_FREE(icount);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
 }
 void tioga::checkComm(void)
 {
@@ -320,9 +320,9 @@ void tioga::checkComm(void)
   //
   pc_cart->sendRecvPackets(sndPack,rcvPack);
   pc_cart->clearPackets2(sndPack,rcvPack);
-  free(sndMap);
-  free(rcvMap);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(sndMap);
+  TIOGA_FREE(rcvMap);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
   printf("checkComm complete in %d\n",myid);
 }

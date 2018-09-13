@@ -70,8 +70,8 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
        for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
        for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
        //
-       free((*intData));
-       free((*realData)); // didnt free this before ??
+       TIOGA_FREE((*intData));
+       TIOGA_FREE((*realData)); // didnt free this before ??
        //  
       }
       (*nints)+=interpCount;
@@ -81,8 +81,8 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       if (nintold > 0) {
        for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
        for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];      
-       free(tmpint);
-       free(tmpreal);
+       TIOGA_FREE(tmpint);
+       TIOGA_FREE(tmpreal);
       }
       listptr=interpList;
       icount=3*nintold;
@@ -113,9 +113,9 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 	    (*realData)[dcount++]=qq[n];
 	  listptr=listptr->next;
 	}
-      free(xtmp);
-      free(index);
-      free(qq);
+      TIOGA_FREE(xtmp);
+      TIOGA_FREE(index);
+      TIOGA_FREE(qq);
     }
 }
 
@@ -161,7 +161,7 @@ void CartBlock::clearLists(void)
   int i;
   if (donorList) {
   for(i=0;i<ndof;i++) { deallocateLinkList(donorList[i]); donorList[i]=NULL;}
-  free(donorList);
+  TIOGA_FREE(donorList);
   }
   deallocateLinkList4(interpList);
   interpList=NULL;
@@ -230,7 +230,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
   listptr->inode[1]=ix[1];
   listptr->inode[2]=ix[2];
   donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
-  free(rst);
+  TIOGA_FREE(rst);
 }
   
 void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid, double cellRes)
@@ -556,8 +556,8 @@ void CartBlock::writeCellFile(int bid)
 	{
 	  ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+
 	    (j+nf)*(dims[0]+2*nf)+(i+nf);
-          ibmin=MIN(ibmin,ibl[ibindex]);
-          ibmax=MAX(ibmax,ibl[ibindex]);
+          ibmin=TIOGA_MIN(ibmin,ibl[ibindex]);
+          ibmax=TIOGA_MAX(ibmax,ibl[ibindex]);
 	  fprintf(fp,"%d\n", ibl[ibindex]);
 	}
 

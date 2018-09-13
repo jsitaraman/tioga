@@ -228,7 +228,7 @@ void tioga::exchangeBoxes(void)
   pc->setMap(nsend,nrecv,sndMap,rcvMap);
 
 
-  // if (obblist) free(obblist);
+  // if (obblist) TIOGA_FREE(obblist);
   // obblist = (OBB*) malloc(sizeof(OBB) * intersectIDs.size());
   intBoxMap.clear();
   ibsPerProc.clear();
@@ -311,8 +311,8 @@ void tioga::exchangeBoxes(void)
   //
   // Free local memory
   //
-  free(sndMap);
-  free(rcvMap);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(sndMap);
+  TIOGA_FREE(rcvMap);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
 }

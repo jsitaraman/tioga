@@ -20,7 +20,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "codetypes.h"
 
 void solvec(double **a,double *b,int *iflag,int n)
 {
@@ -139,9 +139,9 @@ void newtonSolve(double f[7][3],double *u1,double *v1,double *w1)
   *u1=u;
   *v1=v;
   *w1=w;
-  for(i=0;i<3;i++) free(lhs[i]);
-  free(lhs);
-  free(rhs);
+  for(i=0;i<3;i++) TIOGA_FREE(lhs[i]);
+  TIOGA_FREE(lhs);
+  TIOGA_FREE(rhs);
   return;
 }
 
@@ -188,9 +188,9 @@ void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert)
 	  frac[0]=1.0;
 	  frac[1]=frac[2]=frac[3]=0;
 	}
-      for(i=0;i<3;i++) free(lhs[i]);
-      free(lhs);
-      free(rhs);
+      for(i=0;i<3;i++) TIOGA_FREE(lhs[i]);
+      TIOGA_FREE(lhs);
+      TIOGA_FREE(rhs);
       break;
     case 5:
       //

@@ -55,11 +55,11 @@ void ADT::buildADT(int d, int nelements,double *elementBbox)
   /*
    * Allocate arrays in the class
    */
-  if (adtExtents) free(adtExtents);
+  if (adtExtents) TIOGA_FREE(adtExtents);
   adtExtents=(double *) malloc(sizeof(double)*ndim);
-  if (adtIntegers) free(adtIntegers);
+  if (adtIntegers) TIOGA_FREE(adtIntegers);
   adtIntegers=(int *) malloc(sizeof(int)*4*nelem);
-  if (adtReals) free(adtReals);
+  if (adtReals) TIOGA_FREE(adtReals);
   adtReals=(double *) malloc(sizeof(double)*nelem*ndim);
   /*
    * Determine extent of elements
@@ -76,12 +76,12 @@ void ADT::buildADT(int d, int nelements,double *elementBbox)
      for(i=0;i<ndim/2;i++)
        {
 	 i2=2*i;
-	 adtExtents[i2]=MIN(adtExtents[i2],coord[j6+i]);
+	 adtExtents[i2]=TIOGA_MIN(adtExtents[i2],coord[j6+i]);
        }
        for(i=0;i<ndim/2;i++)
        {
 	 i2=2*i+1;
-	 adtExtents[i2]=MAX(adtExtents[i2],coord[j6+i+ndim/2]);
+	 adtExtents[i2]=TIOGA_MAX(adtExtents[i2],coord[j6+i+ndim/2]);
        }
    }
   //
@@ -130,6 +130,6 @@ void ADT::buildADT(int d, int nelements,double *elementBbox)
   // }
   //fclose(fp);
   //fclose(fp1);
-  free(elementsAvailable);
-  free(adtWork);
+  TIOGA_FREE(elementsAvailable);
+  TIOGA_FREE(adtWork);
 }

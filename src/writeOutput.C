@@ -21,10 +21,6 @@
 #include<stdlib.h>
 #define REAL double
 #include "inputBlk.h"
-#define BIGVAL 1E16
-#define MIN(A,B) (A)<(B)?(A):(B)
-#define MAX(A,B) (A)>(B)?(A):(B)
-
 
 void MeshBlock::writeOutput(int bid)
 {

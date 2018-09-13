@@ -136,7 +136,7 @@ void tioga::performConnectivity(void)
     }
     mb->writeGridFile(100*myid+mtags[ib]);
   }
-  if (qblock) free(qblock);
+  if (qblock) TIOGA_FREE(qblock);
   qblock=(double **)malloc(sizeof(double *)*nblocks);
   for(int ib=0;ib<nblocks;ib++)
     qblock[ib]=NULL;
@@ -310,12 +310,12 @@ void tioga::dataUpdate_AMR(int nvar,int interptype)
   // release all memory
   //
   pc_cart->clearPackets2(sndPack,rcvPack);
-  free(sndPack);
-  free(rcvPack);
-  if (integerRecords) free(integerRecords);
-  if (realRecords) free(realRecords);
-  if (icount) free(icount);
-  if (dcount) free(dcount);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
+  if (integerRecords) TIOGA_FREE(integerRecords);
+  if (realRecords) TIOGA_FREE(realRecords);
+  if (icount) TIOGA_FREE(icount);
+  if (dcount) TIOGA_FREE(dcount);
 }
 
 void tioga::dataUpdate(int nvar,int interptype, int at_points)
@@ -485,26 +485,26 @@ void tioga::dataUpdate(int nvar,int interptype, int at_points)
   // release all memory
   //
   pc->clearPackets2(sndPack,rcvPack);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
   if (integerRecords) {
-    for(int ib=0;ib<nblocks;ib++) if (integerRecords[ib]) free(integerRecords[ib]);
-    free(integerRecords);
+    for(int ib=0;ib<nblocks;ib++) if (integerRecords[ib]) TIOGA_FREE(integerRecords[ib]);
+    TIOGA_FREE(integerRecords);
   }
   if (realRecords) {
     for(int ib=0;ib<nblocks;ib++)
-      if (realRecords[ib]) free(realRecords[ib]);
-    free(realRecords);
+      if (realRecords[ib]) TIOGA_FREE(realRecords[ib]);
+    TIOGA_FREE(realRecords);
   }
   if (qtmp) {
     for (int ib =0;ib<nblocks;ib++)
-      if (qtmp[ib]) free(qtmp[ib]);
-      free(qtmp);
+      if (qtmp[ib]) TIOGA_FREE(qtmp[ib]);
+      TIOGA_FREE(qtmp);
   }
   if (itmp) {
     for(int ib=0;ib<nblocks;ib++)
-     if (itmp[ib]) free(itmp[ib]);
-    free(itmp);
+     if (itmp[ib]) TIOGA_FREE(itmp[ib]);
+    TIOGA_FREE(itmp);
   }
 }
 
@@ -635,8 +635,8 @@ void tioga::getReceptorInfo(std::vector<int>& receptors)
   }
 
   pc->clearPackets(sndPack, rcvPack);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
 }
 
 tioga::~tioga()
@@ -645,15 +645,15 @@ tioga::~tioga()
   if (holeMap)
     {
       for(i=0;i<nmesh;i++)
-	if (holeMap[i].existWall) free(holeMap[i].sam);
+	if (holeMap[i].existWall) TIOGA_FREE(holeMap[i].sam);
       delete [] holeMap;
     }
   if (pc) delete[] pc;
   if (pc_cart) delete[] pc_cart;
-  if (sendCount) free(sendCount);
-  if (recvCount) free(recvCount);
+  if (sendCount) TIOGA_FREE(sendCount);
+  if (recvCount) TIOGA_FREE(recvCount);
 
-  if (qblock) free(qblock);
+  if (qblock) TIOGA_FREE(qblock);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 
@@ -788,7 +788,7 @@ void tioga::reduce_fringes(void)
   //
   for (int i=0; i<nblocks; i++) {
     if (donorRecords[i]) {
-      free(donorRecords[i]);
+      TIOGA_FREE(donorRecords[i]);
       donorRecords[i] = NULL;
     }
     nrecords[i] = 0;    
@@ -831,14 +831,14 @@ void tioga::reduce_fringes(void)
       }
   }
   pc->clearPackets(sndPack,rcvPack);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
   
   if (donorRecords) {
     for (int i=0; i<nblocks; i++) {
-      if (donorRecords[i]) free(donorRecords[i]);
+      if (donorRecords[i]) TIOGA_FREE(donorRecords[i]);
     }
-    free(donorRecords);
+    TIOGA_FREE(donorRecords);
   }
   outputStatistics();
   //mb->writeOBB(myid);

@@ -63,9 +63,9 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
 	}
       else if (nnodes==2)
 	{
-	  dxc[0]=MAX(1e-3,fabs(x[3]-x[0]))*0.5;
-	  dxc[1]=MAX(1e-3,fabs(x[4]-x[1]))*0.5;
-	  dxc[2]=MAX(1e-3,fabs(x[5]-x[2]))*0.5;
+	  dxc[0]=TIOGA_MAX(1e-3,fabs(x[3]-x[0]))*0.5;
+	  dxc[1]=TIOGA_MAX(1e-3,fabs(x[4]-x[1]))*0.5;
+	  dxc[2]=TIOGA_MAX(1e-3,fabs(x[5]-x[2]))*0.5;
           return;
 	}
       else
@@ -74,7 +74,7 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
           {
            i3=3*i;
            for(j=0;j<3;j++)
-            dxc[j]=MAX(1e-3,fabs(x[i3+j]-x[0]));
+            dxc[j]=TIOGA_MAX(1e-3,fabs(x[i3+j]-x[0]));
           }
 	 return;
         }
@@ -137,8 +137,8 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
       //
       for(j=0;j<3;j++)
 	{
-	  xmax[j]=MAX(xmax[j],xd[j]);
-	  xmin[j]=MIN(xmin[j],xd[j]);
+	  xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
+	  xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
 	}
     }
   //
@@ -161,8 +161,8 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
       xc[j]+=(xd[k]*vec[k][j]);
     }
   //
-  free(aa);
-  free(eigenv);
+  TIOGA_FREE(aa);
+  TIOGA_FREE(eigenv);
 }
 /**
  check if a point is inside the
@@ -460,8 +460,8 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
   
   for(i=0;i<nnodes;i++)
     for(j=0;j<3;j++) {
-      xmax[j]=MAX(xmax[j],x[3*i+j]);
-      xmin[j]=MIN(xmin[j],x[3*i+j]);
+      xmax[j]=TIOGA_MAX(xmax[j],x[3*i+j]);
+      xmin[j]=TIOGA_MIN(xmin[j],x[3*i+j]);
     }
 
   ds=(xmax[0]-xmin[0]+xmax[1]-xmin[1]+xmax[2]-xmin[2])/3.0/NSUB;
@@ -469,16 +469,16 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
   for(j=0;j<3;j++) xmax[j]+=ds;
   for(j=0;j<3;j++) xmin[j]-=ds;
   
-  jmax=MIN(round((xmax[0]-xmin[0])*dsi),NSUB);
-  jmax=MAX(jmax,1);
+  jmax=TIOGA_MIN(round((xmax[0]-xmin[0])*dsi),NSUB);
+  jmax=TIOGA_MAX(jmax,1);
   dsx=(xmax[0]-xmin[0]+TOL)/jmax;
   dsxi=1./dsx;    
-  kmax=MIN(round((xmax[1]-xmin[1])*dsi),NSUB);
-  kmax=MAX(kmax,1);
+  kmax=TIOGA_MIN(round((xmax[1]-xmin[1])*dsi),NSUB);
+  kmax=TIOGA_MAX(kmax,1);
   dsy=(xmax[1]-xmin[1]+TOL)/kmax;
   dsyi=1./dsy;
-  lmax=MIN(round((xmax[2]-xmin[2])*dsi),NSUB);
-  lmax=MAX(lmax,1);
+  lmax=TIOGA_MIN(round((xmax[2]-xmin[2])*dsi),NSUB);
+  lmax=TIOGA_MAX(lmax,1);
   dsz=(xmax[2]-xmin[2]+TOL)/lmax;
   dszi=1./dsz;
   nsblks=jmax*kmax*lmax;
@@ -526,11 +526,11 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
                  meshtag[p1]==meshtag[p2])
 	      {
 		if (p1 > p2) {
-		  rtag[p2]=MAX(rtag[p1],rtag[p2]);
+		  rtag[p2]=TIOGA_MAX(rtag[p1],rtag[p2]);
 		  itag[p1]=p2;
 		}
 		else {
-		  rtag[p1]=MAX(rtag[p1],rtag[p2]);
+		  rtag[p1]=TIOGA_MAX(rtag[p1],rtag[p2]);
 		  itag[p2]=p1;
 		}
 	      }
@@ -543,9 +543,9 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
      m++;
    }
   */
-  free(ilist);
-  free(cft);
-  free(numpts);
+  TIOGA_FREE(ilist);
+  TIOGA_FREE(cft);
+  TIOGA_FREE(numpts);
 }
   
 		 

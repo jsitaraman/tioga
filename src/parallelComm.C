@@ -85,12 +85,12 @@ void parallelComm::sendRecvPacketsAll(PACKET *sndPack, PACKET *rcvPack)
     }
   MPI_Waitall(irnum,request,status);
   
-  free(sint);
-  free(sreal);
-  free(rint);
-  free(rreal);
-  free(request);
-  free(status);
+  TIOGA_FREE(sint);
+  TIOGA_FREE(sreal);
+  TIOGA_FREE(rint);
+  TIOGA_FREE(rreal);
+  TIOGA_FREE(request);
+  TIOGA_FREE(status);
 }
 
 void parallelComm::sendRecvPackets(PACKET *sndPack,PACKET *rcvPack)
@@ -163,10 +163,10 @@ void parallelComm::sendRecvPackets(PACKET *sndPack,PACKET *rcvPack)
     }
   MPI_Waitall(irnum,request,status);
   //
-  free(scount);
-  free(rcount);
-  free(request);
-  free(status);
+  TIOGA_FREE(scount);
+  TIOGA_FREE(rcount);
+  TIOGA_FREE(request);
+  TIOGA_FREE(status);
 }
 
 void parallelComm::sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack)
@@ -249,18 +249,18 @@ void parallelComm::sendRecvPacketsCheck(PACKET *sndPack,PACKET *rcvPack)
     }
   MPI_Waitall(irnum,request,status);
   //
-  free(scount);
-  free(rcount);
-  free(request);
-  free(status);
+  TIOGA_FREE(scount);
+  TIOGA_FREE(rcount);
+  TIOGA_FREE(request);
+  TIOGA_FREE(status);
 }
 
 void parallelComm::setMap(int ns,int nr, int *snd,int *rcv)
 {
   int i;
   //
-  if (sndMap) free(sndMap); sndMap=NULL;
-  if (rcvMap) free(rcvMap); rcvMap=NULL;
+  if (sndMap) TIOGA_FREE(sndMap); sndMap=NULL;
+  if (rcvMap) TIOGA_FREE(rcvMap); rcvMap=NULL;
   //
   nsend=ns;
   nrecv=nr;
@@ -289,16 +289,16 @@ void parallelComm::clearPackets2(PACKET *sndPack, PACKET *rcvPack)
   //
   for(i=0;i<nsend;i++)
     {
-      if (sndPack[i].nints > 0) free(sndPack[i].intData);
-      if (sndPack[i].nreals > 0) free(sndPack[i].realData);
+      if (sndPack[i].nints > 0) TIOGA_FREE(sndPack[i].intData);
+      if (sndPack[i].nreals > 0) TIOGA_FREE(sndPack[i].realData);
       sndPack[i].intData=NULL;
       sndPack[i].realData=NULL;
       sndPack[i].nints=sndPack[i].nreals=0;
     }
   for(i=0;i<nrecv;i++)
     {
-      if (rcvPack[i].nints > 0) free(rcvPack[i].intData);
-      if (rcvPack[i].nreals > 0) free(rcvPack[i].realData);
+      if (rcvPack[i].nints > 0) TIOGA_FREE(rcvPack[i].intData);
+      if (rcvPack[i].nreals > 0) TIOGA_FREE(rcvPack[i].realData);
       rcvPack[i].intData=NULL;
       rcvPack[i].realData=NULL;
       rcvPack[i].nints=rcvPack[i].nreals=0;
@@ -315,17 +315,17 @@ void parallelComm::clearPackets(PACKET *sndPack, PACKET *rcvPack)
   for(i=0;i<nsend;i++)
     {
       //if (sndPack[i].nints > 0) 
-      if (sndPack[i].intData) free(sndPack[i].intData);
+      if (sndPack[i].intData) TIOGA_FREE(sndPack[i].intData);
       //if (sndPack[i].nreals > 0)
-      if (sndPack[i].realData) free(sndPack[i].realData);
+      if (sndPack[i].realData) TIOGA_FREE(sndPack[i].realData);
       sndPack[i].intData=NULL;
       sndPack[i].realData=NULL;
       sndPack[i].nints=sndPack[i].nreals=0;
     }
   for(i=0;i<nrecv;i++)
     {
-      if (rcvPack[i].intData) free(rcvPack[i].intData);
-      if (rcvPack[i].realData) free(rcvPack[i].realData);
+      if (rcvPack[i].intData) TIOGA_FREE(rcvPack[i].intData);
+      if (rcvPack[i].realData) TIOGA_FREE(rcvPack[i].realData);
       rcvPack[i].intData=NULL;
       rcvPack[i].realData=NULL;
       rcvPack[i].nints=rcvPack[i].nreals=0;

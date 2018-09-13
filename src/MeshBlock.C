@@ -67,7 +67,7 @@ void MeshBlock::preprocess(void)
   //
   // find oriented bounding boxes
   //
-  if (obb) free(obb);
+  if (obb) TIOGA_FREE(obb);
   obb=(OBB *) malloc(sizeof(OBB));
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
   tagBoundary();
@@ -93,8 +93,8 @@ void MeshBlock::tagBoundary(void)
   // initialized, cellRes would be NULL in this case
   //
 
-      if(cellRes) free(cellRes);
-      if(nodeRes) free(nodeRes);
+      if(cellRes) TIOGA_FREE(cellRes);
+      if(nodeRes) TIOGA_FREE(nodeRes);
     
       //
       cellRes=(double *) malloc(sizeof(double)*ncells);
@@ -242,9 +242,9 @@ void MeshBlock::tagBoundary(void)
 	  }
 	for(i=0;i<nnodes;i++) iextmp[i]=iextmp1[i];	
       }
-      free(iflag);
-      free(iextmp);
-      free(iextmp1);
+      TIOGA_FREE(iflag);
+      TIOGA_FREE(iextmp);
+      TIOGA_FREE(iextmp1);
 }
 
 void MeshBlock::writeGridFile(int bid)
@@ -565,8 +565,8 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
       i3=3*inode;
       for(j=0;j<3;j++)
 	{
-	  wbox[j]=MIN(wbox[j],x[i3+j]);
-	  wbox[j+3]=MAX(wbox[j+3],x[i3+j]);
+	  wbox[j]=TIOGA_MIN(wbox[j],x[i3+j]);
+	  wbox[j+3]=TIOGA_MAX(wbox[j+3],x[i3+j]);
 	}
     }
   
@@ -653,14 +653,14 @@ void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
 		    {
 		      xv=x[i3+k];
 		      iv=floor((xv-extents[k])/ds[k]);
-		      imin[k]=MIN(imin[k],iv);
-		      imax[k]=MAX(imax[k],iv);
+		      imin[k]=TIOGA_MIN(imin[k],iv);
+		      imax[k]=TIOGA_MAX(imax[k],iv);
 		    }
 		}
 	     for(j=0;j<3;j++)
               {
-	       imin[j]=MAX(imin[j],0);
-               imax[j]=MIN(imax[j],nx[j]-1);
+	       imin[j]=TIOGA_MAX(imin[j],0);
+               imax[j]=TIOGA_MIN(imax[j],nx[j]-1);
               }
 	      //
 	      // mark sam to 1
@@ -676,8 +676,8 @@ void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
 	  m++;
 	}
      }
-   free(iflag);
-   free(inode);
+   TIOGA_FREE(iflag);
+   TIOGA_FREE(inode);
 }
 
 void MeshBlock::getReducedOBB(OBB *obc,double *realData) 
@@ -707,8 +707,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 	      for(j=0;j<3;j++)
 		for(k=0;k<3;k++)
 		  xd[j]+=(x[i3+k]-obc->xc[k])*obc->vec[j][k];
-	      for(j=0;j<3;j++) bbox[j]=MIN(bbox[j],xd[j]);
-	      for(j=0;j<3;j++) bbox[j+3]=MAX(bbox[j+3],xd[j]);
+	      for(j=0;j<3;j++) bbox[j]=TIOGA_MIN(bbox[j],xd[j]);
+	      for(j=0;j<3;j++) bbox[j+3]=TIOGA_MAX(bbox[j+3],xd[j]);
 	    }
 	  iflag=0;
 	  for(j=0;j<3;j++) iflag=(iflag || (bbox[j] > obc->dxc[j]));
@@ -723,8 +723,8 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 	      for(j=0;j<3;j++)
 		for(k=0;k<3;k++)
 		  xd[j]+=(x[i3+k]-obb->xc[k])*obb->vec[j][k];
-	      for(j=0;j<3;j++) realData[j]=MIN(realData[j],xd[j]);
-	      for(j=0;j<3;j++) realData[j+3]=MAX(realData[j+3],xd[j]);
+	      for(j=0;j<3;j++) realData[j]=TIOGA_MIN(realData[j],xd[j]);
+	      for(j=0;j<3;j++) realData[j+3]=TIOGA_MAX(realData[j+3],xd[j]);
 	    }
 	}
     }
@@ -785,7 +785,7 @@ void MeshBlock::getQueryPoints(OBB *obc,
       (*realData)[m++]=nodeRes[inode[i]];
     }
   //
-  free(inode);
+  TIOGA_FREE(inode);
 }  
   
 void MeshBlock::writeOBB(int bid)
@@ -840,62 +840,62 @@ MeshBlock::~MeshBlock()
   // free all data that is owned by this MeshBlock
   // i.e not the pointers of the external code.
   //
-  if (cellRes) free(cellRes);
-  if (nodeRes) free(nodeRes);
-  if (elementBbox) free(elementBbox);
-  if (elementList) free(elementList);
+  if (cellRes) TIOGA_FREE(cellRes);
+  if (nodeRes) TIOGA_FREE(nodeRes);
+  if (elementBbox) TIOGA_FREE(elementBbox);
+  if (elementList) TIOGA_FREE(elementList);
   if (adt) delete[] adt;
   if (donorList) {
     for(i=0;i<nnodes;i++) deallocateLinkList(donorList[i]);
-    free(donorList);
+    TIOGA_FREE(donorList);
   }
   if (interpList) {
     for(i=0;i<interpListSize;i++)
       {
-	if (interpList[i].inode) free(interpList[i].inode);
-	if (interpList[i].weights) free(interpList[i].weights);
+	if (interpList[i].inode) TIOGA_FREE(interpList[i].inode);
+	if (interpList[i].weights) TIOGA_FREE(interpList[i].weights);
       }
-    free(interpList);
+    TIOGA_FREE(interpList);
   }
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
-	if (interpList2[i].inode) free(interpList2[i].inode);
-	if (interpList2[i].weights) free(interpList2[i].weights);
+	if (interpList2[i].inode) TIOGA_FREE(interpList2[i].inode);
+	if (interpList2[i].weights) TIOGA_FREE(interpList2[i].weights);
       }
-    free(interpList2);
+    TIOGA_FREE(interpList2);
   }
   if (interpListCart) {
     for(i=0;i<interpListCartSize;i++)
       {
-        if (interpListCart[i].inode) free(interpListCart[i].inode);
- 	if (interpListCart[i].weights) free(interpListCart[i].weights);
+        if (interpListCart[i].inode) TIOGA_FREE(interpListCart[i].inode);
+ 	if (interpListCart[i].weights) TIOGA_FREE(interpListCart[i].weights);
       }
-    free(interpListCart);
+    TIOGA_FREE(interpListCart);
   }
   // For nalu-wind API the iblank_cell array is managed on the nalu side
   // if (!ihigh) {
-  //  if (iblank_cell) free(iblank_cell);
+  //  if (iblank_cell) TIOGA_FREE(iblank_cell);
   // }
-  if (obb) free(obb);
-  if (isearch) free(isearch);
-  if (xsearch) free(xsearch);
-  if (res_search) free(res_search);
-  if (xtag) free(xtag);
-  if (rst) free(rst);
-  if (interp2donor) free(interp2donor);
+  if (obb) TIOGA_FREE(obb);
+  if (isearch) TIOGA_FREE(isearch);
+  if (xsearch) TIOGA_FREE(xsearch);
+  if (res_search) TIOGA_FREE(res_search);
+  if (xtag) TIOGA_FREE(xtag);
+  if (rst) TIOGA_FREE(rst);
+  if (interp2donor) TIOGA_FREE(interp2donor);
   if (cancelList) deallocateLinkList2(cancelList);
-  if (ctag) free(ctag);
-  if (pointsPerCell) free(pointsPerCell);
-  if (rxyz) free(rxyz);
-  if (picked) free(picked);
-  if (rxyzCart) free(rxyzCart);
-  if (donorIdCart) free(donorIdCart);
-  if (pickedCart) free(pickedCart);
-  if (ctag_cart) free(ctag_cart);
+  if (ctag) TIOGA_FREE(ctag);
+  if (pointsPerCell) TIOGA_FREE(pointsPerCell);
+  if (rxyz) TIOGA_FREE(rxyz);
+  if (picked) TIOGA_FREE(picked);
+  if (rxyzCart) TIOGA_FREE(rxyzCart);
+  if (donorIdCart) TIOGA_FREE(donorIdCart);
+  if (pickedCart) TIOGA_FREE(pickedCart);
+  if (ctag_cart) TIOGA_FREE(ctag_cart);
 
-  if (tagsearch) free(tagsearch);
-  if (donorId) free(donorId);
+  if (tagsearch) TIOGA_FREE(tagsearch);
+  if (donorId) TIOGA_FREE(donorId);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

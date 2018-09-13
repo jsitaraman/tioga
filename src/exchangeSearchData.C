@@ -118,28 +118,28 @@ void tioga::exchangeSearchData(int at_points)
     mb->nsearch = 0;
 
     if (mb->xsearch) {
-      free(mb->xsearch);
+      TIOGA_FREE(mb->xsearch);
       mb->xsearch=NULL;
     }
     if (mb->isearch) {
-      free(mb->isearch);
+      TIOGA_FREE(mb->isearch);
       mb->isearch=NULL;
     }
     if (mb->tagsearch) {
-      free(mb->tagsearch);
+      TIOGA_FREE(mb->tagsearch);
       mb->tagsearch=NULL;
     }
     if (mb->donorId) {
-      free(mb->donorId);
+      TIOGA_FREE(mb->donorId);
       mb->donorId=NULL;
     }
     if (mb->res_search) {
-      free(mb->res_search);
+      TIOGA_FREE(mb->res_search);
       mb->res_search=NULL;
     }
    if (at_points==1) {
      if (mb->rst) {
-       free(mb->rst);
+       TIOGA_FREE(mb->rst);
        mb->rst=NULL;
      }
     }
@@ -219,20 +219,20 @@ void tioga::exchangeSearchData(int at_points)
   }
 
   pc->clearPackets(sndPack, rcvPack);
-  free(sndPack);
-  free(rcvPack);
+  TIOGA_FREE(sndPack);
+  TIOGA_FREE(rcvPack);
   // printf("%d %d\n",myid,mb->nsearch);
 
   if (int_data) {
     for (int i=0; i<nobb; i++) {
-      if (int_data[i]) free(int_data[i]);
+      if (int_data[i]) TIOGA_FREE(int_data[i]);
     }
-    free(int_data);
+    TIOGA_FREE(int_data);
   }
   if (real_data) {
     for (int i=0; i<nobb; i++) {
-      if (real_data[i]) free(real_data[i]);
+      if (real_data[i]) TIOGA_FREE(real_data[i]);
     }
-    free(real_data);
+    TIOGA_FREE(real_data);
   }
 }

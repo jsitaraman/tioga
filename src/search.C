@@ -86,8 +86,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 		  xd[j]=0;
 		  for(k=0;k<3;k++)
 		    xd[j]+=(x[i3+k]-obq->xc[k])*obq->vec[j][k];
-		  xmin[j]=MIN(xmin[j],xd[j]);
-		  xmax[j]=MAX(xmax[j],xd[j]);
+		  xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
+		  xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
 		}
 	      for(j=0;j<3;j++)
 		{
@@ -118,8 +118,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   // ADT
   //
 
-  if (elementBbox) free(elementBbox);
-  if (elementList) free(elementList);
+  if (elementBbox) TIOGA_FREE(elementBbox);
+  if (elementList) TIOGA_FREE(elementList);
   elementBbox=(double *)malloc(sizeof(double)*cell_count*6);
   elementList=(int *)malloc(sizeof(int)*cell_count);
   //
@@ -148,8 +148,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	  i3=3*(vconn[n][nvert*i+m]-BASE);
 	  for(j=0;j<3;j++)
 	    {
-	      xmin[j]=MIN(xmin[j],x[i3+j]);
-	      xmax[j]=MAX(xmax[j],x[i3+j]);
+	      xmin[j]=TIOGA_MIN(xmin[j],x[i3+j]);
+	      xmax[j]=TIOGA_MAX(xmax[j],x[i3+j]);
 	    }
 	}
       //
@@ -179,9 +179,9 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   adt->buildADT(ndim,cell_count,elementBbox);
   //
-  if (donorId) free(donorId);
+  if (donorId) TIOGA_FREE(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
-  if (xtag) free(xtag);
+  if (xtag) TIOGA_FREE(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
   // create a unique hash
@@ -206,8 +206,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	}
        ipoint+=3;
     }
-  free(dId);
+  TIOGA_FREE(dId);
   //
-  free(icell);
-  free(obq);
+  TIOGA_FREE(icell);
+  TIOGA_FREE(obq);
 }

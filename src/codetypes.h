@@ -59,9 +59,9 @@
 /*==================================================================*/
 # define TRACEI(x)  printf("#tioga:\t"#x" =%d\n",x);
 # define TRACED(x)  printf("#tioga:\t"#x" =%.16e\n",x);
-# define MIN(x,y)  (x) < (y) ? (x) : (y)
-# define MAX(x,y)  (x) > (y) ? (x) : (y)
-# define free(a1)  {free(a1);a1=NULL;}
+# define TIOGA_MIN(x,y)  (x) < (y) ? (x) : (y)
+# define TIOGA_MAX(x,y)  (x) > (y) ? (x) : (y)
+# define TIOGA_FREE(a1)  {free(a1);a1=NULL;}
 // # define debug(x,y)  printf("#tioga:\t"#x"=%d,"#y"=%d\n",x,y);
 // # define stdwrite(x) if (myid==0) printf("#tioga:\t"#x"\n");
 // # define dstr(x) printf("#tioga:\t"#x"\n");
@@ -70,8 +70,8 @@
 /*  Numerical Tools                                                   */
 /*====================================================================*/
 // #define Sign(a1,a2) (((a2) < ZERO)? - fabs(a1): fabs(a1))
-#define Max(a1,a2) (((a1) >= (a2))? (a1): (a2))
-#define Min(a1,a2) (((a1) <= (a2))? (a1): (a2))
+#define TIOGA_Max(a1,a2) (((a1) >= (a2))? (a1): (a2))
+#define TIOGA_Min(a1,a2) (((a1) <= (a2))? (a1): (a2))
 // #define Abs(aa) (((aa) >= 0)? (aa): -(aa))
 // #define Round(aa) (int) ((fabs((aa) - floor(aa)) >= HALF)? ceil(aa): floor(aa))
 // #define swap(a,b) { a=a+b;b=a-b;a=a-b;}

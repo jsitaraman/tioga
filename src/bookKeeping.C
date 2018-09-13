@@ -67,8 +67,8 @@ void MeshBlock::getDonorPacket(PACKET *sndPack, int nsend)
           sndPack[k].realData[dcount[k]++]=cellRes[donorId[i]];  // donor resolution
         }
     }
-  free(icount);
-  free(dcount);
+  TIOGA_FREE(icount);
+  TIOGA_FREE(dcount);
 }
 
 void MeshBlock::getMBDonorPktSizes
@@ -118,7 +118,7 @@ void MeshBlock::initializeDonorList(void)
 	deallocateLinkList(donorList[i]);
 	//printf("\n\t Deallocate (nnodes) i: %d %d ",nnodes,i);
        }
-      free(donorList);
+      TIOGA_FREE(donorList);
     }
 
   donorListLength = nnodes;
@@ -205,7 +205,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
                TRACEI(temp->donorData[1]);
                TRACEI(temp->donorData[2]);
               }
-              nodeRes[i]=MAX(nodeRes[i],temp->receptorRes);
+              nodeRes[i]=TIOGA_MAX(nodeRes[i],temp->receptorRes);
 	      temp=temp->next;
 	    }
 	  for(j=0;j<nmesh;j++)
@@ -268,8 +268,8 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   }
   for(i=0;i<nnodes;i++)
      if (mtag1[i] && iblank[i]) nodeRes[i]=BIGVALUE;
-  free(mtag);
-  free(mtag1);
+  TIOGA_FREE(mtag);
+  TIOGA_FREE(mtag1);
   //
   // now find fringes
   //
@@ -351,7 +351,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   //
   // release local memory
   //
-  free(iflag);
+  TIOGA_FREE(iflag);
 }
 
 void MeshBlock::initializeInterpList(int ninterp_input)
@@ -361,10 +361,10 @@ void MeshBlock::initializeInterpList(int ninterp_input)
     //for(i=0;i<ninterp;i++)
     for(i=0;i<interpListSize;i++)
       {
-	if (interpList[i].inode) free(interpList[i].inode);
-	if (interpList[i].weights) free(interpList[i].weights);
+	if (interpList[i].inode) TIOGA_FREE(interpList[i].inode);
+	if (interpList[i].weights) TIOGA_FREE(interpList[i].weights);
       }
-    free(interpList);
+    TIOGA_FREE(interpList);
   }
   ninterp=ninterp_input;   
   interpListSize=ninterp_input;
@@ -376,7 +376,7 @@ void MeshBlock::initializeInterpList(int ninterp_input)
   if (cancelList) deallocateLinkList2(cancelList);
   cancelList=NULL;
   ncancel=0;
-  if (interp2donor) free(interp2donor);
+  if (interp2donor) TIOGA_FREE(interp2donor);
   interp2donor=(int *)malloc(sizeof(int)*nsearch);
   for(i=0;i<nsearch;i++) interp2donor[i]=-1;
     
@@ -572,7 +572,7 @@ void MeshBlock::resetCoincident(void)
     {
       iptr=interp2donor[i];
       if (iptr > -1) {
-        ireset[xtag[i]]=MIN(ireset[xtag[i]],interpList[iptr].cancel);
+        ireset[xtag[i]]=TIOGA_MIN(ireset[xtag[i]],interpList[iptr].cancel);
       }
     }	
   for(i=0;i<nsearch;i++)
@@ -584,7 +584,7 @@ void MeshBlock::resetCoincident(void)
 	}
       }
     }
-  free(ireset);
+  TIOGA_FREE(ireset);
 }
 void MeshBlock::getInterpData(int *nrecords, int **intData)
 {
@@ -611,7 +611,7 @@ void MeshBlock::clearIblanks(void)
   if (iblank_reduced) {
    for(i=0;i<nnodes;i++)
      if (iblank_reduced[i]==0) iblank[i]=0;
-   free(iblank_reduced);
+   TIOGA_FREE(iblank_reduced);
   }
 }
 
@@ -645,7 +645,7 @@ void MeshBlock::reduce_fringes(void)
   int verbose,iter;
   INTEGERLIST *clist;
   //
-  if (iblank_reduced) free(iblank_reduced);
+  if (iblank_reduced) TIOGA_FREE(iblank_reduced);
   iblank_reduced=(int *)malloc(sizeof(int)*nnodes);
   for(int i=0;i< nnodes;i++) iblank_reduced[i]=iblank[i] > 0 ? iblank[i]:0;
   ibltmp=(int *)malloc(sizeof(int)*nnodes);
@@ -747,7 +747,7 @@ void MeshBlock::reduce_fringes(void)
   //       }
   //   }
   // TRACEI(norph);
-  free(ibltmp);
+  TIOGA_FREE(ibltmp);
 }
 
 

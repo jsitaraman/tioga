@@ -314,11 +314,11 @@ class MeshBlock
     if (interpList) {
       for (int i = 0; i < interpListSize; i++) {
         if (interpList[i].inode)
-          free(interpList[i].inode);
+          TIOGA_FREE(interpList[i].inode);
         if (interpList[i].weights)
-          free(interpList[i].weights);
+          TIOGA_FREE(interpList[i].weights);
       }
-      free(interpList);
+      TIOGA_FREE(interpList);
     }
     ninterp = 0;
     interpListSize = 0;

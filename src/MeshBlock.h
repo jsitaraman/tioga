@@ -92,7 +92,11 @@ class MeshBlock
   int nreceptorCellsCart;
   int *ctag_cart;
   int *pickedCart;
-
+  int uniform_hex;
+  double dx[3];
+  double xlow[3];
+  int idims[3];
+  int *uindx;
  	
  public :
   int *iblank;      /** < iblank value for each grid node */
@@ -110,6 +114,7 @@ class MeshBlock
   // oriented bounding box of this partition
   // 
   OBB *obb;
+  OBB *obh;
   //
   int nsearch;        /** < number of query points to search in this block */
   int *isearch;       /** < index of query points in the remote process */
@@ -156,6 +161,9 @@ class MeshBlock
 
     cellGID = NULL;
     iblank_reduced=NULL;
+    uniform_hex=0;
+    uindx = NULL;
+    obh   = NULL;
   };
 
   /** basic destructor */
@@ -178,7 +186,7 @@ class MeshBlock
   void setResolutions(double *nres,double *cres);    
 	       
   void search();
-
+  void search_uniform_hex();
   void writeOBB(int bid);
 
   void writeOBB2(OBB *obc,int bid);
@@ -324,6 +332,10 @@ class MeshBlock
     interpListSize = 0;
   }
   void reduce_fringes() ;
+
+  void check_for_uniform_hex();
+
+  void create_hex_cell_map();
 };
 
 #endif /* MESHBLOCK_H */

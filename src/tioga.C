@@ -111,9 +111,16 @@ void tioga::profile(void)
 void tioga::performConnectivity(void)
 {
   this->myTimer("tioga::performConnectivity",0);
+  this->myTimer("tioga::getHoleMap",0);
   getHoleMap();
+  this->myTimer("tioga::getHoleMap",1);
+  this->myTimer("tioga::exchangeBoxes",0);
   exchangeBoxes();
+  this->myTimer("tioga::exchangeBoxes",1);
+  this->myTimer("tioga::exchangeSearchData",0);
   exchangeSearchData();
+  this->myTimer("tioga::exchangeSearchData",1);
+  this->myTimer("tioga::search",0);
   for(int ib=0;ib < nblocks;ib++)
   {
    auto& mb = mblocks[ib];
@@ -121,11 +128,15 @@ void tioga::performConnectivity(void)
    mb->resetInterpData();
    mb->search();
   }
+  this->myTimer("tioga::search",1);
+  this->myTimer("tioga::exchangeDonors",0);
   exchangeDonors();
+  this->myTimer("tioga::exchangeDonors",1);
   //this->reduce_fringes();
   outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
+  this->myTimer("tioga::getCellIblanks",0);
   for (int ib=0;ib<nblocks;ib++) {
     auto& mb = mblocks[ib];
     if (ihighGlobal) {
@@ -134,8 +145,9 @@ void tioga::performConnectivity(void)
     else {
       mb->getCellIblanks();
     }
-    mb->writeGridFile(100*myid+mtags[ib]);
+    //mb->writeGridFile(100*myid+mtags[ib]);
   }
+  this->myTimer("tioga::getCellIblanks",1);
   if (qblock) TIOGA_FREE(qblock);
   qblock=(double **)malloc(sizeof(double *)*nblocks);
   for(int ib=0;ib<nblocks;ib++)
@@ -143,7 +155,7 @@ void tioga::performConnectivity(void)
   //}
   //mb->writeOutput(myid);
   //TRACEI(myid);
-  this->myTimer("tioga::performConnectivity",1);
+  //this->myTimer("tioga::performConnectivity",1);
 }
 
 void tioga::performConnectivityHighOrder(void)

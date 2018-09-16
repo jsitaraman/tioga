@@ -50,6 +50,11 @@ void MeshBlock::search(void)
     donorCount=0;
     return;
   }
+ 
+  if (uniform_hex) {
+    search_uniform_hex();
+    return;
+  }
 
   obq=(OBB *) malloc(sizeof(OBB));
   
@@ -205,9 +210,76 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	  donorCount++;
 	}
        ipoint+=3;
-    }
+     }
   TIOGA_FREE(dId);
-  //
   TIOGA_FREE(icell);
   TIOGA_FREE(obq);
+}
+
+void MeshBlock::search_uniform_hex(void)
+{
+  if (donorId) free(donorId);
+  donorId=(int*)malloc(sizeof(int)*nsearch);
+  if (xtag) free(xtag);
+  xtag=(int *)malloc(sizeof(int)*nsearch);
+  //
+  uniquenodes(xsearch,tagsearch,res_search,xtag,&nsearch);
+  //                                                                                                          
+  int donorCount=0;
+  int *dId=(int *) malloc(sizeof(int) *2);
+  double xvec[8][3];
+  //
+  // corners of a cube with of side 4*TOL
+  // with origin as the center
+  // 
+  for(int jj=0;jj<8;jj++)
+    for(int k=0;k<3;k++) xvec[jj][k]=(2*((jj & (1 << k)) >> k)-1)*2*TOL;
+  //
+  double xd[3];
+  int dID[2];
+  for(int i=0;i<nsearch;i++)
+    {
+      int idx[3];
+      if (xtag[i]==i) {
+	for(int j=0;j<3;j++)
+	  {
+	    xd[j]=0;
+	    for(int k=0;k<3;k++)
+	      xd[j]+=(xsearch[3*i+k]-xlow[k])*obh->vec[j][k];
+            idx[j]=xd[j]/dx[j];
+	  }
+        if (xd[0] > -TOL && xd[0] < idims[0]*dx[0]+TOL &&
+            xd[1] > -TOL && xd[1] < idims[1]*dx[1]+TOL &&
+            xd[2] > -TOL && xd[2] < idims[2]*dx[2]+TOL) 
+	   {
+            for(int k=0;k<3;k++) if (idx[k]==idims[k]) idx[k]--;
+            dID[0]=uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]];
+            dID[1]=(dID[0] > -1) ? (cellRes[dID[0]]==BIGVALUE) : 1; 
+            for(int jj=0;jj<8 && (dId[0]==-1 || dID[1]) ;jj++)
+             {
+              for(int k=0;k<3;k++)
+	       {
+                idx[k]=(xd[k]+xvec[jj][k])/dx[k];
+                if (idx[k]==idims[k]) idx[k]--;
+               }
+	        int dtest=uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]];
+                dID[1]=(dtest > -1) ? (cellRes[dtest]==BIGVALUE) : 1; 
+                dID[0]=(dID[0] == -1) ? dtest : (!dID[1] ? dtest : dID[0]);
+              }
+             donorId[i]=dID[0]; 
+            }
+       else
+          {
+           donorId[i]=-1;
+          }
+      }
+     else {
+       donorId[i]=donorId[xtag[i]];
+     }
+      if (donorId[i] > -1) {
+	donorCount++;
+      }
+      ipoint+=3;
+    }
+  free(dId);
 }

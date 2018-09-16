@@ -4,7 +4,7 @@
 // Tioga  is a tool for overset grid assembly on parallel distributed systems
 // Copyright (C) 2015 Jay Sitaraman
 //
-// This library is free software; you can redistribute it and/or
+// This library is TIOGA_FREE software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
 // License as published by the Free Software Foundation; either
 // version 2.1 of the License, or (at your option) any later version.
@@ -24,6 +24,7 @@ extern "C" {
   double computeCellVolume(double xv[8][3],int nvert);
   void deallocateLinkList(DONORLIST *temp);
   void deallocateLinkList2(INTEGERLIST *temp);  
+  double tdot_product(double a[3],double b[3],double c[3]);
 }
 
 void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
@@ -67,6 +68,8 @@ void MeshBlock::preprocess(void)
   //
   // find oriented bounding boxes
   //
+  check_for_uniform_hex();
+  if (uniform_hex) create_hex_cell_map();
   if (obb) TIOGA_FREE(obb);
   obb=(OBB *) malloc(sizeof(OBB));
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);
@@ -689,6 +692,13 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 
   for(j=0;j<3;j++)
     {
+      realData[j]=obb->xc[j];
+      realData[j+3]=obb->dxc[j];
+    }
+  return;
+
+  for(j=0;j<3;j++)
+    {
       realData[j]=BIGVALUE;
       realData[j+3]=-BIGVALUE;
     }
@@ -837,7 +847,7 @@ MeshBlock::~MeshBlock()
 {
   int i;
   //
-  // free all data that is owned by this MeshBlock
+  // TIOGA_FREE all data that is owned by this MeshBlock
   // i.e not the pointers of the external code.
   //
   if (cellRes) TIOGA_FREE(cellRes);
@@ -906,4 +916,169 @@ void MeshBlock::setResolutions(double *nres,double *cres)
 {
   userSpecifiedNodeRes=nres;
   userSpecifiedCellRes=cres;
+}
+//
+// detect if a given meshblock is a uniform hex
+// and create a data structure that will enable faster
+// searching
+//
+void MeshBlock::check_for_uniform_hex(void)
+{
+  double xv[8][3];
+  int hex_present=0;
+
+  for(int n=0;n<ntypes;n++)
+    {
+      int nvert=nv[n];
+      if (nvert==8) {
+	hex_present=1;
+	for(int i=0;i<nc[n];i++)
+	  {
+	    int vold=-1;
+	    for(int m=0;m<nvert;m++)
+	      {
+		if (vconn[n][nvert*i+m]==vold) return; // degenerated hex are not uniform
+		vold=vconn[n][nvert*i+m];
+		int i3=3*(vconn[n][nvert*i+m]-BASE);
+		for(int k=0;k<3;k++)
+		  xv[m][k]=x[i3+k];
+	      }
+	    //
+	    // check angles to see if sides are 
+	    // rectangles
+	    //
+	    // z=0 side
+	    //
+	    if (fabs(tdot_product(xv[1],xv[3],xv[0])) > TOL) return;
+	    if (fabs(tdot_product(xv[1],xv[3],xv[2])) > TOL) return;
+	    //
+	    // x=0 side
+	    //
+	    if (fabs(tdot_product(xv[3],xv[4],xv[0])) > TOL) return;
+	    if (fabs(tdot_product(xv[3],xv[4],xv[7])) > TOL) return;
+	    //
+	    // y=0 side
+	    //
+	    if (fabs(tdot_product(xv[4],xv[1],xv[0])) > TOL) return;
+	    if (fabs(tdot_product(xv[4],xv[1],xv[5])) > TOL) return;
+	    //
+	    // need to check just one more angle on 
+	    // on the corner against 0 (6)
+	    //
+	    if (fabs(tdot_product(xv[5],xv[7],xv[6])) > TOL) return;
+	    //
+	    // so this is a hex
+	    // check if it has the same size as the previous hex
+	    // if not return
+	    //
+	    if (i==0){
+	      dx[0]=tdot_product(xv[1],xv[1],xv[0]);
+	      dx[1]=tdot_product(xv[3],xv[3],xv[0]);
+	      dx[2]=tdot_product(xv[4],xv[4],xv[0]);
+	    }
+	    else {
+	      if (fabs(dx[0]-tdot_product(xv[1],xv[1],xv[0])) > TOL) return;
+	      if (fabs(dx[1]-tdot_product(xv[3],xv[3],xv[0])) > TOL) return;
+	      if (fabs(dx[2]-tdot_product(xv[4],xv[4],xv[0])) > TOL) return;
+	    }
+	  }
+      }
+    }
+  if (hex_present) {
+    for(int j=0;j<3;j++) dx[j]=sqrt(dx[j]);
+    uniform_hex=1;
+    if (obh) TIOGA_FREE(obh);
+    obh=(OBB *) malloc(sizeof(OBB));
+    for(int k=0;k<3;k++)
+      obh->vec[0][k]=(xv[1][k]-xv[0][k])/dx[0];
+    for(int k=0;k<3;k++)
+      obh->vec[1][k]=(xv[3][k]-xv[0][k])/dx[1];
+    for(int k=0;k<3;k++)
+      obh->vec[2][k]=(xv[4][k]-xv[0][k])/dx[2];
+
+    for(int j=0;j<3;j++)
+     for(int k=0;k<3;k++)
+       obh->vec[j][k]=0;      
+    obh->vec[0][0]=obh->vec[1][1]=obh->vec[2][2]=1;
+    //
+    double xd[3];
+    double xmax[3];
+    double xmin[3];
+    xmax[0]=xmax[1]=xmax[2]=-BIGVALUE;
+    xmin[0]=xmin[1]=xmin[2]=BIGVALUE;	
+    //
+    for(int i=0;i<nnodes;i++)
+    {
+      int i3=3*i;
+      for(int j=0;j<3;j++) xd[j]=0;
+      //
+      for(int j=0;j<3;j++)
+	for(int k=0;k<3;k++)
+	  xd[j]+=x[i3+k]*obh->vec[j][k];
+      //
+      for(int j=0;j<3;j++)
+	{
+	  xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
+	  xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
+	}
+    }
+        //
+    // find the extents of the box
+    // and coordinates of the center w.r.t. xc
+    // increase extents by 1% for tolerance
+    //
+    for(int j=0;j<3;j++)
+      {
+	xmax[j]+=TOL;
+	xmin[j]-=TOL;
+	obh->dxc[j]=(xmax[j]-xmin[j])*0.5;	
+	xd[j]=(xmax[j]+xmin[j])*0.5;
+      }
+    //
+    // find the center of the box in 
+    // actual cartesian coordinates
+    //
+    for(int j=0;j<3;j++)
+      {
+	obh->xc[j]=0.0;
+	for(int k=0;k<3;k++)
+	  obh->xc[j]+=(xd[k]*obh->vec[k][j]);
+      }    
+   }
+  return;
+}
+		
+void MeshBlock::create_hex_cell_map(void)
+{
+  for(int j=0;j<3;j++)
+    {
+      xlow[j]=obh->xc[j]-obh->dxc[j];
+      idims[j]=round(2*obh->dxc[j]/dx[j]);
+      dx[j]=(2*obh->dxc[j])/idims[j];
+    }
+  //
+  if (uindx) TIOGA_FREE(uindx);
+  uindx=(int *)malloc(sizeof(int)*idims[0]*idims[1]*idims[2]);
+  for(int i=0;i<idims[0]*idims[1]*idims[2];uindx[i++]=-1);
+  //
+  for(int i=0;i<nc[0];i++)
+    {
+      double xc[3];
+      double xd[3];
+      int idx[3];
+      for(int j=0;j<3;j++)
+	{
+	  int lnode=vconn[0][8*i]-BASE;
+	  int tnode=vconn[0][8*i+6]-BASE;
+	  xc[j]=0.5*(x[3*lnode+j]+x[3*tnode+j]);
+	}
+      for(int j=0;j<3;j++)
+	{
+	  xd[j]=0;
+	  for(int k=0;k<3;k++)
+	    xd[j]+=(xc[k]-xlow[k])*obh->vec[j][k];
+         idx[j]=xd[j]/dx[j];
+	}
+       uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]]=i;
+    }
 }

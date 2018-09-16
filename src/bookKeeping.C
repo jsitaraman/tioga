@@ -518,6 +518,15 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
     {
       interpList[*recid].inode[m]=inode[m];
       interpList[*recid].weights[m]=frac[m];
+      if ( frac[m] < -0.2 || frac[m] > 1.2) {
+       TRACEI(myid);
+       TRACEI(irecord);
+       TRACEI(meshtag);
+       TRACEI(donorId[irecord]);
+       TRACED(frac[m]);
+       int ierr;
+       MPI_Abort(MPI_COMM_WORLD,ierr);
+      }
     }
   interpList[*recid].inode[m]=donorId[irecord];
   interpList[*recid].weights[m]=0.0;

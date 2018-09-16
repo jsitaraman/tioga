@@ -328,3 +328,10 @@ double computeCellVolume(double xv[8][3],int nvert)
  cellvolume_(&vol,xv,&numverts[itype],&faceInfo[itype],&nfaces,&nvert);
  return vol;
 }
+double tdot_product(double a[3],double b[3],double c[3])
+{
+  int k;
+  double dp=0.0;
+  for(k=0;k<3;k++) dp+=((a[k]-c[k])*(b[k]-c[k]));
+  return dp;
+}

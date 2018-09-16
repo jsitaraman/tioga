@@ -76,10 +76,10 @@ program testTioga
   do ib=1,nblocks
    g=>gr(ib)
    if (g%n6 > 0)  then
-    call tioga_registergrid_data(ib,g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
+    call tioga_registergrid_data_mb(ib,g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
        ntypes,nv1,g%n6,g%ndc6)
    else if (g%n8 > 0) then
-    call tioga_registergrid_data(ib,g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
+    call tioga_registergrid_data_mb(ib,g%bodytag(1),g%nv,g%x,g%iblank,g%nwbc,g%nobc,g%wbcnode,g%obcnode,&
        ntypes,nv2,g%n8,g%ndc8)
    endif
   enddo
@@ -156,7 +156,7 @@ program testTioga
     g=>gr(ib)
     call tioga_registersolution(g%bodytag(1),g%q)
   enddo
-  call tioga_dataupdate(gr(1)%nvar,'row')    !< update the q-variables (can be called anywhere)
+  call tioga_dataupdate_mb(gr(1)%nvar,'row')    !< update the q-variables (can be called anywhere)
                                              !< nvar = number of field variables per node
                                              !< if fields are different arrays, you can also 
                                              !< call this multiple times for each field

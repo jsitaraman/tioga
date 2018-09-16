@@ -96,158 +96,158 @@ void MeshBlock::tagBoundary(void)
   // initialized, cellRes would be NULL in this case
   //
 
-      if(cellRes) TIOGA_FREE(cellRes);
-      if(nodeRes) TIOGA_FREE(nodeRes);
+  if(cellRes) TIOGA_FREE(cellRes);
+  if(nodeRes) TIOGA_FREE(nodeRes);
     
-      //
-      cellRes=(double *) malloc(sizeof(double)*ncells);
-      nodeRes=(double *) malloc(sizeof(double)*nnodes);
-      //
-      // this is a local array
-      //
-      iflag=(int *)malloc(sizeof(int)*nnodes);
-      iextmp=(int *) malloc(sizeof(double)*nnodes);
-      iextmp1=(int *) malloc(sizeof(double)*nnodes);
-      // 
+  //
+  cellRes=(double *) malloc(sizeof(double)*ncells);
+  nodeRes=(double *) malloc(sizeof(double)*nnodes);
+  //
+  // this is a local array
+  //
+  iflag=(int *)malloc(sizeof(int)*nnodes);
+  iextmp=(int *) malloc(sizeof(double)*nnodes);
+  iextmp1=(int *) malloc(sizeof(double)*nnodes);
+  // 
+  for(i=0;i<nnodes;i++) iflag[i]=0;
+  //
+  if (userSpecifiedNodeRes ==NULL && userSpecifiedCellRes ==NULL)
+    {
       for(i=0;i<nnodes;i++) iflag[i]=0;
+      for(i=0;i<nnodes;i++) nodeRes[i]=0.0;
       //
-      if (userSpecifiedNodeRes ==NULL && userSpecifiedCellRes ==NULL)
-	{
-	  for(i=0;i<nnodes;i++) iflag[i]=0;
-	  for(i=0;i<nnodes;i++) nodeRes[i]=0.0;
-	  //
-	  k=0;
-	  for(n=0;n<ntypes;n++)
-	    {
-	      nvert=nv[n];
-	      for(i=0;i<nc[n];i++)
-		{
-		  for(m=0;m<nvert;m++)
-		    {
-		      inode[m]=vconn[n][nvert*i+m]-BASE;
-		      i3=3*inode[m];
-		      for(j=0;j<3;j++)
-			xv[m][j]=x[i3+j];
-		    }
-		  vol=computeCellVolume(xv,nvert);
-		  cellRes[k++]=(vol*resolutionScale);
-		  for(m=0;m<nvert;m++)
-		    {
-		      iflag[inode[m]]++;
-		      nodeRes[inode[m]]+=(vol*resolutionScale);
-		    }	      
-		}
-	    }
-	}
-      else
-	{
-	  k=0;
-	  for(n=0;n<ntypes;n++)
-	    {
-	      for(i=0;i<nc[n];i++)		
-		{
-		  cellRes[k]=userSpecifiedCellRes[k];
-		  k++;
-		}
-	    }
-	  for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
-	}	  
-      //
-      // compute nodal resolution as the average of 
-      // all the cells associated with it. This takes care
-      // of partition boundaries as well.
-      //
-      for(i=0;i<nnodes;i++)
-	{
-          if (iflag[i]!=0)  nodeRes[i]/=iflag[i];
-	  iflag[i]=0;
-	  iextmp[i]=iextmp1[i]=0;
-	}
-      //
-      // now tag the boundary nodes
-      // reuse the iflag array
-      //
-      //TRACEI(nobc);
-      for(i=0;i<nobc;i++)
-        { 
-          ii=(obcnode[i]-BASE);
-	  iflag[(obcnode[i]-BASE)]=1;
-        }
-      //
-      // now tag all the nodes of boundary cells
-      // to be mandatory receptors
-      //
+      k=0;
       for(n=0;n<ntypes;n++)
 	{
 	  nvert=nv[n];
 	  for(i=0;i<nc[n];i++)
 	    {
-	      itag=0;
 	      for(m=0;m<nvert;m++)
 		{
 		  inode[m]=vconn[n][nvert*i+m]-BASE;
-		  if (iflag[inode[m]]) itag=1;
+		  i3=3*inode[m];
+		  for(j=0;j<3;j++)
+		    xv[m][j]=x[i3+j];
 		}
-	      if (itag)
+	      vol=computeCellVolume(xv,nvert);
+	      cellRes[k++]=(vol*resolutionScale);
+	      for(m=0;m<nvert;m++)
 		{
-		  for(m=0;m<nvert;m++)
-		    {
-		      //iflag[inode[m]]=1;
-		      nodeRes[inode[m]]=BIGVALUE;
-                      iextmp[inode[m]]=iextmp1[inode[m]]=1;
-		    }
+		  iflag[inode[m]]++;
+		  nodeRes[inode[m]]+=(vol*resolutionScale);
+		}	      
+	    }
+	}
+    }
+  else
+    {
+      k=0;
+      for(n=0;n<ntypes;n++)
+	{
+	  for(i=0;i<nc[n];i++)		
+	    {
+	      cellRes[k]=userSpecifiedCellRes[k];
+	      k++;
+	    }
+	}
+      for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
+    }	  
+  //
+  // compute nodal resolution as the average of 
+  // all the cells associated with it. This takes care
+  // of partition boundaries as well.
+  //
+  for(i=0;i<nnodes;i++)
+    {
+      if (iflag[i]!=0)  nodeRes[i]/=iflag[i];
+      iflag[i]=0;
+      iextmp[i]=iextmp1[i]=0;
+    }
+  //
+  // now tag the boundary nodes
+  // reuse the iflag array
+  //
+  //TRACEI(nobc);
+  for(i=0;i<nobc;i++)
+    { 
+      ii=(obcnode[i]-BASE);
+      iflag[(obcnode[i]-BASE)]=1;
+    }
+  //
+  // now tag all the nodes of boundary cells
+  // to be mandatory receptors
+  //
+  for(n=0;n<ntypes;n++)
+    {
+      nvert=nv[n];
+      for(i=0;i<nc[n];i++)
+	{
+	  itag=0;
+	  for(m=0;m<nvert;m++)
+	    {
+	      inode[m]=vconn[n][nvert*i+m]-BASE;
+	      if (iflag[inode[m]]) itag=1;
+	    }
+	  if (itag)
+	    {
+	      for(m=0;m<nvert;m++)
+		{
+		  //iflag[inode[m]]=1;
+		  nodeRes[inode[m]]=BIGVALUE;
+		  iextmp[inode[m]]=iextmp1[inode[m]]=1;
 		}
 	    }
 	}
-      /*
-      sprintf(intstring,"%d",100000+myid);
-      sprintf(fname,"nodeRes%s.dat",&(intstring[1]));
-      fp=fopen(fname,"w");
-      for(i=0;i<nnodes;i++)
-       {
-        if (nodeRes[i]==BIGVALUE) {
-         fprintf(fp,"%e %e %e\n",x[3*i],x[3*i+1],x[3*i+2]);
-         }
-       }
-      fclose(fp);
-      */
-      //
-      // now tag all the cells which have 
-      // mandatory receptors as nodes as not acceptable
-      // donors
-      //
-      for(iex=0;iex<mexclude;iex++)
-      {
-	k=0;
-	for(n=0;n<ntypes;n++)
-	  {
-	    nvert=nv[n];
-	    for(i=0;i<nc[n];i++)
-	      {
-		for(m=0;m<nvert;m++)
-		  {
+    }
+  /*
+    sprintf(intstring,"%d",100000+myid);
+    sprintf(fname,"nodeRes%s.dat",&(intstring[1]));
+    fp=fopen(fname,"w");
+    for(i=0;i<nnodes;i++)
+    {
+    if (nodeRes[i]==BIGVALUE) {
+    fprintf(fp,"%e %e %e\n",x[3*i],x[3*i+1],x[3*i+2]);
+    }
+    }
+    fclose(fp);
+  */
+  //
+  // now tag all the cells which have 
+  // mandatory receptors as nodes as not acceptable
+  // donors
+  //
+  for(iex=0;iex<mexclude;iex++)
+    {
+      k=0;
+      for(n=0;n<ntypes;n++)
+	{
+	  nvert=nv[n];
+	  for(i=0;i<nc[n];i++)
+	    {
+	      for(m=0;m<nvert;m++)
+		{
+		  inode[m]=vconn[n][nvert*i+m]-BASE;
+		  if (iextmp[inode[m]]==1) //(iflag[inode[m]]) 
+		    {
+		      cellRes[k]=BIGVALUE;
+		      break;
+		    }		    
+		}
+	      if (cellRes[k]==BIGVALUE) 
+		{
+		  for(m=0;m<nvert;m++) {
 		    inode[m]=vconn[n][nvert*i+m]-BASE;
-		    if (iextmp[inode[m]]==1) //(iflag[inode[m]]) 
-		      {
-			cellRes[k]=BIGVALUE;
-			break;
-		      }		    
+		    if (iextmp[inode[m]]!=1) iextmp1[inode[m]]=1;
 		  }
-		if (cellRes[k]==BIGVALUE) 
-		  {
-		    for(m=0;m<nvert;m++) {
-                      inode[m]=vconn[n][nvert*i+m]-BASE;
-                      if (iextmp[inode[m]]!=1) iextmp1[inode[m]]=1;
-                    }
-		  }
-		k++;
-	      }
-	  }
-	for(i=0;i<nnodes;i++) iextmp[i]=iextmp1[i];	
-      }
-      TIOGA_FREE(iflag);
-      TIOGA_FREE(iextmp);
-      TIOGA_FREE(iextmp1);
+		}
+	      k++;
+	    }
+	}
+      for(i=0;i<nnodes;i++) iextmp[i]=iextmp1[i];	
+    }
+  TIOGA_FREE(iflag);
+  TIOGA_FREE(iextmp);
+  TIOGA_FREE(iextmp1);
 }
 
 void MeshBlock::writeGridFile(int bid)

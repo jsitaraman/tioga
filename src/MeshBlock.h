@@ -97,7 +97,11 @@ class MeshBlock
   double xlow[3];
   int idims[3];
   int *uindx;
- 	
+  int *invmap;     // inverse map
+  int *mapmask;    // mask
+  int *icft 	   // frequency table for nodal containment
+  int mapdims[3];  // dimensions of the map
+  double mapdx[3]; // sides of the map
  public :
   int *iblank;      /** < iblank value for each grid node */
   int *iblank_reduced;
@@ -164,6 +168,9 @@ class MeshBlock
     uniform_hex=0;
     uindx = NULL;
     obh   = NULL;
+    invmap = NULL;
+    icft   = NULL;
+    mapmask= NULL;
   };
 
   /** basic destructor */

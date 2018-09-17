@@ -159,7 +159,7 @@ void MeshBlock::tagBoundary(void)
   
   for(int j=0;j<3;j++)
     {
-     mapdims[j]=12;
+     mapdims[j]=10;
      mapdx[j]=2*obb->dxc[j]/mapdims[j];
     }
   //
@@ -884,7 +884,7 @@ void MeshBlock::getQueryPoints2(OBB *obc,
   int indx,iptr;
   int *inode;
   double delta;
-  double xv[8][3],mdx[3],mx0[3],xd[3],xc[3];
+  double xv[8][3],mdx[3],xd[3],xc[3];
   double xmax[3],xmin[3];
   int imin[3],imax[3];
   //
@@ -892,17 +892,17 @@ void MeshBlock::getQueryPoints2(OBB *obc,
   *nints=*nreals=0;
   getobbcoords(obc->xc,obc->dxc,obc->vec,xv);
   for(j=0;j<3;j++) {xmin[j]=BIGVALUE;xmax[j]=-BIGVALUE;};
-  writebbox(obc,1);
-  writebbox(obb,2);
-  writebboxdiv(obb,1);
+  //writebbox(obc,1);
+  //writebbox(obb,2);
+  //writebboxdiv(obb,1);
   //
   for(n=0;n<8;n++)
     {
       transform2OBB(xv[n],obb->xc,obb->vec,xd);
       for(j=0;j<3;j++)
  	{
-          xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
-          xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
+          xmin[j]=TIOGA_MIN(xmin[j],xd[j]+obb->dxc[j]);
+          xmax[j]=TIOGA_MAX(xmax[j],xd[j]+obb->dxc[j]);
         }
     }
   
@@ -914,15 +914,12 @@ void MeshBlock::getQueryPoints2(OBB *obc,
       imin[j]=TIOGA_MAX(xmin[j]/mapdx[j],0);
       imax[j]=TIOGA_MIN(xmax[j]/mapdx[j],mapdims[j]-1);
       mdx[j]=0.5*mapdx[j];
-      mx0[j]=0.0;      
-  TRACEI(imin[j]);
-  TRACEI(imax[j]);
     }
   //
   // find min/max extends of a single sub-block
   // in OBC axes
   //
-  getobbcoords(mx0,mdx,obb->vec,xv);
+  getobbcoords(obc->xc,mdx,obb->vec,xv);
   for(j=0;j<3;j++) {xmin[j]=BIGVALUE;xmax[j]=-BIGVALUE;}
   for(m=0;m<8;m++)
     {
@@ -933,13 +930,18 @@ void MeshBlock::getQueryPoints2(OBB *obc,
 	  xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
 	}
     }
-  printf("%f %f %f\n",xmin[0],xmin[1],xmin[2]);
-  printf("%f %f %f\n",xmax[0],xmax[1],xmax[2]);
+  //printf("xmin :%f %f %f\n",xmin[0],xmin[1],xmin[2]);
+  //printf("xmax :%f %f %f\n",xmax[0],xmax[1],xmax[2]);
   //
   // now find the actual number of points
   // that are within OBC using only the 
   // sub-blocks with potential bbox overlap
   //
+  //FILE *fp,*fp2,*fp3,*fp4;
+  //fp=fopen("v.dat","w");
+  //fp2=fopen("v2.dat","w");
+  //fp3=fopen("v3.dat","w");
+  //fp4=fopen("v4.dat","w");
   for(l=imin[2];l<=imax[2];l++)
     for(k=imin[1];k<=imax[1];k++)
       for(j=imin[0];j<=imax[0];j++)
@@ -957,16 +959,31 @@ void MeshBlock::getQueryPoints2(OBB *obc,
 	      for(ij=0;ij<3;ij++)
 		xc[n]+=(xd[ij]*obb->vec[ij][n]);
 	    }
+          //if (j==0 && k==0 & l==0) {
+          //printf("%f %f %f\n",obc->vec[0][0],obc->vec[1][0],obc->vec[2][0]);
+          //printf("%f %f %f\n",obc->vec[0][1],obc->vec[1][1],obc->vec[2][1]);
+          //printf("%f %f %f\n",obc->vec[0][2],obc->vec[1][2],obc->vec[2][2]);
+          //printf("%f %f %f\n",obc->xc[0],obc->xc[1],obc->xc[2]);
+          //}
+          //fprintf(fp,"%f %f %f\n",xc[0],xc[1],xc[2]);
 	  transform2OBB(xc,obc->xc,obc->vec,xd);
-	  //
+          //fprintf(fp2,"%f %f %f\n",xd[0],xd[1],xd[2]);
+	  //if (fabs(xd[0]) <= obc->dxc[0] &&
+	  //    fabs(xd[1]) <= obc->dxc[1] &&
+	  //   fabs(xd[2]) <= obc->dxc[2])
+//		{
+//                  fprintf(fp3,"%f %f %f\n",xc[0],xc[1],xc[2]);
+//		}
+          //
 	  // check if this sub-block overlaps OBC
 	  //
 	  iflag=0;
-	  //for(ij=0;ij<3 && !iflag;ij++) iflag=(iflag || (xmin[ij]+xd[ij] > obc->dxc[ij]));
+	  for(ij=0;ij<3 && !iflag;ij++) iflag=(iflag || (xmin[ij]+xd[ij] > obc->dxc[ij]));
 	  if (iflag) continue;
 	  iflag=0;
-	  //for(ij=0;ij<3 && !iflag;ij++) iflag=(iflag || (xmax[ij]+xd[ij] < -obc->dxc[ij]));
+	  for(ij=0;ij<3 && !iflag;ij++) iflag=(iflag || (xmax[ij]+xd[ij] < -obc->dxc[ij]));
 	  if (iflag) continue;
+          //fprintf(fp4,"%f %f %f\n",xc[0],xc[1],xc[2]);
 	  //
 	  // if there overlap
 	  // go through points within the sub-block
@@ -988,9 +1005,13 @@ void MeshBlock::getQueryPoints2(OBB *obc,
 		}
 	    }
 	}
-  TRACEI(*nints);
-  int ierr;
-  MPI_Abort(MPI_COMM_WORLD,ierr);
+//  TRACEI(*nints);
+//  fclose(fp);
+//  fclose(fp2);
+//  fclose(fp3);
+//  fclose(fp4);
+//  int ierr;
+//  MPI_Abort(MPI_COMM_WORLD,ierr);
   //
   (*intData)=(int *)malloc(sizeof(int)*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));

@@ -383,7 +383,33 @@ int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
   //
   return 1;
 }
-    
+  
+void getobbcoords(double xc[3],double dxc[3],double vec[3][3],double xv[8][3])
+{
+  int i,j,k,ik;
+  for(i=0;i<8;i++)
+   {
+     for(k=0;k<3;k++)
+      xv[i][k]=xc[k];
+     for(k=0;k<3;k++)
+       {
+         ik=(2*((i & (1 << k)) >> k)-1);
+         for(j=0;j<3;j++)
+           xv[i][j]+=ik*dxc[k]*vec[k][j];
+       }
+   }
+}
+
+void transform2OBB(double xv[3],double xc[3],double vec[3][3],double xd[3])
+{
+ int j,k;
+ for(j=0;j<3;j++)
+  {
+   xd[j]=0;
+   for(k=0;k<3;k++)
+      xd[j]+=(xv[k]-xc[k])*vec[j][k];
+  }
+}
 
 	  
 void writebbox(OBB *obb,int bid)
@@ -423,7 +449,51 @@ void writebbox(OBB *obb,int bid)
   fprintf(fp,"1 2 4 3 5 6 8 7\n");
   fclose(fp);
 }
-    
+void writebboxdiv(OBB *obb,int bid)
+{
+  double mapdx[3],mdx[3],mx0[3];
+  double mapdims[3];
+  int ncells,npts;
+  double xv[8][3],xc[3],xd[3];
+  int i,j,k,l,m,n;
+  int iorder[8]={1, 2, 4, 3, 5, 6, 8, 7};
+  FILE *fp;
+  char intstring[7];
+  char fname[80];
+
+  for(j=0;j<3;j++) { mapdims[j]=12; mapdx[j]=2*obb->dxc[j]/mapdims[j]; mdx[j]=0.5*mapdx[j];mx0[j]=0;}
+  ncells=mapdims[2]*mapdims[1]*mapdims[0];
+  npts=ncells*8;
+  sprintf(intstring,"%d",100000+bid);
+  sprintf(fname,"dbox%s.dat",&(intstring[1]));
+  fp=fopen(fname,"w");
+  fprintf(fp,"TITLE =\"Box file\"\n");
+  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\"\n");
+  fprintf(fp,"ZONE T=\"VOL_MIXED\",N=%d E=%d ET=BRICK, F=FEPOINT\n",npts,ncells);
+
+  getobbcoords(mx0,mdx,obb->vec,xv);
+  for(l=0;l<mapdims[2];l++)
+    for(k=0;k<mapdims[1];k++)
+      for(j=0;j<mapdims[0];j++)
+        {
+          xd[0]=-obb->dxc[0]+j*mapdx[0]+mapdx[0]*0.5;
+          xd[1]=-obb->dxc[1]+k*mapdx[1]+mapdx[1]*0.5;
+          xd[2]=-obb->dxc[2]+l*mapdx[2]+mapdx[2]*0.5;
+          for(n=0;n<3;n++)
+            {
+              xc[n]=obb->xc[n];
+              for(m=0;m<3;m++)
+                xc[n]+=(xd[m]*obb->vec[m][n]);
+            }
+          for(m=0;m<8;m++)
+            fprintf(fp,"%f %f %f\n",xc[0]+xv[m][0],xc[1]+xv[m][1],xc[2]+xv[m][2]);
+        }
+  for(l=0;l<ncells;l++) {
+    for(m=0;m<8;m++)
+      fprintf(fp,"%d ",iorder[m]+l*8);
+    fprintf(fp,"\n");
+  }
+}    
       
     
 void writePoints(double *x,int nsearch,int bid)

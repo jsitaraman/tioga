@@ -23,7 +23,7 @@
 
 #include <vector>
 #include <stdint.h>
-
+#include <assert.h>
 #include "codetypes.h"
 #include "ADT.h"
 // forward declare to instantiate one of the methods
@@ -99,7 +99,7 @@ class MeshBlock
   int *uindx;
   int *invmap;     // inverse map
   int *mapmask;    // mask
-  int *icft 	   // frequency table for nodal containment
+  int *icft; 	   // frequency table for nodal containment
   int mapdims[3];  // dimensions of the map
   double mapdx[3]; // sides of the map
  public :
@@ -214,6 +214,8 @@ class MeshBlock
   
   void markWallBoundary(int *sam,int nx[3],double extents[6]);
 
+  void getQueryPoints2(OBB *obb,int *nints,int **intData,int *nreals,
+		      double **realData);
   void getQueryPoints(OBB *obb,int *nints,int **intData,int *nreals,
 		      double **realData);
   

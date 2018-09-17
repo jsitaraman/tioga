@@ -25,6 +25,10 @@ extern "C" {
   void deallocateLinkList(DONORLIST *temp);
   void deallocateLinkList2(INTEGERLIST *temp);  
   double tdot_product(double a[3],double b[3],double c[3]);
+  void getobbcoords(double xc[3],double dxc[3],double vec[3][3],double xv[8][3]);
+  void transform2OBB(double xv[3],double xc[3],double vec[3][3],double xd[3]);
+  void writebbox(OBB *obb,int bid);
+  void writebboxdiv(OBB *obb,int bid);
 }
 
 void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
@@ -151,18 +155,64 @@ void MeshBlock::tagBoundary(void)
 	    }
 	}
       for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
-    }	  
+    }
+  
+  for(int j=0;j<3;j++)
+    {
+     mapdims[j]=12;
+     mapdx[j]=2*obb->dxc[j]/mapdims[j];
+    }
   //
   // compute nodal resolution as the average of 
   // all the cells associated with it. This takes care
   // of partition boundaries as well.
   //
+  // Also create the inverse map of nodes
+  // 
+  if (icft) TIOGA_FREE(icft);
+  icft=(int *)malloc(sizeof(int)*(mapdims[2]*mapdims[1]*mapdims[0]+1));
+  if (invmap) TIOGA_FREE(invmap);
+  invmap=(int *)malloc(sizeof(int)*nnodes);
+  for(int i=0;i<mapdims[2]*mapdims[1]*mapdims[0]+1;i++) icft[i]=-1;
+  icft[0]=0;	  
+  int *iptr;
+  iptr=(int *)malloc(sizeof(int)*nnodes);
+  //
   for(i=0;i<nnodes;i++)
     {
+      double xd[3];
+      int idx[3];
       if (iflag[i]!=0)  nodeRes[i]/=iflag[i];
       iflag[i]=0;
       iextmp[i]=iextmp1[i]=0;
+      
+      for(int j=0;j<3;j++)
+	{
+	  xd[j]=obb->dxc[j];
+	  for(int k=0;k<3;k++)
+	    xd[j]+=(x[3*i+k]-obb->xc[k])*obb->vec[j][k];
+	  idx[j]=xd[j]/mapdx[j];
+	}
+      int indx=idx[2]*mapdims[1]*mapdims[0]+idx[1]*mapdims[0]+idx[0];
+      iptr[i]=icft[indx+1];
+      icft[indx+1]=i;
     }
+ 
+ int kc=0;
+ for(int i=0;i<mapdims[2]*mapdims[1]*mapdims[0];i++)
+  {
+   int ip=icft[i+1];
+   int m=0;
+   while(ip != -1) 
+   {
+     invmap[kc++]=ip;
+     ip=iptr[ip];
+     m++;
+   }
+   icft[i+1]=icft[i]+m;
+  }
+
+  TIOGA_FREE(iptr);
   //
   // now tag the boundary nodes
   // reuse the iflag array
@@ -176,18 +226,42 @@ void MeshBlock::tagBoundary(void)
   //
   // now tag all the nodes of boundary cells
   // to be mandatory receptors
-  //
+  // also make the inverse map mask
+  if (mapmask) TIOGA_FREE(mapmask);
+  mapmask=(int *)malloc(sizeof(int)*mapdims[2]*mapdims[1]*mapdims[0]);
+  for(int i=0;i<mapdims[2]*mapdims[1]*mapdims[0];i++) mapmask[i]=0;
   for(n=0;n<ntypes;n++)
     {
       nvert=nv[n];
       for(i=0;i<nc[n];i++)
 	{
+	  double xd[3],xc[3],xmin[3],xmax[3];	    
+	  int idx[3];
 	  itag=0;
+	  for(int j=0;j<3;j++) { xmin[j]=BIGVALUE;xmax[j]=-BIGVALUE;}
 	  for(m=0;m<nvert;m++)
 	    {
 	      inode[m]=vconn[n][nvert*i+m]-BASE;
 	      if (iflag[inode[m]]) itag=1;
+	      for(int j=0;j<3;j++)
+		{
+		  xd[j]=obb->dxc[j];
+		  for(int k=0;k<3;k++) 
+		    xd[j]+=(x[3*inode[m]+k]-obb->xc[k])*obb->vec[j][k];
+		  xmin[j]=TIOGA_MIN(xd[j],xmin[j]);
+		  xmax[j]=TIOGA_MAX(xd[j],xmax[j]);
+		} 	    
 	    }
+          for(int j=0;j<3;j++) { xmin[j]-=TOL; xmax[j]+=TOL;}
+	  for(int j=xmin[0]/mapdx[0];j<=xmax[0]/mapdx[0];j++)
+            for(int k=xmin[1]/mapdx[1];k<=xmax[1]/mapdx[1];k++)
+              for(int l=xmin[2]/mapdx[2];l<=xmax[2]/mapdx[2];l++)
+                {
+                  idx[0]=TIOGA_MAX(TIOGA_MIN(j,mapdims[0]-1),0);
+                  idx[1]=TIOGA_MAX(TIOGA_MIN(k,mapdims[1]-1),0);
+                  idx[2]=TIOGA_MAX(TIOGA_MIN(l,mapdims[2]-1),0);
+                  mapmask[idx[2]*mapdims[1]*mapdims[0]+idx[1]*mapdims[0]+idx[0]]=1;
+                }
 	  if (itag)
 	    {
 	      for(m=0;m<nvert;m++)
@@ -199,6 +273,9 @@ void MeshBlock::tagBoundary(void)
 	    }
 	}
     }
+
+
+
   /*
     sprintf(intstring,"%d",100000+myid);
     sprintf(fname,"nodeRes%s.dat",&(intstring[1]));
@@ -748,10 +825,11 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
     }
   return;
 }
-	      
+
+
 void MeshBlock::getQueryPoints(OBB *obc,
-			       int *nints,int **intData,
-			       int *nreals, double **realData)
+                               int *nints,int **intData,
+                               int *nreals, double **realData)
 {
   int i,j,k;
   int i3;
@@ -761,25 +839,158 @@ void MeshBlock::getQueryPoints(OBB *obc,
   int m;
 
   inode=(int *)malloc(sizeof(int)*nnodes);
-  *nints=*nreals=0; 
+  *nints=*nreals=0;
   for(i=0;i<nnodes;i++)
     {
       i3=3*i;
       for(j=0;j<3;j++) xd[j]=0;
       for(j=0;j<3;j++)
-	for(k=0;k<3;k++)
-	  xd[j]+=(x[i3+k]-obc->xc[k])*obc->vec[j][k];
+        for(k=0;k<3;k++)
+          xd[j]+=(x[i3+k]-obc->xc[k])*obc->vec[j][k];
 
       if (fabs(xd[0]) <= obc->dxc[0] &&
-	  fabs(xd[1]) <= obc->dxc[1] &&
-	  fabs(xd[2]) <= obc->dxc[2])
-	{
-	  inode[*nints]=i;
-	  (*nints)++;
-	  (*nreals)+=4;
+          fabs(xd[1]) <= obc->dxc[1] &&
+          fabs(xd[2]) <= obc->dxc[2])
+        {
+          inode[*nints]=i;
+          (*nints)++;
+          (*nreals)+=4;
 
+        }
+    }
+  if (myid==0 && meshtag==1) {TRACEI(*nints);} 
+  (*intData)=(int *)malloc(sizeof(int)*(*nints));
+  (*realData)=(double *)malloc(sizeof(double)*(*nreals));
+  //
+  m=0;
+  for(i=0;i<*nints;i++)
+  {
+    i3=3*inode[i];
+    (*intData)[i]=inode[i];
+    (*realData)[m++]=x[i3];
+    (*realData)[m++]=x[i3+1];
+    (*realData)[m++]=x[i3+2];
+    (*realData)[m++]=nodeRes[inode[i]];
+  }
+  //
+  TIOGA_FREE(inode);
+}
+	      
+void MeshBlock::getQueryPoints2(OBB *obc,
+			       int *nints,int **intData,
+			       int *nreals, double **realData)
+{
+  int i,j,k,l,il,ik,ij,n,m,i3,iflag;
+  int indx,iptr;
+  int *inode;
+  double delta;
+  double xv[8][3],mdx[3],mx0[3],xd[3],xc[3];
+  double xmax[3],xmin[3];
+  int imin[3],imax[3];
+  //
+  inode=(int *)malloc(sizeof(int)*nnodes);
+  *nints=*nreals=0;
+  getobbcoords(obc->xc,obc->dxc,obc->vec,xv);
+  for(j=0;j<3;j++) {xmin[j]=BIGVALUE;xmax[j]=-BIGVALUE;};
+  writebbox(obc,1);
+  writebbox(obb,2);
+  writebboxdiv(obb,1);
+  //
+  for(n=0;n<8;n++)
+    {
+      transform2OBB(xv[n],obb->xc,obb->vec,xd);
+      for(j=0;j<3;j++)
+ 	{
+          xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
+          xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
+        }
+    }
+  
+  for(j=0;j<3;j++) 
+    {
+      delta=0.01*(xmax[j]-xmin[j]);
+      xmin[j]-=delta;
+      xmax[j]+=delta;
+      imin[j]=TIOGA_MAX(xmin[j]/mapdx[j],0);
+      imax[j]=TIOGA_MIN(xmax[j]/mapdx[j],mapdims[j]-1);
+      mdx[j]=0.5*mapdx[j];
+      mx0[j]=0.0;      
+  TRACEI(imin[j]);
+  TRACEI(imax[j]);
+    }
+  //
+  // find min/max extends of a single sub-block
+  // in OBC axes
+  //
+  getobbcoords(mx0,mdx,obb->vec,xv);
+  for(j=0;j<3;j++) {xmin[j]=BIGVALUE;xmax[j]=-BIGVALUE;}
+  for(m=0;m<8;m++)
+    {
+      transform2OBB(xv[m],obc->xc,obc->vec,xd);
+      for(j=0;j<3;j++)
+	{
+	  xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
+	  xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
 	}
     }
+  printf("%f %f %f\n",xmin[0],xmin[1],xmin[2]);
+  printf("%f %f %f\n",xmax[0],xmax[1],xmax[2]);
+  //
+  // now find the actual number of points
+  // that are within OBC using only the 
+  // sub-blocks with potential bbox overlap
+  //
+  for(l=imin[2];l<=imax[2];l++)
+    for(k=imin[1];k<=imax[1];k++)
+      for(j=imin[0];j<=imax[0];j++)
+	{
+	  //
+	  // centroid of each sub-block 
+	  // in OBC axes
+	  //
+	  xd[0]=-obb->dxc[0]+j*mapdx[0]+mapdx[0]*0.5;
+	  xd[1]=-obb->dxc[1]+k*mapdx[1]+mapdx[1]*0.5;
+	  xd[2]=-obb->dxc[2]+l*mapdx[2]+mapdx[2]*0.5;
+	  for(n=0;n<3;n++)
+	    {
+	      xc[n]=obb->xc[n];
+	      for(ij=0;ij<3;ij++)
+		xc[n]+=(xd[ij]*obb->vec[ij][n]);
+	    }
+	  transform2OBB(xc,obc->xc,obc->vec,xd);
+	  //
+	  // check if this sub-block overlaps OBC
+	  //
+	  iflag=0;
+	  //for(ij=0;ij<3 && !iflag;ij++) iflag=(iflag || (xmin[ij]+xd[ij] > obc->dxc[ij]));
+	  if (iflag) continue;
+	  iflag=0;
+	  //for(ij=0;ij<3 && !iflag;ij++) iflag=(iflag || (xmax[ij]+xd[ij] < -obc->dxc[ij]));
+	  if (iflag) continue;
+	  //
+	  // if there overlap
+	  // go through points within the sub-block
+	  // to figure out what needs to be send
+	  //
+	  indx=l*mapdims[1]*mapdims[0]+k*mapdims[0]+j;
+	  for(m=icft[indx];m<icft[indx+1];m++)
+	    {
+	      i3=3*invmap[m];
+	      for(ik=0;ik<3;ik++) xc[ik]=x[i3+ik];
+	      transform2OBB(xc,obc->xc,obc->vec,xd);
+	      if (fabs(xd[0]) <= obc->dxc[0] &&
+		  fabs(xd[1]) <= obc->dxc[1] &&
+		  fabs(xd[2]) <= obc->dxc[2])
+		{
+		  inode[*nints]=invmap[m];
+		  (*nints)++;
+		  (*nreals)+=4;
+		}
+	    }
+	}
+  TRACEI(*nints);
+  int ierr;
+  MPI_Abort(MPI_COMM_WORLD,ierr);
   //
   (*intData)=(int *)malloc(sizeof(int)*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));

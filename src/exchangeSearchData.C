@@ -67,9 +67,16 @@ void tioga::exchangeSearchData(int at_points)
     auto& mb = mblocks[ib];
     if (at_points==0) 
     {
+    if (myid==0 && mb->meshtag==1) {
      mb->getQueryPoints(
       &obblist[ii], &nintsSend[ii], &int_data[ii], &nrealsSend[ii],
       &real_data[ii]);
+     }
+    else {
+      mb->getQueryPoints(
+      &obblist[ii], &nintsSend[ii], &int_data[ii], &nrealsSend[ii],
+      &real_data[ii]);
+     }
     } 
     else
     {

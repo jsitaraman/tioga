@@ -462,6 +462,9 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
             }
         }
 
+  if (iflag) TIOGA_FREE(iflag);
+  if (xtmp)  TIOGA_FREE(xtmp);
+  if (index) TIOGA_FREE(index);
   // fclose(fp);
 }
 			      

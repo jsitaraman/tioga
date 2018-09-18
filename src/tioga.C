@@ -664,7 +664,8 @@ tioga::~tioga()
   if (pc_cart) delete[] pc_cart;
   if (sendCount) TIOGA_FREE(sendCount);
   if (recvCount) TIOGA_FREE(recvCount);
-
+  if (cb) delete [] cb;
+  if (cg) delete [] cg;
   if (qblock) TIOGA_FREE(qblock);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };

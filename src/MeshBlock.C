@@ -827,6 +827,69 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 }
 
 
+void MeshBlock::getReducedOBB2(OBB *obc,double *realData) 
+{
+  int i,j,k,l,m,n,i3,jmin,kmin,lmin,jmax,kmax,lmax,indx;
+  double bbox[6],xd[3];
+  double xmin[3],xmax[3],xv[8][3];
+  double delta;
+  int imin[3],imax[3];
+
+  getobbcoords(obc->xc,obc->dxc,obc->vec,xv);
+  for(j=0;j<3;j++) {xmin[j]=BIGVALUE;xmax[j]=-BIGVALUE;};
+  for(n=0;n<8;n++)
+    {
+      transform2OBB(xv[n],obb->xc,obb->vec,xd);
+      for(j=0;j<3;j++)
+ 	{
+          xmin[j]=TIOGA_MIN(xmin[j],xd[j]+obb->dxc[j]);
+          xmax[j]=TIOGA_MAX(xmax[j],xd[j]+obb->dxc[j]);
+        }
+    }
+  for(j=0;j<3;j++) 
+    {
+      delta=0.01*(xmax[j]-xmin[j]);
+      xmin[j]-=delta;
+      xmax[j]+=delta;
+      imin[j]=TIOGA_MAX(xmin[j]/mapdx[j],0);
+      imax[j]=TIOGA_MIN(xmax[j]/mapdx[j],mapdims[j]-1);
+    }
+  lmin=mapdims[2]-1;
+  kmin=mapdims[1]-1;
+  jmin=mapdims[0]-1;
+  lmax=kmax=jmax=0;
+  for(l=imin[2];l<=imax[2];l++)
+    for(k=imin[1];k<=imax[1];k++)
+      for(j=imin[0];j<=imax[0];j++)
+	{
+	  indx=l*mapdims[1]*mapdims[0]+k*mapdims[0]+j;
+	  if (mapmask[indx]) {
+	    lmin=TIOGA_MIN(lmin,l);
+	    kmin=TIOGA_MIN(kmin,k);
+	    jmin=TIOGA_MIN(jmin,j);
+	    lmax=TIOGA_MAX(lmax,l);
+	    kmax=TIOGA_MAX(kmax,k);
+	    jmax=TIOGA_MAX(jmax,j);
+	  }
+	}
+  bbox[0]=-obb->dxc[0]+jmin*mapdx[0];
+  bbox[1]=-obb->dxc[1]+kmin*mapdx[1];
+  bbox[2]=-obb->dxc[2]+lmin*mapdx[2];
+  bbox[3]=-obb->dxc[0]+(jmax+1)*mapdx[0];
+  bbox[4]=-obb->dxc[1]+(kmax+1)*mapdx[1];
+  bbox[5]=-obb->dxc[2]+(lmax+1)*mapdx[2];
+  for(j=0;j<3;j++)
+    {
+      realData[j]=obb->xc[j];
+      for(k=0;k<3;k++)
+	realData[j]+=((bbox[k]+bbox[k+3])*0.5)*obb->vec[k][j];
+      realData[j+3]=(bbox[j+3]-bbox[j])*0.5;
+    }
+  return;
+}
+
+
+
 void MeshBlock::getQueryPoints(OBB *obc,
                                int *nints,int **intData,
                                int *nreals, double **realData)

@@ -258,6 +258,7 @@ class MeshBlock
   void getReceptorInfo(int *receptors);
 
   void getReducedOBB(OBB *,double *);
+  void getReducedOBB2(OBB *,double *);
 
   void resetCoincident();
   //

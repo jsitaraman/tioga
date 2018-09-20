@@ -137,12 +137,16 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
 	}
       if (rxyzCart !=NULL) free(rxyzCart);
       if (donorIdCart !=NULL) free(donorIdCart);
+      if (receptorIdCart != NULL) free(receptorIdCart);
       rxyzCart=(double *)malloc(sizeof(double)*ntotalPointsCart*3);
       donorIdCart=(int *)malloc(sizeof(int)*ntotalPointsCart);
+      receptorIdCart=(int*)malloc(sizeof(int)*ntotalPointsCart);
       m=0;
+      k=0;
       for(i=0;i<nnodes;i++)
 	if (pickedCart[i]) 
 	  {
+          receptorIdCart[k++] = i;
 	    i3=3*i;
 	    for(j=0;j<3;j++)
 	      rxyzCart[m++]=x[i3+j];

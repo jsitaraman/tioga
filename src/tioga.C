@@ -219,7 +219,9 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
 	  bid=rcvPack[k].intData[2*i];
 	  if (bid< 0) 
 	    {
-	      mb->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],q,nvar,interptype);
+            int tmp1 = rcvPack[k].intData[2*i+1];
+            int inode = mb->receptorIdCart[tmp1];
+	      mb->updateSolnData(inode,&rcvPack[k].realData[m],q,nvar,interptype);
 	    }
 	  else
 	    {

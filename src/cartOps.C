@@ -405,4 +405,5 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 	    }
 	}
     }
+  free(qq);
 }

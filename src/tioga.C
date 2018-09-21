@@ -227,8 +227,8 @@ void tioga::dataUpdate_AMR(int nvar,double *q,int interptype)
 	    {
 
 	      cb[bid].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
-	      m+=nvar;
 	    }
+	      m+=nvar;
 	}
     }
   //
@@ -369,6 +369,8 @@ tioga::~tioga()
   if (sendCount) free(sendCount);
   if (recvCount) free(recvCount);
   if (obblist) free(obblist);
+  if (cb) delete [] cb;
+  if (cg) delete [] cg;
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 

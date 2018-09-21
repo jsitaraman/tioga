@@ -69,6 +69,9 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       tmpreal=(double *)malloc(sizeof(double)*(*nreals));
       for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
       for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
+
+      free(*intData);
+      free(*realData);
       }
       (*nints)+=interpCount;
       (*nreals)+=(interpCount*nvar);
@@ -432,6 +435,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 	    }
 	}
 
+  
+  /*
   for(k=0;k<dims[2];k++)
     for(j=0;j<dims[1];j++)
       for(i=0;i<dims[0];i++)
@@ -457,7 +462,11 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
                 }
             }
         }
+  */
 
+  if (iflag) free(iflag);
+  if (xtmp) free(xtmp);
+  if (index) free(index);
   // fclose(fp);
 }
 			      

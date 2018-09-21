@@ -817,7 +817,6 @@ MeshBlock::~MeshBlock()
       }
     free(interpList);
   }
-  return;
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
@@ -851,6 +850,9 @@ MeshBlock::~MeshBlock()
   if (donorIdCart) free(donorIdCart);
   if (pickedCart) free(pickedCart);
   if (ctag_cart) free(ctag_cart);
+
+  if (tagsearch) free(tagsearch);
+  if (donorId) free(donorId);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

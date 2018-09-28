@@ -36,14 +36,7 @@ parts. It can accept high-order call-back functions to perform p-consistent
 interpolation and searches for formulations with internal degrees of freedom
 within a computational element.
 
-Limitations:
-------------
-
-(1) Each process must own only one partition
-(2) Each partition should be homogeneous, i.e it should have parts of
-    only one of the meshes
-
-Authored by Jay Sitaraman 
+Authored by Jay Sitaraman
 jsitaraman@gmail.com
 (301) 741 3216
 

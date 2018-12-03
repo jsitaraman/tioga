@@ -24,6 +24,7 @@ extern "C" {
   void writebbox(OBB *obb,int bid);
   void writePoints(double *x,int nsearch,int bid);
   void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn);
+  void uniquenodes_octree(double *x,int *meshtag,double *rtag,int *itag,int *nn);
 }
 
 
@@ -191,7 +192,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   // create a unique hash
   //
-  uniquenodes(xsearch,tagsearch,res_search,xtag,&nsearch);
+  uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
   //
   donorCount=0;
   ipoint=0; 
@@ -223,7 +224,7 @@ void MeshBlock::search_uniform_hex(void)
   if (xtag) free(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
-  uniquenodes(xsearch,tagsearch,res_search,xtag,&nsearch);
+  uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
   //                                                                                                          
   int donorCount=0;
   int *dId=(int *) malloc(sizeof(int) *2);

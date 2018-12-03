@@ -766,14 +766,14 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
   int nvert;
   bool iflag;
   double bbox[6],xd[3];
-
+  /*
   for(j=0;j<3;j++)
     {
       realData[j]=obb->xc[j];
       realData[j+3]=obb->dxc[j];
     }
   return;
-
+  */
   for(j=0;j<3;j++)
     {
       realData[j]=BIGVALUE;
@@ -1221,7 +1221,7 @@ void MeshBlock::check_for_uniform_hex(void)
 {
   double xv[8][3];
   int hex_present=0;
-
+  if (ntypes > 1) return;
   for(int n=0;n<ntypes;n++)
     {
       int nvert=nv[n];

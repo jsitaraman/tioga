@@ -274,7 +274,8 @@ void tioga::exchangeBoxes(void)
     sndPack[k].intData[3*ioff] = key_send; // mb->getMeshTag();
     sndPack[k].intData[3*ioff+1] = ib;
     sndPack[k].intData[3*ioff+2] = mb->getMeshTag();
-    mb->getReducedOBB2(&obbRecv[ob], &(sndPack[k].realData[roff]));
+    //mb->getReducedOBB2(&obbRecv[ob], &(sndPack[k].realData[roff]));
+    mb->getReducedOBB(&obbRecv[ob], &(sndPack[k].realData[roff]));
 
     for(int ii=0; ii<3; ii++)
       for(int j=0; j<3; j++)

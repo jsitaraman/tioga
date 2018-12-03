@@ -1,4 +1,3 @@
-
 /* This file is part of the Tioga software library */
 
 /* Tioga  is a tool for overset grid assembly on parallel distributed systems */
@@ -617,6 +616,116 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
   TIOGA_FREE(cft);
   TIOGA_FREE(numpts);
 }
-  
-		 
-    
+//
+// modify ADT builder to remove common nodes
+//
+void uniqNodesTree(double *coord,
+		   int *itag,double *rtag,int *meshtag,
+		   int *elementsAvailable,
+		   int ndim, int nav)
+{  
+  int nd=ndim;  
+  double coordmid;
+  int i,j,ibox;
+  int p1,p2;
+  int *tmpint;
+  int npts[8],iv[3],cft[9];
+  double xmax[3],xmin[3],xmid[3],dx[3],xp[3];
+  //
+  // if there are more than 10 elements divide the tree
+  //
+  if (nav > 10) {
+    //
+    // find the bound of the boxes
+    //
+    xmin[0]=xmin[1]=xmin[2]=BIGVALUE;
+    xmax[0]=xmax[1]=xmax[2]=-BIGVALUE;
+    for(i=0;i<nav;i++)
+      for(j=0;j<nd;j++)
+	{
+	  xmin[j]=TIOGA_MIN(xmin[j],coord[ndim*elementsAvailable[i]+j]);
+	  xmax[j]=TIOGA_MAX(xmax[j],coord[ndim*elementsAvailable[i]+j]);
+	}
+    for(j=0;j<nd;j++) { 
+      xmid[j]=(xmax[j]+xmin[j])*0.5;
+      dx[j]=(xmax[j]-xmin[j])*0.5+TOL;
+    }
+    for(j=0;j<8;j++) npts[j]=0;
+    for(i=0;i<nav;i++)
+      {
+	for(j=0;j<3;j++) {
+	  xp[j]=coord[ndim*elementsAvailable[i]+j]-xmid[j];
+	  iv[j]=floor(xp[j]/dx[j])+1;
+	}
+	ibox= 4*iv[0]+2*iv[1]+iv[2];
+	npts[ibox]++;
+      }
+    cft[0]=0;
+    for(j=0;j<8;j++)
+      cft[j+1]=cft[j]+npts[j];
+    tmpint=(int *)malloc(sizeof(int)*nav);
+    for(i=0;i<nav;i++)
+      {
+	for(j=0;j<3;j++){
+	  xp[j]=coord[ndim*elementsAvailable[i]+j]-xmid[j];
+	  iv[j]=floor(xp[j]/dx[j])+1;
+	}
+	ibox= 4*iv[0]+2*iv[1]+iv[2];
+	npts[ibox]=npts[ibox]-1;
+	tmpint[npts[ibox]+cft[ibox]]=elementsAvailable[i];
+      }
+    for(i=0;i<nav;i++)
+      elementsAvailable[i]=tmpint[i];
+    TIOGA_FREE(tmpint);
+    for(j=0;j<8;j++)
+      uniqNodesTree(coord,itag,rtag,meshtag,&(elementsAvailable[cft[j]]),
+		    ndim,cft[j+1]-cft[j]);
+  }
+  else {
+    for(i=0;i<nav;i++)
+      {
+	p1=elementsAvailable[i];
+	for(j=i+1;j<nav;j++)
+	  {
+	    p2=elementsAvailable[j];	    
+	    if (fabs(coord[3*p1  ]-coord[3*p2  ])+
+		fabs(coord[3*p1+1]-coord[3*p2+1])+
+		fabs(coord[3*p1+2]-coord[3*p2+2]) < TOL &&
+		meshtag[p1]==meshtag[p2])
+	      {
+		if (p1 > p2) {
+		  rtag[p2]=TIOGA_MAX(rtag[p1],rtag[p2]);
+		  itag[p1]=p2;
+		}
+		else {
+		  rtag[p1]=TIOGA_MAX(rtag[p1],rtag[p2]);
+		  itag[p2]=p1;
+		}
+	      }
+	  }
+      }
+  }
+}
+/*
+ * Create a unique hash for list of coordinates with duplicates in 
+ * them. Find the rtag as max of all duplicate samples. itag contains
+ * the hash to the real point
+ */
+void uniquenodes_octree(double *x,int *meshtag,double *rtag,int *itag,
+		     int *nn)
+{
+  int nelem=*nn;
+  int *elementsAvailable;
+  int i;
+
+  elementsAvailable=(int *)malloc(sizeof(int)*nelem);
+  for(i=0;i<nelem;i++)
+    {
+     elementsAvailable[i]=i;
+     itag[i]=i;
+    }
+
+  uniqNodesTree(x,itag,rtag,meshtag,elementsAvailable,3,nelem);
+
+  TIOGA_FREE(elementsAvailable);
+}

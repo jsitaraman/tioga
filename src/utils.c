@@ -631,13 +631,15 @@ void uniqNodesTree(double *coord,
   int *tmpint;
   int npts[8],iv[3],cft[9];
   double xmax[3],xmin[3],xmid[3],dx[3],xp[3];
+  int icheck=1;
   //
   // if there are more than 10 elements divide the tree
   //
-  if (nav > 10) {
+  if (nav > 20) {
     //
     // find the bound of the boxes
     //
+    icheck=0;
     xmin[0]=xmin[1]=xmin[2]=BIGVALUE;
     xmax[0]=xmax[1]=xmax[2]=-BIGVALUE;
     for(i=0;i<nav;i++)
@@ -660,6 +662,8 @@ void uniqNodesTree(double *coord,
 	ibox= 4*iv[0]+2*iv[1]+iv[2];
 	npts[ibox]++;
       }
+    for(j=0;j<8;j++) if(npts[j]==nav) icheck=1;
+    if (!icheck) {
     cft[0]=0;
     for(j=0;j<8;j++)
       cft[j+1]=cft[j]+npts[j];
@@ -678,10 +682,12 @@ void uniqNodesTree(double *coord,
       elementsAvailable[i]=tmpint[i];
     TIOGA_FREE(tmpint);
     for(j=0;j<8;j++)
-      uniqNodesTree(coord,itag,rtag,meshtag,&(elementsAvailable[cft[j]]),
-		    ndim,cft[j+1]-cft[j]);
+      if (cft[j+1] > cft[j])
+        uniqNodesTree(coord,itag,rtag,meshtag,&(elementsAvailable[cft[j]]),
+	    ndim,cft[j+1]-cft[j]);
+      }
   }
-  else {
+  if (icheck) {
     for(i=0;i<nav;i++)
       {
 	p1=elementsAvailable[i];

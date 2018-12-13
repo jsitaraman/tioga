@@ -1,8 +1,6 @@
 mkdir build
 cd build
-cmake ../src
-make -j8
+cmake ..
+make
 cd ..
-cd driver;make;cd -
-cd gridGen;make;cd -
-cd case/;./run.sh 16;cd -
+cd case/;./run.sh 8;cd -

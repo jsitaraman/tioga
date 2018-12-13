@@ -52,6 +52,7 @@
 #define BIGVALUE           1.0e+15
 #define BIGINT             2147483647
 #define TOL                1.0e-10
+#define HOLEMAPSIZE        192
 // #define NFRINGE            3
 // #define NVAR               6
 /*==================================================================*/

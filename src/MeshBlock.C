@@ -1201,6 +1201,7 @@ MeshBlock::~MeshBlock()
 
   if (tagsearch) TIOGA_FREE(tagsearch);
   if (donorId) TIOGA_FREE(donorId);
+  if (receptorIdCart) TIOGA_FREE(receptorIdCart);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

@@ -54,13 +54,13 @@ void tioga::exchangeBoxes(void)
     displs[i] = displs[i-1] + nbPerProc[i-1];
   }
 
-  MPI_Allgatherv(mtags.data(), nblocks, MPI_INT, alltags.data(),
+  MPI_Allgatherv(mytag.data(), nblocks, MPI_INT, alltags.data(),
                  nbPerProc.data(), displs.data(), MPI_INT, scomm);
 
   int maxtag = -1;
   //for (auto itag: alltags)
   for(int i=0;i<ntotalblks;i++) {
-    int itag=alltags[i];
+    int itag=abs(alltags[i]);
     if (maxtag < itag) maxtag = itag;
   }
   int mxtgsqr = maxtag * maxtag;
@@ -76,7 +76,7 @@ void tioga::exchangeBoxes(void)
 
     for(int d=displs[p]; d < displs[p+1]; d++) {
       for (int ib=0; ib < nblocks; ib++) {
-        if (alltags[d] != mtags[ib]) {
+        if (abs(alltags[d]) != mtags[ib]) {
           nsend++;
           sendFlag[p] = true;
           break;
@@ -116,7 +116,7 @@ void tioga::exchangeBoxes(void)
     // Determine buffer sizes
     for (int ib=0; ib < nblocks; ib++) {
       for (int d=displs[ip]; d < displs[ip+1]; d++) {
-        if (( alltags[d] != mtags[ib] ) &&
+        if (( abs(alltags[d]) != mtags[ib] ) &&
             ( bFlag[ib] == false)) {
           sndPack[k].nints++;
           bFlag[ib] = true;
@@ -133,7 +133,7 @@ void tioga::exchangeBoxes(void)
     for (int ib=0; ib < nblocks; ib++) {
       if (bFlag[ib] == false) continue;
 
-      sndPack[k].intData[im++] = mtags[ib];
+      sndPack[k].intData[im++] = mytag[ib];
 
       for (int i=0; i < 3; i++)
         for (int j=0; j< 3; j++)
@@ -193,7 +193,7 @@ void tioga::exchangeBoxes(void)
       auto& mb = mblocks[ib];
       int meshtag = mb->getMeshTag();
 
-        if (obbID[ob] == meshtag) continue;
+        if (abs(obbID[ob]) == meshtag) continue;
 
         if ( obbIntersectCheck(
                mb->obb->vec, mb->obb->xc, mb->obb->dxc,
@@ -201,11 +201,17 @@ void tioga::exchangeBoxes(void)
              obbIntersectCheck(
                obbRecv[ob].vec, obbRecv[ob].xc, obbRecv[ob].dxc,
                mb->obb->vec, mb->obb->xc, mb->obb->dxc)) {
+          int overlap_present=1;
+          if (obbID[ob] < 0 || mytag[ib] < 0) {
+            mb->check_intersect_p4est(&obbProc[ob],&overlap_present);
+          }
           // If there is an intersection, store the index pair, increment number
           // of intersections for this processor, and activate send flag
+          if (overlap_present) {
           intersectIDs.push_back(std::make_pair(ib, ob));
           obPerProc[obbProc[ob]]++;
           sendFlag[obbProc[ob]] = true;
+          }
       }
     }
   }

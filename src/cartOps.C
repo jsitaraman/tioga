@@ -120,6 +120,7 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
       donorIdCart=(int *)malloc(sizeof(int)*ntotalPointsCart);
       //
       m=0;
+      k=0;
       for(i=0;i<nreceptorCellsCart;i++)
 	{
 	  get_receptor_nodes(&(ctag_cart[i]),&(pointsPerCell[i]),&(rxyzCart[m]));
@@ -138,12 +139,16 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
 	}
       if (rxyzCart !=NULL) TIOGA_FREE(rxyzCart);
       if (donorIdCart !=NULL) TIOGA_FREE(donorIdCart);
+      if (receptorIdCart !=NULL) TIOGA_FREE(receptorIdCart);
       rxyzCart=(double *)malloc(sizeof(double)*ntotalPointsCart*3);
       donorIdCart=(int *)malloc(sizeof(int)*ntotalPointsCart);
+      receptorIdCart=(int*)malloc(sizeof(int)*ntotalPointsCart);
       m=0;
+      k=0;
       for(i=0;i<nnodes;i++)
 	if (pickedCart[i]) 
 	  {
+            receptorIdCart[k++]=i;
 	    i3=3*i;
 	    for(j=0;j<3;j++)
 	      rxyzCart[m++]=x[i3+j];

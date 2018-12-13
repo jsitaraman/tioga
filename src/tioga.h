@@ -56,7 +56,6 @@ class tioga
   parallelComm *pc_cart;
   int isym;
   int ierr;
-  int mytag;
   int myid,numprocs;
   int *sendCount;
   int *recvCount;
@@ -68,6 +67,7 @@ class tioga
   std::vector<std::unique_ptr<MeshBlock> > mblocks;
   //! Solver assigned mesh tags for the mesh blocks
   std::vector<int> mtags;
+  std::vector<int> mytag;
   //! Mesh tag to local block index lookup mapping
   std::map<int, int> tag_iblk_map;
 
@@ -220,9 +220,9 @@ class tioga
 
   void set_p4est(void)
   {
-    mytag=-mytag;
     for(int ib=0;ib < nblocks;ib++)
     {
+      mytag[ib]=-mytag[ib];
       auto& mb = mblocks[ib]; // TODO
       mb->resolutionScale=1000.0;
     }

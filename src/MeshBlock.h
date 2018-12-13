@@ -139,6 +139,7 @@ class MeshBlock
   int ninterpCart;
   int interpListCartSize;
   INTERPLIST *interpListCart; 
+  int* receptorIdCart;
 
   //
   // call back functions to use p4est to search
@@ -161,7 +162,7 @@ class MeshBlock
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
     interpList2=NULL;picked=NULL;ctag_cart=NULL;rxyzCart=NULL;donorIdCart=NULL;pickedCart=NULL;ntotalPointsCart=0;
     nreceptorCellsCart=0;ninterpCart=0;interpListCartSize=0;interpListCart=NULL;
-    resolutionScale=1.0;
+    resolutionScale=1.0; receptorIdCart=NULL;
 
     cellGID = NULL;
     iblank_reduced=NULL;

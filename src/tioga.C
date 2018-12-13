@@ -70,6 +70,7 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   auto idxit = tag_iblk_map.find(btag);
   if (idxit == tag_iblk_map.end()) {
     mtags.push_back(btag);
+    mytag.push_back(btag);
     mblocks.push_back(std::unique_ptr<MeshBlock>(new MeshBlock));
     nblocks = mblocks.size();
     iblk = nblocks - 1;
@@ -309,13 +310,15 @@ void tioga::dataUpdate_AMR(int nvar,int interptype)
 	  bid=rcvPack[k].intData[2*i];
 	  if (bid < 0) 
 	    {
-	      mblocks[-(bid+1)]->updateSolnData(rcvPack[k].intData[2*i+1],&rcvPack[k].realData[m],qblock[-(bid+1)],nvar,interptype);
+              int tmp1=rcvPack[k].intData[2*i+1];
+              int inode=mb->receptorIdCart[tmp1];
+	      mblocks[-(bid+1)]->updateSolnData(inode,&rcvPack[k].realData[m],qblock[-(bid+1)],nvar,interptype);
 	    }
 	  else
 	    {
 	      cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
-	      m+=nvar;
 	    }
+	    m+=nvar;
 	}
     }
   //

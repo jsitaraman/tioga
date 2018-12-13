@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include "codetypes.h"
 #include "MeshBlock.h"
 #include <string.h>
 
@@ -45,7 +46,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
     }
   if ((*nints)==0) return;
   //
-  (*intData)=(int *)malloc(sizeof(int)*2*(*nints));
+  (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
   icount=dcount=0;
   //
@@ -61,7 +62,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 		  inode=interpList[i].inode[m];
 		  weight=interpList[i].weights[m];
 		  if (weight < -TOL || weight > 1.0+TOL) {
-                    traced(weight);
+                    TRACED(weight);
                     printf("warning: weights are not convex 1\n");
                    }
 		  for(k=0;k<nvar;k++)
@@ -69,6 +70,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 		}
 	      (*intData)[icount++]=interpList[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
@@ -90,6 +92,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 		}
 	      (*intData)[icount++]=interpList[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
@@ -123,7 +126,7 @@ void MeshBlock::getDonorCount(int *dcount,int *fcount)
       if (!interpList[i].cancel) 
 	{
 	  (*dcount)++;
-	  (*fcount)+=interpList[i].nweights;
+	  (*fcount)+=(interpList[i].nweights+1);
 	}
     }
 }
@@ -139,7 +142,7 @@ void MeshBlock::getDonorInfo(int *receptors,int *indices,double *frac)
     {
       if (!interpList[i].cancel) 
 	{
-	  for(m=0;m<interpList[i].nweights;m++)
+	  for(m=0;m<interpList[i].nweights+1;m++)
 	    {
 	      indices[j]=interpList[i].inode[m];
 	      frac[j]=interpList[i].weights[m];
@@ -147,12 +150,23 @@ void MeshBlock::getDonorInfo(int *receptors,int *indices,double *frac)
 	    }
 	  receptors[k++]=interpList[i].receptorInfo[0];
 	  receptors[k++]=interpList[i].receptorInfo[1];
+	  receptors[k++]=interpList[i].receptorInfo[2];
 	  receptors[k++]=interpList[i].nweights;
 	}
     }
 }
-  
 
-	   
-    
-      
+void MeshBlock::getReceptorInfo(int *receptors)
+{
+  int k=0;
+  for (int i=0; i<ninterp; i++) {
+    if (interpList[i].cancel) continue;
+
+    receptors[k++] = interpList[i].receptorInfo[0];
+    receptors[k++] = interpList[i].receptorInfo[1];
+    receptors[k++] = interpList[i].receptorInfo[2];
+
+    int donID = interpList[i].inode[interpList[i].nweights];
+    receptors[k++] = cellGID[donID];
+  }
+}

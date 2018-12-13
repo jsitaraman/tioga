@@ -74,8 +74,8 @@ void buildADTrecursion(double *coord,double *adtReals,double *adtWork,int *adtIn
 	  jj=ndim*elementsAvailable[i]+j;
 	  jjp=jj+nd;
 	  //
-	  adtReals[ii]=min(adtReals[ii],coord[jj]);
-	  adtReals[iip]=max(adtReals[iip],coord[jjp]);
+	  adtReals[ii]=TIOGA_MIN(adtReals[ii],coord[jj]);
+	  adtReals[iip]=TIOGA_MAX(adtReals[iip],coord[jjp]);
 	}
     //
     // specify that the new element is the child of parent

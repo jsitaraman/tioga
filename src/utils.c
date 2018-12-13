@@ -1,4 +1,3 @@
-
 /* This file is part of the Tioga software library */
 
 /* Tioga  is a tool for overset grid assembly on parallel distributed systems */
@@ -63,9 +62,9 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
 	}
       else if (nnodes==2)
 	{
-	  dxc[0]=max(1e-3,fabs(x[3]-x[0]))*0.5;
-	  dxc[1]=max(1e-3,fabs(x[4]-x[1]))*0.5;
-	  dxc[2]=max(1e-3,fabs(x[5]-x[2]))*0.5;
+	  dxc[0]=TIOGA_MAX(1e-3,fabs(x[3]-x[0]))*0.5;
+	  dxc[1]=TIOGA_MAX(1e-3,fabs(x[4]-x[1]))*0.5;
+	  dxc[2]=TIOGA_MAX(1e-3,fabs(x[5]-x[2]))*0.5;
           return;
 	}
       else
@@ -74,7 +73,7 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
           {
            i3=3*i;
            for(j=0;j<3;j++)
-            dxc[j]=max(1e-3,fabs(x[i3+j]-x[0]));
+            dxc[j]=TIOGA_MAX(1e-3,fabs(x[i3+j]-x[0]));
           }
 	 return;
         }
@@ -137,8 +136,8 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
       //
       for(j=0;j<3;j++)
 	{
-	  xmax[j]=max(xmax[j],xd[j]);
-	  xmin[j]=min(xmin[j],xd[j]);
+	  xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
+	  xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
 	}
     }
   //
@@ -161,8 +160,8 @@ void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes)
       xc[j]+=(xd[k]*vec[k][j]);
     }
   //
-  free(aa);
-  free(eigenv);
+  TIOGA_FREE(aa);
+  TIOGA_FREE(eigenv);
 }
 /**
  check if a point is inside the
@@ -383,7 +382,33 @@ int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
   //
   return 1;
 }
-    
+  
+void getobbcoords(double xc[3],double dxc[3],double vec[3][3],double xv[8][3])
+{
+  int i,j,k,ik;
+  for(i=0;i<8;i++)
+   {
+     for(k=0;k<3;k++)
+      xv[i][k]=xc[k];
+     for(k=0;k<3;k++)
+       {
+         ik=(2*((i & (1 << k)) >> k)-1);
+         for(j=0;j<3;j++)
+           xv[i][j]+=ik*dxc[k]*vec[k][j];
+       }
+   }
+}
+
+void transform2OBB(double xv[3],double xc[3],double vec[3][3],double xd[3])
+{
+ int j,k;
+ for(j=0;j<3;j++)
+  {
+   xd[j]=0;
+   for(k=0;k<3;k++)
+      xd[j]+=(xv[k]-xc[k])*vec[j][k];
+  }
+}
 
 	  
 void writebbox(OBB *obb,int bid)
@@ -423,7 +448,51 @@ void writebbox(OBB *obb,int bid)
   fprintf(fp,"1 2 4 3 5 6 8 7\n");
   fclose(fp);
 }
-    
+void writebboxdiv(OBB *obb,int bid)
+{
+  double mapdx[3],mdx[3],mx0[3];
+  double mapdims[3];
+  int ncells,npts;
+  double xv[8][3],xc[3],xd[3];
+  int i,j,k,l,m,n;
+  int iorder[8]={1, 2, 4, 3, 5, 6, 8, 7};
+  FILE *fp;
+  char intstring[7];
+  char fname[80];
+
+  for(j=0;j<3;j++) { mapdims[j]=12; mapdx[j]=2*obb->dxc[j]/mapdims[j]; mdx[j]=0.5*mapdx[j];mx0[j]=0;}
+  ncells=mapdims[2]*mapdims[1]*mapdims[0];
+  npts=ncells*8;
+  sprintf(intstring,"%d",100000+bid);
+  sprintf(fname,"dbox%s.dat",&(intstring[1]));
+  fp=fopen(fname,"w");
+  fprintf(fp,"TITLE =\"Box file\"\n");
+  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\"\n");
+  fprintf(fp,"ZONE T=\"VOL_MIXED\",N=%d E=%d ET=BRICK, F=FEPOINT\n",npts,ncells);
+
+  getobbcoords(mx0,mdx,obb->vec,xv);
+  for(l=0;l<mapdims[2];l++)
+    for(k=0;k<mapdims[1];k++)
+      for(j=0;j<mapdims[0];j++)
+        {
+          xd[0]=-obb->dxc[0]+j*mapdx[0]+mapdx[0]*0.5;
+          xd[1]=-obb->dxc[1]+k*mapdx[1]+mapdx[1]*0.5;
+          xd[2]=-obb->dxc[2]+l*mapdx[2]+mapdx[2]*0.5;
+          for(n=0;n<3;n++)
+            {
+              xc[n]=obb->xc[n];
+              for(m=0;m<3;m++)
+                xc[n]+=(xd[m]*obb->vec[m][n]);
+            }
+          for(m=0;m<8;m++)
+            fprintf(fp,"%f %f %f\n",xc[0]+xv[m][0],xc[1]+xv[m][1],xc[2]+xv[m][2]);
+        }
+  for(l=0;l<ncells;l++) {
+    for(m=0;m<8;m++)
+      fprintf(fp,"%d ",iorder[m]+l*8);
+    fprintf(fp,"\n");
+  }
+}    
       
     
 void writePoints(double *x,int nsearch,int bid)
@@ -442,4 +511,227 @@ void writePoints(double *x,int nsearch,int bid)
     fprintf(fp,"%f %f %f\n",x[3*i],x[3*i+1],x[3*i+2]);
   fclose(fp);
 }
+/*
+ * Create a unique hash for list of coordinates with duplicates in 
+ * them. Find the rtag as max of all duplicate samples. itag contains
+ * the hash to the real point
+ */
+void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
+{
+  int NSUB=101;
+  int i,j,k,m,ij,i3,jj,kk,ll,p1,p2,indx,jmax,kmax,lmax,nsblks,jkmax;
+  double xmax[3],xmin[3],ds,dsi,dsx,dsxi,dsy,dsyi,dsz,dszi;
+  int *cft,*numpts,*ilist;
+  int nnodes=*nn;
 
+  for(j=0;j<3;j++) xmax[j]=-1E15;
+  for(j=0;j<3;j++) xmin[j]=1E15;
+  
+  for(i=0;i<nnodes;i++)
+    for(j=0;j<3;j++) {
+      xmax[j]=TIOGA_MAX(xmax[j],x[3*i+j]);
+      xmin[j]=TIOGA_MIN(xmin[j],x[3*i+j]);
+    }
+
+  ds=(xmax[0]-xmin[0]+xmax[1]-xmin[1]+xmax[2]-xmin[2])/3.0/NSUB;
+  dsi=1.0/ds;
+  for(j=0;j<3;j++) xmax[j]+=ds;
+  for(j=0;j<3;j++) xmin[j]-=ds;
+  
+  jmax=TIOGA_MIN(round((xmax[0]-xmin[0])*dsi),NSUB);
+  jmax=TIOGA_MAX(jmax,1);
+  dsx=(xmax[0]-xmin[0]+TOL)/jmax;
+  dsxi=1./dsx;    
+  kmax=TIOGA_MIN(round((xmax[1]-xmin[1])*dsi),NSUB);
+  kmax=TIOGA_MAX(kmax,1);
+  dsy=(xmax[1]-xmin[1]+TOL)/kmax;
+  dsyi=1./dsy;
+  lmax=TIOGA_MIN(round((xmax[2]-xmin[2])*dsi),NSUB);
+  lmax=TIOGA_MAX(lmax,1);
+  dsz=(xmax[2]-xmin[2]+TOL)/lmax;
+  dszi=1./dsz;
+  nsblks=jmax*kmax*lmax;
+  jkmax=jmax*kmax;
+  cft=(int *)malloc(sizeof(int)*(nsblks+1));
+  numpts=(int *)malloc(sizeof(int)*nsblks);
+  ilist=(int *)malloc(sizeof(int)*nnodes);
+
+  for(i=0;i<nsblks;i++) numpts[i]=0;
+  for(i=0;i<nnodes;i++)
+    {
+      i3=3*i;
+      jj=(int)((x[i3]-xmin[0])*dsxi);
+      kk=(int)((x[i3+1]-xmin[1])*dsyi);
+      ll=(int)((x[i3+2]-xmin[2])*dszi);
+      indx=ll*jkmax+kk*jmax+jj;
+      numpts[indx]=numpts[indx]+1;
+    }
+
+  cft[0]=0;
+  for(i=0;i<nsblks;i++) cft[i+1]=cft[i]+numpts[i];
+  
+  for(i=0;i<nnodes;i++)
+    {
+      i3=3*i;
+      jj=(int)((x[i3]-xmin[0])*dsxi);
+      kk=(int)((x[i3+1]-xmin[1])*dsyi);
+      ll=(int)((x[i3+2]-xmin[2])*dszi);
+      indx=ll*jkmax+kk*jmax+jj;
+      ilist[cft[indx]+numpts[indx]-1]=i;
+      numpts[indx]--;
+      itag[i]=i;
+    }
+  
+  for(i=0;i<nsblks;i++)
+    for(j=cft[i];j<cft[i+1];j++)
+      {
+	p1=ilist[j];
+	for(k=j+1;k<cft[i+1];k++)
+	  {
+	    p2=ilist[k];
+	    if ( fabs(x[3*p1  ]-x[3*p2  ])+
+		 fabs(x[3*p1+1]-x[3*p2+1])+
+		 fabs(x[3*p1+2]-x[3*p2+2]) < TOL &&
+                 meshtag[p1]==meshtag[p2])
+	      {
+		if (p1 > p2) {
+		  rtag[p2]=TIOGA_MAX(rtag[p1],rtag[p2]);
+		  itag[p1]=p2;
+		}
+		else {
+		  rtag[p1]=TIOGA_MAX(rtag[p1],rtag[p2]);
+		  itag[p2]=p1;
+		}
+	      }
+	  }
+      }
+  /*
+  m=0;
+  for(i=0;i<nnodes;i++)
+    if (itag[i]==i+1) {
+     m++;
+   }
+  */
+  TIOGA_FREE(ilist);
+  TIOGA_FREE(cft);
+  TIOGA_FREE(numpts);
+}
+//
+// modify ADT builder to remove common nodes
+//
+void uniqNodesTree(double *coord,
+		   int *itag,double *rtag,int *meshtag,
+		   int *elementsAvailable,
+		   int ndim, int nav)
+{  
+  int nd=ndim;  
+  double coordmid;
+  int i,j,ibox;
+  int p1,p2;
+  int *tmpint;
+  int npts[8],iv[3],cft[9];
+  double xmax[3],xmin[3],xmid[3],dx[3],xp[3];
+  int icheck=1;
+  //
+  // if there are more than 10 elements divide the tree
+  //
+  if (nav > 20) {
+    //
+    // find the bound of the boxes
+    //
+    icheck=0;
+    xmin[0]=xmin[1]=xmin[2]=BIGVALUE;
+    xmax[0]=xmax[1]=xmax[2]=-BIGVALUE;
+    for(i=0;i<nav;i++)
+      for(j=0;j<nd;j++)
+	{
+	  xmin[j]=TIOGA_MIN(xmin[j],coord[ndim*elementsAvailable[i]+j]);
+	  xmax[j]=TIOGA_MAX(xmax[j],coord[ndim*elementsAvailable[i]+j]);
+	}
+    for(j=0;j<nd;j++) { 
+      xmid[j]=(xmax[j]+xmin[j])*0.5;
+      dx[j]=(xmax[j]-xmin[j])*0.5+TOL;
+    }
+    for(j=0;j<8;j++) npts[j]=0;
+    for(i=0;i<nav;i++)
+      {
+	for(j=0;j<3;j++) {
+	  xp[j]=coord[ndim*elementsAvailable[i]+j]-xmid[j];
+	  iv[j]=floor(xp[j]/dx[j])+1;
+	}
+	ibox= 4*iv[0]+2*iv[1]+iv[2];
+	npts[ibox]++;
+      }
+    for(j=0;j<8;j++) if(npts[j]==nav) icheck=1;
+    if (!icheck) {
+    cft[0]=0;
+    for(j=0;j<8;j++)
+      cft[j+1]=cft[j]+npts[j];
+    tmpint=(int *)malloc(sizeof(int)*nav);
+    for(i=0;i<nav;i++)
+      {
+	for(j=0;j<3;j++){
+	  xp[j]=coord[ndim*elementsAvailable[i]+j]-xmid[j];
+	  iv[j]=floor(xp[j]/dx[j])+1;
+	}
+	ibox= 4*iv[0]+2*iv[1]+iv[2];
+	npts[ibox]=npts[ibox]-1;
+	tmpint[npts[ibox]+cft[ibox]]=elementsAvailable[i];
+      }
+    for(i=0;i<nav;i++)
+      elementsAvailable[i]=tmpint[i];
+    TIOGA_FREE(tmpint);
+    for(j=0;j<8;j++)
+      if (cft[j+1] > cft[j])
+        uniqNodesTree(coord,itag,rtag,meshtag,&(elementsAvailable[cft[j]]),
+	    ndim,cft[j+1]-cft[j]);
+      }
+  }
+  if (icheck) {
+    for(i=0;i<nav;i++)
+      {
+	p1=elementsAvailable[i];
+	for(j=i+1;j<nav;j++)
+	  {
+	    p2=elementsAvailable[j];	    
+	    if (fabs(coord[3*p1  ]-coord[3*p2  ])+
+		fabs(coord[3*p1+1]-coord[3*p2+1])+
+		fabs(coord[3*p1+2]-coord[3*p2+2]) < TOL &&
+		meshtag[p1]==meshtag[p2])
+	      {
+		if (p1 > p2) {
+		  rtag[p2]=TIOGA_MAX(rtag[p1],rtag[p2]);
+		  itag[p1]=p2;
+		}
+		else {
+		  rtag[p1]=TIOGA_MAX(rtag[p1],rtag[p2]);
+		  itag[p2]=p1;
+		}
+	      }
+	  }
+      }
+  }
+}
+/*
+ * Create a unique hash for list of coordinates with duplicates in 
+ * them. Find the rtag as max of all duplicate samples. itag contains
+ * the hash to the real point
+ */
+void uniquenodes_octree(double *x,int *meshtag,double *rtag,int *itag,
+		     int *nn)
+{
+  int nelem=*nn;
+  int *elementsAvailable;
+  int i;
+
+  elementsAvailable=(int *)malloc(sizeof(int)*nelem);
+  for(i=0;i<nelem;i++)
+    {
+     elementsAvailable[i]=i;
+     itag[i]=i;
+    }
+
+  uniqNodesTree(x,itag,rtag,meshtag,elementsAvailable,3,nelem);
+
+  TIOGA_FREE(elementsAvailable);
+}

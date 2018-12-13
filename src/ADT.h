@@ -17,11 +17,19 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-/** 
- * Generic Alternating Digital Tree For Search Operations
- */
+
+#ifndef ADT_H
+#define ADT_H
+
+#include <cstdlib>
+#include <memory>
+
 // forward declaration for instantiation
 class MeshBlock; 
+
+/**
+ * Generic Alternating Digital Tree For Search Operations
+ */
 class ADT
 {
   private :
@@ -57,3 +65,5 @@ class ADT
   void searchADT(MeshBlock *mb,int *cellindx,double *xsearch);
 };
 
+
+#endif /* ADT_H */

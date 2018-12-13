@@ -6,9 +6,9 @@ SHELL       = /bin/sh
 ARCH        = LINUX
 CC          = gcc
 CLINKER     = $(CC)
-F77         = mpif90
+F77         = ~/tests/openmpi/gnu/bin/mpif90
 FLINKER     = $(F77)
-F90         = mpif90
+F90         = ~/tests/openmpi/gnu/bin/mpif90
 F90LINKER   = $(F90)      
 CCC         = gcc
 CCLINKER    = $(CCC)
@@ -22,8 +22,8 @@ srcdir= $(PWD)
 .SUFFIXES:	.cc .C .f90
 CFLAGS	  = $(OPTFLAGS) 
 CCFLAGS	  = $(CFLAGS)
-FFLAGS	  = $(OPTFLAGS) -r8 -traceback -CB
-#FFLAGS	  = $(OPTFLAGS) -fdefault-real-8 -ffree-line-length-132 -fcheck=bounds -g
+#FFLAGS	  = $(OPTFLAGS) -r8 -traceback -CB
+FFLAGS	  = $(OPTFLAGS) -fdefault-real-8 -ffree-line-length-132 -fbounds-check -g
 LDFLAGS   =  
 LIBS	  = -lm
 ALL_EXECS = buildGrid 

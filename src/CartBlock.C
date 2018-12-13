@@ -65,23 +65,24 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       nintold=(*nints);
       nrealold=(*nreals);
       if (nintold > 0) {
-      tmpint=(int *)malloc(sizeof(int)*3*(*nints));
-      tmpreal=(double *)malloc(sizeof(double)*(*nreals));
-      for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
-      for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
-
-      free(*intData);
-      free(*realData);
+       tmpint=(int *)malloc(sizeof(int)*3*(*nints));
+       tmpreal=(double *)malloc(sizeof(double)*(*nreals));
+       for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
+       for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
+       //
+       TIOGA_FREE((*intData));
+       TIOGA_FREE((*realData)); // didnt free this before ??
+       //  
       }
       (*nints)+=interpCount;
       (*nreals)+=(interpCount*nvar);
       (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
       (*realData)=(double *)malloc(sizeof(double)*(*nreals));
       if (nintold > 0) {
-      for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
-      for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];      
-      free(tmpint);
-      free(tmpreal);
+       for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
+       for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];      
+       TIOGA_FREE(tmpint);
+       TIOGA_FREE(tmpreal);
       }
       listptr=interpList;
       icount=3*nintold;
@@ -96,7 +97,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 			    pdegree,dims[0],dims[1],dims[2],nf,
 			    xlo,dx,&qnode[ploc],index,xtmp);
 	  (*intData)[icount++]=listptr->receptorInfo[0];
-	  (*intData)[icount++]=-1;
+	  (*intData)[icount++]=-1-listptr->receptorInfo[2];
 	  (*intData)[icount++]=listptr->receptorInfo[1];	  
 	  for(n=0;n<nvar;n++)
            {
@@ -112,9 +113,9 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 	    (*realData)[dcount++]=qq[n];
 	  listptr=listptr->next;
 	}
-      free(xtmp);
-      free(index);
-      free(qq);
+      TIOGA_FREE(xtmp);
+      TIOGA_FREE(index);
+      TIOGA_FREE(qq);
     }
 }
 
@@ -160,14 +161,14 @@ void CartBlock::clearLists(void)
   int i;
   if (donorList) {
   for(i=0;i<ndof;i++) { deallocateLinkList(donorList[i]); donorList[i]=NULL;}
-  free(donorList);
+  TIOGA_FREE(donorList);
   }
   deallocateLinkList4(interpList);
   interpList=NULL;
 }
 
 
-void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
+void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,double *xtmp)
 {
   int i,n;
   int ix[3];
@@ -201,23 +202,23 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
          }
        }
       // if (!(ix[n] >=0 && ix[n] < dims[n]) && myid==77) {
-      //  tracei(procid);
-      //  tracei(global_id);
-      //  tracei(local_id);
-      //  tracei(remoteid);
-      //  tracei(myid);
-      //  traced(xtmp[0]);
-      //  traced(xtmp[1]);
-      //  traced(xtmp[2]);
-      //  traced(xlo[0]);
-      //  traced(xlo[1]);
-      //  traced(xlo[2]);
-      //  traced(dx[0]);
-      //  traced(dx[1]);
-      //  traced(dx[2]);
-      //  tracei(ix[n]);
-      //  tracei(n);
-      //  tracei(dims[n]);
+      //  TRACEI(procid);
+      //  TRACEI(global_id);
+      //  TRACEI(local_id);
+      //  TRACEI(remoteid);
+      //  TRACEI(myid);
+      //  TRACED(xtmp[0]);
+      //  TRACED(xtmp[1]);
+      //  TRACED(xtmp[2]);
+      //  TRACED(xlo[0]);
+      //  TRACED(xlo[1]);
+      //  TRACED(xlo[2]);
+      //  TRACED(dx[0]);
+      //  TRACED(dx[1]);
+      //  TRACED(dx[2]);
+      //  TRACEI(ix[n]);
+      //  TRACEI(n);
+      //  TRACEI(dims[n]);
       //  printf("--------------------------\n");
       // }
      assert((ix[n] >=0 && ix[n] < dims[n]));
@@ -229,10 +230,10 @@ void CartBlock::insertInInterpList(int procid,int remoteid,double *xtmp)
   listptr->inode[1]=ix[1];
   listptr->inode[2]=ix[2];
   donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
-  free(rst);
+  TIOGA_FREE(rst);
 }
   
-void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes)
+void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid, double cellRes)
 {
   DONORLIST *temp1;
   int ijklmn[6];
@@ -249,13 +250,13 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
            ijklmn[5]*(pdegree+1)*(pdegree+1)+
            ijklmn[4]*(pdegree+1)+ijklmn[3];
   if (!(pointid >= 0 && pointid < ndof)) {
-    tracei(index);
-    tracei(nf);
-    tracei(pdegree);
-    tracei(dims[0]);
-    tracei(dims[1]);
-    tracei(dims[2]);
-    tracei(qstride);
+    TRACEI(index);
+    TRACEI(nf);
+    TRACEI(pdegree);
+    TRACEI(dims[0]);
+    TRACEI(dims[1]);
+    TRACEI(dims[2]);
+    TRACEI(qstride);
     printf("%d %d %d %d %d %d\n",ijklmn[0],ijklmn[1],ijklmn[2],
 	   ijklmn[3],ijklmn[4],ijklmn[5]);
   }
@@ -264,6 +265,7 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   temp1->donorData[0]=senderid;
   temp1->donorData[1]=meshtagdonor;
   temp1->donorData[2]=remoteid;
+  temp1->donorData[3]=remoteblockid;
   temp1->donorRes=cellRes;
   temp1->cancel=0;
   insertInList(&(donorList[pointid]),temp1);
@@ -464,9 +466,9 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
         }
   */
 
-  if (iflag) free(iflag);
-  if (xtmp) free(xtmp);
-  if (index) free(index);
+  if (iflag) TIOGA_FREE(iflag);
+  if (xtmp)  TIOGA_FREE(xtmp);
+  if (index) TIOGA_FREE(index);
   // fclose(fp);
 }
 			      
@@ -495,6 +497,7 @@ void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
 		      cancelledData[m++]=temp->donorData[0];
 		      cancelledData[m++]=1;
 		      cancelledData[m++]=temp->donorData[2];
+		      cancelledData[m++]=temp->donorData[3];
 		    }
 	            temp=temp->next;
 		  }
@@ -560,8 +563,8 @@ void CartBlock::writeCellFile(int bid)
 	{
 	  ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+
 	    (j+nf)*(dims[0]+2*nf)+(i+nf);
-          ibmin=min(ibmin,ibl[ibindex]);
-          ibmax=max(ibmax,ibl[ibindex]);
+          ibmin=TIOGA_MIN(ibmin,ibl[ibindex]);
+          ibmax=TIOGA_MAX(ibmax,ibl[ibindex]);
 	  fprintf(fp,"%d\n", ibl[ibindex]);
 	}
 

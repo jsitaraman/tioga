@@ -17,7 +17,17 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-//#include "codetypes.h"
+
+#ifndef CARTBLOCK_H
+#define CARTBLOCK_H
+
+#include <cstdlib>
+#include "codetypes.h"
+
+struct INTERPLIST2;
+struct DONORLIST;
+struct HOLEMAP;
+
 class CartGrid;
 class CartBlock
 {
@@ -54,9 +64,11 @@ class CartBlock
   void update(double *qval,int index,int nq);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
-  void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,double cellRes);
-  void insertInInterpList(int procid,int remoteid,double *xtmp);
+  void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid,double cellRes);
+  void insertInInterpList(int procid,int remoteid,int remoteblockid,double *xtmp);
   void writeCellFile(int bid);
   void clearLists(void);
   void initializeLists(void);
 };
+
+#endif /* CARTBLOCK_H */

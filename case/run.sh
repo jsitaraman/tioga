@@ -1,4 +1,6 @@
 cd grid;
-mpirun -np $1 ../../gridGen/buildGrid
+p2=`expr $1 \* 2`
+echo $p2
+mpirun -np $p2 ../../build/gridGen/buildGrid
 cd ..
-mpirun -np $1 ../driver/tioga.exe
+mpirun -np $1 ../build/driver/tioga.exe

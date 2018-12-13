@@ -17,11 +17,14 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include "codetypes.h"
 #include "MeshBlock.h"
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
   void writebbox(OBB *obb,int bid);
   void writePoints(double *x,int nsearch,int bid);
+  void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn);
+  void uniquenodes_octree(double *x,int *meshtag,double *rtag,int *itag,int *nn);
 }
 
 
@@ -32,19 +35,25 @@ void MeshBlock::search(void)
   int iptr,isum,nvert;
   OBB *obq;
   int *icell;
+  int *itag;
   int cell_count; 
   int cellindex;
   double xd[3];
   double dxc[3];
   double xmin[3];
   double xmax[3];
+  int *dId;
   //
   // form the bounding box of the 
   // query points
   //
-
   if (nsearch == 0) {
     donorCount=0;
+    return;
+  }
+ 
+  if (uniform_hex) {
+    search_uniform_hex();
     return;
   }
 
@@ -83,8 +92,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 		  xd[j]=0;
 		  for(k=0;k<3;k++)
 		    xd[j]+=(x[i3+k]-obq->xc[k])*obq->vec[j][k];
-		  xmin[j]=min(xmin[j],xd[j]);
-		  xmax[j]=max(xmax[j],xd[j]);
+		  xmin[j]=TIOGA_MIN(xmin[j],xd[j]);
+		  xmax[j]=TIOGA_MAX(xmax[j],xd[j]);
 		}
 	      for(j=0;j<3;j++)
 		{
@@ -115,8 +124,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   // ADT
   //
 
-  if (elementBbox) free(elementBbox);
-  if (elementList) free(elementList);
+  if (elementBbox) TIOGA_FREE(elementBbox);
+  if (elementList) TIOGA_FREE(elementList);
   elementBbox=(double *)malloc(sizeof(double)*cell_count*6);
   elementList=(int *)malloc(sizeof(int)*cell_count);
   //
@@ -145,8 +154,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	  i3=3*(vconn[n][nvert*i+m]-BASE);
 	  for(j=0;j<3;j++)
 	    {
-	      xmin[j]=min(xmin[j],x[i3+j]);
-	      xmax[j]=max(xmax[j],x[i3+j]);
+	      xmin[j]=TIOGA_MIN(xmin[j],x[i3+j]);
+	      xmax[j]=TIOGA_MAX(xmax[j],x[i3+j]);
 	    }
 	}
       //
@@ -176,20 +185,102 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   adt->buildADT(ndim,cell_count,elementBbox);
   //
-  if (donorId) free(donorId);
+  if (donorId) TIOGA_FREE(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
+  if (xtag) TIOGA_FREE(xtag);
+  xtag=(int *)malloc(sizeof(int)*nsearch);
+  //
+  // create a unique hash
+  //
+  uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
   //
   donorCount=0;
-  ipoint=0;
+  ipoint=0; 
+  dId=(int *) malloc(sizeof(int) *2);
   for(i=0;i<nsearch;i++)
     {
-      adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
+     if (xtag[i]==i) {
+	//adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
+	adt->searchADT(this,dId,&(xsearch[3*i]));
+        donorId[i]=dId[0];
+      }
+      else {
+	donorId[i]=donorId[xtag[i]];
+      }
+      if (donorId[i] > -1) {
+	  donorCount++;
+	}
+       ipoint+=3;
+     }
+  TIOGA_FREE(dId);
+  TIOGA_FREE(icell);
+  TIOGA_FREE(obq);
+}
+
+void MeshBlock::search_uniform_hex(void)
+{
+  if (donorId) free(donorId);
+  donorId=(int*)malloc(sizeof(int)*nsearch);
+  if (xtag) free(xtag);
+  xtag=(int *)malloc(sizeof(int)*nsearch);
+  //
+  uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
+  //                                                                                                          
+  int donorCount=0;
+  int *dId=(int *) malloc(sizeof(int) *2);
+  double xvec[8][3];
+  //
+  // corners of a cube with of side 4*TOL
+  // with origin as the center
+  // 
+  for(int jj=0;jj<8;jj++)
+    for(int k=0;k<3;k++) xvec[jj][k]=(2*((jj & (1 << k)) >> k)-1)*2*TOL;
+  //
+  double xd[3];
+  int dID[2];
+  for(int i=0;i<nsearch;i++)
+    {
+      int idx[3];
+      if (xtag[i]==i) {
+	for(int j=0;j<3;j++)
+	  {
+	    xd[j]=0;
+	    for(int k=0;k<3;k++)
+	      xd[j]+=(xsearch[3*i+k]-xlow[k])*obh->vec[j][k];
+            idx[j]=xd[j]/dx[j];
+	  }
+        if (xd[0] > -TOL && xd[0] < idims[0]*dx[0]+TOL &&
+            xd[1] > -TOL && xd[1] < idims[1]*dx[1]+TOL &&
+            xd[2] > -TOL && xd[2] < idims[2]*dx[2]+TOL) 
+	   {
+            for(int k=0;k<3;k++) if (idx[k]==idims[k]) idx[k]--;
+            dID[0]=uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]];
+            dID[1]=(dID[0] > -1) ? (cellRes[dID[0]]==BIGVALUE) : 1; 
+            for(int jj=0;jj<8 && (dId[0]==-1 || dID[1]) ;jj++)
+             {
+              for(int k=0;k<3;k++)
+	       {
+                idx[k]=(xd[k]+xvec[jj][k])/dx[k];
+                if (idx[k]==idims[k]) idx[k]--;
+               }
+	        int dtest=uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]];
+                dID[1]=(dtest > -1) ? (cellRes[dtest]==BIGVALUE) : 1; 
+                dID[0]=(dID[0] == -1) ? dtest : (!dID[1] ? dtest : dID[0]);
+              }
+             donorId[i]=dID[0]; 
+            }
+       else
+          {
+           donorId[i]=-1;
+          }
+      }
+     else {
+       donorId[i]=donorId[xtag[i]];
+     }
       if (donorId[i] > -1) {
 	donorCount++;
       }
       ipoint+=3;
     }
-  //
-  free(icell);
-  free(obq);
+  free(dId);
 }

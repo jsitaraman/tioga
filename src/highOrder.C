@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include "codetypes.h"
 #include "MeshBlock.h"
 
 #define ROW 0
@@ -29,6 +30,61 @@ extern "C"
   int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
 
+void MeshBlock::getCellIblanks2(void)
+{
+  int i;
+  int n,nvert,m;
+  int icell;
+  int inode[8];
+  int ncount,flag;
+  int verbose;
+
+  icell=0;
+  if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
+  for(n=0;n<ntypes;n++)
+    {
+      nvert=nv[n];
+      for(i=0;i<nc[n];i++)
+        {
+          flag=1;
+          iblank_cell[icell]=1;
+          verbose=0;
+          //if (myid==763 && icell==7975) {
+          // verbose=1;
+          //}
+          ncount=0;
+          for(m=0;m<nvert && flag;m++)
+            {
+              inode[m]=vconn[n][nvert*i+m]-BASE;
+              if (verbose) {
+                TRACEI(m);
+                TRACEI(inode[m]);
+                TRACEI(iblank[inode[m]]);
+              }
+              if (iblank[inode[m]]==0)
+                {
+                  iblank_cell[icell]=0;
+                  flag=0;
+                }
+              ncount=ncount+(iblank[inode[m]]==-1);
+            }
+          if (verbose) {
+            TRACEI(icell);
+            TRACEI(ncount);
+            TRACEI(nvert);
+	  }
+          if (flag)
+            {
+              if (ncount ==nvert) iblank_cell[icell]=-1;
+	      //            if (ncount > 0)  iblank_cell[icell]=-1;
+	      //            if (ncount >= nvert/2) iblank_cell[icell]=-1;
+            }
+          icell++;
+        }
+    }
+}
+
+
 void MeshBlock::getCellIblanks(void)
 {
   int i;
@@ -37,6 +93,16 @@ void MeshBlock::getCellIblanks(void)
   int inode[8];
   int ncount,flag;
   int verbose;
+  int *ibl;
+  
+  if (iblank_reduced) 
+    {
+      ibl=iblank_reduced;
+    }
+  else 
+    {
+      ibl=iblank;
+    }
 
   icell=0;
   if (iblank_cell==NULL) iblank_cell=(int *)malloc(sizeof(int)*ncells);
@@ -56,25 +122,25 @@ void MeshBlock::getCellIblanks(void)
 	    {
 	      inode[m]=vconn[n][nvert*i+m]-BASE;
 	      if (verbose) {
-                tracei(m);
-                tracei(inode[m]);
-                tracei(iblank[inode[m]]);
+                TRACEI(m);
+                TRACEI(inode[m]);
+                TRACEI(ibl[inode[m]]);
               }
-	      if (iblank[inode[m]]==0) 
+	      if (ibl[inode[m]]==-1) 
 		{
-		  iblank_cell[icell]=0;
+		  iblank_cell[icell]=-1;
 		  flag=0;
 		}
-	      ncount=ncount+(iblank[inode[m]]==-1);
+	      ncount=ncount+(ibl[inode[m]]==0);
 	    }
 	  if (verbose) {
-	    tracei(icell);
-            tracei(ncount);
-            tracei(nvert);
+	    TRACEI(icell);
+            TRACEI(ncount);
+            TRACEI(nvert);
            } 
 	  if (flag) 
 	    {
-	      if (ncount ==nvert) iblank_cell[icell]=-1;
+	      if (ncount ==nvert) iblank_cell[icell]=0;
 //	      if (ncount > 0)  iblank_cell[icell]=-1;
 //	      if (ncount >= nvert/2) iblank_cell[icell]=-1;
 	    }
@@ -145,7 +211,7 @@ void MeshBlock::getInternalNodes(void)
   //
   nreceptorCells=0;
   //
-  if (ctag!=NULL) free(ctag);
+  if (ctag!=NULL) TIOGA_FREE(ctag);
   ctag=(int *)malloc(sizeof(int)*ncells);
   //
   for(i=0;i<ncells;i++)
@@ -153,7 +219,7 @@ void MeshBlock::getInternalNodes(void)
   //
   if (ihigh) 
     {
-      if (pointsPerCell!=NULL) free(pointsPerCell);
+      if (pointsPerCell!=NULL) TIOGA_FREE(pointsPerCell);
       pointsPerCell=(int *)malloc(sizeof(int)*nreceptorCells);
       //
       maxPointsPerCell=0;
@@ -163,10 +229,10 @@ void MeshBlock::getInternalNodes(void)
 	{
 	  get_nodes_per_cell(&(ctag[i]),&(pointsPerCell[i]));
 	  ntotalPoints+=pointsPerCell[i];
-	  maxPointsPerCell=max(maxPointsPerCell,pointsPerCell[i]);
+	  maxPointsPerCell=TIOGA_MAX(maxPointsPerCell,pointsPerCell[i]);
       }
       //
-      if (rxyz !=NULL) free(rxyz);
+      if (rxyz !=NULL) TIOGA_FREE(rxyz);
       //printf("getInternalNodes : %d %d\n",myid,ntotalPoints);
       rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
       //
@@ -180,7 +246,7 @@ void MeshBlock::getInternalNodes(void)
   else
     {
       ntotalPoints=0;      
-      if (picked !=NULL) free(picked);
+      if (picked !=NULL) TIOGA_FREE(picked);
       picked=(int *) malloc(sizeof(int)*nnodes);
       for(i=0;i<nnodes;i++) {
         picked[i]=0;
@@ -190,7 +256,7 @@ void MeshBlock::getInternalNodes(void)
          }
       }
   
-      if (rxyz !=NULL) free(rxyz);
+      if (rxyz !=NULL) TIOGA_FREE(rxyz);
       rxyz=(double *)malloc(sizeof(double)*ntotalPoints*3);
       m=0;
       for(i=0;i<nnodes;i++)
@@ -230,7 +296,7 @@ void MeshBlock::getExtraQueryPoints(OBB *obc,
 	{
 	  inode[*nints]=i;
 	  (*nints)++;
-	  (*nreals)+=3;
+	  (*nreals)+=4;
 
 	}
     }
@@ -246,9 +312,10 @@ void MeshBlock::getExtraQueryPoints(OBB *obc,
       (*realData)[m++]=rxyz[i3];
       (*realData)[m++]=rxyz[i3+1];
       (*realData)[m++]=rxyz[i3+2];
+      (*realData)[m++]=BIGVALUE;
     }
   //
-  free(inode);
+  TIOGA_FREE(inode);
 }  
 
 void MeshBlock::processPointDonors(void)
@@ -274,10 +341,10 @@ void MeshBlock::processPointDonors(void)
   if (interpList2) {
     for(i=0;i<interp2ListSize;i++)
       {
-	if (interpList2[i].inode) free(interpList2[i].inode);
-	if (interpList2[i].weights) free(interpList2[i].weights);
+	if (interpList2[i].inode) TIOGA_FREE(interpList2[i].inode);
+	if (interpList2[i].weights) TIOGA_FREE(interpList2[i].weights);
       }
-    free(interpList2);
+    TIOGA_FREE(interpList2);
   } 
   interp2ListSize = ninterp2;
   interpList2=(INTERPLIST *)malloc(sizeof(INTERPLIST)*interp2ListSize);
@@ -307,8 +374,9 @@ void MeshBlock::processPointDonors(void)
 	      interpList2[m].weights=(double *)malloc(sizeof(double)*interpList2[m].nweights);
 	      for(j=0;j<interpList2[m].nweights;j++)
 		interpList2[m].weights[j]=frac[j];
-	      interpList2[m].receptorInfo[0]=isearch[2*i];
-	      interpList2[m].receptorInfo[1]=isearch[2*i+1];
+	      interpList2[m].receptorInfo[0]=isearch[3*i];
+	      interpList2[m].receptorInfo[1]=isearch[3*i+1];
+	      interpList2[m].receptorInfo[2]=isearch[3*i+2];
 	      m++;
 	    }
 	  else
@@ -340,13 +408,14 @@ void MeshBlock::processPointDonors(void)
 	      computeNodalWeights(xv,xp,frac2,nvert);
 	      for(j=0;j<nvert;j++)
 		interpList2[m].weights[j]=frac2[j];
-	      interpList2[m].receptorInfo[0]=isearch[2*i];
-	      interpList2[m].receptorInfo[1]=isearch[2*i+1];
+	      interpList2[m].receptorInfo[0]=isearch[3*i];
+	      interpList2[m].receptorInfo[1]=isearch[3*i+1];
+	      interpList2[m].receptorInfo[2]=isearch[3*i+2];
 	      m++;
 	    }
 	}
     }
-  free(frac);
+  TIOGA_FREE(frac);
 }
 
 void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **intData,
@@ -365,11 +434,11 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
   (*nints)=ninterp2;
   (*nreals)=ninterp2*nvar;
   if ((*nints)==0) {
-	free(qq);
+	TIOGA_FREE(qq);
 	return;
   }
   //
-  (*intData)=(int *)malloc(sizeof(int)*2*(*nints));
+  (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
   icount=dcount=0;
   //
@@ -385,7 +454,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		{
 		  weight=interpList2[i].weights[m];
 		  //if (weight < 0 || weight > 1.0) {
-		  //	traced(weight);
+		  //	TRACED(weight);
 		  //	printf("warning: weights are not convex\n");
 		  //    }
 		  for(k=0;k<nvar;k++)
@@ -393,6 +462,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		}
 	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList2[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
@@ -410,7 +480,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		  inode=interpList2[i].inode[m];
 		  weight=interpList2[i].weights[m];
 		  if (weight < -TOL || weight > 1.0+TOL) {
-                    traced(weight);
+                    TRACED(weight);
                     printf("warning: weights are not convex 2\n");
                    }
 		  for(k=0;k<nvar;k++)
@@ -418,6 +488,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		}
 	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList2[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
@@ -436,6 +507,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
 		}
 	      (*intData)[icount++]=interpList2[i].receptorInfo[0];
 	      (*intData)[icount++]=interpList2[i].receptorInfo[1];
+	      (*intData)[icount++]=interpList2[i].receptorInfo[2];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }
@@ -444,7 +516,7 @@ void MeshBlock::getInterpolatedSolutionAtPoints(int *nints,int *nreals,int **int
   //
   // no column-wise storage for high-order data
   //
-  free(qq);
+  TIOGA_FREE(qq);
 }
 	
 void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)  
@@ -477,7 +549,7 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
 	    }
 	  m+=(pointsPerCell[i]*nvar);
 	}
-      free(qout);
+      TIOGA_FREE(qout);
     }
   else
     {

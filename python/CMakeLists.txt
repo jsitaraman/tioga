@@ -2,8 +2,8 @@
 find_package(PythonInterp 2.7 REQUIRED)
 find_package(PythonLibs 2.7 REQUIRED)
 
-execute_process(COMMAND python -c "import mpi4py; print( mpi4py.get_include() )"
-  OUTPUT_VARIABLE mpi4py_inc OUTPUT_STRIP_TRAILING_WHITESPACE)
+# execute_process(COMMAND python -c "import mpi4py; print( mpi4py.get_include() )"
+#   OUTPUT_VARIABLE mpi4py_inc OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND python -c "import numpy; print( numpy.get_include() )"
   OUTPUT_VARIABLE numpy_inc OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "mpi4py: ${mpi4py_inc}")

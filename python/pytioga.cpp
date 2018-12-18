@@ -221,6 +221,10 @@ PyObject* PyTioga_register_data(PyTioga* self, PyObject *args){
   } 
 
   if(cell_vol and node_vol){
+
+    for(int ii=0; ii<self->nv; ii++) node_vol[ii]*=3.0;
+    for(int ii=0; ii<count8/8; ii++) cell_vol[ii]*=3.0;
+
     self->tg->setResolutions(node_vol, cell_vol);
   }
 

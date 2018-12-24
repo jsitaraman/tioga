@@ -25,6 +25,15 @@ elseif (${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -r8 -double_size 128")
 endif()
 
+if (APPLE)
+  set(CMAKE_MACOSX_RPATH ON)
+endif()
+
+if (BUILD_SHARED_LIBS)
+  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+endif()
+
 # Always build libtioga
 add_subdirectory(src)
 

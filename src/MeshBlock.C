@@ -1183,6 +1183,7 @@ MeshBlock::~MeshBlock()
   //  if (iblank_cell) TIOGA_FREE(iblank_cell);
   // }
   if (obb) TIOGA_FREE(obb);
+  if (obh) TIOGA_FREE(obh);
   if (isearch) TIOGA_FREE(isearch);
   if (xsearch) TIOGA_FREE(xsearch);
   if (res_search) TIOGA_FREE(res_search);
@@ -1202,6 +1203,9 @@ MeshBlock::~MeshBlock()
   if (tagsearch) TIOGA_FREE(tagsearch);
   if (donorId) TIOGA_FREE(donorId);
   if (receptorIdCart) TIOGA_FREE(receptorIdCart);
+  if (icft) TIOGA_FREE(icft);
+  if (mapmask) TIOGA_FREE(mapmask);
+  if (uindx) TIOGA_FREE(uindx);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

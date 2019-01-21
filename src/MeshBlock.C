@@ -1206,6 +1206,7 @@ MeshBlock::~MeshBlock()
   if (icft) TIOGA_FREE(icft);
   if (mapmask) TIOGA_FREE(mapmask);
   if (uindx) TIOGA_FREE(uindx);
+  if (invmap) TIOGA_FREE(invmap);
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

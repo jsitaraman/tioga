@@ -67,7 +67,8 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
 {
   if (nnodes > 0) nblocks=1;
 
-  mb->resolutionScale=1.0 - btag*1.0e-10;
+  // mb->resolutionScale=1.0 + btag*1.0e-10;
+  // mb->resolutionScale=1.0 - (btag-1)*5.0e-1;
   // mb->resolutionScale=1000.0;
 
   mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn);
@@ -99,7 +100,7 @@ void tioga::performConnectivity(void)
   mb->getCellIblanks();
   // mb->writeCellFile(myid);
   //}
-  //mb->writeOutput(myid);
+  // mb->writeOutput(myid);
   //tracei(myid);
 }
 
@@ -260,6 +261,7 @@ void tioga::dataUpdate(int nvar,double *q,int interptype)
   int *sndMap,*rcvMap;
   PACKET *sndPack,*rcvPack;
   int *icount,*dcount;
+
   //
   // initialize send and recv packets
   //
@@ -322,6 +324,7 @@ void tioga::dataUpdate(int nvar,double *q,int interptype)
 	  m+=nvar;
 	}
     }
+
   //
   // release all memory
   //

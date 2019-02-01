@@ -119,7 +119,7 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
     {
       iblank[i]=1;
       verbose=0;
-      //if (myid==553 && i==29670) verbose=1;
+      // if (myid==i && i==21013) verbose=1;
       if (verbose) tracei(i);
       if (donorList[i]==NULL)
 	{
@@ -194,17 +194,17 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
     {
       nvert=nv[n];
       for(i=0;i<nc[n];i++)
-	{
-	  for(m=0;m<nvert;m++)
-	    {
-	      if (mtag[(vconn[n][nvert*i+m]-BASE)]==1)
-		{
-		  for(mm=0;mm<nvert;mm++)
-		    if (m!=mm && mtag[vconn[n][nvert*i+mm]-BASE] !=1) 
-	                 mtag1[vconn[n][nvert*i+mm]-BASE] = 1;
-		}
-	    }
-	}
+ 	{
+ 	  for(m=0;m<nvert;m++)
+ 	    {
+ 	      if (mtag[(vconn[n][nvert*i+m]-BASE)]==1)
+ 		{
+ 		  for(mm=0;mm<nvert;mm++)
+ 		    if (m!=mm && mtag[vconn[n][nvert*i+mm]-BASE] !=1) 
+ 	                 mtag1[vconn[n][nvert*i+mm]-BASE] = 1;
+ 		}
+ 	    }
+ 	}
     }
    for(i=0;i<nnodes;i++) mtag[i]=mtag1[i];
   }
@@ -219,33 +219,33 @@ void MeshBlock::processDonors(HOLEMAP *holemap, int nmesh, int **donorRecords,do
   for(i=0;i<nnodes;i++)
     {
       verbose=0;
-      //if (myid==553 && i==29670) verbose=1;
+      // if (myid==1 && i==21013) verbose=1;
       if (verbose) {
          tracei(i);
          tracei(iblank[i]);
       }
       if (donorList[i]!=NULL && iblank[i]!=0)
-	{ 
-	  temp=donorList[i];
+  	{ 
+  	  temp=donorList[i];
           if (verbose) traced(nodeRes[i]);
-	  while(temp!=NULL)
-	    {
-	      if (verbose) traced(temp->donorRes);
-	      if (temp->donorRes < nodeRes[i])
-		{
-		  //iblank[i]=-1;
-		  iblank[i]=-temp->donorData[1];
+  	  while(temp!=NULL)
+  	    {
+  	      if (verbose) traced(temp->donorRes);
+  	      if (temp->donorRes < nodeRes[i])
+  		{
+  		  // iblank[i]=-1;
+  		  iblank[i]=-temp->donorData[1];
                   if (verbose) tracei(iblank[i]);
                   if (verbose) {
                   tracei(temp->donorData[0]);
                   tracei(temp->donorData[1]);
                   tracei(temp->donorData[2]);}
-		  (*nrecords)++;
-		  break;
-		}
-	      temp=temp->next;
-	    }
-	}
+  		  (*nrecords)++;
+  		  break;
+  		}
+  	      temp=temp->next;
+  	    }
+  	}
     }
   //
   // set the records to send back to the donor
@@ -502,15 +502,35 @@ void MeshBlock::clearIblanks(void)
      if (iblank[i] < 0) iblank[i]=1;
 }
 
-void MeshBlock::getStats(int mstats[2])
+void MeshBlock::getStats(int mstats[3])
 {
-  int i;
+  int i,m;
+  int special=0;
   mstats[0]=mstats[1]=0;
+  mstats[2]=0;
   for (i=0;i<nnodes;i++)
     {
       if (iblank[i]==0) mstats[0]++;
       if (iblank[i] < 0) mstats[1]++;
     }
+  for(i=0;i<ninterp;i++)
+    {
+      if(!interpList[i].cancel)
+	{
+	  for(m=0;m<interpList[i].nweights;m++)
+	    {
+	      if(iblank[interpList[i].inode[m]] < 1){
+		mstats[2]++;
+		if(mstats[2] == 10) special = interpList[i].inode[m];
+	      }
+	    }
+	}
+    }
+
+  if(special){
+    printf("%2d : %9d %16.8e %16.8e %16.8e\n", myid, special, 
+	   x[special*3+0],x[special*3+1],x[special*3+2]);
+  }
 }
 
 void MeshBlock::setIblanks(int inode)

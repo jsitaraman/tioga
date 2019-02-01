@@ -136,7 +136,7 @@ class MeshBlock
   MeshBlock() { nv=NULL; nc=NULL; x=NULL;iblank=NULL;iblank_cell=NULL;vconn=NULL;wbcnode=NULL;
     obcnode=NULL; cellRes=NULL; nodeRes=NULL; elementBbox=NULL; elementList=NULL; adt=NULL; donorList=NULL;
     interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; xsearch=NULL; donorId=NULL;
-    adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=2;
+    adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=1;
 #ifdef USE_CUDA
     d_interpList=NULL;
 #endif
@@ -222,7 +222,7 @@ class MeshBlock
 
   void clearIblanks(void);
   
-  void getStats(int mstat[2]);
+  void getStats(int mstat[3]);
 
   void setIblanks(int inode);
 

@@ -167,6 +167,10 @@ void MeshBlock::getReceptorInfo(int *receptors)
     receptors[k++] = interpList[i].receptorInfo[2];
 
     int donID = interpList[i].inode[interpList[i].nweights];
-    receptors[k++] = cellGID[donID];
+
+    // Copy the contents of uint64_t (8 bytes) into 2 4-byte locations in the
+    // array
+    memcpy(&receptors[k], &cellGID[donID], sizeof(uint64_t));
+    k += 2;
   }
 }

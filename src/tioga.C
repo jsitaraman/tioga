@@ -605,13 +605,25 @@ void tioga::getReceptorInfo(std::vector<int>& receptors)
 
   for (int ib=0; ib < nblocks; ib++) {
     mblocks[ib]->getDonorCount(&dcount[ib], &fcount[ib]);
-    fringeSend[ib].resize(4 * dcount[ib]);
+
+    // For each fringe the following data is returned by mesh block
+    //
+    // - MPI rank of the fringe point
+    // - local node ID for the fringe point (on that proc)
+    // - local mesh block index containing the fringe point (on that proc)
+    // - Global ID of the donor cell
+    //
+    // The donor cell GID is uint64_t and is packed using 2*sizeof(int) bytes
+    // through the int array. This makes total number of ints per fringe data
+    // be (3 + 2) = 5
+    //
+    fringeSend[ib].resize(5 * dcount[ib]);
     mblocks[ib]->getReceptorInfo(fringeSend[ib].data());
 
     std::vector<int>& fringeData = fringeSend[ib];
-    for (int i=0; i<(4*dcount[ib]); i+=4) {
+    for (int i=0; i<(5*dcount[ib]); i+=5) {
       int k = fringeData[i];
-      sndPack[k].nints += 3;
+      sndPack[k].nints += 4;
     }
   }
 
@@ -624,11 +636,14 @@ void tioga::getReceptorInfo(std::vector<int>& receptors)
   for (int ib=0; ib<nblocks; ib++) {
     std::vector<int>& fringeData = fringeSend[ib];
 
-    for(size_t i=0; i<fringeData.size(); i+=4) {
+    for(size_t i=0; i<fringeData.size(); i+=5) {
       int k = fringeData[i];
       sndPack[k].intData[ix[k]++] = fringeData[i+1];  // nodeID
       sndPack[k].intData[ix[k]++] = fringeData[i+2];  // local block index at receiver
-      sndPack[k].intData[ix[k]++] = fringeData[i+3];  // Global Donor ID
+
+      // The uint64_t donor cell ID data (transferred as 2 4-byte entries)
+      sndPack[k].intData[ix[k]++] = fringeData[i+3];
+      sndPack[k].intData[ix[k]++] = fringeData[i+4];
     }
   }
 
@@ -642,10 +657,11 @@ void tioga::getReceptorInfo(std::vector<int>& receptors)
 
   size_t idx=0;
   for (int k=0; k<nrecv; k++) {
-    for (int j=0; j<rcvPack[k].nints; j+=3) {
+    for (int j=0; j<rcvPack[k].nints; j+=4) {
       receptors[idx++] = rcvPack[k].intData[j];
       receptors[idx++] = mtags[rcvPack[k].intData[j+1]];
       receptors[idx++] = rcvPack[k].intData[j+2];
+      receptors[idx++] = rcvPack[k].intData[j+3];
     }
   }
 

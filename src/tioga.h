@@ -30,6 +30,12 @@
 #include "CartBlock.h"
 #include "parallelComm.h"
 
+/** Define a macro entry flagging the versions that are safe to use with large
+ *  meshes containing element and node IDs greater than what a 4-byte signed int
+ *  can support
+ */
+#define TIOGA_HAS_UINT64T 1
+
 /**
  * Topology Indpendent Overset Grid Assembler (TIOGA)
  * Base class and dependencies

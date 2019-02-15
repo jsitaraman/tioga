@@ -190,9 +190,16 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   if (xtag) TIOGA_FREE(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
+  // create a reverse map based on donors found
+  //  
+  int *ist=(int *)malloc(sizeof(int)*ncells);
+  int *ipt=(int *)malloc(sizeof(int)*nsearch);
+  for(i=0;i<ncells;i++) ist[i]=-1;
+  //
   // create a unique hash
   //
-  uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
+  for(i=0;i<nsearch;i++) xtag[i]=i;
+  //uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
   //
   donorCount=0;
   ipoint=0; 
@@ -203,6 +210,10 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	//adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
 	adt->searchADT(this,dId,&(xsearch[3*i]));
         donorId[i]=dId[0];
+        if (donorId[i] > -1) {
+  	  ipt[i]=ist[donorId[i]];
+          ist[donorId[i]]=i;
+        }
       }
       else {
 	donorId[i]=donorId[xtag[i]];
@@ -212,9 +223,51 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	}
        ipoint+=3;
      }
+  //
+  // check if there are duplicates based on
+  // donor hashed search list
+  // advantage: multiple small uniquenodes_octree
+  // instead of one big one
+  //
+  std::vector<double> xv,rtag1;
+  std::vector<int> iv,tagsearch1,xtag1;
+  for(i=0;i<ncells;i++)
+    {
+      int ip=ist[i];
+      int m=0;
+      while(ip > -1)
+	{
+	  xv.push_back(xsearch[3*ip]);
+	  xv.push_back(xsearch[3*ip+1]);
+	  xv.push_back(xsearch[3*ip+2]);
+	  iv.push_back(ip);
+	  rtag1.push_back(res_search[ip]);
+	  xtag1.push_back(m++);
+	  tagsearch1.push_back(tagsearch[ip]);
+	  ip=ipt[ip];
+	}
+      if (m > 1) {
+	uniquenodes_octree(xv.data(),tagsearch1.data(),
+			   rtag1.data(),xtag1.data(),&m);
+	for(int k=0;k<m;k++) {
+	  if (xtag1[k]!=k) {
+	    xtag[iv[k]]=xtag[iv[xtag1[k]]];
+	    res_search[iv[k]]=res_search[iv[xtag1[k]]];
+	  }
+	}
+      }
+      xv.clear();
+      iv.clear();
+      tagsearch1.clear();
+      rtag1.clear();
+      xtag1.clear();      
+    }
+
   TIOGA_FREE(dId);
   TIOGA_FREE(icell);
   TIOGA_FREE(obq);
+  TIOGA_FREE(ist);
+  TIOGA_FREE(ipt);
 }
 
 void MeshBlock::search_uniform_hex(void)

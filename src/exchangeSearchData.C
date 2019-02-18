@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <cstring>
 #include "codetypes.h"
 #include "tioga.h"
 using namespace TIOGA;

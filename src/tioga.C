@@ -63,7 +63,7 @@ void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
  */
 void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
                              int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
-                             uint64_t* cell_gid)
+                             uint64_t* cell_gid, uint64_t* node_gid)
 {
   int iblk;
 
@@ -80,9 +80,9 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   }
 
   auto& mb = mblocks[iblk];
-  mb->setData(btag,nnodes,xyz,ibl,nwbc,nobc,wbcnode,obcnode,ntypes,nv,nc,vconn, cell_gid);
-  mb->myid=myid;
-
+  mb->setData(btag, nnodes, xyz, ibl, nwbc, nobc, wbcnode, obcnode, ntypes, nv,
+              nc, vconn, cell_gid, node_gid);
+  mb->myid = myid;
 }
 
 void tioga::registerSolution(int btag,double *q)

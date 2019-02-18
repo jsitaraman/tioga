@@ -120,7 +120,7 @@ class tioga
 
   void registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,int nobc,
                         int *wbcnode,int *obcnode,int ntypes, int *nv, int *nc, int **vconn,
-                        uint64_t* cell_gid=NULL);
+                        uint64_t* cell_gid=NULL, uint64_t* node_gid=NULL);
 
   void registerSolution(int btag,double *q);
 

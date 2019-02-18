@@ -5,6 +5,7 @@ project(TIOGA CXX C Fortran)
 option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" on)
 option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" on)
 option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" on)
+option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
 
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
@@ -32,6 +33,10 @@ endif()
 if (BUILD_SHARED_LIBS)
   set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+endif()
+
+if (TIOGA_HAS_NODEGID)
+  add_definitions(-DTIOGA_HAS_NODEGID)
 endif()
 
 # Always build libtioga

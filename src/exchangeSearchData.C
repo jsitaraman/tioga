@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <cstring>
 #include "codetypes.h"
 #include "tioga.h"
 using namespace TIOGA;
@@ -143,7 +144,16 @@ void tioga::exchangeSearchData(int at_points)
        mb->rst=NULL;
      }
     }
+#ifdef TIOGA_HAS_NODEGID
+   mb->gid_search.clear();
+#endif
   }
+
+#ifdef TIOGA_HAS_NODEGID
+  int nintsPerNode = 3;
+#else
+  int nintsPerNode = 1;
+#endif
 
   // Loop through recv packets and estimate search array sizes in MeshBlock data
   // structures
@@ -161,9 +171,11 @@ void tioga::exchangeSearchData(int at_points)
       nintsRecv[ii] = rcvPack[k].intData[m++];
       nrealsRecv[ii] = rcvPack[k].intData[m++];
 
-      mb->nsearch += nintsRecv[ii];
-      // Skip the node indices
+      // Skip the nodal data (indices and global IDs)
       m += nintsRecv[ii];
+      // Adjust for node GIDs if available
+      nintsRecv[ii] /= nintsPerNode;
+      mb->nsearch += nintsRecv[ii];
     }
   }
 
@@ -176,14 +188,19 @@ void tioga::exchangeSearchData(int at_points)
     mb->isearch = (int*)malloc(3 * sizeof(int) * mb->nsearch);
     mb->tagsearch = (int*)malloc(sizeof(int) * mb->nsearch);
     mb->donorId = (int*)malloc(sizeof(int) * mb->nsearch);
+#ifdef TIOGA_HAS_NODEGID
+    mb->gid_search.resize(mb->nsearch);
+#endif
     if (at_points==1) mb->rst = (double*)malloc(sizeof(double) * 3 * mb->nsearch);
   }
+
   //
   // Update search arrays in mesh blocks from recv packets
   //
   std::vector<int> icOffset(nblocks,0); // Index of isearch arrays where next fill happens
   std::vector<int> dcOffset(nblocks, 0); // Index of xsearch arrays where next fill happens
   std::vector<int> rcOffset(nblocks, 0); // Index of res_search arrays where next fill happens
+  std::vector<int> igOffset(nblocks, 0); // Index of gid_search where next fill happens
   for (int k=0; k < nrecv; k++) {
     int l = 0;
     int m = 0;
@@ -197,24 +214,32 @@ void tioga::exchangeSearchData(int at_points)
       int ioff = icOffset[ib];
       int doff = dcOffset[ib];
       int roff = rcOffset[ib];
+      int goff = igOffset[ib];
 
       m += 2; // Skip nints and nreals information
       for (int j=0; j < nintsRecv[ii]; j++) {
         mb->isearch[ioff++] = k;
         mb->isearch[ioff++] = rcvPack[k].intData[m++];
-	mb->isearch[ioff++] = obblist[ii].iblk_remote;
+        mb->isearch[ioff++] = obblist[ii].iblk_remote;
         mb->tagsearch[ioff/3-1]=obblist[ii].tag_remote;
+
+#ifdef TIOGA_HAS_NODEGID
+        std::memcpy(&(mb->gid_search[goff]), &(rcvPack[k].intData[m]), sizeof(uint64_t));
+        m += 2;
+        goff++;
+#endif
       }
 
-      for (int j=0; j < nrealsRecv[ii]/4; j++) {
-        for(int mm=0;mm<3;mm++)
+      for (int j = 0; j < nrealsRecv[ii] / 4; j++) {
+        for (int mm = 0; mm < 3; mm++)
           mb->xsearch[doff++] = rcvPack[k].realData[l++];
-        mb->res_search[roff++]= rcvPack[k].realData[l++];
+        mb->res_search[roff++] = rcvPack[k].realData[l++];
       }
 
       icOffset[ib] = ioff;
       dcOffset[ib] = doff;
       rcOffset[ib] = roff;
+      igOffset[ib] = goff;
     }
   }
 

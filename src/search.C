@@ -19,12 +19,59 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "codetypes.h"
 #include "MeshBlock.h"
+#include <unordered_map>
+#include <iostream>
+
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
   void writebbox(OBB *obb,int bid);
   void writePoints(double *x,int nsearch,int bid);
   void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn);
   void uniquenodes_octree(double *x,int *meshtag,double *rtag,int *itag,int *nn);
+}
+
+namespace {
+
+/** Determine the unique nodes by a global identifier
+ *
+ *  The function will create a mapping such that all duplicate nodes will point
+ *  to the original node (as determined by a global identifier) in the `itag`
+ *  array. It will update the nodal resolutions the shared nodes such that the
+ *  resolutions upon exit will be the maximum resolution amongst all the
+ *  duplicate nodes.
+ *
+ *  \param[in] node_ids Global IDs for the nodes across all MPI ranks
+ *  \param[inout] node_res The nodal resolutions
+ *  \param[out] itag The local index of the original node (duplicate to original mapping)
+ *  \param[in] nnodes The size of the arrays
+ */
+void uniquenode_map(uint64_t* node_ids, double* node_res, int* itag, int nnodes)
+{
+    std::unordered_map<uint64_t, int> lookup;
+
+    for (int i=0; i < nnodes; i++) {
+        auto found = lookup.find(node_ids[i]);
+        if (found != lookup.end()) {
+            // This is a duplicate node, store the index to the original node
+            // found previously
+            itag[i] = found->second;
+
+            // Update the original node's resolution to be the max of either
+            // node resolution
+            node_res[found->second] = std::max(node_res[found->second], node_res[i]);
+        } else {
+            // This is the first appearance of the unique ID, stash it in the
+            // lookup table
+            lookup[node_ids[i]] = i;
+            itag[i] = i;
+        }
+    }
+
+    // The max node resolution was stored off in the original node, propagate
+    // this to all the duplicates
+    for (int i=0; i < nnodes; i++)
+        node_res[i] = node_res[itag[i]];
+}
 }
 
 
@@ -192,7 +239,11 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   // create a unique hash
   //
+#ifdef TIOGA_HAS_NODEGID
+  uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
+#else
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
+#endif
   //
   donorCount=0;
   ipoint=0; 
@@ -224,8 +275,12 @@ void MeshBlock::search_uniform_hex(void)
   if (xtag) free(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
+#ifdef TIOGA_HAS_NODEGID
+  uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
+#else
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
-  //                                                                                                          
+#endif
+  //
   int donorCount=0;
   int *dId=(int *) malloc(sizeof(int) *2);
   double xvec[8][3];

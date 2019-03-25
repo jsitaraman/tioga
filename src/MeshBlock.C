@@ -19,6 +19,8 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "codetypes.h"
 #include "MeshBlock.h"
+#include <cstring>
+
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
   double computeCellVolume(double xv[8][3],int nvert);
@@ -34,7 +36,7 @@ extern "C" {
 void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 			int *wbcnodei,int *obcnodei,
                         int ntypesi,int *nvi,int *nci,int **vconni,
-                        uint64_t* cell_gid)
+                        uint64_t* cell_gid, uint64_t* node_gid)
 {
   int i;
   //
@@ -55,11 +57,17 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   nc=nci;
   vconn=vconni;
   cellGID = cell_gid;
+  nodeGID = node_gid;
   //
   //TRACEI(nnodes);
   //for(i=0;i<ntypes;i++) TRACEI(nc[i]);
   ncells=0;
   for(i=0;i<ntypes;i++) ncells+=nc[i];
+
+#ifdef TIOGA_HAS_NODEGID
+  if (nodeGID == NULL)
+      throw std::runtime_error("#tioga: global IDs for nodes not provided");
+#endif
 }
 
 void MeshBlock::preprocess(void)
@@ -1076,19 +1084,31 @@ void MeshBlock::getQueryPoints2(OBB *obc,
 //  int ierr;
 //  MPI_Abort(MPI_COMM_WORLD,ierr);
   //
-  (*intData)=(int *)malloc(sizeof(int)*(*nints));
+#ifdef TIOGA_HAS_NODEGID
+  int nintsPerNode = 3;
+#else
+  int nintsPerNode = 1;
+#endif
+  (*intData)=(int *)malloc(sizeof(int)*(*nints) * nintsPerNode);
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
   //
   m=0;
-  for(i=0;i<*nints;i++)
-    {
+  int iidx = 0;
+  for(i=0;i<*nints;i++) {
       i3=3*inode[i];
-      (*intData)[i]=inode[i];
+      (*intData)[iidx++]=inode[i];
+#ifdef TIOGA_HAS_NODEGID
+      std::memcpy(&(*intData)[iidx],&nodeGID[inode[i]], sizeof(uint64_t));
+      iidx += 2;
+#endif
       (*realData)[m++]=x[i3];
       (*realData)[m++]=x[i3+1];
       (*realData)[m++]=x[i3+2];
       (*realData)[m++]=nodeRes[inode[i]];
-    }
+  }
+
+  // Adjust nints to the proper array size
+  *nints *= nintsPerNode;
   //
   TIOGA_FREE(inode);
 }  

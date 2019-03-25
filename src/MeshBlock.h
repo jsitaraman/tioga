@@ -54,6 +54,7 @@ class MeshBlock
   int *wbcnode;     /** < wall boundary node indices */
   int *obcnode;     /** < overset boundary node indices */
   uint64_t *cellGID;     /**< Global ID of the cell */
+  uint64_t *nodeGID;     /**< Global ID for the nodes */
   //
   double *nodeRes;  /** < node resolution  */
   double *userSpecifiedNodeRes;
@@ -128,6 +129,7 @@ class MeshBlock
   double *xsearch;    /** < coordinates of the query points */
   double *rst;            /**  natrural coordinates */
   int *donorId;       /** < donor indices for those found */
+  std::vector<uint64_t> gid_search; /**< Global node ID for the query points */
   int donorCount;
   int myid;
   double *cellRes;  /** < resolution for each cell */
@@ -188,7 +190,7 @@ class MeshBlock
   void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
 	       int *wbcnodei,int *obcnodei,
                int ntypesi, int *nvi, int *nci, int **vconni,
-               uint64_t* cell_gid=NULL);
+               uint64_t* cell_gid=NULL, uint64_t* node_gid=NULL);
 
 
   void setResolutions(double *nres,double *cres);    

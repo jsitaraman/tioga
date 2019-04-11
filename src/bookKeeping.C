@@ -383,49 +383,54 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
   //
   if (verbose) tracei(acceptFlag);
   if (acceptFlag==0 && receptorRes!=BIGVALUE) return;
-  if (receptorRes==BIGVALUE && resolutionScale==1.0)
-    {
-      clist=cancelList;
-      //
-      // go to the end of the list 
-      //
-      if (clist !=NULL) while(clist->next !=NULL) clist=clist->next;
-      //
-      for(m=0;m<nvert;m++)
-	{
-          verbose=0;
-          inode[m]=vconn[n][nvert*i+m]-BASE;
-          //if (myid==763 && inode[m]==9515) verbose=1;
-          if (verbose) tracei(inode[m]);
-          if (verbose) traced(nodeRes[inode[m]]);
-          if (verbose) {
-              tracei(procid);
-              tracei(pointid);
-              traced(receptorRes);
-              tracei(irecord);
-              tracei(donorId[irecord]);
-          }
-	  if (iblank[inode[m]] < 0 && nodeRes[inode[m]]!=BIGVALUE) 
-	    {
-	      iblank[inode[m]]=1;
-	      if (clist == NULL) 
-		{
-		  clist=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
-		  clist->inode=inode[m];
-		  clist->next=NULL;
-                  cancelList=clist;
-		}
-	      else
-		{
-		  clist->next=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
-		  clist->next->inode=inode[m];
-		  clist->next->next=NULL;
-		  clist=clist->next;
-		}
-	      ncancel++;
-	    }
-	}
+  //
+  // Dylan: Originally the "if" statement below was active, meaning
+  // donors are only canceled if the receptorRes=BIGVALUE, meaning the
+  // receptors are forced because they are tagged as boundary
+  // points. This leads to "implicit interpolation" where donors are
+  // also receivers. By commenting the if statement, we look for
+  // issues across all donor/receiver pairs and not only the ones at
+  // the boundary. Needed especially for O-GMRES.
+  //
+  // if (receptorRes==BIGVALUE && resolutionScale==1.0){
+  //
+  clist=cancelList;
+  //
+  // go to the end of the list 
+  //
+  if (clist !=NULL) while(clist->next !=NULL) clist=clist->next;
+  //
+  for(m=0;m<nvert;m++){
+    verbose=0;
+    inode[m]=vconn[n][nvert*i+m]-BASE;
+    //if (myid==763 && inode[m]==9515) verbose=1;
+    if (verbose) tracei(inode[m]);
+    if (verbose) traced(nodeRes[inode[m]]);
+    if (verbose) {
+      tracei(procid);
+      tracei(pointid);
+      traced(receptorRes);
+      tracei(irecord);
+      tracei(donorId[irecord]);
     }
+    if (iblank[inode[m]] < 0 && nodeRes[inode[m]]!=BIGVALUE) {
+      iblank[inode[m]]=1;
+      if (clist == NULL) {
+	clist=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
+	clist->inode=inode[m];
+	clist->next=NULL;
+	cancelList=clist;
+      } else {
+	clist->next=(INTEGERLIST *)malloc(sizeof(INTEGERLIST));
+	clist->next->inode=inode[m];
+	clist->next->next=NULL;
+	clist=clist->next;
+      }
+      ncancel++;
+    }
+  }
+  //
+  // } // end of commented if statement
   //  
   computeNodalWeights(xv,xp,frac,nvert);
   //

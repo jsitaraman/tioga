@@ -126,12 +126,12 @@ void MeshBlock::getCellIblanks(void)
                 TRACEI(inode[m]);
                 TRACEI(ibl[inode[m]]);
               }
-	      if (ibl[inode[m]]==-1) 
+	      if (ibl[inode[m]]==0)
 		{
-		  iblank_cell[icell]=-1;
+		  iblank_cell[icell]=0;
 		  flag=0;
 		}
-	      ncount=ncount+(ibl[inode[m]]==0);
+	      ncount=ncount+(ibl[inode[m]]== -1);
 	    }
 	  if (verbose) {
 	    TRACEI(icell);
@@ -140,7 +140,7 @@ void MeshBlock::getCellIblanks(void)
            } 
 	  if (flag) 
 	    {
-	      if (ncount ==nvert) iblank_cell[icell]=0;
+	      if (ncount ==nvert) iblank_cell[icell]=-1;
 //	      if (ncount > 0)  iblank_cell[icell]=-1;
 //	      if (ncount >= nvert/2) iblank_cell[icell]=-1;
 	    }

@@ -6,6 +6,8 @@ option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" on)
 option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" on)
 option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" on)
 option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
+option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
+option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
@@ -37,6 +39,14 @@ endif()
 
 if (TIOGA_HAS_NODEGID)
   add_definitions(-DTIOGA_HAS_NODEGID)
+endif()
+
+if (TIOGA_ENABLE_TIMERS)
+  add_definitions(-DTIOGA_ENABLE_TIMERS)
+endif()
+
+if (TIOGA_OUTPUT_STATS)
+  add_definitions(-DTIOGA_OUTPUT_STATS)
 endif()
 
 # Always build libtioga

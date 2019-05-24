@@ -712,8 +712,13 @@ void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,double 
   cb[ipatch].registerData(ipatch,global_id,iblank,q);
 }
 
+#ifdef TIOGA_ENABLE_TIMERS
 void tioga::myTimer(char const *info,int type)
+#else
+void tioga::myTimer(char const*, int)
+#endif
 {
+#ifdef TIOGA_ENABLE_TIMERS
   static double t_start;
   double t_end;
 
@@ -726,6 +731,7 @@ void tioga::myTimer(char const *info,int type)
    t_end=MPI_Wtime();
    if (myid==0) printf("End %s, time taken=%lf\n",info,t_end-t_start);
   }
+#endif
 }
 
 void tioga::reduce_fringes(void)

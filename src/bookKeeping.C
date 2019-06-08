@@ -399,6 +399,7 @@ void MeshBlock::findInterpData(int *recid,int irecord,double receptorRes2)
 
   INTEGERLIST *clist;
   //
+  if (interp2donor[irecord] != -1) return;
   verbose=0;
   //if (myid==3 && irecord==4878 && meshtag==2) verbose=1;
   //if (myid==63 && irecord==3224) verbose=1;

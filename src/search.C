@@ -236,6 +236,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   donorId=(int*)malloc(sizeof(int)*nsearch);
   if (xtag) TIOGA_FREE(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
+  umap.clear();
+  umap.resize(nsearch);
   //
   // create a unique hash
   //
@@ -257,6 +259,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       }
       else {
 	donorId[i]=donorId[xtag[i]];
+        umap[xtag[i]].push_back(i);
       }
       if (donorId[i] > -1) {
 	  donorCount++;
@@ -274,6 +277,8 @@ void MeshBlock::search_uniform_hex(void)
   donorId=(int*)malloc(sizeof(int)*nsearch);
   if (xtag) free(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
+  umap.clear();
+  umap.resize(nsearch);
   //
 #ifdef TIOGA_HAS_NODEGID
   uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
@@ -331,6 +336,7 @@ void MeshBlock::search_uniform_hex(void)
       }
      else {
        donorId[i]=donorId[xtag[i]];
+       umap[xtag[i]].push_back(i);
      }
       if (donorId[i] > -1) {
 	donorCount++;

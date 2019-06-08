@@ -126,6 +126,7 @@ class MeshBlock
   int *tagsearch;       /** < index of query points in the remote process */
   double *res_search;   /** < resolution of search points */
   int *xtag;            /** < hash to determine if there are duplicates */
+  std::vector<std::vector<int>> umap; /** unique node groups attached to the root node */
   double *xsearch;    /** < coordinates of the query points */
   double *rst;            /**  natrural coordinates */
   int *donorId;       /** < donor indices for those found */

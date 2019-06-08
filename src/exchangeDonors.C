@@ -153,9 +153,15 @@ void tioga::exchangeDonors(void)
       int m=0;
       for(int j=0; j < rcvPack[k].nints/2;j++)
 	{
-	  m++;   // skip over point id
+	  int recid=rcvPack[k].intData[m++];   // skip over point id
 	  int ib=tag_iblk_map[rcvPack[k].intData[m++]];
 	  ninterp[ib]++;
+          if (mblocks[ib]->xtag[recid] != recid ||
+              mblocks[ib]->umap[recid].size() > 0) 
+             {
+                int rnode=mblocks[ib]->xtag[recid];
+		for(int ll=0;ll < mblocks[ib]->umap[rnode].size();ll++)  ninterp[ib]++;
+             }
 	}
     }
 
@@ -175,7 +181,17 @@ void tioga::exchangeDonors(void)
 	  int ib = tag_iblk_map[rcvPack[k].intData[m++]];
 	  double receptorRes=rcvPack[k].realData[l++];
 	  mblocks[ib]->findInterpData(&(ninterp[ib]),recid,receptorRes);
-	}
+          if (mblocks[ib]->xtag[recid] != recid || mblocks[ib]->umap[recid].size() > 0) {
+           int rnode=mblocks[ib]->xtag[recid];
+           mblocks[ib]->findInterpData(&(ninterp[ib]),rnode,receptorRes);
+           int *nodelist=mblocks[ib]->umap[rnode].data();
+           for(int ll=0;ll < mblocks[ib]->umap[rnode].size();ll++)
+             {
+              //printf("umap : %d %d %d %d\n",myid,ib,rnode,nodelist[ll]);
+              mblocks[ib]->findInterpData(&(ninterp[ib]),nodelist[ll],receptorRes);
+             }
+	  }
+       }
     }
   
   for (int ib=0; ib<nblocks; ib++) {

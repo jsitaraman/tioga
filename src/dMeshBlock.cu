@@ -1,10 +1,12 @@
 #include "dMeshBlock.h"
 #include "funcs.hpp"
 
-#include "device_functions.h"
+#include "cuda_runtime.h"
 #include "math.h"
 
 #define MAX_UCHAR 255
+
+#define FULL_MASK 0xffffffff
 
 /* --- Handy Vector Operation Macros --- */
 
@@ -81,13 +83,13 @@ __device__
 inline int lane_id(void) { return threadIdx.x % WARP_SZ; }
 
 __device__
-inline int warp_bcast(int v, int leader) { return __shfl(v, leader); }
+inline int warp_bcast(unsigned int mask, int v, int leader) { return __shfl_sync(mask, v, leader); }
 
 __device__ __forceinline__
 float warpAllReduceMin(float val)
 {
   for (int mask = warpSize/2; mask > 0; mask /= 2)
-    val = fminf(val, __shfl_xor(val, mask));
+    val = fminf(val, __shfl_xor_sync(FULL_MASK, val, mask));
   return val;
 }
 
@@ -149,7 +151,7 @@ __device__ float atomicMinf(float* address, float val)
 __device__
 int atomicAggInc(int *ctr)
 {
-  int mask = __ballot(1);
+  int mask = __ballot_sync(FULL_MASK, 1);
   // select the leader
   int leader = __ffs(mask) - 1;
   // leader does the update
@@ -157,7 +159,7 @@ int atomicAggInc(int *ctr)
   if (lane_id() == leader)
     res = atomicAdd(ctr, __popc(mask));
   // brodcast result
-  res = warp_bcast(res, leader);
+  res = warp_bcast(mask, res, leader);
   // each thread computes its own value
   return res + __popc(mask & ((1 << lane_id()) - 1));
 }

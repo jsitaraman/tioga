@@ -2097,7 +2097,7 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     eleBbox.resize(16*nfiltC);
 
     eleXC.resize(nfiltC*3);
-    faceXC.resize(nfiltC*3);
+    faceXC.resize(nfiltF*3);
 
     int ThreadsB = 128;
     int BlocksB = (nfiltC + ThreadsB - 1) / ThreadsB;

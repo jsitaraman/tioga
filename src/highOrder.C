@@ -882,7 +882,7 @@ void MeshBlock::getInternalNodes(void)
 
     // Gather a list of cell IDs for all receptor (fringe) cells
     for (int i = 0; i < ncells; i++)
-      if (iblank_cell[i] == FRINGE)
+      if (iblank_cell[i] <= FRINGE)
         ctag[nreceptorCells++] = i+BASE;
 
     free(pointsPerCell);
@@ -916,7 +916,7 @@ void MeshBlock::getInternalNodes(void)
 
     for (int i = 0; i < nnodes; i++) {
       picked[i] = 0;
-      if (iblank[i] == FRINGE) {
+      if (iblank[i] <= FRINGE) {
         picked[i] = 1;
         ntotalPoints++;
       }
@@ -954,7 +954,7 @@ void MeshBlock::getFringeNodes(bool unblanking)
 
     // Gather a list of cell IDs for all receptor (fringe) cells
     for (int i = 0; i < nfaces; i++)
-      if (iblank_face[i] == FRINGE)
+      if (iblank_face[i] <= FRINGE)
         ftag[nreceptorFaces++] = i+BASE;
 
     free(pointsPerFace);
@@ -1015,7 +1015,7 @@ void MeshBlock::getFringeNodes(bool unblanking)
 
       // Gather a list of cell IDs for all receptor (fringe) cells
       for (int i = 0; i < ncells; i++)
-        if (iblank_cell[i] == FRINGE)
+        if (iblank_cell[i] <= FRINGE)
           ctag[nreceptorCells++] = i+BASE;
     }
 
@@ -1065,7 +1065,7 @@ void MeshBlock::getFringeNodes(bool unblanking)
 
     for (int i = 0; i < nnodes; i++) {
       picked[i] = 0;
-      if (iblank[i] == FRINGE) {
+      if (iblank[i] <= FRINGE) {
         picked[i] = 1;
         ntotalPoints++;
       }
@@ -1619,17 +1619,19 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
   if (!ihigh) FatalError("updateFringePointData not applicable to non-high order solvers");
 
 #ifdef _GPU
+
   if (nreceptorFaces > 0)
     face_data_to_device(ftag, nreceptorFaces, 0, qtmp);
 
   if (nreceptorCells > 0)
     cell_data_to_device(ctag, nreceptorCells, 0, qtmp+nvar*nFacePoints);
+
 #else
 
   int fpt_start = 0;
   for(int i = 0; i < nreceptorFaces; i++)
   {
-    if (iblank_face[ftag[i]-BASE] == FRINGE)
+    if (iblank_face[ftag[i]-BASE] <= FRINGE)
     {
       for (int j = 0; j < pointsPerFace[i]; j++)
         for (int n = 0; n < nvar; n++)
@@ -1653,7 +1655,7 @@ void MeshBlock::updateFringePointGradient(double *dqtmp, int nvar)
 //#pragma omp parallel for
   for (int i = 0; i < nreceptorFaces; i++)
   {
-    if (iblank_face[ftag[i]-BASE] == FRINGE)
+    if (iblank_face[ftag[i]-BASE] <= FRINGE)
     {
       for (int j = 0; j < pointsPerFace[i]; j++)
         for (int dim = 0; dim < 3; dim++)

@@ -1186,7 +1186,7 @@ void MeshBlock::processPointDonorsGPU(void)
 
   // Get the interpolation weights for each of the interpolation points
   donors_d.assign(donorId.data(), donorId.size(), &stream_handle);
-  //mb_d.rst.assign(rst.data(), rst.size(), &stream_handle); /// <-- Pretty sure redundant...?
+  mb_d.rst.assign(rst.data(), rst.size(), &stream_handle); /// <-- Pretty sure redundant...?  (7/17/19): Nope, seems to be needed.
 
   donorsBT_d.assign(donorsBT_h.data(), donorsBT_h.size());
   etypes_d.assign(etypes_h.data(), etypes_h.size());

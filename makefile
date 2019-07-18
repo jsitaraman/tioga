@@ -24,8 +24,8 @@ ld=$(CXX)
 
 SWIG = $(SWIG_BIN)/swig
 
-CFLAGS = -std=c++11 -fPIC -rdynamic
-CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC
+CFLAGS = -std=c++11 -fPIC -rdynamic -fsigned-char
+CUFLAGS = -std=c++11 --default-stream per-thread -Xcompiler -fPIC -Xcompiler -fsigned-char
 FFLAGS = -fPIC  #-CB -traceback #-fbacktrace -fbounds-check
 SFLAGS = -I$(strip $(PYTHON_INC_DIR))/ -I$(strip $(MPI4PY_INC_DIR))/ -I$(strip $(NUMPY_INC_DIR))/
 

@@ -1086,7 +1086,7 @@ void tioga::dataUpdate_artBnd_recv(int nvar, int dataFlag)
     fp.close();
 
     if (norphanPoint > 0) {
-      if (myid == 0) printf("Orphan points found!\n");
+      printf("Orphan points found!\n");
       MPI_Finalize();
       exit(2);
     }

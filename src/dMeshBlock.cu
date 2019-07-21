@@ -1760,18 +1760,20 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
     dPointf norm = faceNormal(&cutFaces[ff*nvertf*3]);
     if (cutType == 0) norm *= -1;
 
-    float dist = dists[F+nTri*IC];
+    const float dist = dists[F+nTri*IC];
 
     dPointf vec;
     for (int d = 0; d < 3; d++)
       vec[d] = vecs[F+nTri*(IC+nEles*NF2*d)];
 
+    const float dot = norm*vec;
+
     if (dist < dtol) // They intersect
     {
       myFlag = DC_CUT;
-      minDist = 0.;
+      minDist = 0.f;
     }
-    else if (myFlag == DC_UNASSIGNED || dist < (minDist - .02*dtol))
+    else if (myFlag == DC_UNASSIGNED || (dist < (minDist - .02f*dtol) && fabs(dot) > 0.5f*fabs(myDot)))
     {
       // Unflagged cell, or have a closer face to use
       minDist = dist;
@@ -1785,11 +1787,9 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
       else
         myFlag = DC_NORMAL;
     }
-    else if (fabs(dist - minDist) <= .02*dtol && minDist > 0.)
+    else if (fabs(dist - minDist) <= .02f*dtol && minDist > 0.f && fabs(dot) > 0.5f*fabs(myDot))
     {
-      double dot = norm*vec;
-
-      if (fabs(dot) > fabs(myDot) - .01)
+      if (fabs(dot) > fabs(myDot) - .01f)
       {
         if (fabs(dot) > fabs(myDot))
         {
@@ -1802,7 +1802,7 @@ void getFinalFlag(dvec<int> eleList, dvec<int> checkFaces,
         // Approx. same dist. to two faces; avg. their normals to decide
         minDist = dist;
         for (int d = 0; d < 3; d++)
-          myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.);
+          myNorm[d] = (nMin*myNorm[d] + norm[d]) / (nMin + 1.f);
         nMin++;
 
         myDot = myNorm*vec;
@@ -2147,7 +2147,6 @@ void dMeshBlock::directCut(double* cutFaces_h, int nCut, int nvertf, double *cut
     cfNorm.resize(3*nfiltC*nTri*NF2);
     cfVec.resize(3*nfiltC*nTri*NF2);
     cfDist.resize(nfiltC*nTri*NF2);
-
 
     dim3 t3(32,NF2);
     int b3 = (nfiltC*nTri + t3.x - 1) / t3.x;

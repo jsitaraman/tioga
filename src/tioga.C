@@ -196,6 +196,29 @@ void tioga::unblankPart2(int nvar)
   }
 }
 
+void tioga::unblankAllGrids(int nvar)
+{
+  mb->swapPointers();
+
+  mb->updateOBB();
+
+  mb->setAllCellsNormal();
+
+  mb->resetCurrentGrid();
+
+  mb->updateOBB();
+
+  mb->getIterIblanks();
+
+  mb->calcFaceIblanks(meshcomm);
+
+  doPointConnectivity(true);
+
+  dataUpdate_artBnd(nvar, 0);
+
+  mb->clearUnblanks();
+}
+
 #ifdef _GPU
 #define TG_DIRECTCUT
 #else

@@ -643,6 +643,11 @@ int get_cell_index(int* nc, int ntypes, int ic_in, int &ic_out)
   }
 }
 
+void MeshBlock::setAllCellsNormal(void)
+{
+  for (int i = 0; i < ncells; i++)
+    iblank_cell[i] = NORMAL;
+}
 
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)
 {

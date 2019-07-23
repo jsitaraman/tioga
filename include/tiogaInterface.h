@@ -123,6 +123,8 @@ void tioga_do_point_connectivity(void);
 void tioga_unblank_part_1(void);
 void tioga_unblank_part_2(int nvar);
 
+void tioga_unblank_all_grids(int nvar);
+
 void tioga_set_amr_callback_(void (*f1)(int *,double *,int *,double *));
 
 void tioga_delete_(void);

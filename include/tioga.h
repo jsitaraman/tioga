@@ -249,6 +249,7 @@ class tioga
 
   void unblankPart1(void);
   void unblankPart2(int nvar);
+  void unblankAllGrids(int nvar);
   void doHoleCutting(bool unblanking = false);
   void doPointConnectivity(bool unblanking = false);
 

@@ -501,6 +501,8 @@ private:
   //
   // routines for high order connectivity and interpolation
   //
+  void setAllCellsNormal(void);
+
   void getCellIblanks(const MPI_Comm meshComm);
 
   //! Find all artificial boundary faces using previously-set cell iblank values

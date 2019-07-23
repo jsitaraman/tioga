@@ -358,6 +358,11 @@ extern "C" {
     tg->unblankPart2(nvar);
   }
 
+  void tioga_unblank_all_grids(int nvar)
+  {
+    tg->unblankAllGrids(nvar);
+  }
+
   callbackFuncs tioga_get_callbacks(void)
   {
     callbackFuncs cbs;

@@ -27,8 +27,16 @@
 # Compiled Python Scripts
 *.pyc
 
+# Visualization Output
+*.vtu
+*.vtk
+*.pvtu
+*.pyfrs
+
 # Other
 *.dat
 *.csv
 *.out
+*.out.*
 bin/*
+*.pro.user

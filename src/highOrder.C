@@ -645,8 +645,31 @@ int get_cell_index(int* nc, int ntypes, int ic_in, int &ic_out)
 
 void MeshBlock::setAllCellsNormal(void)
 {
-  for (int i = 0; i < ncells; i++)
-    iblank_cell[i] = NORMAL;
+  // Unblank ALL cells that aren't currently "NORMAL"
+  unblanks.clear();
+
+  if (!iblank_cell) iblank_cell = (int *)malloc(sizeof(int)*ncells);
+
+  for (int i = 0; i < ncells; i++) {
+    if (iblank_cell[i] != NORMAL) {
+      unblanks.insert(i);
+      iblank_cell[i] = FRINGE;
+    }
+  }
+
+  // Setup final Artificial Boundary face list
+  // Set only the explicit [solver-defined] overset faces
+  nreceptorFaces = nOverFaces;
+
+  free(ftag);
+  ftag = (int*)malloc(sizeof(int)*nreceptorFaces);
+
+  for (int i = 0; i < nOverFaces; i++)
+  {
+    int ff = overFaces[i];
+    iblank_face[ff] = FRINGE;
+    ftag[i] = ff;
+  }
 }
 
 void MeshBlock::getCellIblanks(const MPI_Comm meshComm)

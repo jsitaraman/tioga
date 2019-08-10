@@ -198,19 +198,9 @@ void tioga::unblankPart2(int nvar)
 
 void tioga::unblankAllGrids(int nvar)
 {
-  mb->swapPointers();
-
-  mb->updateOBB();
-
   mb->setAllCellsNormal();
 
-  mb->resetCurrentGrid();
-
   mb->updateOBB();
-
-  mb->getIterIblanks();
-
-  mb->calcFaceIblanks(meshcomm);
 
   doPointConnectivity(true);
 

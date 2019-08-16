@@ -173,7 +173,7 @@ private:
    */
   void (*get_face_nodes)(int* faceID, int* nNodes, double* xyz);
 
-  double (*get_q_spt)(int cellID, int spt, int var);
+  double& (*get_q_spt)(int cellID, int spt, int var);
 
   double (*get_grad_spt)(int cellID, int spt, int dim, int var);
   double& (*get_grad_fpt)(int faceID, int fpt, int dim, int var);
@@ -546,7 +546,7 @@ private:
   //! Set callback functions specific to Artificial Boundary method
   void setCallbackArtBnd(void (*gnf)(int* id, int* npf),
                          void (*gfn)(int* id, int* npf, double* xyz),
-                         double (*gqs)(int ic, int spt, int var),
+                         double& (*gqs)(int ic, int spt, int var),
                          double& (*gqf)(int ff, int fpt, int var),
                          double (*ggs)(int ic, int spt, int dim, int var),
                          double& (*ggf)(int ff, int fpt, int dim, int var),

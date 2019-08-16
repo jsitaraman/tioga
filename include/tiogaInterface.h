@@ -97,7 +97,7 @@ void tioga_set_highorder_callback_(void (*f1)(int*, int*),
 
 void tioga_set_ab_callback_(void (*gnf)(int* id, int* npf),
                             void (*gfn)(int* id, int* npf, double* xyz),
-                            double (*gqs)(int ic, int spt, int var),
+                            double& (*gqs)(int ic, int spt, int var),
                             double& (*gqf)(int ff, int fpt, int var),
                             double (*ggs)(int ic, int spt, int dim, int var),
                             double& (*ggf)(int ff, int fpt, int dim, int var),

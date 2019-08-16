@@ -1667,6 +1667,15 @@ void MeshBlock::updateFringePointData(double *qtmp, int nvar)
     }
     fpt_start += (pointsPerFace[i]*nvar);
   }
+
+  int spt_start = fpt_start;
+  for (int i = 0; i < nreceptorCells; i++)
+  {
+    for (int j = 0; j < pointsPerCell[i]; j++)
+      for (int n = 0; n < nvar; n++)
+        get_q_spt(ctag[i], j, n) = qtmp[spt_start+j*nvar+n];
+    spt_start += (pointsPerCell[i]*nvar);
+  }
 #endif
 }
 

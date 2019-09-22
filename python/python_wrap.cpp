@@ -88,20 +88,23 @@ static PyTypeObject pytioga_PyTiogaType = {
   0,                           // tp_alloc 
 };
 
-
-// We're using c++ and python can only see C init functions
-extern "C" {
-
-#ifndef PyMODINIT_FUNC/* declarations for DLL import/export */
-#define PyMODINIT_FUNC void
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+  PyModuleDef_HEAD_INIT,
+  "pytioga",    /* name of module */
+  NULL,        /* module documentation, may be NULL */
+  -1,          /* size of per-interpreter state of the module,
+	       or -1 if the module keeps state in global variables. */
+  pytioga_methods
+};
 #endif
-// In python if we want to do "import pytioga", we have to declare a
-// "void initpytioga()" function. This would be for a library called
-// "pytioga.so". The naming here matters so make sure to follow this
-// format. CMake likes to add "lib" as a prefix to libraries but you
-// can tell it not to.
+
 PyMODINIT_FUNC
-initpytioga(void){
+#if PY_MAJOR_VERSION >= 3
+PyInit_pytioga(void){
+#else
+initpytioga(){
+#endif
 
   PyObject* m;
 
@@ -114,28 +117,29 @@ initpytioga(void){
   pytioga_PyTiogaType.tp_new = PyType_GenericNew;
 
   // check PyTioga was created properly
-  if (PyType_Ready(&pytioga_PyTiogaType) < 0)
+  if (PyType_Ready(&pytioga_PyTiogaType) < 0){
+#if PY_MAJOR_VERSION >= 3
+    return NULL;
+#else
     return;
+#endif
+  }
 
-  // Initialize the tioga module
+#if PY_MAJOR_VERSION >= 3
+  m = PyModule_Create(&moduledef); 
+#else
   m = Py_InitModule3("pytioga", pytioga_methods,
   		     "Python Tioga module including PyTioga object");
+#endif
 
   // Tell python we're using this type, dont clean it up from memory
   Py_INCREF(&pytioga_PyTiogaType);
   // Add our type to the module and connect the functions we wrote
   PyModule_AddObject(m, "PyTioga", (PyObject *)&pytioga_PyTiogaType);
- }
 
+#if PY_MAJOR_VERSION >= 3
+  return m;
+#endif
 }
 
 
-//// Old Boost Stuff:
-//   class_<PyTioga>("PyTioga", init<object>())
-//     .def(init<>())
-//     .def("register_data", &PyTioga::register_data)
-//     .def("preprocess_grids", &PyTioga::preprocess_grids)
-//     .def("perform_connectivity", &PyTioga::perform_connectivity)
-//     .def("register_solution", &PyTioga::register_solution)
-//     .def("write_data", &PyTioga::write_data)
-//     .def("data_update", &PyTioga::data_update);

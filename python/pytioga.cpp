@@ -85,11 +85,25 @@ bool check_gpu_dict(PyObject* d, const char* type){
   if(not PyDict_Contains(d,Py_BuildValue("s", "ptr"    ))){ printf("missing ptr key\n");          return 1;}
   if(not PyDict_Contains(d,Py_BuildValue("s", "nvar"   ))){ printf("missing nvar key\n");         return 1;}  
   if(not PyDict_Contains(d,Py_BuildValue("s", "type"   ))){ printf("missing type key\n");         return 1;}  
+  PyObject *tmpo;
   char *gottype;
+#if PY_MAJOR_VERSION >= 3
+  tmpo = PyUnicode_AsEncodedString(PyDict_GetItemString(d, "type"), "UTF-8", "strict");
+  if (tmpo != NULL) {
+    gottype = PyBytes_AS_STRING(tmpo);
+    Py_DECREF(tmpo);
+  } 
+#else
   gottype = PyString_AsString(PyDict_GetItemString(d, "type"));
+#endif
   if(strstr(gottype, type) == NULL){ printf("wrong data type\n"); }
+#if PY_MAJOR_VERSION >= 3
+  if(PyLong_AsLong(PyDict_GetItemString(d,"pts"))  == -1){ printf("incorrect type for pts\n");}
+  if(PyLong_AsLong(PyDict_GetItemString(d,"nvar")) == -1){ printf("incorrect type for nvar\n");}
+#else
   if(PyInt_AsLong(PyDict_GetItemString(d,"pts"))  == -1){ printf("incorrect type for pts\n");}
   if(PyInt_AsLong(PyDict_GetItemString(d,"nvar")) == -1){ printf("incorrect type for nvar\n");}
+#endif
   return 0;
 }
 
@@ -291,7 +305,11 @@ PyObject* PyTioga_update(PyTioga* self, PyObject* args){
   //
   else if(PyDict_Check(data) and !check_gpu_dict(data, "double")){
     q   = reinterpret_cast<double*>(PyCapsule_GetPointer(PyDict_GetItemString(data, "ptr"),"gpudata"));
+#if PY_MAJOR_VERSION >= 3
+    len = PyLong_AsLong(PyDict_GetItemString(data,"pts"));
+#else
     len = PyInt_AsLong(PyDict_GetItemString(data,"pts"));
+#endif
     GPUvec<double> v(len, nq, q);
     self->tg->dataUpdate(&v);
   } 

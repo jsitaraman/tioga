@@ -421,7 +421,7 @@ void MeshBlock::writeGridFile(int bid)
 void MeshBlock::writeCellFile(int bid)
 {
   char fname[80];
-  char qstr[2];
+  char qstr[3];
   char intstring[7];
   char hash,c;
   int i,n,j;

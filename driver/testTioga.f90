@@ -147,6 +147,7 @@ program testTioga
   ! should be machine-zero for the linear
   ! problem here
   ! 
+  rnorm=0d0
   do ib=1,2
    g=>gr(ib)
    m=1

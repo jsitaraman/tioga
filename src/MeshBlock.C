@@ -507,7 +507,7 @@ void MeshBlock::writeCellFile(int bid)
 void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
 {
   char fname[80];
-  char qstr[2];
+  char qstr[3];
   char intstring[7];
   char hash,c;
   int i,n,j;

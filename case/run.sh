@@ -1,6 +1,17 @@
+#!/usr/bin/env bash
+set -e  # do not continue if any command fails
+
+HELP_STRING="Usage: ./run.sh <num_mpi_ranks>"
+if [[ $# -ne 1 ]]; then
+  echo -e $HELP_STRING
+  exit 0
+fi
+
+num_mpi_ranks=$1
+num_mesh_parts=$(($num_mpi_ranks * 2))
+
 cd grid;
-p2=`expr $1 \* 2`
-echo $p2
-mpirun -np $p2 ../../build4/gridGen/buildGrid
+echo $num_mesh_parts
+mpirun -np $num_mesh_parts ../../build/gridGen/buildGrid
 cd ..
-mpirun -np $1 ../build4/driver/tioga.exe
+mpirun -np $num_mpi_ranks ../build/driver/tioga.exe

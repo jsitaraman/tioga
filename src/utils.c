@@ -596,11 +596,11 @@ void uniquenodes(double *x,int *meshtag,double *rtag,int *itag,int *nn)
 	      {
 		if (p1 > p2) {
 		  rtag[p2]=TIOGA_MAX(rtag[p1],rtag[p2]);
-		  itag[p1]=p2;
+		  itag[p1]=itag[p2];
 		}
 		else {
 		  rtag[p1]=TIOGA_MAX(rtag[p1],rtag[p2]);
-		  itag[p2]=p1;
+		  itag[p2]=itag[p1];
 		}
 	      }
 	  }
@@ -701,11 +701,11 @@ void uniqNodesTree(double *coord,
 	      {
 		if (p1 > p2) {
 		  rtag[p2]=TIOGA_MAX(rtag[p1],rtag[p2]);
-		  itag[p1]=p2;
+		  itag[p1]=itag[p2];
 		}
 		else {
 		  rtag[p1]=TIOGA_MAX(rtag[p1],rtag[p2]);
-		  itag[p2]=p1;
+		  itag[p2]=itag[p1];
 		}
 	      }
 	  }

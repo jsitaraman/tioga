@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 2.8)
 
 project(TIOGA CXX C Fortran)
 
-option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" on)
+option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" off)
 option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" on)
 option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" on)
-option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
+option(TIOGA_HAS_NODEGID "Support node global IDs (default: off)" off)
 option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 
@@ -17,7 +17,7 @@ if (CMAKE_VERSION VERSION_LESS "3.1")
   set(CMAKE_CXX_FLAGS "-g -rdynamic -std=c++0x" ${CMAKE_CXX_FLAGS})
 else()
   set(CMAKE_CXX_STANDARD 11)
-  set(CMAKE_CXX_FLAGS "-O3" ${CMAKE_CXX_FLAGS})
+  set(CMAKE_CXX_FLAGS "-g -rdynamic -std=c++0x -O3" ${CMAKE_CXX_FLAGS})
 endif()
 
 # Set some default compilation settings for Fortran compiler

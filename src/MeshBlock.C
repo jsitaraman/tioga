@@ -1310,17 +1310,16 @@ void MeshBlock::check_for_uniform_hex(void)
     uniform_hex=1;
     if (obh) TIOGA_FREE(obh);
     obh=(OBB *) malloc(sizeof(OBB));
+    for(int j=0;j<3;j++)
+     for(int k=0;k<3;k++)
+       obh->vec[j][k]=0;      
     for(int k=0;k<3;k++)
       obh->vec[0][k]=(xv[1][k]-xv[0][k])/dx[0];
     for(int k=0;k<3;k++)
       obh->vec[1][k]=(xv[3][k]-xv[0][k])/dx[1];
     for(int k=0;k<3;k++)
       obh->vec[2][k]=(xv[4][k]-xv[0][k])/dx[2];
-
-    for(int j=0;j<3;j++)
-     for(int k=0;k<3;k++)
-       obh->vec[j][k]=0;      
-    obh->vec[0][0]=obh->vec[1][1]=obh->vec[2][2]=1;
+    //obh->vec[0][0]=obh->vec[1][1]=obh->vec[2][2]=1;
     //
     double xd[3];
     double xmax[3];
@@ -1373,7 +1372,9 @@ void MeshBlock::create_hex_cell_map(void)
 {
   for(int j=0;j<3;j++)
     {
-      xlow[j]=obh->xc[j]-obh->dxc[j];
+      xlow[j]=obh->xc[j];
+      for (int k=0;k<3;k++)
+         xlow[j]-=(obh->dxc[k]*obh->vec[k][j]);
       idims[j]=round(2*obh->dxc[j]/dx[j]);
       dx[j]=(2*obh->dxc[j])/idims[j];
     }

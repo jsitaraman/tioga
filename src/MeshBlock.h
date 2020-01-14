@@ -114,6 +114,7 @@ class MeshBlock
   int nfringe;
   int mexclude;
   int meshtag; /** < tag of the mesh that this block belongs to */
+  int check_uniform_hex_flag;
   double resolutionScale;
   //
   // oriented bounding box of this partition
@@ -169,6 +170,7 @@ class MeshBlock
     cellGID = NULL;
     iblank_reduced=NULL;
     uniform_hex=0;
+    check_uniform_hex_flag=0;
     uindx = NULL;
     obh   = NULL;
     invmap = NULL;

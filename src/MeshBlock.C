@@ -80,8 +80,10 @@ void MeshBlock::preprocess(void)
   //
   // find oriented bounding boxes
   //
-  check_for_uniform_hex();
-  if (uniform_hex) create_hex_cell_map();
+  if (check_uniform_hex_flag) {
+      check_for_uniform_hex();
+      if (uniform_hex) create_hex_cell_map();
+  }
   if (obb) TIOGA_FREE(obb);
   obb=(OBB *) malloc(sizeof(OBB));
   findOBB(x,obb->xc,obb->dxc,obb->vec,nnodes);

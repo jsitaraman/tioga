@@ -192,6 +192,14 @@ class tioga
    mb->set_cell_iblank(iblank_cell);
   }
 
+  void set_uniform_hex_flag(int btag, int flag)
+  {
+      auto idxit = tag_iblk_map.find(btag);
+      int iblk = idxit->second;
+      auto& mb = mblocks[iblk];
+      mb->check_uniform_hex_flag = flag;
+  }
+
   void set_cell_iblank(int btag, int* ib_cell)
   {
     auto idxit = tag_iblk_map.find(btag);

@@ -499,7 +499,7 @@ void tioga::dataUpdate(int nvar,int interptype, int at_points)
   //
   // release all memory
   //
-  pc->clearPackets2(sndPack,rcvPack);
+  pc->clearPackets(sndPack,rcvPack);
   TIOGA_FREE(sndPack);
   TIOGA_FREE(rcvPack);
   if (integerRecords) {

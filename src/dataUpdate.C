@@ -30,10 +30,9 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
   int i;
   int k,m,inode;
   double weight;
-  double *qq;
+  double *qq = NULL;
   int icount,dcount;
   //
-  qq=(double *)malloc(sizeof(double)*nvar);
   //
   (*nints)=(*nreals)=0;
   for(i=0;i<ninterp;i++)
@@ -46,6 +45,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
     }
   if ((*nints)==0) return;
   //
+  qq=(double *)malloc(sizeof(double)*nvar);
   (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
   (*realData)=(double *)malloc(sizeof(double)*(*nreals));
   icount=dcount=0;
@@ -98,6 +98,8 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 	    }
 	}
     }
+
+  if (qq) TIOGA_FREE(qq);
 }
 	
 void MeshBlock::updateSolnData(int inode,double *qvar,double *q,int nvar,int interptype)

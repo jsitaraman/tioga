@@ -5,7 +5,7 @@ include $(CONFIG)
 endif
 
 MODULENAME=tioga
-ifeq ($(strip $(INTEL)),YES)
+ifeq ($(strip $(USE_INTEL)),YES)
 	F90 = ifort
 	CXX = icpc
 	CC  = icc
@@ -15,8 +15,10 @@ else
 	CC  = mpicc
 endif
 
-ifeq ($(strip $(CUC)),)
+ifeq ($(strip $(CUDA_ROOT)),)
 	CUC = nvcc
+else
+	CUC = $(strip $(CUDA_ROOT))/bin/nvcc
 endif
 AR = ar -rvs
 LD = $(CXX)
@@ -32,24 +34,24 @@ SFLAGS = -I$(strip $(PYTHON_INC_DIR))/ -I$(strip $(MPI4PY_INC_DIR))/ -I$(strip $
 # Intel compiler flags:
 # Floating-point exception; underflow gives 0.0: -fpe0
 
-ifeq ($(strip $(CUDA)),YES)
+ifeq ($(strip $(TARGET_ARCH)),GPU)
 	CFLAGS += -D_GPU
 	CUFLAGS += -D_GPU
 	SFLAGS += -D_GPU
-	LIBS += -L$(strip $(CUDA_LIB_DIR))/ -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_LIB_DIR))/
+	LIBS += -L$(strip $(CUDA_ROOT))/lib -lcudart -lcublas -lnvToolsExt -Wl,-rpath=$(strip $(CUDA_ROOT))/lib
 	# If compiling on Ubuntu 16.04 with default GCC, this might be needed:
 	CUFLAGS += -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES
-ifeq ($(strip $(CU_SM)),)
+ifeq ($(strip $(CUDA_CC)),)
 	CUFLAGS += -arch=sm_20
 else
-	CUFLAGS += -arch=sm_$(CU_SM)
+	CUFLAGS += -arch=sm_$(CUDA_CC)
 endif
 else
   CFLAGS += -D_CPU
   SFLAGS += -D_CPU
 endif
-INCS += -I$(strip $(CUDA_INC_DIR))/
-INCS += -I$(strip $(MPI_INC_DIR))/
+INCS += -I$(strip $(CUDA_ROOT))/include
+INCS += -I$(strip $(MPI_ROOT))/include
 
 ifeq ($(strip $(DEBUG_LEVEL)),0)
 	CFLAGS += -Ofast #-D_NVTX
@@ -93,7 +95,7 @@ ifeq ($(strip $(WARNINGS)),OFF)
 	CUFLAGS += -Xcompiler=-Wno-narrowing,-Wno-unused-result,-Wno-narrowing,-Wno-literal-suffix -Xcudafe "--diag_suppress=subscript_out_of_range"
 endif
 
-ifeq ($(strip $(OPENMP)),YES)
+ifeq ($(strip $(USE_OPENMP)),YES)
 	CFLAGS += -fopenmp
 	CUFLAGS += -Xcompiler=-fopenmp
 endif
@@ -118,11 +120,11 @@ OBJECTS = $(BINDIR)/buildADTrecursion.o $(BINDIR)/searchADTrecursion.o $(BINDIR)
 	$(BINDIR)/superMesh.o $(BINDIR)/tiogaInterface.o
 OBJSWIG = $(BINDIR)/tioga_wrap.o
 
-ifeq ($(strip $(CUDA)),YES)
+ifeq ($(strip $(TARGET_ARCH)),GPU)
 	OBJECTS += $(BINDIR)/highOrder_kernels.o $(BINDIR)/dADT.o $(BINDIR)/dMeshBlock.o
 endif
 
-ifeq ($(strip $(INTEL)),YES)
+ifeq ($(strip $(USE_INTEL)),YES)
 	LDFLAGS= -L$(MPI_LIB_DIR)/ -lmpich_intel
 	LIBS= -L$(MPI_LIB_DIR)/ -lmpich_intel
 else

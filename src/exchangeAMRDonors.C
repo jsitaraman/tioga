@@ -251,7 +251,7 @@ void tioga::exchangeAMRDonors(void)
       if (rcvPack[i].nints > 0) 
 	{
 	  m=0;
-	  for(j=0;j<rcvPack[i].nints/2;j++)
+	  for(j=0;j<rcvPack[i].nints/3;j++)
 	    {
 	      ctype=rcvPack[i].intData[m++];
 	      id=rcvPack[i].intData[m++];

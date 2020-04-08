@@ -429,8 +429,8 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		    qq[k]+=q[k*nnodes+inode]*weight;
 		}
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[0];
-	      (*intData)[icount++]=1+interpListCart[i].receptorInfo[1];
-	      (*intData)[icount++]=interpListCart[i].receptorInfo[2];
+	      (*intData)[icount++]=1+interpListCart[i].receptorInfo[2];
+	      (*intData)[icount++]=interpListCart[i].receptorInfo[1];
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
 	    }

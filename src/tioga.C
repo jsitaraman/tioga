@@ -311,7 +311,7 @@ void tioga::dataUpdate_AMR(int nvar,int interptype)
 	  if (bid < 0) 
 	    {
               int tmp1=rcvPack[k].intData[2*i+1];
-              int inode=mb->receptorIdCart[tmp1];
+              int inode=mblocks[-(bid+1)]->receptorIdCart[tmp1];
 	      mblocks[-(bid+1)]->updateSolnData(inode,&rcvPack[k].realData[m],qblock[-(bid+1)],nvar,interptype);
 	    }
 	  else

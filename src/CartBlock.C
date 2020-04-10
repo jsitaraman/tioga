@@ -20,6 +20,7 @@
 #include "codetypes.h"
 #include "CartBlock.h"
 #include "CartGrid.h"
+#include "linCartInterp.h"
 #include <assert.h>
 extern "C" {
   void deallocateLinkList(DONORLIST *temp);
@@ -92,27 +93,48 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       ploc=(pdegree)*(pdegree+1)/2;
       qq=(double *)malloc(sizeof(double)*nvar);
       while(listptr!=NULL)
-	{
-	  get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
-			    pdegree,dims[0],dims[1],dims[2],nf,
-			    xlo,dx,&qnode[ploc],index,xtmp);
-	  (*intData)[icount++]=listptr->receptorInfo[0];
-	  (*intData)[icount++]=-1-listptr->receptorInfo[2];
-	  (*intData)[icount++]=listptr->receptorInfo[1];	  
-	  for(n=0;n<nvar;n++)
-           {
-            qq[n]=0;
-	    for(i=0;i<p3;i++)
-	      {
-		weight=listptr->weights[i];
-		qq[n]+=q[index[i]+d3nf*n]*weight;
-	      }
+      {
+        (*intData)[icount++]=listptr->receptorInfo[0];
+        (*intData)[icount++]=-1-listptr->receptorInfo[2];
+        (*intData)[icount++]=listptr->receptorInfo[1];
+
+        for(n=0;n<nvar;n++) qq[n]=0; // zero out solution
+
+        if(pdegree>0) // higher order elements
+        {
+          get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
+            pdegree,dims[0],dims[1],dims[2],nf,
+            xlo,dx,&qnode[ploc],index,xtmp);
+
+          for(n=0;n<nvar;n++)
+          {
+            for(i=0;i<p3;i++)
+            {
+              weight=listptr->weights[i];
+              qq[n]+=q[index[i]+d3nf*n]*weight;
             }
+          }
           //writeqnode_(&myid,qq,&nvar);
-	  for(n=0;n<nvar;n++)
-	    (*realData)[dcount++]=qq[n];
-	  listptr=listptr->next;
-	}
+        }
+        else // linear elements
+        {
+          for(i=0;i<listptr->nweights;i++)
+          {
+            get_amr_index_xyz(qstride,listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2],
+              pdegree,dims[0],dims[1],dims[2],nf,
+              xlo,dx,&qnode[ploc],index,xtmp);
+            for(n=0;n<nvar;n++)
+            {
+              weight=listptr->weights[i];
+              qq[n]+=q[index[0]+d3nf*n]*weight;
+            }
+          }
+        }
+
+        for(n=0;n<nvar;n++) (*realData)[dcount++]=qq[n]; // update solution
+
+        listptr=listptr->next;
+      }
       TIOGA_FREE(xtmp);
       TIOGA_FREE(index);
       TIOGA_FREE(qq);
@@ -224,13 +246,21 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
       // }
      assert((ix[n] >=0 && ix[n] < dims[n]));
     }
-  listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
-  listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
-  listptr->inode=(int *)malloc(sizeof(int)*3);
-  listptr->inode[0]=ix[0];
-  listptr->inode[1]=ix[1];
-  listptr->inode[2]=ix[2];
-  donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));  
+  if ((donor_frac == nullptr) && (pdegree == 0)) {
+    listptr->nweights=8;
+    listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
+    listptr->inode=(int *)malloc(sizeof(int)*(listptr->nweights*3));
+    cart_interp::linear_interpolation(&pdegree,ix,dims,rst,&(listptr->nweights),
+      &(listptr->inode),&(listptr->weights));
+  }
+  else {
+    listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
+    listptr->inode=(int *)malloc(sizeof(int)*3);
+    listptr->inode[0]=ix[0];
+    listptr->inode[1]=ix[1];
+    listptr->inode[2]=ix[2];
+    donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));
+  }
   TIOGA_FREE(rst);
 }
   

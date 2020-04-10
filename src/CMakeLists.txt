@@ -29,6 +29,7 @@ set(TIOGA_SOURCES
   getCartReceptors.C
   highOrder.C
   holeMap.C
+  linCartInterp.C
   parallelComm.C
   search.C
   searchADTrecursion.C

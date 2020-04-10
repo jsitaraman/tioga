@@ -48,7 +48,8 @@ class CartBlock
   DONORLIST **donorList;
   void (*donor_frac) (int *,double *,int *,double *);
  public:
-  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;interpListSize=0;donorList=NULL;interpList=NULL;};
+  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
+    donor_frac=nullptr;};
   ~CartBlock() { clearLists();};
   void registerData(int local_id_in,int global_id_in,int *iblankin,double *qin)
   {

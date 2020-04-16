@@ -21,129 +21,89 @@
 
 namespace cart_interp
 {
-void check_out_of_domain(int* dims, int nw, int** ijk_stencil, std::vector<double>& ref_coord)
+void compute_1d_bases(const int& p, const std::vector<double>& ref_coord,
+  std::vector<double>& phi_x, std::vector<double>& phi_y, std::vector<double>& phi_z)
 {
-  // adjust reference cooridnates to collapse dimensions if out of domain
-  for(int i=0;i<nw;i++)
-  {
-    if(ijk_stencil[0][3*i]>=dims[0])
-    {
-      ijk_stencil[0][3*i]=dims[0]-1;
-      ref_coord[0]=-1;
-    }
-    else if(ijk_stencil[0][3*i]<0)
-    {
-      ijk_stencil[0][3*i]=0;
-      ref_coord[0]=1;
-    }
-    if(ijk_stencil[0][3*i+1]>=dims[1])
-    {
-      ijk_stencil[0][3*i+1]=dims[1]-1;
-      ref_coord[1]=-1;
-    }
-    else if(ijk_stencil[0][3*i+1]<0)
-    {
-      ijk_stencil[0][3*i+1]=0;
-      ref_coord[1]=1;
-    }
-    if(ijk_stencil[0][3*i+2]>=dims[2])
-    {
-      ijk_stencil[0][3*i+2]=dims[2]-1;
-      ref_coord[2]=-1;
-    }
-    else if(ijk_stencil[0][3*i+2]<0)
-    {
-      ijk_stencil[0][3*i+2]=0;
-      ref_coord[2]=1;
+  double zeta = ref_coord[0];
+  double mu   = ref_coord[1];
+  double eta  = ref_coord[2];
+
+  switch (p) {
+      case 1: // FE shape functions in a (-1,1) reference element
+        phi_x[0]=(1-zeta)/2;
+        phi_x[1]=(1+zeta)/2;
+
+        phi_y[0]=(1-mu)/2;
+        phi_y[1]=(1+mu)/2;
+
+        phi_z[0]=(1-eta)/2;
+        phi_z[1]=(1+eta)/2;
+      break;
+
+      default:
+        throw std::runtime_error("#tioga: Cartesian 1d bases not setup for chosen interpolation order");
+  }
+}
+
+void compute_weights(const int& p, const std::vector<double>& ref_coord, double* weights)
+{
+  std::vector<double> phi_x(p+1,0);
+  std::vector<double> phi_y(p+1,0);
+  std::vector<double> phi_z(p+1,0);
+
+  compute_1d_bases(p,ref_coord,phi_x,phi_y,phi_z);
+
+  int ind = 0;
+  for(int k=0;k<p+1;k++) {
+    for(int j=0;j<p+1;j++) {
+      for(int i=0;i<p+1;i++) {
+        weights[ind++] = phi_z[k]*phi_y[j]*phi_x[i];
+      }
     }
   }
 }
 
-void compute_linear_weights(const std::vector<double>& ref_coord, double** weights)
+void compute_ref_coords(const int& p, double* ref_ratio, std::vector<double>& ref_coord)
 {
-  double eta = ref_coord[0];
-  double mu  = ref_coord[1];
-  double xi  = ref_coord[2];
-
-  // assign weights based on shape functions for a FE brick element
-  weights[0][0] = (1-eta)*(1+mu)*(1-xi)/8;
-  weights[0][1] = (1-eta)*(1-mu)*(1-xi)/8;
-  weights[0][2] = (1-eta)*(1-mu)*(1+xi)/8;
-  weights[0][3] = (1-eta)*(1+mu)*(1+xi)/8;
-  weights[0][4] = (1+eta)*(1+mu)*(1-xi)/8;
-  weights[0][5] = (1+eta)*(1-mu)*(1-xi)/8;
-  weights[0][6] = (1+eta)*(1-mu)*(1+xi)/8;
-  weights[0][7] = (1+eta)*(1+mu)*(1+xi)/8;
+  // reference coordinates in -1 to 1. Assumes cells of uniform sizes
+  ref_coord[0] = (ref_ratio[0]-0.5>=0) ?
+      ((ref_ratio[0]-0.5)/p*2-1) : ((ref_ratio[0]+0.5*(2*p-1))/p*2-1);
+  ref_coord[1] = (ref_ratio[1]-0.5>=0) ?
+      ((ref_ratio[1]-0.5)/p*2-1) : ((ref_ratio[1]+0.5*(2*p-1))/p*2-1);
+  ref_coord[2] = (ref_ratio[2]-0.5>=0) ?
+      ((ref_ratio[2]-0.5)/p*2-1) : ((ref_ratio[2]+0.5*(2*p-1))/p*2-1);
 }
 
-void compute_ref_coords(double* ref_ratio, std::vector<double>& ref_coord)
+void create_donor_stencil(const int& p, int* ijk_cell, int* dims, double* ref_ratio, int* ijk_stencil)
 {
-  ref_coord[0] = (ref_ratio[0]-0.5>=0) ? ((ref_ratio[0]-0.5)*2-1) : ((ref_ratio[0]+0.5)*2-1);
-  ref_coord[1] = (ref_ratio[1]-0.5>=0) ? ((ref_ratio[1]-0.5)*2-1) : ((ref_ratio[1]+0.5)*2-1);
-  ref_coord[2] = (ref_ratio[2]-0.5>=0) ? ((ref_ratio[2]-0.5)*2-1) : ((ref_ratio[2]+0.5)*2-1);
+  // determine start node if donor stencil is
+  // right/left or front/behind or above/below of ijk_cell cell-center
+   int start_x = (ref_ratio[0]-0.5>=0) ? (ijk_cell[0]) : (ijk_cell[0]-1);
+   int start_y = (ref_ratio[1]-0.5>=0) ? (ijk_cell[1]) : (ijk_cell[1]-1);
+   int start_z = (ref_ratio[2]-0.5>=0) ? (ijk_cell[2]) : (ijk_cell[2]-1);
+
+   int ind = 0;
+   for(int k=0;k<p+1;k++) {
+     for(int j=0;j<p+1;j++) {
+       for(int i=0;i<p+1;i++) {
+         ijk_stencil[ind++] = std::max(0, std::min(start_x+i*1, dims[0]-1));
+         ijk_stencil[ind++] = std::max(0, std::min(start_y+j*1, dims[1]-1));
+         ijk_stencil[ind++] = std::max(0, std::min(start_z+k*1, dims[2]-1));
+       }
+     }
+   }
 }
 
-void create_linear_donor_stencil(int* ijk_cell, double* ref_ratio, int** ijk_stencil)
+void linear_interpolation(const int& p, int* ijk_cell, int* dims, double* ref_ratio,
+  int* nw, int* ijk_stencil, double* weights)
 {
-  // determine if donor stencil is to right or left of the cell-center
-   ijk_stencil[0][0] = (ref_ratio[0]-0.5>=0) ? (ijk_cell[0]) : (ijk_cell[0]-1);
-
-   // determine if donor stencil is front of or behind the cell-center
-   ijk_stencil[0][1] = (ref_ratio[1]-0.5>=0) ? (ijk_cell[1]+1) : (ijk_cell[1]);
-
-   // determine if donor stencil is above or below the cell-center
-   ijk_stencil[0][2] = (ref_ratio[2]-0.5>=0) ? (ijk_cell[2]) : (ijk_cell[2]-1);
-
-   // node 2 of reference brick element
-   ijk_stencil[0][3]=ijk_stencil[0][0];
-   ijk_stencil[0][4]=ijk_stencil[0][1]-1;
-   ijk_stencil[0][5]=ijk_stencil[0][2];
-
-   // node 3 of reference brick element
-   ijk_stencil[0][6]=ijk_stencil[0][0];
-   ijk_stencil[0][7]=ijk_stencil[0][1]-1;
-   ijk_stencil[0][8]=ijk_stencil[0][2]+1;
-
-   // node 4 of reference brick element
-   ijk_stencil[0][9] =ijk_stencil[0][0];
-   ijk_stencil[0][10]=ijk_stencil[0][1];
-   ijk_stencil[0][11]=ijk_stencil[0][2]+1;
-
-   // node 5 of reference brick element
-   ijk_stencil[0][12]=ijk_stencil[0][0]+1;
-   ijk_stencil[0][13]=ijk_stencil[0][1];
-   ijk_stencil[0][14]=ijk_stencil[0][2];
-
-   // node 6 of reference brick element
-   ijk_stencil[0][15]=ijk_stencil[0][0]+1;
-   ijk_stencil[0][16]=ijk_stencil[0][1]-1;
-   ijk_stencil[0][17]=ijk_stencil[0][2];
-
-   // node 7 of reference brick element
-   ijk_stencil[0][18]=ijk_stencil[0][0]+1;
-   ijk_stencil[0][19]=ijk_stencil[0][1]-1;
-   ijk_stencil[0][20]=ijk_stencil[0][2]+1;
-
-   // node 8 of reference brick element
-   ijk_stencil[0][21]=ijk_stencil[0][0]+1;
-   ijk_stencil[0][22]=ijk_stencil[0][1];
-   ijk_stencil[0][23]=ijk_stencil[0][2]+1;
-}
-
-void linear_interpolation(int* pdegree, int* ijk_cell, int* dims, double* ref_ratio,
-  int* nw, int** ijk_stencil, double** weights)
-{
-  if(*pdegree != 0)
-    throw std::runtime_error("#tioga: linear Cartesian interpolation not setup for pdegree > 0");
-
   std::vector<double> ref_coord(3,0); // array of reference coordinates
 
   // 8-node donor stencil where the nodes are neighboring cell-centers
   // ordering of cell centers in donor stencil is such that
   // left->right is along x-axis. back->front is along y-axis. bottom->top is along z-axis
-  create_linear_donor_stencil(ijk_cell,ref_ratio,ijk_stencil);
-  compute_ref_coords(ref_ratio,ref_coord);
-  check_out_of_domain(dims,*nw,ijk_stencil,ref_coord);
-  compute_linear_weights(ref_coord,weights);
+  create_donor_stencil(p,ijk_cell,dims,ref_ratio,ijk_stencil);
+  compute_ref_coords(p,ref_ratio,ref_coord);
+  compute_weights(p,ref_coord,weights);
 }
 }

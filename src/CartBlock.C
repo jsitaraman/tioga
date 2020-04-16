@@ -164,6 +164,8 @@ void CartBlock::preprocess(CartGrid *cg)
     myid=cg->myid;
     qstride=cg->qstride;
     donor_frac=cg->donor_frac;
+    if((pdegree != 0) && (donor_frac == nullptr))
+      throw std::runtime_error("#tioga: Donor function required for pdegree > 0");
     qnode=cg->qnode;
     d1=dims[0];
     d2=dims[0]*dims[1];
@@ -250,8 +252,8 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
     listptr->nweights=8;
     listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
     listptr->inode=(int *)malloc(sizeof(int)*(listptr->nweights*3));
-    cart_interp::linear_interpolation(&pdegree,ix,dims,rst,&(listptr->nweights),
-      &(listptr->inode),&(listptr->weights));
+    cart_interp::linear_interpolation(1,ix,dims,rst,&(listptr->nweights),
+      listptr->inode,listptr->weights);
   }
   else {
     listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);

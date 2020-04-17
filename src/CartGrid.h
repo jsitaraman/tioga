@@ -50,7 +50,7 @@ class CartGrid
    
   CartGrid() { ngrids=0;global_id=NULL;level_num=NULL;local_id=NULL;porder=NULL;
     proc_id=NULL;local_id=NULL;ilo=NULL;ihi=NULL;dims=NULL;
-               xlo=NULL;dx=NULL;dxlvl=NULL;lcount=NULL;qnode=NULL;};
+               xlo=NULL;dx=NULL;dxlvl=NULL;lcount=NULL;qnode=NULL;donor_frac=nullptr;};
   ~CartGrid() { 
     if (global_id) free(global_id);
     if (level_num) free(level_num);

@@ -135,7 +135,7 @@ void CartBlock::preprocess(CartGrid *cg)
     d3=d2*dims[2];
     ncell=d3;
     ncell_nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
-    nnode=(d1+1)*(d2+1)*(d3+1);
+    nnode=(dims[0]+1)*(dims[1]+1)*(dims[2]+1);
     nnode_nf=(dims[0]+1+2*nf)*(dims[1]+1+2*nf)*(dims[2]+1+2*nf);
   };
 
@@ -448,11 +448,49 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
         }
   */
 
+  processNodeIblank();
+
   if (iflag) TIOGA_FREE(iflag);
   if (xtmp)  TIOGA_FREE(xtmp);
   // fclose(fp);
 }
 			      
+void CartBlock::processNodeIblank()
+{
+  int cell_ind,nd_ind,num_loc,sum = 0;
+
+  for(int ndk=0;ndk<(dims[2]+1);ndk++) {
+    for(int ndj=0;ndj<(dims[1]+1);ndj++) {
+      for(int ndi=0;ndi<(dims[0]+1);ndi++) {
+        nd_ind = cart_utils::get_node_index(dims[0],dims[1],dims[2],nf,ndi,ndj,ndk) - ncell_nf;
+
+        num_loc = sum = 0;
+        for(int k=(ndk-1);k<(ndk+1);k++) {
+          if(k<0 || k>=dims[2]) continue;
+
+          for(int j=(ndj-1);j<(ndj+1);j++) {
+            if(j<0 || j>=dims[1]) continue;
+
+            for(int i=(ndi-1);i<(ndi+1);i++) {
+              if(i<0 || i>=dims[0]) continue;
+
+              cell_ind = cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
+              num_loc += 1; // counter for number of cell sharing node
+              sum += ibl[cell_ind]; // iblank sum for all cells sharing node
+
+              // if any cell connected to node is hole, mark node as hole
+              if(ibl[cell_ind] == 0)
+                ibln[nd_ind] = 0;
+            }
+          }
+        }
+        // if all cells connected to node are field, leave node as field
+        if(sum != num_loc && ibln[nd_ind] != 0)
+          ibln[nd_ind] = -1;
+      }
+    }
+  }
+}
 
 void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
 {

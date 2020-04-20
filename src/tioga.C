@@ -701,9 +701,9 @@ void tioga::set_amr_patch_count(int npatchesin)
   cb=new CartBlock[ncart];
 }
 
-void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank)
+void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,int *iblankn)
 {
-  cb[ipatch].registerData(ipatch,global_id,iblank);
+  cb[ipatch].registerData(ipatch,global_id,iblank,iblankn);
 }
 
 void tioga::register_amr_solution(int ipatch,double *q,bool isnodal)

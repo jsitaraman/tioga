@@ -142,9 +142,14 @@ extern "C" {
     tg->set_amr_patch_count(*npatches);
   }
 
-  void tioga_register_amr_local_data_(int *ipatch,int *global_id,int *iblank,double *q)
+  void tioga_register_amr_local_data_(int *ipatch,int *global_id,int *iblank)
   {
-    tg->register_amr_local_data(*ipatch,*global_id,iblank,q);
+    tg->register_amr_local_data(*ipatch,*global_id,iblank);
+  }
+
+  void tioga_register_amr_solution_(int *ipatch,double *q, bool isnodal)
+  {
+    tg->register_amr_solution(*ipatch,q,isnodal);
   }
 
   void tioga_preprocess_grids_(void)

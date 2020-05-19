@@ -51,13 +51,13 @@ class CartBlock
   CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;q=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
     donor_frac=nullptr;};
   ~CartBlock() { clearLists();};
-  void registerData(int local_id_in,int global_id_in,int *iblankin,double *qin)
+  void registerData(int local_id_in,int global_id_in,int *iblankin)
   {
     local_id=local_id_in;
     global_id=global_id_in;
     ibl=iblankin;
-    q=qin;
   };
+  void registerSolution(double *qin, bool isnodal) {q=qin;};
   void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData,

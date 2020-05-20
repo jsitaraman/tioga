@@ -707,9 +707,14 @@ void tioga::set_amr_patch_count(int npatchesin)
   cb=new CartBlock[ncart];
 }
 
-void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,double *q)
+void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank)
 {
-  cb[ipatch].registerData(ipatch,global_id,iblank,q);
+  cb[ipatch].registerData(ipatch,global_id,iblank);
+}
+
+void tioga::register_amr_solution(int ipatch,double *q,bool isnodal)
+{
+  cb[ipatch].registerSolution(q,isnodal);
 }
 
 #ifdef TIOGA_ENABLE_TIMERS

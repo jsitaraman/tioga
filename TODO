@@ -26,6 +26,8 @@ Task 1: Redesign on a Top Down basis for hybrid cells
    change API to
 
    register_amr_global_data(int nf,int *idata, double *rdata, int ngridsin)
+   
+   `register_amr_local_data` should not have `q` pointer.
     
    modify:
    tiogaInterface.C ->{tioga.h,tioga.C} -> {CartGrid.h,CartGrid.C,CartBlock.h,CartBlock.C}

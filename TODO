@@ -29,13 +29,14 @@ Task 1: Redesign on a Top Down basis for hybrid cells
     
    modify:
    tiogaInterface.C ->{tioga.h,tioga.C} -> {CartGrid.h,CartGrid.C,CartBlock.h,CartBlock.C}
+   [Jay]
 
 2. registersolution data as two separate pointers for cartesian blocks, one for nodal data and
    another for cell data. Suggest using qc and qn. Need two calls from the framework for each block
 
    register_amr_solution(ipatch,qin,1) -> cb[ipatch].qn = qin
    register_amr_solution(ipatch,qin,0) -> cb[ipatch].qc = qin
-
+   [Ashesh]
 
 3. Recode  MeshBlock::getCartReceptors
    - have to get both nodal and cell centered coords in to isearch
@@ -56,6 +57,7 @@ Task 1: Redesign on a Top Down basis for hybrid cells
 
    - isearch can remain the same. MeshBlock does not know if its cell centers or corners. Since
      near-body data is going to remain node-centered this should be fine
+    [Ashesh]
 
 4. exchangeAMRDonors
 
@@ -64,6 +66,7 @@ Task 1: Redesign on a Top Down basis for hybrid cells
    that iblank for Cartesian grids will be only cell based.
 
    Expect other changes as we start debugging
+   [Jay]
    
 
 5. Fix CartBlock::insertInInterpList
@@ -81,6 +84,7 @@ Task 1: Redesign on a Top Down basis for hybrid cells
       listptr->inode,listptr->weights,isNoda1=1);
    cart_interp::linear_interpolation(1,ix,dims,rst,&(mwt),
       &(listptr->inode[8]),&(listptr->weights[8]),isNodal=0);
+   [Ashesh]
 
 6. Fix tioga::dataUpdate_AMR
 
@@ -125,6 +129,7 @@ Task 1: Redesign on a Top Down basis for hybrid cells
          for(i=0;i< nvar_cells;i++)
             qc[index+i]=qval; //assuming field storage per dof is contiguous
         }
+   [Ashesh & Jay]
 
 
 

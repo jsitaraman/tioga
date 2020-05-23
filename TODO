@@ -1,0 +1,134 @@
+TIOGA redesign for exawind 
+
+Overall goals
+-------------
+Task 1:
+Support hybrid data provided as cell centered velocity + nodal pressure
+Make sure multiple NB blocks and OB blocks can connect. I was wrong about this
+on earlier discussion. This is already implemented. dataUpdate_AMR does everything.
+
+
+Task 2:
+Move all calculations to GPU
+      stage 1: connectivity still on CPU but data update on GPU
+      stage 2: get connectivity and data updated on GPU
+
+
+
+Task 1: Redesign on a Top Down basis for hybrid cells
+-----------------------------------------------------
+
+1. Remove qnodein, qnodesize, qstride from whole code base in this branch. These are 
+   obsolete since samcart-dg has not been touched in a while. Leaving this around
+   make the whole process confusing and bug-prone. It seems that high-order cart cells are
+   not in the horizon of ECP anyway
+
+   change API to
+
+   register_amr_global_data(int nf,int *idata, double *rdata, int ngridsin)
+    
+   modify:
+   tiogaInterface.C ->{tioga.h,tioga.C} -> {CartGrid.h,CartGrid.C,CartBlock.h,CartBlock.C}
+
+2. registersolution data as two separate pointers for cartesian blocks, one for nodal data and
+   another for cell data. Suggest using qc and qn. Need two calls from the framework for each block
+
+   register_amr_solution(ipatch,qin,1) -> cb[ipatch].qn = qin
+   register_amr_solution(ipatch,qin,0) -> cb[ipatch].qc = qin
+
+
+3. Recode  MeshBlock::getCartReceptors
+   - have to get both nodal and cell centered coords in to isearch
+   - remove get_amr_index_xyz and add code to test xyz of nodes and cell centers
+     together in one pass and push them to the dataPtr stack. Maybe replace dataPtr with
+     a STL like a vector. 
+      i.e. this loop has to change
+
+      for(j=0;j<cg->dims[3*c];j++)
+            for(k=0;k<cg->dims[3*c+1];k++)
+              for(l=0;l<cg->dims[3*c+2];l++)
+                {
+                  /// rewrite everything here
+                }
+             
+       dataPtr->intData[2] should be in [0: ncells + nnodes -1]
+       so that we can search for both separately in each unstructured mesh block
+
+   - isearch can remain the same. MeshBlock does not know if its cell centers or corners. Since
+     near-body data is going to remain node-centered this should be fine
+
+4. exchangeAMRDonors
+
+   Fix CartBlock::processDonors so that it deals only 
+   with cell centers and not nodes. This is likely more complicated that I imagine now. I assume
+   that iblank for Cartesian grids will be only cell based.
+
+   Expect other changes as we start debugging
+   
+
+5. Fix CartBlock::insertInInterpList
+
+   Each receptor (from the unstructured mesh) will carry 16 weights instead of 8.
+   First 8 will be cell center based linear interpolation (as implemented now) and second 8 will
+   be trilinear weights based on nodes. Use the same function cart_interp::linear_interpolation, but
+   with an index shift and switch based on the isNodal flag. So something like this
+
+   listptr->nweights=16;
+   mwt=8
+   listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
+   listptr->inode=(int *)malloc(sizeof(int)*(listptr->nweights*3));
+   cart_interp::linear_interpolation(1,ix,dims,rst,&(mwt),
+      listptr->inode,listptr->weights,isNoda1=1);
+   cart_interp::linear_interpolation(1,ix,dims,rst,&(mwt),
+      &(listptr->inode[8]),&(listptr->weights[8]),isNodal=0);
+
+6. Fix tioga::dataUpdate_AMR
+
+   Design here is based on assumption that you will do overset update of pressure and
+   velocity fields simultaneously. If that is not the case the problem becomes more complex,
+   but still doable. You could always change this on the solver side as well after you get the
+   update from TIOGA. 
+
+   Change to tioga::dataUpdate_AMR(int nvar_cells, int nvar_nodes, int interptype)
+   nvar=nvar_cells+nvar_nodes for near-body interpolation, keep it the same
+
+   change CartBlock::getInterpolatedData to accept two nvar arguments
+
+   cb[i].getInterpolatedData(..,nvar_cells,nvar_nodes)   
+   
+   CartBlock::getInterpolatedData needs to be simplified 
+
+   (1) Remove all the get_amr_index stuff
+   (2) change interpolation to notionally this
+       isNodal=0;
+       for(n=0;n<nvar_cells;n++)
+         {
+           index=f(listptr->inode[0],listptr->inode[1],listptr->inode[2],isNodal);
+           weight=listptr->weights[i];
+           qq[n]+=qc[index+n]*weight;
+         }
+       isNodal=1;
+       for(n=0;n<nvar_nodes;n++)
+         {
+           index=f(listptr->inode[0],listptr->inode[1],listptr->inode[2],isNodal);
+           weight=listptr->weights[i+8];
+           qq[n+nvar_cells]+=qn[index+n]*weight;
+         }
+    
+    change CartBlock::update
+    to 
+    if (index >=ncells) { 
+         for(i=0;i<nvar_nodes;i++)
+            qn[index-ncells+i]=qval; //assuming field storage is contiguous
+     }
+    else {
+         for(i=0;i< nvar_cells;i++)
+            qc[index+i]=qval; //assuming field storage per dof is contiguous
+        }
+
+
+
+
+
+
+      

@@ -20,6 +20,7 @@
 #include "codetypes.h"
 #include "MeshBlock.h"
 #include <cstring>
+#include <stdexcept>
 
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);

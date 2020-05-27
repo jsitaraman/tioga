@@ -436,17 +436,22 @@ void MeshBlock::writeCellFile(int bid)
   sprintf(intstring,"%d",100000+bid);
   sprintf(fname,"cell%s.dat",&(intstring[1]));
   fp=fopen(fname,"w");
-  fprintf(fp,"TITLE =\"Tioga output\"\n");
-  fprintf(fp,"VARIABLES=\"X\",\"Y\",\"Z\",\"IBLANK\",\"IBLANK_CELL\" ");
-  fprintf(fp,"\n");
-  fprintf(fp,"ZONE T=\"VOL_MIXED\",N=%d E=%d ET=BRICK, F=FEBLOCK\n",nnodes,
-	  ncells);
-  fprintf(fp,"VARLOCATION =  (1=NODAL, 2=NODAL, 3=NODAL, 4=NODAL,5=CELLCENTERED)\n");
+  fprintf(fp, "TITLE =\"Tioga output\"\n");
+  fprintf(fp, "VARIABLES = \"X\"\n");
+  fprintf(fp, "\"Y\"\n");
+  fprintf(fp, "\"Z\"\n");
+  fprintf(fp, "\"IBLANK\"\n");
+  fprintf(fp, "\"IBLANK_CELL\"\n");
+  fprintf(fp, "ZONE T=\"VOL_MIXED\"\n");
+  fprintf(fp, " Nodes=%d, Elements=%d, ZONETYPE=FEBrick\n", nnodes, ncells);
+  fprintf(fp, " DATAPACKING=BLOCK\n");
+  fprintf(fp, " VARLOCATION=([5]=CELLCENTERED)\n");
+  fprintf(fp, " DT=(SINGLE SINGLE SINGLE SINGLE SINGLE)\n");
   for(i=0;i<nnodes;i++) fprintf(fp,"%lf\n",x[3*i]);
   for(i=0;i<nnodes;i++) fprintf(fp,"%lf\n",x[3*i+1]);
   for(i=0;i<nnodes;i++) fprintf(fp,"%lf\n",x[3*i+2]);
-  for(i=0;i<nnodes;i++) fprintf(fp,"%d\n",iblank[i]);
-  for(i=0;i<ncells;i++) fprintf(fp,"%d\n",iblank_cell[i]);
+  for(i=0;i<nnodes;i++) fprintf(fp,"%d.0\n",iblank[i]);
+  for(i=0;i<ncells;i++) fprintf(fp,"%d.0\n",iblank_cell[i]);
   ba=1-BASE;
   for(n=0;n<ntypes;n++)
     {

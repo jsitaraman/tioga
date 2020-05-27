@@ -104,7 +104,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
           for(n=0;n<nvar;n++)
           {
             weight=listptr->weights[i];
-            qq[n]+=q[index[0]+d3nf*n]*weight;
+            qq[n]+=qcell[index[0]+d3nf*n]*weight;
           }
         }
 
@@ -123,7 +123,7 @@ void CartBlock::update(double *qval, int index,int nq)
 {
   int i;
   for(i=0;i<nq;i++)
-    q[index+d3nf*i]=qval[i];
+    qcell[index+d3nf*i]=qval[i];
 }
 
   

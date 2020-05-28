@@ -31,7 +31,6 @@ extern "C"{
                         double vB[3][3],double xB[3],double dxB[3]);
 
   void get_amr_index_xyz(int i,int j,int k,
-			 int pBasis,
 			 int nX,int nY,int nZ,
 			 int nf,
 			 double *xlo,double *dx,
@@ -41,7 +40,7 @@ extern "C"{
 
 void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 {
-  int i,j,k,l,m,ploc,c,n,ntm,jj,kk;
+  int i,j,k,l,m,c,n,ntm,jj,kk;
   int i3;
   int iflag;
   int icount,dcount;
@@ -100,16 +99,15 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 	  intersectCount++;
           //if (myid==0 && intersectCount==0) writeOBB2(obcart,c);
            
-	  ntm=(cg->porder[c]+1)*(cg->porder[c]+1)*(cg->porder[c]+1);      
+	  ntm=1;
 	  xtm=(double *)malloc(sizeof(double)*3*ntm);
 	  itm=(int *) malloc(sizeof(int)*ntm);
-	  ploc=(cg->porder[c])*(cg->porder[c]+1)/2;
 	  for(j=0;j<cg->dims[3*c];j++)
 	    for(k=0;k<cg->dims[3*c+1];k++)
 	      for(l=0;l<cg->dims[3*c+2];l++)
 		{
 		  get_amr_index_xyz(j,k,l,
-				    cg->porder[c],cg->dims[3*c],cg->dims[3*c+1],cg->dims[3*c+2],
+				    cg->dims[3*c],cg->dims[3*c+1],cg->dims[3*c+2],
 				    cg->nf,
 				    &cg->xlo[3*c],
 				    &cg->dx[3*c],

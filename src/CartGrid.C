@@ -32,7 +32,6 @@ void CartGrid::registerData(int nfin,int *idata,double *rdata,int ngridsin)
   ihi=(int *) malloc(sizeof(int)*3*ngrids);
   xlo=(double *) malloc(sizeof(double)*3*ngrids);
   dx=(double *) malloc(sizeof(double)*3*ngrids);
-  porder=(int *) malloc(sizeof(int)*ngrids);
   local_id=(int *)malloc(sizeof(int)*ngrids);
   dims=(int *)malloc(sizeof(dims)*3*ngrids);
   nf=nfin;
@@ -41,17 +40,16 @@ void CartGrid::registerData(int nfin,int *idata,double *rdata,int ngridsin)
     {
       i3=3*i;
       i6=2*i3;
-      iloc=11*i;
+      iloc=10*i;
 
       global_id[i]=idata[iloc];
       level_num[i]=idata[iloc+1];
       proc_id[i]=idata[iloc+2];
-      porder[i]=idata[iloc+3];
-      local_id[i]=idata[iloc+4];
+      local_id[i]=idata[iloc+3];
       for(n=0;n<3;n++)
 	{
-	  ilo[i3+n]=idata[iloc+5+n];
-	  ihi[i3+n]=idata[iloc+8+n];
+	  ilo[i3+n]=idata[iloc+4+n];
+	  ihi[i3+n]=idata[iloc+7+n];
 	  dims[i3+n]=ihi[i3+n]-ilo[i3+n]+1;
 	}
       xlo[i3]=rdata[i6];
@@ -61,9 +59,8 @@ void CartGrid::registerData(int nfin,int *idata,double *rdata,int ngridsin)
       dx[i3+1]=rdata[i6+4];
       dx[i3+2]=rdata[i6+5];
       if (myid==0) 
-        fprintf(fp,"%d %d %d %d %d %f %f %f\n",global_id[i],level_num[i],proc_id[i],
-                                   porder[i],local_id[i],dx[i3],dx[i3+1],
-                                   dx[i3+2]);
+        fprintf(fp,"%d %d %d %d %f %f %f\n",global_id[i],level_num[i],proc_id[i],
+                                   local_id[i],dx[i3],dx[i3+1],dx[i3+2]);
     }
    if (myid==0) fclose(fp);
 };

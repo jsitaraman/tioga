@@ -212,7 +212,7 @@ void tioga::performConnectivityAMR(void)
   MPI_Barrier(scomm);
   //printf("Finished performConnectivityAMR in %d\n",myid);
   //ierr=0;
-  MPI_Abort(scomm,ierr);
+//  MPI_Abort(scomm,ierr);
 }
 
 void tioga::dataUpdate_AMR(int nvar,int interptype)

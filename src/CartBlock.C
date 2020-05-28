@@ -29,24 +29,20 @@ extern "C" {
   void deallocateLinkList3(INTEGERLIST2 *temp);
   void deallocateLinkList4(INTERPLIST2 *temp);
   void insertInList(DONORLIST **donorList,DONORLIST *temp1);
-  void get_amr_index_xyz( int nq,int i,int j,int k,
-			  int pBasis,
+  void get_amr_index_xyz(int i,int j,int k,
 			  int nX,int nY,int nZ,
 			  int nf,
 			  double xlo[3],double dx[3],
-			  double qnodes[],
 			  int* index, double* xyz);
-    void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf, int nq,
+    void amr_index_to_ijklmn(int nX,int nY,int nZ, int nf,
 			     int index, int* ijklmn);
     int checkHoleMap(double *x,int *nx,int *sam,double *extents);
-    //void writeqnode_(int *myid,double *qnodein,int *qnodesize);
 }
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData,
 				    int nvar)
 {
   int i,n;
-  int ploc;
   double *xtmp;
   int *index;
   double *qq;
@@ -89,9 +85,8 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       listptr=interpList;
       icount=3*nintold;
       dcount=nrealold;
-      xtmp=(double *)malloc(sizeof(double)*p3*3);
-      index=(int *)malloc(sizeof(int)*p3);
-      ploc=(pdegree)*(pdegree+1)/2;
+      xtmp=(double *)malloc(sizeof(double)*3);
+      index=(int *)malloc(sizeof(int)*1);
       qq=(double *)malloc(sizeof(double)*nvar);
       while(listptr!=NULL)
       {
@@ -101,34 +96,15 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
         for(n=0;n<nvar;n++) qq[n]=0; // zero out solution
 
-        if(pdegree>0) // higher order elements
+        for(i=0;i<listptr->nweights;i++)
         {
-          get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
-            pdegree,dims[0],dims[1],dims[2],nf,
-            xlo,dx,&qnode[ploc],index,xtmp);
-
+          get_amr_index_xyz(listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2],
+            dims[0],dims[1],dims[2],nf,
+            xlo,dx,index,xtmp);
           for(n=0;n<nvar;n++)
           {
-            for(i=0;i<p3;i++)
-            {
-              weight=listptr->weights[i];
-              qq[n]+=q[index[i]+d3nf*n]*weight;
-            }
-          }
-          //writeqnode_(&myid,qq,&nvar);
-        }
-        else // linear elements
-        {
-          for(i=0;i<listptr->nweights;i++)
-          {
-            get_amr_index_xyz(qstride,listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2],
-              pdegree,dims[0],dims[1],dims[2],nf,
-              xlo,dx,&qnode[ploc],index,xtmp);
-            for(n=0;n<nvar;n++)
-            {
-              weight=listptr->weights[i];
-              qq[n]+=q[index[0]+d3nf*n]*weight;
-            }
+            weight=listptr->weights[i];
+            qq[n]+=q[index[0]+d3nf*n]*weight;
           }
         }
 
@@ -159,20 +135,14 @@ void CartBlock::preprocess(CartGrid *cg)
     dims[0]=cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
     dims[1]=cg->ihi[3*global_id+1]-cg->ilo[3*global_id+1]+1;
     dims[2]=cg->ihi[3*global_id+2]-cg->ilo[3*global_id+2]+1;
-    pdegree=cg->porder[global_id];
-    p3=(pdegree+1)*(pdegree+1)*(pdegree+1);
     nf=cg->nf;
     myid=cg->myid;
-    qstride=cg->qstride;
     donor_frac=cg->donor_frac;
-    if((pdegree != 0) && (donor_frac == nullptr))
-      throw std::runtime_error("#tioga: Donor function required for pdegree > 0");
-    qnode=cg->qnode;
     d1=dims[0];
     d2=dims[0]*dims[1];
     d3=d2*dims[2];
     d3nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
-    ndof=d3*p3;
+    ndof=d3;
   };
 
 void CartBlock::initializeLists(void)
@@ -249,20 +219,12 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
       // }
      assert((ix[n] >=0 && ix[n] < dims[n]));
     }
-  if ((donor_frac == nullptr) && (pdegree == 0)) {
+  if (donor_frac == nullptr) {
     listptr->nweights=8;
     listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
     listptr->inode=(int *)malloc(sizeof(int)*(listptr->nweights*3));
     cart_interp::linear_interpolation(1,ix,dims,rst,&(listptr->nweights),
       listptr->inode,listptr->weights);
-  }
-  else {
-    listptr->nweights=(pdegree+1)*(pdegree+1)*(pdegree+1);
-    listptr->inode=(int *)malloc(sizeof(int)*3);
-    listptr->inode[0]=ix[0];
-    listptr->inode[1]=ix[1];
-    listptr->inode[2]=ix[2];
-    donor_frac(&pdegree,rst,&(listptr->nweights),(listptr->weights));
   }
   TIOGA_FREE(rst);
 }
@@ -273,24 +235,22 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   int ijklmn[6];
   int pointid;
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
-  amr_index_to_ijklmn(pdegree,dims[0],dims[1],dims[2],nf,qstride,index,ijklmn);
+  amr_index_to_ijklmn(dims[0],dims[1],dims[2],nf,index,ijklmn);
   //pointid=ijklmn[5]*(pdegree+1)*(pdegree+1)*d3+
   //        ijklmn[4]*(pdegree+1)*d3+
   //        ijklmn[3]*d3+
   //        ijklmn[2]*d2+
   //        ijklmn[1]*d1+
   //        ijklmn[0];
-  pointid=(ijklmn[2]*d2+ijklmn[1]*d1+ijklmn[0])*p3+
-           ijklmn[5]*(pdegree+1)*(pdegree+1)+
-           ijklmn[4]*(pdegree+1)+ijklmn[3];
+  pointid=(ijklmn[2]*d2+ijklmn[1]*d1+ijklmn[0])+
+           ijklmn[5]+
+           ijklmn[4]+ijklmn[3];
   if (!(pointid >= 0 && pointid < ndof)) {
     TRACEI(index);
     TRACEI(nf);
-    TRACEI(pdegree);
     TRACEI(dims[0]);
     TRACEI(dims[1]);
     TRACEI(dims[2]);
-    TRACEI(qstride);
     printf("%d %d %d %d %d %d\n",ijklmn[0],ijklmn[1],ijklmn[2],
 	   ijklmn[3],ijklmn[4],ijklmn[5]);
   }
@@ -307,14 +267,14 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
 
 void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 {
-  int i,j,k,l,m,n,h,p;
+  int i,j,k,l,m,n,h;
   int ibcount,idof,meshtagdonor,icount;
   DONORLIST *temp;
   int *iflag;
   int holeFlag;
   double *xtmp;
   int *index;
-  int ploc,ibindex;
+  int ibindex;
   //FILE*fp;
   char fname[80];
   char qstr[2];
@@ -335,24 +295,22 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
   // first mark hole points
   //
   iflag=(int *)malloc(sizeof(int)*nmesh);
-  index=(int *)malloc(sizeof(int)*p3);
-  xtmp=(double *)malloc(sizeof(double)*p3*3);
+  index=(int *)malloc(sizeof(int)*1);
+  xtmp=(double *)malloc(sizeof(double)*3);
   //
   ibcount=-1;
   idof=-1;
   //for(i=0;i<(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);i++) ibl[i]=1;
-  ploc=pdegree*(pdegree+1)/2;
 
   for(k=0;k<dims[2];k++)
     for(j=0;j<dims[1];j++)
       for(i=0;i<dims[0];i++)
 	{
 	  ibcount++;
-	  get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
-			    xlo,dx,&qnode[ploc],index,xtmp);
+	  get_amr_index_xyz(i,j,k,dims[0],dims[1],dims[2],nf,
+			    xlo,dx,index,xtmp);
           holeFlag=1;
-          idof=ibcount*p3-1;
-	  for(p=0;p<p3 && holeFlag;p++)
+          idof=ibcount-1;
 	    {
 	      idof++;
 	      if (donorList[idof]==NULL)
@@ -360,7 +318,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		  for(h=0;h<nmesh;h++)
 		    if (holemap[h].existWall)
 		      {
-			if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
+			if (checkHoleMap(&xtmp[3],holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			  {
 	                    ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
 			    ibl[ibindex]=0;
@@ -384,7 +342,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		      if (holemap[h].existWall)
 			{
 			  if (!iflag[h])
-			    if (checkHoleMap(&xtmp[3*p],holemap[h].nx,holemap[h].sam,holemap[h].extents))
+			    if (checkHoleMap(&xtmp[3],holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			      {
 	                        ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
 				ibl[ibindex]=0;
@@ -404,12 +362,11 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 	{
 	  ibcount++;
           ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-          get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
-                            xlo,dx,&qnode[ploc],index,xtmp);
+          get_amr_index_xyz(i,j,k,dims[0],dims[1],dims[2],nf,
+                            xlo,dx,index,xtmp);
 	  if (ibl[ibindex]==0) 
 	    {
-              idof=ibcount*p3-1;
-	      for(p=0;p<p3;p++)
+              idof=ibcount-1;
 		{
 		  idof++;
 		  if (donorList[idof]!=NULL)
@@ -427,8 +384,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 	  else
 	    {
 	      icount=0;
-              idof=ibcount*p3-1;
-	      for(p=0;p<p3;p++)
+              idof=ibcount-1;
 		{
 		  idof++;
 		  if (donorList[idof]!=NULL)
@@ -445,7 +401,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 			}
 		    }
 		}
-	      if (icount==p3) 
+	      if (icount==1)
 		{
 		  ibl[ibindex]=-1;
                   //for(p=0;p<p3;p++)
@@ -453,8 +409,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		}
 	      else
 		{
-                  idof=ibcount*p3-1;
-		  for(p=0;p<p3;p++)
+                  idof=ibcount-1;
 		    {
 		      idof++;
 		      if (donorList[idof]!=NULL)
@@ -509,7 +464,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 
 void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
 {
-  int i,j,k,p,m;
+  int i,j,k,m;
   int idof;
   DONORLIST *temp;
   idof=-1;
@@ -518,7 +473,6 @@ void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
   for(k=0;k<dims[2];k++)
     for(j=0;j<dims[1];j++)
       for(i=0;i<dims[0];i++)
-	for(p=0;p<p3;p++)
 	  {
 	    idof++;
 	    if (donorList[idof]!=NULL)

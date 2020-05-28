@@ -34,12 +34,11 @@ class CartBlock
  private:
   int local_id;
   int global_id;
-  int dims[3],nf,qstride,ndof,pdegree,p3;
+  int dims[3],nf,ndof;
   int d1,d2,d3,d3nf;
   int myid;
   int *ibl;
   double *q;
-  double *qnode;
   double xlo[3]; 
   double dx[3];
   int ndonors;

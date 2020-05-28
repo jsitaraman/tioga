@@ -25,9 +25,6 @@ using namespace TIOGA;
  * set communicator
  * and initialize a few variables
  */
-extern "C"{
-//void writeqnode_(int *myid,double *qnodein,int *qnodesize);
-};
 void tioga::setCommunicator(MPI_Comm communicator, int id_proc, int nprocs)
 {
   scomm=communicator;
@@ -212,7 +209,7 @@ void tioga::performConnectivityAMR(void)
   MPI_Barrier(scomm);
   //printf("Finished performConnectivityAMR in %d\n",myid);
   //ierr=0;
-  MPI_Abort(scomm,ierr);
+//  MPI_Abort(scomm,ierr);
 }
 
 void tioga::dataUpdate_AMR(int nvar,int interptype)
@@ -689,15 +686,12 @@ tioga::~tioga()
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 
-void tioga::register_amr_global_data(int nf,int qstride,double *qnodein,int *idata,
-				     double *rdata,int ngridsin,
-				     int qnodesize)
+void tioga::register_amr_global_data(int nf,int *idata,double *rdata,int ngridsin)
 {
   if (cg) delete [] cg;
   cg=new CartGrid[1];
   cg->myid=myid;
-  cg->registerData(nf,qstride,qnodein,idata,rdata,ngridsin,qnodesize);
-  //writeqnode_(&myid,qnodein,&qnodesize);
+  cg->registerData(nf,idata,rdata,ngridsin);
 }
 
 void tioga::set_amr_patch_count(int npatchesin)

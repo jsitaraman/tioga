@@ -247,7 +247,7 @@ class tioga
     cg->setcallback(f1);
   }
 
-  void register_amr_global_data(int, int, double *, int *,double *, int, int);
+  void register_amr_global_data(int,int *,double *,int);
   void set_amr_patch_count(int);
   void register_amr_local_data(int, int ,int *);
   void register_amr_solution(int ,double *, bool);

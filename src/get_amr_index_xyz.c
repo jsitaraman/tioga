@@ -1,9 +1,7 @@
-void get_amr_index_xyz( int nq,int i,int j,int k,
-			int pBasis,
+void get_amr_index_xyz(int i,int j,int k,
 			int nX,int nY,int nZ,
 			int nf,
 			double *xlo,double *dx,
-			double qnodes[],
 			int* index, double* xyz){
         
   int base;
@@ -11,9 +9,9 @@ void get_amr_index_xyz( int nq,int i,int j,int k,
         
   int ind = 0;               
   int two_nf = 2*nf;
-  int qp_1d = pBasis + 1;  
+  int qp_1d = 1;
         
-  int grid_stride = nq*(nX + two_nf)*(nY + two_nf)*(nZ + two_nf);
+  int grid_stride = (nX + two_nf)*(nY + two_nf)*(nZ + two_nf);
   int z_stride = grid_stride*(qp_1d*qp_1d);
   int y_stride = grid_stride*(qp_1d);
         
@@ -35,9 +33,9 @@ void get_amr_index_xyz( int nq,int i,int j,int k,
     + (i+nf);
         
   for (z = 0;z < qp_1d;z++){
-    zco = cell_zlo + half_dz*(1.0 + qnodes[z]);
+    zco = cell_zlo + half_dz;
     for (y = 0;y < qp_1d;y++){
-      yco = cell_ylo + half_dy*(1.0 + qnodes[y]);
+      yco = cell_ylo + half_dy;
       for ( x = 0;x < qp_1d;x++){                    
                     index[ind] = starting_entry
 		      + z_stride*(z)
@@ -45,7 +43,7 @@ void get_amr_index_xyz( int nq,int i,int j,int k,
 		      + grid_stride*(x);
                                                             
                     base = 3*ind;
-                    xyz[base]   = cell_xlo + half_dx*(1.0 + qnodes[x]);
+                    xyz[base]   = cell_xlo + half_dx;
                     xyz[base+1] = yco;
                     xyz[base+2] = zco;
                     
@@ -55,7 +53,7 @@ void get_amr_index_xyz( int nq,int i,int j,int k,
   }
 }
 
-void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf, int nq,
+void amr_index_to_ijklmn(int nX,int nY,int nZ, int nf,
 			 int index, int* ijklmn)
 {
         
@@ -64,7 +62,7 @@ void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf, int nq,
   int remainder;
 
   int two_nf = 2*nf;
-  int qp_1d = pBasis + 1;  
+  int qp_1d = 1;
 
   int x_size = (nX + two_nf);
   int y_size = (nY + two_nf);
@@ -73,7 +71,7 @@ void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf, int nq,
   int xy_stride = x_size*y_size;
   int xyz_stride = xy_stride*z_size;
 
-  int grid_stride = nq*x_size*y_size*z_size;
+  int grid_stride = x_size*y_size*z_size;
   int x_stride = grid_stride;
   int y_stride = grid_stride*(qp_1d);
   int z_stride = grid_stride*(qp_1d*qp_1d);

@@ -129,11 +129,9 @@ extern "C" {
     tg->registerGridData(*btag,*nnodes,xyz,ibl,*nwbc,*nobc,wbcnode,obcnode,*ntypes,idata[iblk].nv,idata[iblk].nc,idata[iblk].vconn);
   }
 
-  void tioga_register_amr_global_data_(int *nf, int *qstride, double *qnodein,
-				      int *idata,double *rdata,
-				      int *ngridsin,int *qnodesize)
+  void tioga_register_amr_global_data_(int *nf, int *idata,double *rdata,int *ngridsin)
   {
-    tg->register_amr_global_data(*nf,*qstride,qnodein,idata,rdata,*ngridsin,*qnodesize);
+    tg->register_amr_global_data(*nf,idata,rdata,*ngridsin);
   }
 
 

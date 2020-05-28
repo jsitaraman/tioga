@@ -29,17 +29,15 @@ extern "C" {
   void deallocateLinkList3(INTEGERLIST2 *temp);
   void deallocateLinkList4(INTERPLIST2 *temp);
   void insertInList(DONORLIST **donorList,DONORLIST *temp1);
-  void get_amr_index_xyz( int nq,int i,int j,int k,
+  void get_amr_index_xyz(int i,int j,int k,
 			  int pBasis,
 			  int nX,int nY,int nZ,
 			  int nf,
 			  double xlo[3],double dx[3],
-			  double qnodes[],
 			  int* index, double* xyz);
-    void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf, int nq,
+    void amr_index_to_ijklmn(int pBasis,int nX,int nY,int nZ, int nf,
 			     int index, int* ijklmn);
     int checkHoleMap(double *x,int *nx,int *sam,double *extents);
-    //void writeqnode_(int *myid,double *qnodein,int *qnodesize);
 }
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData,
@@ -103,9 +101,9 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
         if(pdegree>0) // higher order elements
         {
-          get_amr_index_xyz(qstride,listptr->inode[0],listptr->inode[1],listptr->inode[2],
+          get_amr_index_xyz(listptr->inode[0],listptr->inode[1],listptr->inode[2],
             pdegree,dims[0],dims[1],dims[2],nf,
-            xlo,dx,&qnode[ploc],index,xtmp);
+            xlo,dx,index,xtmp);
 
           for(n=0;n<nvar;n++)
           {
@@ -121,9 +119,9 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
         {
           for(i=0;i<listptr->nweights;i++)
           {
-            get_amr_index_xyz(qstride,listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2],
+            get_amr_index_xyz(listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2],
               pdegree,dims[0],dims[1],dims[2],nf,
-              xlo,dx,&qnode[ploc],index,xtmp);
+              xlo,dx,index,xtmp);
             for(n=0;n<nvar;n++)
             {
               weight=listptr->weights[i];
@@ -163,11 +161,9 @@ void CartBlock::preprocess(CartGrid *cg)
     p3=(pdegree+1)*(pdegree+1)*(pdegree+1);
     nf=cg->nf;
     myid=cg->myid;
-    qstride=cg->qstride;
     donor_frac=cg->donor_frac;
     if((pdegree != 0) && (donor_frac == nullptr))
       throw std::runtime_error("#tioga: Donor function required for pdegree > 0");
-    qnode=cg->qnode;
     d1=dims[0];
     d2=dims[0]*dims[1];
     d3=d2*dims[2];
@@ -273,7 +269,7 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   int ijklmn[6];
   int pointid;
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
-  amr_index_to_ijklmn(pdegree,dims[0],dims[1],dims[2],nf,qstride,index,ijklmn);
+  amr_index_to_ijklmn(pdegree,dims[0],dims[1],dims[2],nf,index,ijklmn);
   //pointid=ijklmn[5]*(pdegree+1)*(pdegree+1)*d3+
   //        ijklmn[4]*(pdegree+1)*d3+
   //        ijklmn[3]*d3+
@@ -290,7 +286,6 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
     TRACEI(dims[0]);
     TRACEI(dims[1]);
     TRACEI(dims[2]);
-    TRACEI(qstride);
     printf("%d %d %d %d %d %d\n",ijklmn[0],ijklmn[1],ijklmn[2],
 	   ijklmn[3],ijklmn[4],ijklmn[5]);
   }
@@ -348,8 +343,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
       for(i=0;i<dims[0];i++)
 	{
 	  ibcount++;
-	  get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
-			    xlo,dx,&qnode[ploc],index,xtmp);
+	  get_amr_index_xyz(i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
+			    xlo,dx,index,xtmp);
           holeFlag=1;
           idof=ibcount*p3-1;
 	  for(p=0;p<p3 && holeFlag;p++)
@@ -404,8 +399,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 	{
 	  ibcount++;
           ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-          get_amr_index_xyz(qstride,i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
-                            xlo,dx,&qnode[ploc],index,xtmp);
+          get_amr_index_xyz(i,j,k,pdegree,dims[0],dims[1],dims[2],nf,
+                            xlo,dx,index,xtmp);
 	  if (ibl[ibindex]==0) 
 	    {
               idof=ibcount*p3-1;

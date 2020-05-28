@@ -26,7 +26,6 @@
 extern "C" 
 {
   void computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert);
-//  void writeqnode_(int *myid,double *qnodein,int *qnodesize);
 }
 
 void MeshBlock::setCartIblanks(void)

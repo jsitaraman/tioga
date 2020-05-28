@@ -20,8 +20,7 @@
 # include "codetypes.h"
 # include "CartGrid.h"
 
-void CartGrid::registerData(int nfin,int qstridein,double *qnodein,int *idata,
-			    double *rdata,int ngridsin,int qnodesize)
+void CartGrid::registerData(int nfin,int *idata,double *rdata,int ngridsin)
 {
   int i,i3,i6,iloc,n;
   FILE *fp;
@@ -35,12 +34,8 @@ void CartGrid::registerData(int nfin,int qstridein,double *qnodein,int *idata,
   dx=(double *) malloc(sizeof(double)*3*ngrids);
   porder=(int *) malloc(sizeof(int)*ngrids);
   local_id=(int *)malloc(sizeof(int)*ngrids);
-  qnode=(double *)malloc(sizeof(double)*qnodesize);
   dims=(int *)malloc(sizeof(dims)*3*ngrids);
-  for(i=0;i<qnodesize;i++)  { qnode[i]=qnodein[i];}
-  //                            if (myid==0) printf("qnode[%d]= %f\n",i,qnode[i]);}
   nf=nfin;
-  qstride=qstridein;
   if (myid==0) fp=fopen("cartGrid.dat","w");
   for(i=0;i<ngrids;i++)
     {

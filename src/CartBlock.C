@@ -29,22 +29,14 @@ extern "C" {
   void deallocateLinkList3(INTEGERLIST2 *temp);
   void deallocateLinkList4(INTERPLIST2 *temp);
   void insertInList(DONORLIST **donorList,DONORLIST *temp1);
-  void get_amr_index_xyz(int i,int j,int k,
-			  int nX,int nY,int nZ,
-			  int nf,
-			  double xlo[3],double dx[3],
-			  int* index, double* xyz);
-    void amr_index_to_ijklmn(int nX,int nY,int nZ, int nf,
-			     int index, int* ijklmn);
-    int checkHoleMap(double *x,int *nx,int *sam,double *extents);
+  int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData,
 				    int nvar)
 {
   int i,n;
-  double *xtmp;
-  int *index;
+  int index;
   double *qq;
   int *tmpint;
   double *tmpreal;
@@ -85,8 +77,6 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       listptr=interpList;
       icount=3*nintold;
       dcount=nrealold;
-      xtmp=(double *)malloc(sizeof(double)*3);
-      index=(int *)malloc(sizeof(int)*1);
       qq=(double *)malloc(sizeof(double)*nvar);
       while(listptr!=NULL)
       {
@@ -98,13 +88,15 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
         for(i=0;i<listptr->nweights;i++)
         {
-          get_amr_index_xyz(listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2],
-            dims[0],dims[1],dims[2],nf,
-            xlo,dx,index,xtmp);
+          //Q[nq,nZ+2*nf,nY+2*nf,nX+2*nf]--> C++ Cell storage
+          index = (dims[1]+2*nf)*(dims[0]+2*nf)*(listptr->inode[3*i+2]+nf)
+              + (dims[0]+2*nf)*(listptr->inode[3*i+1]+nf)
+              + (listptr->inode[3*i]+nf);
+
           for(n=0;n<nvar;n++)
           {
             weight=listptr->weights[i];
-            qq[n]+=qcell[index[0]+d3nf*n]*weight;
+            qq[n]+=qcell[index+d3nf*n]*weight;
           }
         }
 
@@ -112,8 +104,6 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
         listptr=listptr->next;
       }
-      TIOGA_FREE(xtmp);
-      TIOGA_FREE(index);
       TIOGA_FREE(qq);
     }
 }
@@ -232,27 +222,27 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
 void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid, double cellRes)
 {
   DONORLIST *temp1;
-  int ijklmn[6];
+  int i,j,k,x_stride,xy_stride;
   int pointid;
   temp1=(DONORLIST *)malloc(sizeof(DONORLIST));
-  amr_index_to_ijklmn(dims[0],dims[1],dims[2],nf,index,ijklmn);
-  //pointid=ijklmn[5]*(pdegree+1)*(pdegree+1)*d3+
-  //        ijklmn[4]*(pdegree+1)*d3+
-  //        ijklmn[3]*d3+
-  //        ijklmn[2]*d2+
-  //        ijklmn[1]*d1+
-  //        ijklmn[0];
-  pointid=(ijklmn[2]*d2+ijklmn[1]*d1+ijklmn[0])+
-           ijklmn[5]+
-           ijklmn[4]+ijklmn[3];
+
+  // Get point-id accounting for nf
+  x_stride = (dims[0]+2*nf);
+  xy_stride = x_stride*(dims[1]+2*nf);
+  index %= d3nf;
+  k = index / xy_stride;
+  index %= xy_stride;
+  j = index / x_stride;
+  index %= x_stride;
+  i = index;
+  pointid=(k-nf)*d2+(j-nf)*d1+(i-nf);
+
   if (!(pointid >= 0 && pointid < ndof)) {
     TRACEI(index);
     TRACEI(nf);
     TRACEI(dims[0]);
     TRACEI(dims[1]);
     TRACEI(dims[2]);
-    printf("%d %d %d %d %d %d\n",ijklmn[0],ijklmn[1],ijklmn[2],
-	   ijklmn[3],ijklmn[4],ijklmn[5]);
   }
   assert((pointid >= 0 && pointid < ndof));
     
@@ -273,7 +263,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
   int *iflag;
   int holeFlag;
   double *xtmp;
-  int *index;
   int ibindex;
   //FILE*fp;
   char fname[80];
@@ -295,7 +284,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
   // first mark hole points
   //
   iflag=(int *)malloc(sizeof(int)*nmesh);
-  index=(int *)malloc(sizeof(int)*1);
   xtmp=(double *)malloc(sizeof(double)*3);
   //
   ibcount=-1;
@@ -307,8 +295,10 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
       for(i=0;i<dims[0];i++)
 	{
 	  ibcount++;
-	  get_amr_index_xyz(i,j,k,dims[0],dims[1],dims[2],nf,
-			    xlo,dx,index,xtmp);
+    xtmp[0] = xlo[0] + (i+0.5)*dx[0];
+    xtmp[1] = xlo[1] + (j+0.5)*dx[1];
+    xtmp[2] = xlo[2] + (k+0.5)*dx[2];
+
           holeFlag=1;
           idof=ibcount-1;
 	    {
@@ -362,8 +352,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 	{
 	  ibcount++;
           ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-          get_amr_index_xyz(i,j,k,dims[0],dims[1],dims[2],nf,
-                            xlo,dx,index,xtmp);
+
 	  if (ibl[ibindex]==0) 
 	    {
               idof=ibcount-1;
@@ -404,8 +393,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 	      if (icount==1)
 		{
 		  ibl[ibindex]=-1;
-                  //for(p=0;p<p3;p++)
-	          // fprintf(fp,"%f %f %f\n",xtmp[3*p],xtmp[3*p+1],xtmp[3*p+2]);
 		}
 	      else
 		{
@@ -457,7 +444,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 
   if (iflag) TIOGA_FREE(iflag);
   if (xtmp)  TIOGA_FREE(xtmp);
-  if (index) TIOGA_FREE(index);
   // fclose(fp);
 }
 			      

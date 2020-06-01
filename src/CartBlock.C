@@ -318,7 +318,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		  for(h=0;h<nmesh;h++)
 		    if (holemap[h].existWall)
 		      {
-			if (checkHoleMap(&xtmp[3],holemap[h].nx,holemap[h].sam,holemap[h].extents))
+			if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			  {
 	                    ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
 			    ibl[ibindex]=0;
@@ -342,7 +342,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		      if (holemap[h].existWall)
 			{
 			  if (!iflag[h])
-			    if (checkHoleMap(&xtmp[3],holemap[h].nx,holemap[h].sam,holemap[h].extents))
+			    if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			      {
 	                        ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
 				ibl[ibindex]=0;

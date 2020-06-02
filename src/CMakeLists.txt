@@ -10,6 +10,7 @@ set(TIOGA_SOURCES
   buildADTrecursion.c
   linklist.c
   math.c
+  get_amr_index_xyz.c
   utils.c
 
   # CXX sources

@@ -229,7 +229,6 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   // Get point-id accounting for nf
   x_stride = (dims[0]+2*nf);
   xy_stride = x_stride*(dims[1]+2*nf);
-  index %= d3nf;
   k = index / xy_stride;
   index %= xy_stride;
   j = index / x_stride;

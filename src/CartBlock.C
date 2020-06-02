@@ -223,7 +223,7 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
     listptr->nweights=8;
     listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
     listptr->inode=(int *)malloc(sizeof(int)*(listptr->nweights*3));
-    cart_interp::linear_interpolation(1,ix,dims,rst,&(listptr->nweights),
+    cart_interp::linear_interpolation(nf,ix,dims,rst,&(listptr->nweights),
       listptr->inode,listptr->weights);
   }
   TIOGA_FREE(rst);

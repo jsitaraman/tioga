@@ -24,16 +24,16 @@
 
 namespace cart_interp
 {
-void compute_1d_bases(const int& p, const std::vector<double>& ref_coord,
+void compute_1d_bases(const std::vector<double>& ref_coord,
   std::vector<double>& phi_x, std::vector<double>& phi_y, std::vector<double>& phi_z);
 
 void compute_linear_weights(const std::vector<double>& ref_coord, double* weights);
 
 void compute_ref_coords(double* ref_ratio, std::vector<double>& ref_coord);
 
-void create_donor_stencil(const int& p, int* ijk_cell, int* dims, double* ref_ratio, int* ijk_stencil);
+void create_donor_stencil(const int nf, int* ijk_cell, int* dims, double* ref_ratio, int* ijk_stencil);
 
-void linear_interpolation(const int& p, int* ijk_cell, int* dims, double* ref_ratio,
+void linear_interpolation(const int nf, int* ijk_cell, int* dims, double* ref_ratio,
   int* nw, int* ijk_stencil, double* weights);
 } // namespacee cart_interp
 

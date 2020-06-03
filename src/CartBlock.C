@@ -96,7 +96,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
           for(n=0;n<nvar;n++)
           {
             weight=listptr->weights[i];
-            qq[n]+=qcell[index+d3nf*n]*weight;
+            qq[n]+=qcell[index+ncell_nf*n]*weight;
           }
         }
 
@@ -113,7 +113,7 @@ void CartBlock::update(double *qval, int index,int nq)
 {
   int i;
   for(i=0;i<nq;i++)
-    qcell[index+d3nf*i]=qval[i];
+    qcell[index+ncell_nf*i]=qval[i];
 }
 
   
@@ -131,21 +131,23 @@ void CartBlock::preprocess(CartGrid *cg)
     d1=dims[0];
     d2=dims[0]*dims[1];
     d3=d2*dims[2];
-    d3nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
-    ndof=d3;
+    ncell=d3;
+    ncell_nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
+    nnode=(d1+1)*(d2+1)*(d3+1);
+    nnode_nf=(dims[0]+1+2*nf)*(dims[1]+1+2*nf)*(dims[2]+1+2*nf);
   };
 
 void CartBlock::initializeLists(void)
 {
- donorList=(DONORLIST **)malloc(sizeof(DONORLIST *)*ndof);
- for(int i=0;i<ndof;i++) donorList[i]=NULL;
+ donorList=(DONORLIST **)malloc(sizeof(DONORLIST *)*ncell);
+ for(int i=0;i<ncell;i++) donorList[i]=NULL;
 }
 
 void CartBlock::clearLists(void)
 {
   int i;
   if (donorList) {
-  for(i=0;i<ndof;i++) { deallocateLinkList(donorList[i]); donorList[i]=NULL;}
+  for(i=0;i<ncell;i++) { deallocateLinkList(donorList[i]); donorList[i]=NULL;}
   TIOGA_FREE(donorList);
   }
   deallocateLinkList4(interpList);
@@ -236,14 +238,14 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   i = index;
   pointid=(k-nf)*d2+(j-nf)*d1+(i-nf);
 
-  if (!(pointid >= 0 && pointid < ndof)) {
+  if (!(pointid >= 0 && pointid < ncell)) {
     TRACEI(index);
     TRACEI(nf);
     TRACEI(dims[0]);
     TRACEI(dims[1]);
     TRACEI(dims[2]);
   }
-  assert((pointid >= 0 && pointid < ndof));
+  assert((pointid >= 0 && pointid < ncell));
     
   temp1->donorData[0]=senderid;
   temp1->donorData[1]=meshtagdonor;

@@ -37,7 +37,7 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
   int i,j,k,l,m,c,n,itm,jj,kk;
   int i3;
   int iflag;
-  int icount,dcount;
+  int icount,dcount,cell_count;
   int nsend,nrecv;
   int *pmap;
   int *sndMap,*rcvMap;
@@ -45,7 +45,7 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
   INTEGERLIST2 *head;
   INTEGERLIST2 *dataPtr;
   double *xtm;
-  double xd[3];
+  double xd[3],vol;
   //char qstr[2];
   //char fname[80];
   //char intstring[7];
@@ -78,8 +78,14 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
   //writeOBB(myid);
   //
   for(c=0;c<cg->ngrids;c++)
-    {
-      for(n=0;n<3;n++)
+  {
+    cell_count = (cg->dims[3*c]+2*cg->nf)
+        * (cg->dims[3*c+1]+2*cg->nf)
+        * (cg->dims[3*c+2]+2*cg->nf);
+
+    vol = cg->dx[3*c]*cg->dx[3*c+1]*cg->dx[3*c+2];
+
+    for(n=0;n<3;n++)
 	{
 	  obcart->dxc[n]=cg->dx[3*c+n]*(cg->dims[3*c+n])*0.5;
 	  obcart->xc[n]=cg->xlo[3*c+n]+obcart->dxc[n];
@@ -93,6 +99,8 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
           //if (myid==0 && intersectCount==0) writeOBB2(obcart,c);
            
 	  xtm=(double *)malloc(sizeof(double)*3);
+
+	  // loop over all cells
 	  for(j=0;j<cg->dims[3*c];j++)
 	    for(k=0;k<cg->dims[3*c+1];k++)
 	      for(l=0;l<cg->dims[3*c+2];l++)
@@ -127,21 +135,81 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
 		      pmap[cg->proc_id[c]]=1;
 		      dataPtr->next=(INTEGERLIST2 *) malloc(sizeof(INTEGERLIST2));
 		      dataPtr=dataPtr->next;
-		      dataPtr->realData=(double *) malloc(sizeof(double)*3);
-		      dataPtr->intData=(int *) malloc(sizeof(int)*3);
+          dataPtr->intDataSize=4;
+          dataPtr->realDataSize=4;
+          dataPtr->realData=(double *) malloc(sizeof(double)*dataPtr->realDataSize);
+          dataPtr->intData=(int *) malloc(sizeof(int)*dataPtr->intDataSize);
 		      dataPtr->intData[0]=cg->proc_id[c];
 		      dataPtr->intData[1]=cg->local_id[c];
 	        dataPtr->intData[2]=itm;
-		      dataPtr->intDataSize=3;
-		      dataPtr->realDataSize=1;
+	        dataPtr->intData[3]=0;
 		      nsearch+=1;
 
-			  for(kk=0;kk<3;kk++)
-			    dataPtr->realData[kk]=xtm[kk];
+          for(kk=0;kk<dataPtr->realDataSize-1;kk++)
+            dataPtr->realData[kk]=xtm[kk];
+
+          dataPtr->realData[dataPtr->realDataSize-1]=vol;
 
 		      dataPtr->next=NULL;
 		    }
 		}
+
+    // loop over all nodes
+    for(j=0;j<cg->dims[3*c]+1;j++)
+      for(k=0;k<cg->dims[3*c+1]+1;k++)
+        for(l=0;l<cg->dims[3*c+2]+1;l++)
+        {
+          // Q[nq,nZ+1+2*nf,nY+1+2*nf,nX+1+2*nf]--> C++ Node storage
+          // indexing starts from number of cells onwards
+          itm = (cg->dims[3*c+1]+1+2*cg->nf)*(cg->dims[3*c]+1+2*cg->nf)*(l+cg->nf)
+              + (cg->dims[3*c]+1+2*cg->nf)*(k+cg->nf) + (j+cg->nf)
+              + cell_count;
+
+          xtm[0] = cg->xlo[3*c]   + j*cg->dx[3*c];
+          xtm[1] = cg->xlo[3*c+1] + k*cg->dx[3*c+1];
+          xtm[2] = cg->xlo[3*c+2] + l*cg->dx[3*c+2];
+
+          iflag=0;
+
+          {
+            //if (intersectCount==1 && myid==0) fprintf(fp,"%lf %lf %lf\n",xtm[0],xtm[1],xtm[2]);
+            for(jj=0;jj<3;jj++) xd[jj]=0;
+            for(jj=0;jj<3;jj++)
+              for(kk=0;kk<3;kk++)
+                xd[jj]+=(xtm[kk]-obb->xc[kk])*obb->vec[jj][kk];
+
+            if (fabs(xd[0]) <= obb->dxc[0] &&
+                fabs(xd[1]) <= obb->dxc[1] &&
+                fabs(xd[2]) <= obb->dxc[2])
+            {
+              iflag++;
+            }
+          }
+
+          if (iflag > 0)
+          {
+            pmap[cg->proc_id[c]]=1;
+            dataPtr->next=(INTEGERLIST2 *) malloc(sizeof(INTEGERLIST2));
+            dataPtr=dataPtr->next;
+            dataPtr->intDataSize=4;
+            dataPtr->realDataSize=4;
+            dataPtr->realData=(double *) malloc(sizeof(double)*dataPtr->realDataSize);
+            dataPtr->intData=(int *) malloc(sizeof(int)*dataPtr->intDataSize);
+            dataPtr->intData[0]=cg->proc_id[c];
+            dataPtr->intData[1]=cg->local_id[c];
+            dataPtr->intData[2]=itm;
+            dataPtr->intData[3]=0;
+            nsearch+=1;
+
+            for(kk=0;kk<dataPtr->realDataSize-1;kk++)
+              dataPtr->realData[kk]=xtm[kk];
+
+            dataPtr->realData[dataPtr->realDataSize-1]=vol;
+
+            dataPtr->next=NULL;
+          }
+        }
+
 	  TIOGA_FREE(xtm);
 	}
     }
@@ -167,30 +235,35 @@ void MeshBlock::getCartReceptors(CartGrid *cg,parallelComm *pc)
   // if these were already allocated
   // get rid of them
   //
-  if (xsearch) TIOGA_FREE(xsearch);
-  if (isearch) TIOGA_FREE(isearch);
   if (donorId) TIOGA_FREE(donorId);
+  if (tagsearch) TIOGA_FREE(tagsearch);
+  if (isearch) TIOGA_FREE(isearch);
   if (rst) TIOGA_FREE(rst);
+  if (res_search) TIOGA_FREE(res_search);
+  if (xsearch) TIOGA_FREE(xsearch);
   //
-  xsearch=(double *)malloc(sizeof(double)*3*nsearch);
-  isearch=(int *)malloc(3*sizeof(int)*nsearch);
   donorId=(int *)malloc(sizeof(int)*nsearch);
+  tagsearch=(int *)malloc(sizeof(int)*nsearch);
+  isearch=(int *)malloc(3*sizeof(int)*nsearch);
+  res_search=(double *)malloc(sizeof(double)*nsearch);
+  xsearch=(double *)malloc(sizeof(double)*3*nsearch);
   rst=(double *) malloc(sizeof(double)*3*nsearch);
   //
   dataPtr=head->next;
-  m=n=0;
+  k=l=m=n=0;
   while(dataPtr!=NULL)
-    {
-      for(j=2;j<dataPtr->intDataSize;j++)
-	{
-	  isearch[m++]=dataPtr->intData[0];
-	  isearch[m++]=dataPtr->intData[1];	  
-	  isearch[m++]=dataPtr->intData[j];
-	}
-      for(j=0;j<3*dataPtr->realDataSize;j++)
-	xsearch[n++]=dataPtr->realData[j];
-       dataPtr=dataPtr->next;
-    }
+  {
+    for(j=0;j<dataPtr->intDataSize-1;j++)
+      isearch[m++]=dataPtr->intData[j];
+    tagsearch[k++]=dataPtr->intData[dataPtr->intDataSize-1];
+
+    for(j=0;j<dataPtr->realDataSize-1;j++)
+      xsearch[n++]=dataPtr->realData[j];
+    res_search[l++]=dataPtr->realData[dataPtr->realDataSize-1];
+
+    dataPtr=dataPtr->next;
+  }
+
   deallocateLinkList3(head);
   //fclose(fp);
   TIOGA_FREE(obcart);

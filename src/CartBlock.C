@@ -111,6 +111,12 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
 void CartBlock::update(double *qval, int index,int nq)
 {
+  if(index >= ncell_nf){
+    int stop = 0;
+    stop = stop -1;
+    return;
+  }
+
   int i;
   for(i=0;i<nq;i++)
     qcell[index+ncell_nf*i]=qval[i];
@@ -223,6 +229,9 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
   
 void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid, double cellRes)
 {
+  if(index >= ncell_nf)
+    return;
+
   DONORLIST *temp1;
   int i,j,k,x_stride,xy_stride;
   int pointid;

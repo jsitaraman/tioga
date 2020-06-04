@@ -20,6 +20,7 @@
 #include "codetypes.h"
 #include "CartBlock.h"
 #include "CartGrid.h"
+#include "cartUtils.h"
 #include "linCartInterp.h"
 #include <assert.h>
 #include <stdexcept>
@@ -88,10 +89,8 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
         for(i=0;i<listptr->nweights;i++)
         {
-          //Q[nq,nZ+2*nf,nY+2*nf,nX+2*nf]--> C++ Cell storage
-          index = (dims[1]+2*nf)*(dims[0]+2*nf)*(listptr->inode[3*i+2]+nf)
-              + (dims[0]+2*nf)*(listptr->inode[3*i+1]+nf)
-              + (listptr->inode[3*i]+nf);
+          index = cart_utils::get_cell_index(dims[0],dims[1],nf,
+            listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2]);
 
           for(n=0;n<nvar;n++)
           {
@@ -317,8 +316,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		      {
 			if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			  {
-	                    ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-			    ibl[ibindex]=0;
+        ibindex=cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
+        ibl[ibindex]=0;
                             holeFlag=0;
 			    break;
 			  }
@@ -341,7 +340,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 			  if (!iflag[h])
 			    if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			      {
-	                        ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+			      ibindex=cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
 				ibl[ibindex]=0;
                                 holeFlag=0;
 				break;
@@ -358,7 +357,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
       for(i=0;i<dims[0];i++)
 	{
 	  ibcount++;
-          ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+	  ibindex=cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
 
 	  if (ibl[ibindex]==0) 
 	    {

@@ -26,6 +26,7 @@
 #include "MeshBlock.h"
 #include "parallelComm.h"
 #include "CartGrid.h"
+#include "cartUtils.h"
 extern "C"{
   int obbIntersectCheck(double vA[3][3],double xA[3],double dxA[3],
                         double vB[3][3],double xB[3],double dxB[3]);
@@ -157,22 +158,22 @@ void MeshBlock::fillReceptorDataPtr(CartGrid *cg,int cell_count,int c,int j,int 
 {
   int itm = -1;
   if(isNodal){
-    itm = (cg->dims[3*c+1]+1+2*cg->nf)*(cg->dims[3*c]+1+2*cg->nf)*(l+cg->nf)
-        + (cg->dims[3*c]+1+2*cg->nf)*(k+cg->nf) + (j+cg->nf)
-        + cell_count;
+    itm = cart_utils::get_node_index(cg->dims[3*c],cg->dims[3*c+1],cg->dims[3*c+2],
+      cg->nf,j,k,l);
 
     xtm[0] = cg->xlo[3*c]   + j*cg->dx[3*c];
     xtm[1] = cg->xlo[3*c+1] + k*cg->dx[3*c+1];
     xtm[2] = cg->xlo[3*c+2] + l*cg->dx[3*c+2];
   }
   else {
-    itm = (cg->dims[3*c+1]+2*cg->nf)*(cg->dims[3*c]+2*cg->nf)*(l+cg->nf)
-        + (cg->dims[3*c]+2*cg->nf)*(k+cg->nf) + (j+cg->nf);
+    itm = cart_utils::get_cell_index(cg->dims[3*c],cg->dims[3*c+1],
+      cg->nf,j,k,l);
 
     xtm[0] = cg->xlo[3*c]   + (j+0.5)*cg->dx[3*c];
     xtm[1] = cg->xlo[3*c+1] + (k+0.5)*cg->dx[3*c+1];
     xtm[2] = cg->xlo[3*c+2] + (l+0.5)*cg->dx[3*c+2];
   }
+
 
   double xd[3];
   for(int jj=0;jj<3;jj++) xd[jj]=0;

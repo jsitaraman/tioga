@@ -111,11 +111,8 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
 void CartBlock::update(double *qval, int index,int nq)
 {
-  if(index >= ncell_nf){
-    int stop = 0;
-    stop = stop -1;
+  if(index >= ncell_nf)
     return;
-  }
 
   int i;
   for(i=0;i<nq;i++)

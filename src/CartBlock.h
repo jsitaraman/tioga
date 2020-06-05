@@ -34,8 +34,8 @@ class CartBlock
  private:
   int local_id;
   int global_id;
-  int dims[3],nf,ndof;
-  int d1,d2,d3,d3nf;
+  int dims[3],nf,ncell,ncell_nf,nnode,nnode_nf;
+  int d1,d2,d3;
   int myid;
   int *ibl;
   double *qcell, *qnode;

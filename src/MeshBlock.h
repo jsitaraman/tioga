@@ -312,6 +312,8 @@ class MeshBlock
   void clearOrphans(HOLEMAP *holemap,int nmesh,int *itmp);
   void getUnresolvedMandatoryReceptors();
   void getCartReceptors(CartGrid *cg, parallelComm *pc);
+  void fillReceptorDataPtr(CartGrid *cg,int cell_count,int c,int j,int k,int l,int* pmap,
+    double vol,double* xtm,bool isNodal,INTEGERLIST2*& dataPtr);
   void setCartIblanks(void);
   
   // Getters

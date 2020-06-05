@@ -20,6 +20,7 @@
 #include "codetypes.h"
 #include "CartBlock.h"
 #include "CartGrid.h"
+#include "cartUtils.h"
 #include "linCartInterp.h"
 #include <assert.h>
 #include <stdexcept>
@@ -88,15 +89,13 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
         for(i=0;i<listptr->nweights;i++)
         {
-          //Q[nq,nZ+2*nf,nY+2*nf,nX+2*nf]--> C++ Cell storage
-          index = (dims[1]+2*nf)*(dims[0]+2*nf)*(listptr->inode[3*i+2]+nf)
-              + (dims[0]+2*nf)*(listptr->inode[3*i+1]+nf)
-              + (listptr->inode[3*i]+nf);
+          index = cart_utils::get_cell_index(dims[0],dims[1],nf,
+            listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2]);
 
           for(n=0;n<nvar;n++)
           {
             weight=listptr->weights[i];
-            qq[n]+=qcell[index+d3nf*n]*weight;
+            qq[n]+=qcell[index+ncell_nf*n]*weight;
           }
         }
 
@@ -111,9 +110,12 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 
 void CartBlock::update(double *qval, int index,int nq)
 {
+  if(index >= ncell_nf)
+    return;
+
   int i;
   for(i=0;i<nq;i++)
-    qcell[index+d3nf*i]=qval[i];
+    qcell[index+ncell_nf*i]=qval[i];
 }
 
   
@@ -131,21 +133,23 @@ void CartBlock::preprocess(CartGrid *cg)
     d1=dims[0];
     d2=dims[0]*dims[1];
     d3=d2*dims[2];
-    d3nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
-    ndof=d3;
+    ncell=d3;
+    ncell_nf=(dims[0]+2*nf)*(dims[1]+2*nf)*(dims[2]+2*nf);
+    nnode=(d1+1)*(d2+1)*(d3+1);
+    nnode_nf=(dims[0]+1+2*nf)*(dims[1]+1+2*nf)*(dims[2]+1+2*nf);
   };
 
 void CartBlock::initializeLists(void)
 {
- donorList=(DONORLIST **)malloc(sizeof(DONORLIST *)*ndof);
- for(int i=0;i<ndof;i++) donorList[i]=NULL;
+ donorList=(DONORLIST **)malloc(sizeof(DONORLIST *)*ncell);
+ for(int i=0;i<ncell;i++) donorList[i]=NULL;
 }
 
 void CartBlock::clearLists(void)
 {
   int i;
   if (donorList) {
-  for(i=0;i<ndof;i++) { deallocateLinkList(donorList[i]); donorList[i]=NULL;}
+  for(i=0;i<ncell;i++) { deallocateLinkList(donorList[i]); donorList[i]=NULL;}
   TIOGA_FREE(donorList);
   }
   deallocateLinkList4(interpList);
@@ -221,6 +225,9 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
   
 void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid, double cellRes)
 {
+  if(index >= ncell_nf)
+    return;
+
   DONORLIST *temp1;
   int i,j,k,x_stride,xy_stride;
   int pointid;
@@ -236,14 +243,14 @@ void CartBlock::insertInDonorList(int senderid,int index,int meshtagdonor,int re
   i = index;
   pointid=(k-nf)*d2+(j-nf)*d1+(i-nf);
 
-  if (!(pointid >= 0 && pointid < ndof)) {
+  if (!(pointid >= 0 && pointid < ncell)) {
     TRACEI(index);
     TRACEI(nf);
     TRACEI(dims[0]);
     TRACEI(dims[1]);
     TRACEI(dims[2]);
   }
-  assert((pointid >= 0 && pointid < ndof));
+  assert((pointid >= 0 && pointid < ncell));
     
   temp1->donorData[0]=senderid;
   temp1->donorData[1]=meshtagdonor;
@@ -309,8 +316,8 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 		      {
 			if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			  {
-	                    ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
-			    ibl[ibindex]=0;
+        ibindex=cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
+        ibl[ibindex]=0;
                             holeFlag=0;
 			    break;
 			  }
@@ -333,7 +340,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 			  if (!iflag[h])
 			    if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
 			      {
-	                        ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+			      ibindex=cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
 				ibl[ibindex]=0;
                                 holeFlag=0;
 				break;
@@ -350,7 +357,7 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
       for(i=0;i<dims[0];i++)
 	{
 	  ibcount++;
-          ibindex=(k+nf)*(dims[1]+2*nf)*(dims[0]+2*nf)+(j+nf)*(dims[0]+2*nf)+i+nf;
+	  ibindex=cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
 
 	  if (ibl[ibindex]==0) 
 	    {

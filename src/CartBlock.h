@@ -35,9 +35,8 @@ class CartBlock
   int local_id;
   int global_id;
   int dims[3],nf,ncell,ncell_nf,nnode,nnode_nf;
-  int d1,d2,d3;
   int myid;
-  int *ibl;
+  int *ibl_cell, *ibl_node;;
   double *qcell, *qnode;
   double xlo[3]; 
   double dx[3];
@@ -47,14 +46,15 @@ class CartBlock
   DONORLIST **donorList;
   void (*donor_frac) (int *,double *,int *,double *);
  public:
-  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl=NULL;qcell=NULL;qnode=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
+  CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl_cell=NULL;ibl_node=NULL;qcell=NULL;qnode=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
     donor_frac=nullptr;};
   ~CartBlock() { clearLists();};
-  void registerData(int local_id_in,int global_id_in,int *iblankin)
+  void registerData(int local_id_in,int global_id_in,int *iblankin,int *iblanknin)
   {
     local_id=local_id_in;
     global_id=global_id_in;
-    ibl=iblankin;
+    ibl_cell=iblankin;
+    ibl_node=iblanknin;
   };
   void registerSolution(double *qin, bool isnodal) {
     if(isnodal)
@@ -69,6 +69,7 @@ class CartBlock
   void update(double *qval,int index,int nq);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
+  void processIblank(HOLEMAP *holemap, int nmesh, bool isNodal);
   void insertInDonorList(int senderid,int index,int meshtagdonor,int remoteid,int remoteblockid,double cellRes);
   void insertInInterpList(int procid,int remoteid,int remoteblockid,double *xtmp);
   void writeCellFile(int bid);

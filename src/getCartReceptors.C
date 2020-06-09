@@ -158,8 +158,8 @@ void MeshBlock::fillReceptorDataPtr(CartGrid *cg,int cell_count,int c,int j,int 
 {
   int itm = -1;
   if(isNodal){
-    itm = cart_utils::get_node_index(cg->dims[3*c],cg->dims[3*c+1],cg->dims[3*c+2],
-      cg->nf,j,k,l);
+    itm = cart_utils::get_concatenated_node_index(
+      cg->dims[3*c],cg->dims[3*c+1],cg->dims[3*c+2],cg->nf,j,k,l);
 
     xtm[0] = cg->xlo[3*c]   + j*cg->dx[3*c];
     xtm[1] = cg->xlo[3*c+1] + k*cg->dx[3*c+1];

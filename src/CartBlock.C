@@ -335,7 +335,7 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
               if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
               {
                 int ibindex = isNodal ?
-                    (cart_utils::get_node_index(dims[0],dims[1],dims[2],nf,i,j,k) - ncell_nf) :
+                    cart_utils::get_node_index(dims[0],dims[1],nf,i,j,k) :
                     cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
                 iblank[ibindex]=0;
                 break;
@@ -360,7 +360,7 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
                 if (checkHoleMap(xtmp,holemap[h].nx,holemap[h].sam,holemap[h].extents))
                 {
                   int ibindex = isNodal ?
-                      (cart_utils::get_node_index(dims[0],dims[1],dims[2],nf,i,j,k) - ncell_nf) :
+                      cart_utils::get_node_index(dims[0],dims[1],nf,i,j,k) :
                       cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
                   iblank[ibindex]=0;
                   break;
@@ -380,7 +380,7 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
       {
         idof++;
         int ibindex = isNodal ?
-            (cart_utils::get_node_index(dims[0],dims[1],dims[2],nf,i,j,k) - ncell_nf) :
+            cart_utils::get_node_index(dims[0],dims[1],nf,i,j,k) :
             cart_utils::get_cell_index(dims[0],dims[1],nf,i,j,k);
 
         if (iblank[ibindex]==0)

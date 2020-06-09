@@ -397,38 +397,23 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
         }
         else
         {
-          int icount=0;
-          if (donorList[idof]!=NULL)
-          {
-            temp=donorList[idof];
-            while(temp!=NULL)
-            {
-              if (temp->donorRes < BIGVALUE)
-              {
-                icount++;
-                break;
-              }
-              temp=temp->next;
-            }
-          }
-          if (icount==1)
-          {
-            iblank[ibindex]=-1;
-          }
-          else
-          {
-            if (donorList[idof]!=NULL)
-            {
-              temp=donorList[idof];
-              while(temp!=NULL)
-              {
+          if ((temp=donorList[idof])!=NULL)
+          {    
+             // simplify logic here: the first one on the list is the
+             // best donor anyway, accept it if its not a mandatory
+             // receptor on the donor side
+             if (temp->donorRes < BIGVALUE) iblank[ibindex]=-1;
+             temp=temp->next;
+             // cancel other donors of some exist
+             while(temp!=NULL)
+              {  
                 temp->cancel=1;
                 temp=temp->next;
               }
-            }
-          }
-        }
+           } 
+        } 
       }
+      
 
   /* FIXME: this piece of code needs to be modified to account for isNodal
   for(k=0;k<dims[2];k++)

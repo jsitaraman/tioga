@@ -256,6 +256,9 @@ void tioga::exchangeAMRDonors(void)
 	      ctype=rcvPack[i].intData[m++];
 	      id=rcvPack[i].intData[m++];
               int ib = rcvPack[i].intData[m++];
+              mblocks[ib]->donorIdCart[id]=-1;
+              /* not really sure why ctype was necessary
+                 revisit later, we shouldn't be touching donorId[id] here anyway
 	      if (ctype==0) 
 		{
 		  mblocks[ib]->donorIdCart[id]=-1;
@@ -264,6 +267,7 @@ void tioga::exchangeAMRDonors(void)
 		{
 		  mblocks[ib]->donorId[id]=-1;
 		}
+             */
 	    }
 	}
     }

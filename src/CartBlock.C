@@ -404,7 +404,7 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
              // receptor on the donor side
              if (temp->donorRes < BIGVALUE) iblank[ibindex]=-1;
              temp=temp->next;
-             // cancel other donors of some exist
+             // cancel other donors if some exist
              while(temp!=NULL)
               {  
                 temp->cancel=1;

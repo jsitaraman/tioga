@@ -29,8 +29,15 @@ namespace cart_utils
   }
 
   //Q[nq,nZ+1+2*nf,nY+1+2*nf,nX+1+2*nf]--> C++ node storage
+  inline int get_node_index(int nX,int nY,int nf,int i,int j,int k)
+  {
+    return (nY+1+2*nf)*(nX+1+2*nf)*(k+nf) + (nX+1+2*nf)*(j+nf) + (i+nf);
+  }
+
+  //Q[nq,nZ+1+2*nf,nY+1+2*nf,nX+1+2*nf]--> C++ node storage
+  // for arrays with both node and cell indices,
   // node index is assumed to follow cell index
-  inline int get_node_index(int nX,int nY,int nZ,int nf,int i,int j,int k)
+  inline int get_concatenated_node_index(int nX,int nY,int nZ,int nf,int i,int j,int k)
   {
     return (nY+1+2*nf)*(nX+1+2*nf)*(k+nf) + (nX+1+2*nf)*(j+nf) + (i+nf)
         + (nX+2*nf)*(nY+2*nf)*(nZ+2*nf);

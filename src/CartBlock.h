@@ -65,8 +65,8 @@ class CartBlock
   void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData,
-			   int nvar);
-  void update(double *qval,int index,int nq);
+			   int nvar_cell,int nvar_node);
+  void update(double *qval,int index,int nq_cell,int nq_node);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
   void processIblank(HOLEMAP *holemap, int nmesh, bool isNodal);

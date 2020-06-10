@@ -29,12 +29,14 @@ void compute_1d_bases(const std::vector<double>& ref_coord,
 
 void compute_linear_weights(const std::vector<double>& ref_coord, double* weights);
 
-void compute_ref_coords(double* ref_ratio, std::vector<double>& ref_coord);
+void compute_ref_coords_cell(double* ref_ratio, std::vector<double>& ref_coord);
 
-void create_donor_stencil(const int nf, int* ijk_cell, int* dims, double* ref_ratio, int* ijk_stencil);
+void compute_ref_coords_node(double* ref_ratio, std::vector<double>& ref_coord);
+
+void create_donor_stencil(const int nf, int* ijk_cell, int* dims, double* ref_ratio, int* ijk_stencil, bool isNodal);
 
 void linear_interpolation(const int nf, int* ijk_cell, int* dims, double* ref_ratio,
-  int* nw, int* ijk_stencil, double* weights);
+  int* nw, int* ijk_stencil, double* weights, bool isNodal);
 } // namespacee cart_interp
 
 #endif /* LINCARTINTERP_H */

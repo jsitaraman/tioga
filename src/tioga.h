@@ -142,7 +142,7 @@ class tioga
 
   void dataUpdate(int nvar,int interptype,int at_points=0) ;
 
-  void dataUpdate_AMR(int nvar,int interptype) ;
+  void dataUpdate_AMR(int nvar_cell,int nvar_node,int interptype) ;
   
   void dataUpdate_highorder(int nvar,double *q,int interptype) ;
 

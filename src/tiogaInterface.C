@@ -175,7 +175,7 @@ extern "C" {
     tg->registerSolution(*bid,q);
   }
 
-  void tioga_dataupdate_mb_(int *nvar,char *itype)
+  void tioga_dataupdate_mb_(int *nvar_cell,int *nvar_node,char *itype)
   {
     int interptype;
     if (strstr(itype,"row")) 
@@ -194,22 +194,23 @@ extern "C" {
 
     //tg->dataUpdate(*nvar,interptype);
 
+    int nvar = *nvar_cell + *nvar_node;
     if (tg->ihighGlobal==0) 
     {
       if (tg->iamrGlobal==0) 
       	{
-     	    tg->dataUpdate(*nvar,interptype);
+     	    tg->dataUpdate(nvar,interptype);
         }
      	else
      	  {
-     	    tg->dataUpdate_AMR(*nvar,interptype);
+     	    tg->dataUpdate_AMR(*nvar_cell,*nvar_node,interptype);
      	  }
     }
     else
     {
      if (tg->iamrGlobal==0) 
        {
-     	    tg->dataUpdate(*nvar,interptype,1);
+     	    tg->dataUpdate(nvar,interptype,1);
        }
       else
       {
@@ -218,12 +219,12 @@ extern "C" {
     }
   }
 
-  void tioga_dataupdate_(double *q,int *nvar,char *itype)
+  void tioga_dataupdate_(double *q,int *nvar_cell,int *nvar_node,char *itype)
   {
     int interptype;
     int bid=0;
     tg->registerSolution(bid,q);
-    tioga_dataupdate_mb_(nvar,itype);
+    tioga_dataupdate_mb_(nvar_cell,nvar_node,itype);
   }
 
   void tioga_writeoutputfiles_(int *nvar,char *itype)

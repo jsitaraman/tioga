@@ -58,7 +58,7 @@ void compute_weights(const std::vector<double>& ref_coord, double* weights)
   }
 }
 
-void compute_ref_coords(double* ref_ratio, std::vector<double>& ref_coord)
+void compute_ref_coords_cell(double* ref_ratio, std::vector<double>& ref_coord)
 {
   static constexpr int p = 1;
   // reference coordinates in -1 to 1. Assumes cells of uniform sizes
@@ -70,37 +70,67 @@ void compute_ref_coords(double* ref_ratio, std::vector<double>& ref_coord)
       ((ref_ratio[2]-0.5)/p*2-1) : ((ref_ratio[2]+0.5*(2*p-1))/p*2-1);
 }
 
-void create_donor_stencil(const int nf, int* ijk_cell, int* dims, double* ref_ratio, int* ijk_stencil)
+void compute_ref_coords_node(double* ref_ratio, std::vector<double>& ref_coord)
+{
+  static constexpr int p = 1;
+  // reference coordinates in -1 to 1. Assumes cells of uniform sizes
+  ref_coord[0] = ref_ratio[0]/p*2-1;
+  ref_coord[1] = ref_ratio[1]/p*2-1;
+  ref_coord[2] = ref_ratio[2]/p*2-1;
+}
+
+void create_donor_stencil(const int nf, int* ijk_cell, int* dims, double* ref_ratio, int* ijk_stencil, bool isNodal)
 {
   static constexpr int basis = 2;
-  // determine start node if donor stencil is
-  // right/left or front/behind or above/below of ijk_cell cell-center
-   int start_x = (ref_ratio[0]-0.5>=0) ? (ijk_cell[0]) : (ijk_cell[0]-1);
-   int start_y = (ref_ratio[1]-0.5>=0) ? (ijk_cell[1]) : (ijk_cell[1]-1);
-   int start_z = (ref_ratio[2]-0.5>=0) ? (ijk_cell[2]) : (ijk_cell[2]-1);
+
+  int start_x, start_y, start_z = 0;
+  int nX, nY, nZ = 0;
+  if(isNodal) {
+    start_x = ijk_cell[0];
+    start_y = ijk_cell[1];
+    start_z = ijk_cell[2];
+    nX = dims[0]+1;
+    nY = dims[1]+1;
+    nZ = dims[2]+1;
+  }
+  else {
+    // determine start node if donor stencil is
+    // right/left or front/behind or above/below of ijk_cell cell-center
+     start_x = (ref_ratio[0]-0.5>=0) ? (ijk_cell[0]) : (ijk_cell[0]-1);
+     start_y = (ref_ratio[1]-0.5>=0) ? (ijk_cell[1]) : (ijk_cell[1]-1);
+     start_z = (ref_ratio[2]-0.5>=0) ? (ijk_cell[2]) : (ijk_cell[2]-1);
+     nX = dims[0];
+     nY = dims[1];
+     nZ = dims[2];
+  }
 
    int ind = 0;
    for(int k=0;k<basis;k++) {
      for(int j=0;j<basis;j++) {
        for(int i=0;i<basis;i++) {
-         ijk_stencil[ind++] = std::max(-nf, std::min(start_x+i*1, dims[0]+nf-1));
-         ijk_stencil[ind++] = std::max(-nf, std::min(start_y+j*1, dims[1]+nf-1));
-         ijk_stencil[ind++] = std::max(-nf, std::min(start_z+k*1, dims[2]+nf-1));
+         ijk_stencil[ind++] = std::max(-nf, std::min(start_x+i*1, nX+nf-1));
+         ijk_stencil[ind++] = std::max(-nf, std::min(start_y+j*1, nY+nf-1));
+         ijk_stencil[ind++] = std::max(-nf, std::min(start_z+k*1, nZ+nf-1));
        }
      }
    }
 }
 
 void linear_interpolation(const int nf, int* ijk_cell, int* dims, double* ref_ratio,
-  int* nw, int* ijk_stencil, double* weights)
+  int* nw, int* ijk_stencil, double* weights, bool isNodal)
 {
   std::vector<double> ref_coord(3,0); // array of reference coordinates
 
   // 8-node donor stencil where the nodes are neighboring cell-centers
   // ordering of cell centers in donor stencil is such that
   // left->right is along x-axis. back->front is along y-axis. bottom->top is along z-axis
-  create_donor_stencil(nf, ijk_cell,dims,ref_ratio,ijk_stencil);
-  compute_ref_coords(ref_ratio,ref_coord);
+  create_donor_stencil(nf,ijk_cell,dims,ref_ratio,ijk_stencil,isNodal);
+
+  if(isNodal)
+    compute_ref_coords_node(ref_ratio,ref_coord);
+  else
+    compute_ref_coords_cell(ref_ratio,ref_coord);
+
   compute_weights(ref_coord,weights);
 }
 }

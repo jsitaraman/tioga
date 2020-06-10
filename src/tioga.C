@@ -212,8 +212,9 @@ void tioga::performConnectivityAMR(void)
 //  MPI_Abort(scomm,ierr);
 }
 
-void tioga::dataUpdate_AMR(int nvar,int interptype)
+void tioga::dataUpdate_AMR(int nvar_cell, int nvar_node, int interptype)
 {
+  int nvar = nvar_cell + nvar_node;
   int i,j,k,m;
   int nints;
   int nreals;
@@ -258,7 +259,7 @@ void tioga::dataUpdate_AMR(int nvar,int interptype)
    mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblock[ib],nvar,interptype);
   }
   for(i=0;i<ncart;i++)
-    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar);
+    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar_cell,nvar_node);
   //
   // populate the packets
   //
@@ -313,7 +314,7 @@ void tioga::dataUpdate_AMR(int nvar,int interptype)
 	    }
 	  else
 	    {
-	      cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar);
+	      cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar_cell,nvar_node);
 	    }
 	    m+=nvar;
 	}

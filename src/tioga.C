@@ -89,6 +89,15 @@ void tioga::registerSolution(int btag,double *q)
   qblock[iblk]=q;
 }
 
+void tioga::register_unstructured_solution(int btag,double *q,int nvar,int interptype)
+{
+  auto idxit=tag_iblk_map.find(btag);
+  int iblk=idxit->second;
+  qblock[iblk]=q;
+  mblocks[iblk]->num_var() = nvar;
+  mblocks[iblk]->set_interptype(interptype);
+}
+
 void tioga::profile(void)
 {
   this->myTimer("tioga::profile",0);
@@ -212,9 +221,17 @@ void tioga::performConnectivityAMR(void)
 //  MPI_Abort(scomm,ierr);
 }
 
-void tioga::dataUpdate_AMR(int nvar_cell, int nvar_node, int interptype)
+void tioga::dataUpdate_AMR()
 {
-  int nvar = nvar_cell + nvar_node;
+  if ((nblocks > 0) && (ncart > 0))
+    assert(mblocks[0]->num_var() == (cb[0].num_cell_var()+cb[0].num_node_var()));
+
+  int nvar = 0;
+  if (nblocks > 0)
+    nvar = mblocks[0]->num_var();
+  else if (ncart > 0)
+    nvar = cb[0].num_cell_var()+cb[0].num_node_var();
+
   int i,j,k,m;
   int nints;
   int nreals;
@@ -253,13 +270,14 @@ void tioga::dataUpdate_AMR(int nvar_cell, int nvar_node, int interptype)
   //
   // TODO : verify for nblocks > 1
   //
+
   nints=nreals=0;
   for(int ib=0;ib<nblocks;ib++) {
    auto & mb = mblocks[ib];
-   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblock[ib],nvar,interptype);
+   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblock[ib]);
   }
   for(i=0;i<ncart;i++)
-    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords,nvar_cell,nvar_node);
+    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords);
   //
   // populate the packets
   //
@@ -310,13 +328,13 @@ void tioga::dataUpdate_AMR(int nvar_cell, int nvar_node, int interptype)
 	    {
               int tmp1=rcvPack[k].intData[2*i+1];
               int inode=mblocks[-(bid+1)]->receptorIdCart[tmp1];
-	      mblocks[-(bid+1)]->updateSolnData(inode,&rcvPack[k].realData[m],qblock[-(bid+1)],nvar,interptype);
+	      mblocks[-(bid+1)]->updateSolnData(inode,&rcvPack[k].realData[m],qblock[-(bid+1)]);
 	    }
 	  else
 	    {
-	      cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1],nvar_cell,nvar_node);
+	      cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1]);
 	    }
-	    m+=nvar;
+	  m+=nvar;
 	}
     }
   //
@@ -448,7 +466,9 @@ void tioga::dataUpdate(int nvar,int interptype, int at_points)
 	  auto &mb = mblocks[ib];
           if (at_points==0) {
            double *q  = qblock[ib];
-	   mb->updateSolnData(pointid,&rcvPack[k].realData[m],q,nvar,interptype);
+           mb->num_var() = nvar;
+           mb->set_interptype(interptype);
+	   mb->updateSolnData(pointid,&rcvPack[k].realData[m],q);
           }
           else {
             for (int j=0;j<nvar;j++)
@@ -707,9 +727,9 @@ void tioga::register_amr_local_data(int ipatch,int global_id,int *iblank,int *ib
   cb[ipatch].registerData(ipatch,global_id,iblank,iblankn);
 }
 
-void tioga::register_amr_solution(int ipatch,double *q,bool isnodal)
+void tioga::register_amr_solution(int ipatch,double *q,int nvar_cell,int nvar_node)
 {
-  cb[ipatch].registerSolution(q,isnodal);
+  cb[ipatch].registerSolution(q,nvar_cell,nvar_node);
 }
 
 #ifdef TIOGA_ENABLE_TIMERS

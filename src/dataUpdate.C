@@ -102,7 +102,7 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
   if (qq) TIOGA_FREE(qq);
 }
 	
-void MeshBlock::updateSolnData(int inode,double *qvar,double *q,int nvar,int interptype)
+void MeshBlock::updateSolnData(int inode,double *qvar,double *q)
 {
   int k;
 

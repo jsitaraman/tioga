@@ -22,7 +22,6 @@
 #include "CartGrid.h"
 #include "cartUtils.h"
 #include "linCartInterp.h"
-#include <assert.h>
 #include <stdexcept>
 extern "C" {
   void deallocateLinkList(DONORLIST *temp);
@@ -33,8 +32,7 @@ extern "C" {
   int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
-				    double **realData,
-				    int nvar_cell, int nvar_node)
+				    double **realData)
 {
   int i,n;
   double *qq;
@@ -115,16 +113,16 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 }
 
 
-void CartBlock::update(double *qval,int index,int nq_cell,int nq_node)
+void CartBlock::update(double *qval,int index)
 {
   if(index >= ncell_nf) {
-    if(nq_node == 0) return;
-    for(int i=0;i<nq_node;i++)
-      qnode[index-ncell_nf+nnode_nf*i]=qval[nq_cell+i];
+    if(nvar_node == 0) return;
+    for(int i=0;i<nvar_node;i++)
+      qnode[index-ncell_nf+nnode_nf*i]=qval[nvar_cell+i];
   }
   else {
-    if(nq_cell == 0) return;
-    for(int i=0;i<nq_cell;i++)
+    if(nvar_cell == 0) return;
+    for(int i=0;i<nvar_cell;i++)
       qcell[index+ncell_nf*i]=qval[i];
   }
 }

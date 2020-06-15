@@ -22,7 +22,6 @@
 #include "CartGrid.h"
 #include "cartUtils.h"
 #include "linCartInterp.h"
-#include <assert.h>
 #include <stdexcept>
 extern "C" {
   void deallocateLinkList(DONORLIST *temp);
@@ -33,11 +32,9 @@ extern "C" {
   int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
-				    double **realData,
-				    int nvar)
+				    double **realData)
 {
   int i,n;
-  int index;
   double *qq;
   int *tmpint;
   double *tmpreal;
@@ -66,7 +63,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
        //  
       }
       (*nints)+=interpCount;
-      (*nreals)+=(interpCount*nvar);
+      (*nreals)+=(interpCount*(nvar_cell+nvar_node));
       (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
       (*realData)=(double *)malloc(sizeof(double)*(*nreals));
       if (nintold > 0) {
@@ -78,31 +75,36 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
       listptr=interpList;
       icount=3*nintold;
       dcount=nrealold;
-      qq=(double *)malloc(sizeof(double)*nvar);
+      qq=(double *)malloc(sizeof(double)*(nvar_cell+nvar_node));
       while(listptr!=NULL)
       {
         (*intData)[icount++]=listptr->receptorInfo[0];
         (*intData)[icount++]=-1-listptr->receptorInfo[2];
         (*intData)[icount++]=listptr->receptorInfo[1];
 
-        for(n=0;n<nvar;n++) qq[n]=0; // zero out solution
+        for(n=0;n<(nvar_cell+nvar_node);n++) qq[n]=0; // zero out solution
 
         for(i=0;i<listptr->nweights;i++)
         {
-          index = cart_utils::get_cell_index(dims[0],dims[1],nf,
+          int cell_index = cart_utils::get_cell_index(dims[0],dims[1],nf,
             listptr->inode[3*i],listptr->inode[3*i+1],listptr->inode[3*i+2]);
-
-          if(index >= ncell_nf)
-            continue;
-
-          for(n=0;n<nvar;n++)
+          for(n=0;n<nvar_cell;n++)
           {
             weight=listptr->weights[i];
-            qq[n]+=qcell[index+ncell_nf*n]*weight;
+            qq[n]+=qcell[cell_index+ncell_nf*n]*weight;
+          }
+
+          int ind_offset = 3*(listptr->nweights+i);
+          int node_index = cart_utils::get_node_index(dims[0],dims[1],nf,
+            listptr->inode[ind_offset],listptr->inode[ind_offset+1],listptr->inode[ind_offset+2]);
+          for(n=0;n<nvar_node;n++)
+          {
+            weight=listptr->weights[listptr->nweights+i];
+            qq[nvar_cell+n]+=qnode[node_index+nnode_nf*n]*weight;
           }
         }
 
-        for(n=0;n<nvar;n++) (*realData)[dcount++]=qq[n]; // update solution
+        for(n=0;n<(nvar_cell+nvar_node);n++) (*realData)[dcount++]=qq[n]; // update solution
 
         listptr=listptr->next;
       }
@@ -111,14 +113,18 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 }
 
 
-void CartBlock::update(double *qval, int index,int nq)
+void CartBlock::update(double *qval,int index)
 {
-  if(index >= ncell_nf)
-    return;
-
-  int i;
-  for(i=0;i<nq;i++)
-    qcell[index+ncell_nf*i]=qval[i];
+  if(index >= ncell_nf) {
+    if(nvar_node == 0) return;
+    for(int i=0;i<nvar_node;i++)
+      qnode[index-ncell_nf+nnode_nf*i]=qval[nvar_cell+i];
+  }
+  else {
+    if(nvar_cell == 0) return;
+    for(int i=0;i<nvar_cell;i++)
+      qcell[index+ncell_nf*i]=qval[i];
+  }
 }
 
   
@@ -191,34 +197,39 @@ void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,dou
           rst[n]=(xtmp[n]-xlo[n]-ix[n]*dx[n])/dx[n];
          }
        }
-      // if (!(ix[n] >=0 && ix[n] < dims[n]) && myid==77) {
-      //  TRACEI(procid);
-      //  TRACEI(global_id);
-      //  TRACEI(local_id);
-      //  TRACEI(remoteid);
-      //  TRACEI(myid);
-      //  TRACED(xtmp[0]);
-      //  TRACED(xtmp[1]);
-      //  TRACED(xtmp[2]);
-      //  TRACED(xlo[0]);
-      //  TRACED(xlo[1]);
-      //  TRACED(xlo[2]);
-      //  TRACED(dx[0]);
-      //  TRACED(dx[1]);
-      //  TRACED(dx[2]);
-      //  TRACEI(ix[n]);
-      //  TRACEI(n);
-      //  TRACEI(dims[n]);
-      //  printf("--------------------------\n");
-      // }
+       if (!(ix[n] >=0 && ix[n] < dims[n])) {
+        TRACEI(procid);
+        TRACEI(global_id);
+        TRACEI(local_id);
+        TRACEI(remoteid);
+        TRACEI(myid);
+        TRACED(xtmp[0]);
+        TRACED(xtmp[1]);
+        TRACED(xtmp[2]);
+        TRACED(xlo[0]);
+        TRACED(xlo[1]);
+        TRACED(xlo[2]);
+        TRACED(dx[0]);
+        TRACED(dx[1]);
+        TRACED(dx[2]);
+        TRACEI(ix[n]);
+        TRACEI(n);
+        TRACEI(dims[n]);
+        printf("--------------------------\n");
+       }
      assert((ix[n] >=0 && ix[n] < dims[n]));
     }
   if (donor_frac == nullptr) {
     listptr->nweights=8;
-    listptr->weights=(double *)malloc(sizeof(double)*listptr->nweights);
-    listptr->inode=(int *)malloc(sizeof(int)*(listptr->nweights*3));
+    listptr->weights=(double *)malloc(sizeof(double)*(listptr->nweights*2));
+    listptr->inode=(int *)malloc(sizeof(int)*(listptr->nweights*2*3));
+
     cart_interp::linear_interpolation(nf,ix,dims,rst,&(listptr->nweights),
-      listptr->inode,listptr->weights);
+      listptr->inode,listptr->weights,false);
+
+    int ind_offset = 3*listptr->nweights;
+    cart_interp::linear_interpolation(nf,ix,dims,rst,&(listptr->nweights),
+      &(listptr->inode[ind_offset]),&(listptr->weights[listptr->nweights]),true);
   }
   TIOGA_FREE(rst);
 }

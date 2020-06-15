@@ -46,6 +46,7 @@ class MeshBlock
   int *nc;     /**  < number of each of different kinds of cells (tets, prism, pyramids, hex etc) */
   int nobc;    /** < number of overset boundary nodes */
   int nwbc;    /** < number of wall boundary nodes */
+  int nvar;    /** < Number of variables */
   //
   double *x;        /** < grid nodes x[3*nnodes] */
   int *iblank_cell; /** < iblank value at each grid cell */
@@ -70,6 +71,7 @@ class MeshBlock
   //
   int ninterp;              /**< number of interpolations to be performed */
   int interpListSize;
+  int interptype;
   INTERPLIST *interpList;   /**< list of donor nodes in my grid, with fractions and information of
                                  who they donate to */ 
   int *interp2donor;
@@ -159,7 +161,7 @@ class MeshBlock
     interpList=NULL; interp2donor=NULL; obb=NULL; nsearch=0; isearch=NULL; tagsearch=NULL;
     res_search=NULL;xsearch=NULL; donorId=NULL;xtag=NULL;
     adt=NULL; cancelList=NULL; userSpecifiedNodeRes=NULL; userSpecifiedCellRes=NULL; nfringe=1;
-    mexclude=3;
+    mexclude=3; nvar=0; interptype=0;
     // new vars
     ninterp=ninterp2=interpListSize=interp2ListSize=0;
     ctag=NULL;pointsPerCell=NULL;maxPointsPerCell=0;rxyz=NULL;ntotalPoints=0;rst=NULL;ihigh=0;ipoint=0;
@@ -203,15 +205,14 @@ class MeshBlock
 
   void writeOBB2(OBB *obc,int bid);
 
-  void updateSolnData(int inode,double *qvar,double *q,int nvar,int interptype);
+  void updateSolnData(int inode,double *qvar,double *q);
 
   int getNinterp(void) {return ninterp;};
 
   void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,double *q,
 			       int nvar, int interptype);
 
-  void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,
-				  int nvar, int interptype);
+  void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q);
   
   void checkContainment(int *cellIndex,int adtElement,double *xsearch);
 
@@ -353,6 +354,13 @@ class MeshBlock
   void check_for_uniform_hex();
 
   void create_hex_cell_map();
+
+  int num_var() const { return nvar; }
+  int& num_var() { return nvar; }
+
+  void set_interptype(int type) {
+    interptype = type;
+  }
 };
 
 #endif /* MESHBLOCK_H */

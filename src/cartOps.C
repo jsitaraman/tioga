@@ -276,8 +276,7 @@ void MeshBlock::findInterpListCart(void)
 }    
 
 
-void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,
-					int nvar, int interptype)
+void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q)
 {
   int i;
   int k,m,inode;

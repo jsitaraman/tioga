@@ -558,7 +558,11 @@ void MeshBlock::updatePointData(double *q,double *qtmp,int nvar,int interptype)
 	{
 	  if (picked[i]) 
 	    {
-	      if (iblank[i]==-1) updateSolnData(i,&(qtmp[m]),q,nvar,interptype);
+	      if (iblank[i]==-1) {
+          num_var() = nvar;
+          set_interptype(interptype);
+	        updateSolnData(i,&(qtmp[m]),q);
+	      }
 	      m+=nvar;
 	    }
 	}

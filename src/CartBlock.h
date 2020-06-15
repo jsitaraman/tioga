@@ -21,6 +21,7 @@
 #ifndef CARTBLOCK_H
 #define CARTBLOCK_H
 
+#include <cassert>
 #include <cstdlib>
 #include "codetypes.h"
 
@@ -35,6 +36,7 @@ class CartBlock
   int local_id;
   int global_id;
   int dims[3],nf,ncell,ncell_nf,nnode,nnode_nf;
+  int nvar_cell,nvar_node;
   int myid;
   int *ibl_cell, *ibl_node;;
   double *qcell, *qnode;
@@ -47,7 +49,7 @@ class CartBlock
   void (*donor_frac) (int *,double *,int *,double *);
  public:
   CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl_cell=NULL;ibl_node=NULL;qcell=NULL;qnode=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
-    donor_frac=nullptr;};
+    donor_frac=nullptr;nvar_cell=0;nvar_node=0;};
   ~CartBlock() { clearLists();};
   void registerData(int local_id_in,int global_id_in,int *iblankin,int *iblanknin)
   {
@@ -56,17 +58,24 @@ class CartBlock
     ibl_cell=iblankin;
     ibl_node=iblanknin;
   };
-  void registerSolution(double *qin, bool isnodal) {
-    if(isnodal)
+  void registerSolution(double *qin,int nq_cell,int nq_node) {
+    assert ((nq_cell+nq_node > 0)
+      && !((nq_cell > 0) && (nq_node > 0)));
+    if (nq_node > 0) {
+      nvar_node = nq_node;
       qnode = qin;
-    else
+    }
+    else if (nq_cell > 0){
+      nvar_cell = nq_cell;
       qcell = qin;
+    }
   };
+  int num_cell_var() const { return nvar_cell; }
+  int num_node_var() const { return nvar_node; }
   void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
-			   double **realData,
-			   int nvar);
-  void update(double *qval,int index,int nq);
+			   double **realData);
+  void update(double *qval,int index);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
   void processIblank(HOLEMAP *holemap, int nmesh, bool isNodal);

@@ -145,9 +145,9 @@ extern "C" {
     tg->register_amr_local_data(*ipatch,*global_id,iblank,iblankn);
   }
 
-  void tioga_register_amr_solution_(int *ipatch,double *q, bool isnodal)
+  void tioga_register_amr_solution_(int *ipatch,double *q,int nvar_cell,int nvar_node)
   {
-    tg->register_amr_solution(*ipatch,q,isnodal);
+    tg->register_amr_solution(*ipatch,q,nvar_cell,nvar_node);
   }
 
   void tioga_preprocess_grids_(void)
@@ -202,7 +202,7 @@ extern "C" {
         }
      	else
      	  {
-     	    tg->dataUpdate_AMR(*nvar,interptype);
+     	    tg->dataUpdate_AMR();
      	  }
     }
     else

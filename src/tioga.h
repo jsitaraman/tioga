@@ -124,6 +124,8 @@ class tioga
 
   void registerSolution(int btag,double *q);
 
+  void register_unstructured_solution(int btag,double *q,int nvar,int interptype);
+
   void profile(void);
 
   void exchangeBoxes(void);
@@ -142,7 +144,7 @@ class tioga
 
   void dataUpdate(int nvar,int interptype,int at_points=0) ;
 
-  void dataUpdate_AMR(int nvar,int interptype) ;
+  void dataUpdate_AMR() ;
   
   void dataUpdate_highorder(int nvar,double *q,int interptype) ;
 
@@ -250,7 +252,7 @@ class tioga
   void register_amr_global_data(int,int *,double *,int);
   void set_amr_patch_count(int);
   void register_amr_local_data(int, int ,int *, int *);
-  void register_amr_solution(int ,double *, bool);
+  void register_amr_solution(int,double*,int,int);
   void exchangeAMRDonors(void);
   void checkComm(void);
   void outputStatistics(void);

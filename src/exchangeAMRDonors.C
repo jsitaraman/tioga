@@ -129,13 +129,17 @@ void tioga::exchangeAMRDonors(void)
 	      procid=imap[cg->proc_id[gid]];
 	      localid=cg->local_id[gid];	  
 	      sndPack[procid].intData[intcount[procid]++]=localid;
-	      sndPack[procid].intData[intcount[procid]++]=i;
+	      sndPack[procid].intData[intcount[procid]++]=mb->receptorIdCart[i];
 	      sndPack[procid].intData[intcount[procid]++]=ib;
 	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i];
 	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i+1];
 	      sndPack[procid].realData[realcount[procid]++]=mb->rxyzCart[3*i+2];	  
 	    }
 	}
+      }
+      for(int ib=0;ib<nblocks;ib++)
+      {
+      auto & mb = mblocks[ib];
       for(i=0;i<mb->nsearch;i++) 
 	{
 	  if (mb->donorId[i]!=-1) 
@@ -256,9 +260,6 @@ void tioga::exchangeAMRDonors(void)
 	      ctype=rcvPack[i].intData[m++];
 	      id=rcvPack[i].intData[m++];
               int ib = rcvPack[i].intData[m++];
-              mblocks[ib]->donorIdCart[id]=-1;
-              /* not really sure why ctype was necessary
-                 revisit later, we shouldn't be touching donorId[id] here anyway
 	      if (ctype==0) 
 		{
 		  mblocks[ib]->donorIdCart[id]=-1;
@@ -267,7 +268,6 @@ void tioga::exchangeAMRDonors(void)
 		{
 		  mblocks[ib]->donorId[id]=-1;
 		}
-             */
 	    }
 	}
     }

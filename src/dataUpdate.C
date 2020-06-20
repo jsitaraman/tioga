@@ -108,6 +108,8 @@ void MeshBlock::updateSolnData(int inode,double *qvar,double *q)
 
   if (interptype==ROW)
     {
+      if (inode > nnodes) { TRACEI(inode); TRACEI(nnodes);}
+      assert(inode < nnodes);
       for(k=0;k<nvar;k++)
 	q[inode*nvar+k]=qvar[k];
     }

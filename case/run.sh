@@ -12,6 +12,6 @@ num_mesh_parts=$(($num_mpi_ranks * 2))
 
 cd grid;
 echo $num_mesh_parts
-mpirun -np $num_mesh_parts ../../build3/gridGen/buildGrid
+mpirun -np $num_mesh_parts --oversubscribe ../../build/gridGen/buildGrid
 cd ..
-mpirun -np $num_mpi_ranks ../build3/driver/tioga.exe
+mpirun -np $num_mpi_ranks --oversubscribe ../build/driver/tioga.exe

@@ -361,6 +361,7 @@ class MeshBlock
   void set_interptype(int type) {
     interptype = type;
   }
+  void checkOrphans(void);
 };
 
 #endif /* MESHBLOCK_H */

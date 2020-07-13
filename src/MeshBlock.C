@@ -1407,3 +1407,34 @@ void MeshBlock::create_hex_cell_map(void)
        uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]]=i;
     }
 }
+
+void MeshBlock::checkOrphans(void)
+{
+  int norphan=0;
+  for (int i=0;i<nnodes;i++) 
+    {
+      if (nodeRes[i]==BIGVALUE) {
+	if (iblank[i]==1) {
+	  norphan++;
+        }
+      }
+    }
+  if (norphan > 0) {
+    char intstring[7];
+    char fname[80];
+    printf("myid/meshtag/norphan/nnodes/nobc=%d %d %d %d %d\n",myid,meshtag,norphan,nnodes,nobc);
+    sprintf(intstring,"%d",100000+myid);
+    sprintf(fname,"orphan%s.dat",&(intstring[1]));
+    FILE *fp=fopen(fname,"w");
+    for (int i=0;i<nnodes;i++) 
+    {
+      if (nodeRes[i]==BIGVALUE) {
+	if (iblank[i]==1) {
+          fprintf(fp,"%f %f %f\n",x[3*i],x[3*i+1],x[3*i+2]);
+	  norphan++;
+        }
+      }
+    }
+    fclose(fp);
+  }
+}

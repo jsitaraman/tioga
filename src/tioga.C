@@ -190,23 +190,35 @@ void tioga::performConnectivityAMR(void)
 
   iamr=(ncart >0)?1:0;
   MPI_Allreduce(&iamr,&iamrGlobal,1,MPI_INT,MPI_MAX,scomm);
+  this->myTimer("tioga::cg->preprocess",0);
   cg->preprocess();
+  this->myTimer("tioga::cg->preprocess",1);
+  this->myTimer("tioga::cb[i].preprocess",0);
   for(i=0;i<ncart;i++) cb[i].preprocess(cg);
+  this->myTimer("tioga::cb[i].preprocess",1);
   
   if (nblocks > 0) 
     {
      for(int ib=0;ib<nblocks;ib++)
      {
       auto& mb = mblocks[ib];
+      this->myTimer("tioga::getCartReceptors",0);
       mb->getCartReceptors(cg,pc_cart);
+      this->myTimer("tioga::getCartReceptors",1);
       mb->ihigh=ihigh;
+      this->myTimer("tioga::searchCartesianMB",0);
       mb->search();
+      this->myTimer("tioga::searchCartesianMB",1);
       mb->getUnresolvedMandatoryReceptors();
+      this->myTimer("tioga::cgSearch",0);
       cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
+      this->myTimer("tioga::cgSearch",1);
      }
     }    
   //checkComm();
+  this->myTimer("tioga::exchangeAMRDonors",0);
   exchangeAMRDonors();
+  this->myTimer("tioga::exchangeAMRDonors",1);
   for(int ib=0;ib<nblocks;ib++)
    {
     auto &mb = mblocks[ib];
@@ -339,6 +351,7 @@ void tioga::dataUpdate_AMR()
   //
   // release all memory
   //
+  this->writeData(nvar,0);
   pc_cart->clearPackets2(sndPack,rcvPack);
   TIOGA_FREE(sndPack);
   TIOGA_FREE(rcvPack);
@@ -544,7 +557,12 @@ void tioga::writeData(int nvar,int interptype)
 {
   //mb->writeGridFile(myid);
   for(int ib=0;ib<nblocks;ib++)
-     mblocks[ib]->writeFlowFile(100*myid+ib,qblock[ib],nvar,interptype);
+     {
+      mblocks[ib]->writeFlowFile(100*myid+ib,qblock[ib],nvar,interptype);
+      mblocks[ib]->checkOrphans();
+     }
+  for (int ib=0;ib<ncart;ib++)
+    cb[ib].writeCellFile(ib);
 }
 
 void tioga::getDonorCount(int btag, int *dcount,int *fcount)

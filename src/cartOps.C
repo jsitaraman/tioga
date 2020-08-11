@@ -276,7 +276,7 @@ void MeshBlock::findInterpListCart(void)
 }    
 
 
-void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q)
+void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,int *sndMap)
 {
   int i;
   int k,m,inode;
@@ -356,7 +356,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[inode*nvar+k]*weight;
 		}
-	      (*intData)[icount++]=interpList[i].receptorInfo[0];
+	      (*intData)[icount++]=sndMap[interpList[i].receptorInfo[0]];
 	      (*intData)[icount++]=-1-interpList[i].receptorInfo[2];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
 	      for(k=0;k<nvar;k++)

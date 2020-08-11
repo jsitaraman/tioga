@@ -202,17 +202,17 @@ void tioga::performConnectivityAMR(void)
      for(int ib=0;ib<nblocks;ib++)
      {
       auto& mb = mblocks[ib];
-      this->myTimer("tioga::getCartReceptors",0);
+      //this->myTimer("tioga::getCartReceptors",0);
       mb->getCartReceptors(cg,pc_cart);
-      this->myTimer("tioga::getCartReceptors",1);
+      //this->myTimer("tioga::getCartReceptors",1);
       mb->ihigh=ihigh;
-      this->myTimer("tioga::searchCartesianMB",0);
+      //this->myTimer("tioga::searchCartesianMB",0);
       mb->search();
-      this->myTimer("tioga::searchCartesianMB",1);
+      //this->myTimer("tioga::searchCartesianMB",1);
       mb->getUnresolvedMandatoryReceptors();
-      this->myTimer("tioga::cgSearch",0);
+      //this->myTimer("tioga::cgSearch",0);
       cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
-      this->myTimer("tioga::cgSearch",1);
+      //this->myTimer("tioga::cgSearch",1);
      }
     }    
   //checkComm();
@@ -251,6 +251,8 @@ void tioga::dataUpdate_AMR()
   double *realRecords;
   int nsend,nrecv;
   int *sndMap,*rcvMap;
+  int *sndMapNB,*rcvMapNB;
+  int nsendNB,nrecvNB;
   PACKET *sndPack,*rcvPack;
   int *icount,*dcount;
   int bid;
@@ -282,11 +284,14 @@ void tioga::dataUpdate_AMR()
   //
   // TODO : verify for nblocks > 1
   //
-
+  // get nearbody process maps
+  //  
+  pc->getMap(&nsendNB,&nrecvNB,&sndMapNB,&rcvMapNB);
+  
   nints=nreals=0;
   for(int ib=0;ib<nblocks;ib++) {
    auto & mb = mblocks[ib];
-   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblock[ib]);
+   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblock[ib],sndMapNB);
   }
   for(i=0;i<ncart;i++)
     cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords);
@@ -325,8 +330,10 @@ void tioga::dataUpdate_AMR()
     }
   //
   // communicate the data across
+  // use All comm because pc_cart is across all procs
+  // anyway
   //
-  pc_cart->sendRecvPackets(sndPack,rcvPack);
+  pc_cart->sendRecvPacketsAll(sndPack,rcvPack);
   //
   // decode the packets and update the data
   //

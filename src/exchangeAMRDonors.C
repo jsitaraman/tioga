@@ -166,7 +166,9 @@ void tioga::exchangeAMRDonors(void)
   //
   // exchange data
   //
-  pc_cart->sendRecvPackets(sndPack,rcvPack);
+  // send to All because there is no gain for now
+  //  
+  pc_cart->sendRecvPacketsAll(sndPack,rcvPack);
   //
   // decode the data now
   //
@@ -249,7 +251,7 @@ void tioga::exchangeAMRDonors(void)
   for(i=0;i<nsend;i++) sndPack[i].nints=intcount[i];
   //}
 
-  pc_cart->sendRecvPackets(sndPack,rcvPack);
+  pc_cart->sendRecvPacketsAll(sndPack,rcvPack);
   for(i=0;i<nrecv;i++)
     {
       if (rcvPack[i].nints > 0) 

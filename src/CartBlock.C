@@ -413,7 +413,14 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
              // simplify logic here: the first one on the list is the
              // best donor anyway, accept it if its not a mandatory
              // receptor on the donor side
-             if (temp->donorRes < BIGVALUE) iblank[ibindex]=-1;
+             if (temp->donorRes < BIGVALUE) 
+              {
+                iblank[ibindex]=-1;
+              }
+             else 
+              {
+               temp->cancel=1;
+              }
              temp=temp->next;
              // cancel other donors if some exist
              while(temp!=NULL)

@@ -407,7 +407,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[k*nnodes+inode]*weight;
 		}
-	      (*intData)[icount++]=interpList[i].receptorInfo[0];
+	      (*intData)[icount++]=sndMap[interpList[i].receptorInfo[0]];
 	      (*intData)[icount++]=-1-interpList[i].receptorInfo[2];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
 	      for(k=0;k<nvar;k++)

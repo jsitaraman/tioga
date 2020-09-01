@@ -197,24 +197,24 @@ void tioga::performConnectivityAMR(void)
   for(i=0;i<ncart;i++) cb[i].preprocess(cg);
   this->myTimer("tioga::cb[i].preprocess",1);
   
-  if (nblocks > 0) 
-    {
-     for(int ib=0;ib<nblocks;ib++)
-     {
-      auto& mb = mblocks[ib];
-      //this->myTimer("tioga::getCartReceptors",0);
-      mb->getCartReceptors(cg,pc_cart);
-      //this->myTimer("tioga::getCartReceptors",1);
-      mb->ihigh=ihigh;
-      //this->myTimer("tioga::searchCartesianMB",0);
-      mb->search();
-      //this->myTimer("tioga::searchCartesianMB",1);
-      mb->getUnresolvedMandatoryReceptors();
-      //this->myTimer("tioga::cgSearch",0);
-      cg->search(mb->rxyzCart,mb->donorIdCart,mb->ntotalPointsCart);
-      //this->myTimer("tioga::cgSearch",1);
-     }
-    }    
+  int nbmax;
+  MPI_Allreduce(&nblocks, &nbmax, 1, MPI_INT, MPI_MAX, scomm);
+  for(int ib=0;ib<nbmax ;ib++)
+  {
+    this->myTimer("tioga::getCartReceptors",0);
+    if (ib < nblocks) mblocks[ib]->getCartReceptors(cg,pc_cart);
+    this->myTimer("tioga::getCartReceptors",1);
+    if (ib < nblocks) mblocks[ib]->ihigh=ihigh;
+    this->myTimer("tioga::searchCartesianMB",0);
+    if (ib < nblocks) mblocks[ib]->search();
+    this->myTimer("tioga::searchCartesianMB",1);
+    if (ib < nblocks) mblocks[ib]->getUnresolvedMandatoryReceptors();
+    this->myTimer("tioga::cgSearch",0);
+    if (ib < nblocks) cg->search(
+      mblocks[ib]->rxyzCart,mblocks[ib]->donorIdCart,mblocks[ib]->ntotalPointsCart);
+    this->myTimer("tioga::cgSearch",1);
+  }
+
   //checkComm();
   this->myTimer("tioga::exchangeAMRDonors",0);
   exchangeAMRDonors();
@@ -228,9 +228,6 @@ void tioga::performConnectivityAMR(void)
   //for(i=0;i<ncart;i++)
 	//cb[i].writeCellFile(i);
   MPI_Barrier(scomm);
-  //printf("Finished performConnectivityAMR in %d\n",myid);
-  //ierr=0;
-//  MPI_Abort(scomm,ierr);
 }
 
 void tioga::dataUpdate_AMR()
@@ -358,7 +355,7 @@ void tioga::dataUpdate_AMR()
   //
   // release all memory
   //
-  this->writeData(nvar,0);
+  // this->writeData(nvar,0);
   pc_cart->clearPackets2(sndPack,rcvPack);
   TIOGA_FREE(sndPack);
   TIOGA_FREE(rcvPack);

@@ -416,12 +416,8 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
              if (temp->donorRes < BIGVALUE) 
               {
                 iblank[ibindex]=-1;
+                temp=temp->next;
               }
-             else 
-              {
-               temp->cancel=1;
-              }
-             temp=temp->next;
              // cancel other donors if some exist
              while(temp!=NULL)
               {  
@@ -468,15 +464,16 @@ void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
 
 void CartBlock::getCancellationData(int *cancelledData, int *ncancel)
 {
-  int i,j,k,m;
+  int i,j,k,m,isNodal;
   int idof;
   DONORLIST *temp;
   idof=-1;
   m=0;
   *ncancel=0;
-  for(k=0;k<dims[2];k++)
-    for(j=0;j<dims[1];j++)
-      for(i=0;i<dims[0];i++)
+  for(isNodal=0;isNodal<2;isNodal++)
+   for(k=0;k<dims[2]+isNodal;k++)
+    for(j=0;j<dims[1]+isNodal;j++)
+      for(i=0;i<dims[0]+isNodal;i++)
 	  {
 	    idof++;
 	    if (donorList[idof]!=NULL)

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 project(TIOGA CXX C Fortran)
 
@@ -8,16 +8,29 @@ option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" on)
 option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
 option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
+option(TIOGA_ENABLE_CUDA "Enable CUDA support (default: off)" OFF)
+
+# CUDA specific options
+set(TIOGA_CUDA_SM "70" CACHE STRING "CUDA arch option")
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
-# Ensure C++11 standard is enabled
-if (CMAKE_VERSION VERSION_LESS "3.1")
-  set(CMAKE_CXX_FLAGS "-g -rdynamic -std=c++0x" ${CMAKE_CXX_FLAGS})
-else()
-  set(CMAKE_CXX_STANDARD 11)
-  set(CMAKE_CXX_FLAGS "-O3" ${CMAKE_CXX_FLAGS})
+if (TIOGA_ENABLE_CUDA)
+  enable_language(CUDA)
+  if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "9.0")
+    message(FATAL_ERROR "Your nvcc version is ${CMAKE_CUDA_COMPILER_VERSION}. "
+      "Please use CUDA toolkit version 9.0 or newer")
+  endif()
+  set(TIOGA_CUDA_FLAGS "--Wno-deprecated-gpu-targets -m64")
+  set(TIOGA_CUDA_ARCH_FLAGS "-gencode=arch=compute_${TIOGA_CUDA_SM},code=sm_${TIOGA_CUDA_SM}")
+  set(CMAKE_CUDA_STANDARD 11)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  set(CMAKE_CUDA_EXTENSIONS OFF)
 endif()
 
 # Set some default compilation settings for Fortran compiler
@@ -35,18 +48,6 @@ endif()
 if (BUILD_SHARED_LIBS)
   set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
-endif()
-
-if (TIOGA_HAS_NODEGID)
-  add_definitions(-DTIOGA_HAS_NODEGID)
-endif()
-
-if (TIOGA_ENABLE_TIMERS)
-  add_definitions(-DTIOGA_ENABLE_TIMERS)
-endif()
-
-if (TIOGA_OUTPUT_STATS)
-  add_definitions(-DTIOGA_OUTPUT_STATS)
 endif()
 
 # Always build libtioga

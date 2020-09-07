@@ -23,6 +23,16 @@ add_executable(poisson_mms.exe poisson_mms.f90)
 target_link_libraries(poisson_mms.exe tiogadriver)
 set_target_properties(poisson_mms.exe PROPERTIES LINKER_LANGUAGE Fortran)
 
+add_executable(gpu_test.exe)
+target_sources(gpu_test.exe PRIVATE
+  gpu_test.C)
+target_link_libraries(gpu_test.exe tioga)
+if (TIOGA_ENABLE_CUDA)
+  get_target_property(GPUTEST_CPP_SRC tioga SOURCES)
+  list(FILTER GPUTEST_CPP_SRC INCLUDE REGEX "\\.C")
+  set_source_files_properties(${GPUTEST_CPP_SRC} PROPERTIES LANGUAGE CUDA)
+endif()
+
 install(TARGETS tiogadriver
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib

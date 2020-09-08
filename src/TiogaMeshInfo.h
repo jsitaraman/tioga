@@ -63,18 +63,23 @@ struct AMRMeshInfo
     TiogaView<int> local_id;
     TiogaView<int> ilow;
     TiogaView<int> ihigh;
+    TiogaView<int> dims;
     TiogaView<double> xlo;
     TiogaView<double> dx;
 
     // Patch data for all patches belonging to this MPI rank
     // [ngrids_local]
     TiogaView<int> global_idmap;
-    TiogaView<int> iblank_node;
-    TiogaView<int> iblank_cell;
-    TiogaView<double> qcell;
-    TiogaView<double> qnode;
+    TiogaView<int*> iblank_node;
+    TiogaView<int*> iblank_cell;
+    TiogaView<double*> qcell;
+    TiogaView<double*> qnode;
 
     int num_ghost{0};
+    int ngrids_global{0};
+    int ngrids_local{0};
+    int nvar_cell{0};
+    int nvar_node{0};
 };
 
 } // namespace TIOGA

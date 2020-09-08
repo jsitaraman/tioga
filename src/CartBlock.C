@@ -17,12 +17,14 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include <stdexcept>
+#include "TiogaMeshInfo.h"
 #include "codetypes.h"
 #include "CartBlock.h"
 #include "CartGrid.h"
 #include "cartUtils.h"
 #include "linCartInterp.h"
-#include <stdexcept>
+
 extern "C" {
   void deallocateLinkList(DONORLIST *temp);
   void deallocateLinkList2(INTEGERLIST *temp);
@@ -31,6 +33,25 @@ extern "C" {
   void insertInList(DONORLIST **donorList,DONORLIST *temp1);
   int checkHoleMap(double *x,int *nx,int *sam,double *extents);
 }
+
+void CartBlock::registerData(int lid, TIOGA::AMRMeshInfo* minfo)
+{
+  local_id = lid;
+  global_id = minfo->global_idmap.hptr[lid];
+  ibl_cell = minfo->iblank_cell.hptr[lid];
+  ibl_node = minfo->iblank_node.hptr[lid];
+
+  registerSolution(lid, minfo);
+}
+
+void CartBlock::registerSolution(int lid, TIOGA::AMRMeshInfo* minfo)
+{
+  nvar_cell = minfo->nvar_cell;
+  nvar_node = minfo->nvar_node;
+  qcell = minfo->qcell.hptr[lid];
+  qnode = minfo->qnode.hptr[lid];
+}
+
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData)
 {

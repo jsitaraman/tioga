@@ -760,6 +760,29 @@ tioga::~tioga()
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
 
+void tioga::register_amr_grid(TIOGA::AMRMeshInfo* minfo)
+{
+  if (cg) delete [] cg;
+  if (cb) delete [] cb;
+
+  cg = new CartGrid[1];
+  ncart = minfo->ngrids_local;
+  cb = new CartBlock[ncart];
+  cg->registerData(minfo);
+
+  for (int ic = 0; ic < ncart; ++ic) {
+    cb[ic].registerData(ic, minfo);
+  }
+}
+
+void tioga::register_amr_solution()
+{
+  auto* minfo = cg->m_info;
+  for (int ic = 0; ic < ncart; ++ic) {
+    cb[ic].registerSolution(ic, minfo);
+  }
+}
+
 void tioga::register_amr_global_data(int nf,int *idata,double *rdata,int ngridsin)
 {
   if (cg) delete [] cg;

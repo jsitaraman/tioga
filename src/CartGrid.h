@@ -22,7 +22,11 @@
 #define CARTGRID_H
 
 #include <cstdlib>
-#include "TiogaMeshInfo.h"
+
+namespace TIOGA
+{
+struct AMRMeshInfo;
+}
 
 class CartGrid
 {
@@ -35,6 +39,9 @@ class CartGrid
   bool own_data_ptrs{true};
 
  public :
+  TIOGA::AMRMeshInfo* m_info{nullptr};
+  TIOGA::AMRMeshInfo* m_info_device{nullptr};
+
   int *global_id{nullptr};
   int *level_num{nullptr};
   int *proc_id{nullptr};
@@ -42,8 +49,8 @@ class CartGrid
   int *ilo{nullptr};
   int *ihi{nullptr};
   int *dims{nullptr};
-  int myid;
-  int nf;
+  int myid{0};
+  int nf{0};
   double *xlo{nullptr};
   double *dx{nullptr};
   int ngrids{0};
@@ -51,6 +58,8 @@ class CartGrid
 
   CartGrid() = default;
   ~CartGrid();
+
+  void registerData(TIOGA::AMRMeshInfo* m_info);
   void registerData(int nf,int *idata,double *rdata,int ngridsin);
   void preprocess(void);     
   void search(double *x,int *donorid,int nsearch);

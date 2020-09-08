@@ -29,6 +29,10 @@ struct INTERPLIST2;
 struct DONORLIST;
 struct HOLEMAP;
 
+namespace TIOGA {
+struct AMRMeshInfo;
+}
+
 class CartGrid;
 class CartBlock
 {
@@ -51,6 +55,10 @@ class CartBlock
   CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl_cell=NULL;ibl_node=NULL;qcell=NULL;qnode=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
     donor_frac=nullptr;nvar_cell=0;nvar_node=0;};
   ~CartBlock() { clearLists();};
+
+  void registerData(int lid, TIOGA::AMRMeshInfo* minfo);
+  void registerSolution(int lid, TIOGA::AMRMeshInfo* minfo);
+
   void registerData(int local_id_in,int global_id_in,int *iblankin,int *iblanknin)
   {
     local_id=local_id_in;

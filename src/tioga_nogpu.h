@@ -2,6 +2,7 @@
 #define TIOGA_NOGPU_H
 
 #include <cstdlib>
+#include <cstring>
 
 #define TIOGA_GPU_DEVICE
 #define TIOGA_GPU_GLOBAL

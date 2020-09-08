@@ -129,6 +129,9 @@ class tioga
   void register_unstructured_grid(TIOGA::MeshBlockInfo* minfo);
   void register_unstructured_solution();
 
+  void register_amr_grid(TIOGA::AMRMeshInfo* minfo);
+  void register_amr_solution();
+
   void profile(void);
 
   void exchangeBoxes(void);

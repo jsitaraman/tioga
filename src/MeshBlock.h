@@ -41,7 +41,19 @@ class CartGrid;
 class MeshBlock
 {
  private:
+  /** Mesh block info provided by the application code
+   *
+   *  This is a non-owning pointer whose lifetime is controlled by the
+   *  application.
+   */
   TIOGA::MeshBlockInfo* m_info{nullptr};
+
+  /** Device copy of the mesh block info registered by the application code
+   *
+   *  This pointer is owned by MeshBlock
+   */
+  TIOGA::MeshBlockInfo* m_info_device{nullptr};
+
   int nnodes;  /** < number of grid nodes */
   int ncells;  /** < total number of cells */
   int ntypes;  /** < number of different types of cells */
@@ -367,6 +379,9 @@ class MeshBlock
 
   const TIOGA::MeshBlockInfo* mesh_info() const { return m_info; }
   TIOGA::MeshBlockInfo* mesh_info() { return m_info; }
+
+  const TIOGA::MeshBlockInfo* d_mesh_info() const { return m_info_device; }
+  TIOGA::MeshBlockInfo* d_mesh_info() { return m_info_device; }
 
   void set_interptype(int type) {
     interptype = type;

@@ -17,10 +17,12 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-#include "codetypes.h"
-#include "MeshBlock.h"
 #include <cstring>
 #include <stdexcept>
+
+#include "codetypes.h"
+#include "MeshBlock.h"
+#include "tioga_gpu.h"
 
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
@@ -107,6 +109,12 @@ void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
   if (nodeGID == nullptr)
     throw std::runtime_error("#tioga: global IDs for nodes not provided");
 #endif
+
+  if (m_info_device == nullptr) {
+    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::MeshBlockInfo>(
+      sizeof(TIOGA::MeshBlockInfo));
+  }
+  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::MeshBlockInfo));
 }
 
 void MeshBlock::preprocess(void)
@@ -1268,6 +1276,9 @@ MeshBlock::~MeshBlock()
   if (mapmask) TIOGA_FREE(mapmask);
   if (uindx) TIOGA_FREE(uindx);
   if (invmap) TIOGA_FREE(invmap);
+
+  if (m_info_device) TIOGA_FREE_DEVICE(m_info_device);
+
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

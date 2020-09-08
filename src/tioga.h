@@ -126,6 +126,9 @@ class tioga
 
   void register_unstructured_solution(int btag,double *q,int nvar,int interptype);
 
+  void register_unstructured_grid(TIOGA::MeshBlockInfo* minfo);
+  void register_unstructured_solution();
+
   void profile(void);
 
   void exchangeBoxes(void);

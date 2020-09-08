@@ -26,6 +26,8 @@
 #include <assert.h>
 #include "codetypes.h"
 #include "ADT.h"
+#include "TiogaMeshInfo.h"
+
 // forward declare to instantiate one of the methods
 class parallelComm;
 class CartGrid;
@@ -39,6 +41,7 @@ class CartGrid;
 class MeshBlock
 {
  private:
+  TIOGA::MeshBlockInfo* m_info{nullptr};
   int nnodes;  /** < number of grid nodes */
   int ncells;  /** < total number of cells */
   int ntypes;  /** < number of different types of cells */
@@ -146,6 +149,8 @@ class MeshBlock
   INTERPLIST *interpListCart; 
   int* receptorIdCart;
 
+  int* vconn_ptrs[TIOGA::MeshBlockInfo::max_vertex_types];
+
   //
   // call back functions to use p4est to search
   // its own internal data
@@ -190,8 +195,10 @@ class MeshBlock
   void writeGridFile(int bid);
 
   void writeFlowFile(int bid,double *q,int nvar,int type);
-  
-  void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci, 
+
+  void setData(TIOGA::MeshBlockInfo* minfo);
+
+  void setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, int nobci,
 	       int *wbcnodei,int *obcnodei,
                int ntypesi, int *nvi, int *nci, int **vconni,
                uint64_t* cell_gid=NULL, uint64_t* node_gid=NULL);
@@ -357,6 +364,9 @@ class MeshBlock
 
   int num_var() const { return nvar; }
   int& num_var() { return nvar; }
+
+  const TIOGA::MeshBlockInfo* mesh_info() const { return m_info; }
+  TIOGA::MeshBlockInfo* mesh_info() { return m_info; }
 
   void set_interptype(int type) {
     interptype = type;

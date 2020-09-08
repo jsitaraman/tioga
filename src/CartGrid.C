@@ -38,6 +38,8 @@ CartGrid::~CartGrid()
   }
   if (lcount) TIOGA_FREE(lcount);
   if (dxlvl) TIOGA_FREE(dxlvl);
+
+  if (m_info_device != nullptr) TIOGA_FREE_DEVICE(m_info_device);
 };
 
 void CartGrid::registerData(TIOGA::AMRMeshInfo* minfo)

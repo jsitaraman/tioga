@@ -20,6 +20,23 @@
 # include "codetypes.h"
 # include "CartGrid.h"
 
+CartGrid::~CartGrid()
+{
+  if (own_data_ptrs) {
+    if (global_id) TIOGA_FREE(global_id);
+    if (level_num) TIOGA_FREE(level_num);
+    if (proc_id) TIOGA_FREE(proc_id);
+    if (local_id) TIOGA_FREE(local_id);
+    if (ilo) TIOGA_FREE(ilo);
+    if (ihi) TIOGA_FREE(ihi);
+    if (dims) TIOGA_FREE(dims);
+    if (xlo) TIOGA_FREE(xlo);
+    if (dx) TIOGA_FREE(dx);
+  }
+  if (lcount) TIOGA_FREE(lcount);
+  if (dxlvl) TIOGA_FREE(dxlvl);
+};
+
 void CartGrid::registerData(int nfin,int *idata,double *rdata,int ngridsin)
 {
   int i,i3,i6,iloc,n;

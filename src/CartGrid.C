@@ -17,8 +17,53 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#include "tioga_gpu.h"
+#include "TiogaMeshInfo.h"
 # include "codetypes.h"
 # include "CartGrid.h"
+
+
+CartGrid::~CartGrid()
+{
+  if (own_data_ptrs) {
+    if (global_id) TIOGA_FREE(global_id);
+    if (level_num) TIOGA_FREE(level_num);
+    if (proc_id) TIOGA_FREE(proc_id);
+    if (local_id) TIOGA_FREE(local_id);
+    if (ilo) TIOGA_FREE(ilo);
+    if (ihi) TIOGA_FREE(ihi);
+    if (dims) TIOGA_FREE(dims);
+    if (xlo) TIOGA_FREE(xlo);
+    if (dx) TIOGA_FREE(dx);
+  }
+  if (lcount) TIOGA_FREE(lcount);
+  if (dxlvl) TIOGA_FREE(dxlvl);
+
+  if (m_info_device != nullptr) TIOGA_FREE_DEVICE(m_info_device);
+};
+
+void CartGrid::registerData(TIOGA::AMRMeshInfo* minfo)
+{
+  own_data_ptrs = false;
+  m_info = minfo;
+  ngrids = minfo->ngrids_global;
+  global_id = nullptr; // unused
+  level_num = minfo->level.hptr;
+  proc_id = minfo->mpi_rank.hptr;
+  local_id = minfo->local_id.hptr;
+  ilo = minfo->ilow.hptr;
+  ihi = minfo->ihigh.hptr;
+  dims = minfo->dims.hptr;
+  xlo = minfo->xlo.hptr;
+  dx = minfo->dx.hptr;
+  nf = minfo->num_ghost;
+
+  if (m_info_device == nullptr) {
+    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::AMRMeshInfo>(
+      sizeof(TIOGA::AMRMeshInfo));
+  }
+  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::AMRMeshInfo));
+}
 
 void CartGrid::registerData(int nfin,int *idata,double *rdata,int ngridsin)
 {

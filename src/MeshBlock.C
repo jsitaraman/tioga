@@ -17,10 +17,12 @@
 // You should have received a copy of the GNU Lesser General Public
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-#include "codetypes.h"
-#include "MeshBlock.h"
 #include <cstring>
 #include <stdexcept>
+
+#include "codetypes.h"
+#include "MeshBlock.h"
+#include "tioga_gpu.h"
 
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
@@ -69,6 +71,50 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   if (nodeGID == NULL)
       throw std::runtime_error("#tioga: global IDs for nodes not provided");
 #endif
+}
+
+void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
+{
+  m_info = minfo;
+
+  // Populate legacy data
+  meshtag = m_info->meshtag;
+  nnodes = m_info->num_nodes;
+  x = m_info->xyz.hptr;
+  iblank = m_info->iblank_node.hptr;
+  iblank_cell = m_info->iblank_cell.hptr;
+  nwbc = m_info->wall_ids.sz;
+  nobc = m_info->overset_ids.sz;
+  wbcnode = m_info->wall_ids.hptr;
+  obcnode = m_info->overset_ids.hptr;
+
+  ntypes = m_info->num_vert_per_elem.sz;
+  nv = m_info->num_vert_per_elem.hptr;
+  nc = m_info->num_cells_per_elem.hptr;
+
+  for (int i=0; i < TIOGA::MeshBlockInfo::max_vertex_types; ++i) {
+    vconn_ptrs[i] = m_info->vertex_conn[i].hptr;
+  }
+  vconn = &vconn_ptrs[0];
+
+  cellGID = m_info->cell_gid.hptr;
+  nodeGID = m_info->node_gid.hptr;
+
+  userSpecifiedNodeRes = m_info->node_res.hptr;
+  userSpecifiedCellRes = m_info->cell_res.hptr;
+
+  interptype = m_info->qtype;
+
+#ifdef TIOGA_HAS_NODEGID
+  if (nodeGID == nullptr)
+    throw std::runtime_error("#tioga: global IDs for nodes not provided");
+#endif
+
+  if (m_info_device == nullptr) {
+    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::MeshBlockInfo>(
+      sizeof(TIOGA::MeshBlockInfo));
+  }
+  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::MeshBlockInfo));
 }
 
 void MeshBlock::preprocess(void)
@@ -1230,6 +1276,9 @@ MeshBlock::~MeshBlock()
   if (mapmask) TIOGA_FREE(mapmask);
   if (uindx) TIOGA_FREE(uindx);
   if (invmap) TIOGA_FREE(invmap);
+
+  if (m_info_device) TIOGA_FREE_DEVICE(m_info_device);
+
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

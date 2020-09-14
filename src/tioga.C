@@ -82,6 +82,29 @@ void tioga::registerGridData(int btag,int nnodes,double *xyz,int *ibl, int nwbc,
   mb->myid = myid;
 }
 
+void tioga::register_unstructured_grid(TIOGA::MeshBlockInfo *minfo)
+{
+
+  int iblk;
+
+  const int btag = minfo->meshtag;
+  auto idxit = tag_iblk_map.find(btag);
+  if (idxit == tag_iblk_map.end()) {
+    mtags.push_back(btag);
+    mytag.push_back(btag);
+    mblocks.push_back(std::unique_ptr<MeshBlock>(new MeshBlock));
+    nblocks = mblocks.size();
+    iblk = nblocks - 1;
+    tag_iblk_map[btag] = iblk;
+  } else {
+    iblk = idxit->second;
+  }
+
+  auto& mb = mblocks[iblk];
+  mb->setData(minfo);
+  mb->myid = myid;
+}
+
 void tioga::registerSolution(int btag,double *q)
 {
   auto idxit=tag_iblk_map.find(btag);
@@ -96,6 +119,15 @@ void tioga::register_unstructured_solution(int btag,double *q,int nvar,int inter
   qblock[iblk]=q;
   mblocks[iblk]->num_var() = nvar;
   mblocks[iblk]->set_interptype(interptype);
+}
+
+void tioga::register_unstructured_solution()
+{
+  for (int iblk = 0; iblk < mblocks.size(); ++iblk) {
+    const auto* minfo = mblocks[iblk]->mesh_info();
+    qblock[iblk] = minfo->qnode.hptr;
+    mblocks[iblk]->num_var() = minfo->num_vars;
+  }
 }
 
 void tioga::profile(void)
@@ -727,6 +759,29 @@ tioga::~tioga()
   if (qblock) TIOGA_FREE(qblock);
   if (myid==0) printf("#tioga :successfully cleared all the memory accessed\n");
 };
+
+void tioga::register_amr_grid(TIOGA::AMRMeshInfo* minfo)
+{
+  if (cg) delete [] cg;
+  if (cb) delete [] cb;
+
+  cg = new CartGrid[1];
+  ncart = minfo->ngrids_local;
+  cb = new CartBlock[ncart];
+  cg->registerData(minfo);
+
+  for (int ic = 0; ic < ncart; ++ic) {
+    cb[ic].registerData(ic, minfo);
+  }
+}
+
+void tioga::register_amr_solution()
+{
+  auto* minfo = cg->m_info;
+  for (int ic = 0; ic < ncart; ++ic) {
+    cb[ic].registerSolution(ic, minfo);
+  }
+}
 
 void tioga::register_amr_global_data(int nf,int *idata,double *rdata,int ngridsin)
 {

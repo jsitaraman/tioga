@@ -27,8 +27,8 @@ class CartGrid
 {
  private:
   double xlosup[3];
-  double *dxlvl;
-  int *lcount;
+  double *dxlvl{nullptr};
+  int *lcount{nullptr};
   int maxlevel;
 
  public :
@@ -44,7 +44,7 @@ class CartGrid
   double *xlo;
   double *dx;
   int ngrids;
-  void (*donor_frac) (int *,double *,int *,double *);
+  void (*donor_frac) (int *,double *,int *,double *) = nullptr;
    
   CartGrid() { ngrids=0;global_id=NULL;level_num=NULL;local_id=NULL;
     proc_id=NULL;local_id=NULL;ilo=NULL;ihi=NULL;dims=NULL;

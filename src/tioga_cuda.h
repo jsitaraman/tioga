@@ -2,6 +2,8 @@
 #define TIOGA_CUDA_H
 
 #include <cstdlib>
+#include <string>
+#include <stdexcept>
 #include <cuda.h>
 
 #define TIOGA_GPU_DEVICE __device__

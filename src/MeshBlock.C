@@ -92,6 +92,9 @@ void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
   nv = m_info->num_vert_per_elem.hptr;
   nc = m_info->num_cells_per_elem.hptr;
 
+  ncells=0;
+  for(int i=0;i<ntypes;i++) ncells+=nc[i];
+
   for (int i=0; i < TIOGA::MeshBlockInfo::max_vertex_types; ++i) {
     vconn_ptrs[i] = m_info->vertex_conn[i].hptr;
   }

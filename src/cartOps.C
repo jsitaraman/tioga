@@ -349,7 +349,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		{
 		  inode=interpList[i].inode[m];
 		  weight=interpList[i].weights[m];
-		  if (weight < 0 || weight > 1.0) {
+		  if (weight < -TOL || weight > 1.0+TOL) {
                     TRACED(weight);
                     printf("warning: weights are not convex 3\n");
                    }
@@ -372,7 +372,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		{
 		  inode=interpListCart[i].inode[m];
 		  weight=interpListCart[i].weights[m];
-		  if (weight < 0 || weight > 1.0) {
+		  if (weight < -TOL || weight > 1.0+TOL) {
                     TRACED(weight);
                     printf("warning: weights are not convex 4\n");
                    }

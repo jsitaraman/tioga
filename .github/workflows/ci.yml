@@ -29,11 +29,16 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         build_type: [Release, Debug]
+        include:
+          - os: macos-latest
+            build_deps: brew install open-mpi
+          - os: ubuntu-latest
+            build_deps: sudo apt-get install mpich libmpich-dev
     name: ${{matrix.os}} - ${{matrix.build_type}}
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
-        run: sudo apt-get install mpich libmpich-dev
+        run: ${{matrix.build_deps}}
       - name: Configure and build
         run: |
           cmake -Bbuild .

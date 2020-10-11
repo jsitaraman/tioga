@@ -4,21 +4,9 @@ on:
   push:
     branches:
       - exawind
-    paths:
-      - src/**
-      - cmake/**
-      - driver/**
-      - gridgen/**
-      - CMakeLists.txt
   pull_request:
     branches:
       - exawind
-    paths:
-      - src/**
-      - cmake/**
-      - driver/**
-      - gridgen/**
-      - CMakeLists.txt
 
 jobs:
   cuda-build:

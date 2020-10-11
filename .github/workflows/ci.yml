@@ -5,22 +5,10 @@ on:
     branches:
       - master
       - exawind
-    paths:
-      - src/**
-      - cmake/**
-      - driver/**
-      - gridgen/**
-      - CMakeLists.txt
   pull_request:
     branches:
       - master
       - exawind
-    paths:
-      - src/**
-      - cmake/**
-      - driver/**
-      - gridgen/**
-      - CMakeLists.txt
 
 jobs:
   build:

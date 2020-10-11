@@ -1,0 +1,61 @@
+name: TIOGA CI
+
+on:
+  push:
+    branches:
+      - master
+      - exawind
+    paths:
+      - src/**
+      - cmake/**
+      - driver/**
+      - gridgen/**
+      - CMakeLists.txt
+  pull_request:
+    branches:
+      - master
+      - exawind
+    paths:
+      - src/**
+      - cmake/**
+      - driver/**
+      - gridgen/**
+      - CMakeLists.txt
+
+jobs:
+  build:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        build_type: [Release, Debug]
+    name: ${{matrix.os}} - ${{matrix.build_type}}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: sudo apt-get install mpich libmpich-dev
+      - name: Configure and build
+        run: |
+          cmake -Bbuild .
+          cmake --build build -- -j $(nproc)
+
+  analyze:
+    name: CodeQL analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get install mpich libmpich-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v1
+        with:
+          languages: cpp
+
+      - name: Configure and build
+        uses: github/codeql-action/autobuild@v1
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v1

@@ -14,10 +14,10 @@ include_directories(${MPI_INCLUDE_PATH})
 
 # Ensure C++11 standard is enabled
 if (CMAKE_VERSION VERSION_LESS "3.1")
-  set(CMAKE_CXX_FLAGS "-g -rdynamic -std=c++0x" ${CMAKE_CXX_FLAGS})
+  set(CMAKE_CXX_FLAGS "-g -rdynamic -std=c++0x ${CMAKE_CXX_FLAGS}")
 else()
   set(CMAKE_CXX_STANDARD 11)
-  set(CMAKE_CXX_FLAGS "-O3" ${CMAKE_CXX_FLAGS})
+  set(CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS}")
 endif()
 
 # Set some default compilation settings for Fortran compiler

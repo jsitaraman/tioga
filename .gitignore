@@ -1,6 +1,11 @@
 *.o
 *.a
-build/*
+build*
+case/*.dat
+case/fort*
+case/grid/*.plt
+install*
+
 
 GPATH
 GRTAGS

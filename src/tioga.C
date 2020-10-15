@@ -526,8 +526,10 @@ void tioga::dataUpdate(int nvar,int interptype, int at_points)
 void tioga::writeData(int nvar,int interptype)
 {
   //mb->writeGridFile(myid);
-  for(int ib=0;ib<nblocks;ib++)
+  for(int ib=0;ib<nblocks;ib++) {
      mblocks[ib]->writeFlowFile(100*myid+ib,qblock[ib],nvar,interptype);
+     mblocks[ib]->writeCellFile(100*myid+ib);
+  }
 }
 
 void tioga::getDonorCount(int btag, int *dcount,int *fcount)

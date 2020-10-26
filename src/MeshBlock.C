@@ -173,6 +173,10 @@ void MeshBlock::tagBoundary(void)
   iextmp=(int *) malloc(sizeof(double)*nnodes);
   iextmp1=(int *) malloc(sizeof(double)*nnodes);
   // 
+  //printf("%p %p\n",userSpecifiedNodeRes,userSpecifiedCellRes);
+  //TRACED( userSpecifiedNodeRes[12]);
+  //userSpecifiedNodeRes=NULL;
+  //userSpecifiedCellRes=NULL;
   for(i=0;i<nnodes;i++) iflag[i]=0;
   //
   if (userSpecifiedNodeRes ==NULL && userSpecifiedCellRes ==NULL)
@@ -215,6 +219,11 @@ void MeshBlock::tagBoundary(void)
 	    }
 	}
       for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
+      int nmandatory=0;
+      int nman_global;
+      for(k=0;k<nnodes;k++) if (nodeRes[k]>=BIGVALUE) nmandatory++;
+      MPI_Reduce(&nmandatory,&nman_global,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+      if (myid==0) printf("Total mandatory receptors :%d\n",nman_global);
     }
   
   for(int j=0;j<3;j++)
@@ -1463,14 +1472,19 @@ void MeshBlock::create_hex_cell_map(void)
 void MeshBlock::checkOrphans(void)
 {
   int norphan=0;
+  char fname[80];
+  sprintf(fname,"nodeRes%d.dat",myid);
+  FILE *fp=fopen(fname,"w");
   for (int i=0;i<nnodes;i++) 
     {
-      if (nodeRes[i]==BIGVALUE) {
+      if (nodeRes[i]>=BIGVALUE) {
 	if (iblank[i]==1) {
 	  norphan++;
         }
       }
+      fprintf(fp,"%d %e %d %d\n",i,nodeRes[i],iblank[i],nodeRes[i]>=BIGVALUE);
     }
+  fclose(fp);
   if (norphan > 0) {
     char intstring[7];
     char fname[80];
@@ -1480,9 +1494,9 @@ void MeshBlock::checkOrphans(void)
     FILE *fp=fopen(fname,"w");
     for (int i=0;i<nnodes;i++) 
     {
-      if (nodeRes[i]==BIGVALUE) {
+      if (nodeRes[i]>=BIGVALUE) {
 	if (iblank[i]==1) {
-          fprintf(fp,"%f %f %f\n",x[3*i],x[3*i+1],x[3*i+2]);
+          fprintf(fp,"%f %f %f %f\n",x[3*i],x[3*i+1],x[3*i+2],nodeRes[i]);
 	  norphan++;
         }
       }

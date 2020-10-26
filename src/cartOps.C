@@ -79,7 +79,7 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
 	  for(m=0;m<nvert;m++)
 	    {
 	      inode[m]=vconn[n][nvert*i+m]-BASE;
-	      if (nodeRes[inode[m]]==BIGVALUE) fcount++;
+	      if (nodeRes[inode[m]]>=BIGVALUE) fcount++;
 	    }
 	  if (fcount==nvert && iblank_cell[k]==1) 
 	    {

@@ -179,6 +179,7 @@ void CartGrid::search(double *x,int *donorid,int npts)
 	    }
 	}
     }
+    if (donorid[i]==-1) printf("%d %f %f %f\n",myid,x[3*i],x[3*i+1],x[3*i+2]);
   }
  //printf("CartGrid::search Processor %d located %d of %d points\n",myid,dcount,npts);
 }

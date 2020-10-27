@@ -302,7 +302,7 @@ void tioga::exchangeDonors(void)
   
 void tioga::outputStatistics(void)
 {
-#ifdef TIOGA_OUTPUT_STATS
+//#ifdef TIOGA_OUTPUT_STATS
   int mstats[2], mstats_sum[2], mstats_global[2];
   mstats_sum[0] = 0;
   mstats_sum[1] = 0;
@@ -319,5 +319,5 @@ void tioga::outputStatistics(void)
     printf("#tioga : total holes    :\t%d\n",mstats_global[0]);
     printf("#tioga -----------------------------------------\n");
   }
-#endif
+//#endif
 }

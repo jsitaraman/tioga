@@ -62,43 +62,39 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
   int i,j,k,m,n,nvert,i3,fcount;
   int inode[8];
   int *iflag;
-  iflag=(int *) malloc(sizeof(int) *ncells);
-  if (pickedCart !=NULL) TIOGA_FREE(pickedCart);
-  pickedCart=(int *) malloc(sizeof(int)*nnodes);
-
-  for(i=0;i<ncells;i++) iflag[i]=0;
-  for(i=0;i<nnodes;i++) pickedCart[i]=0;
-
-  k=0;
-  for(n=0;n<ntypes;n++)
-    {
-      nvert=nv[n];
-      for(i=0;i<nc[n];i++)
-	{
-	  fcount=0;
-	  for(m=0;m<nvert;m++)
-	    {
-	      inode[m]=vconn[n][nvert*i+m]-BASE;
-	      if (nodeRes[inode[m]]>=BIGVALUE) fcount++;
-	    }
-	  if (fcount==nvert && iblank_cell[k]==1) 
-	    {
-	      iflag[k]=1;
-	      for(m=0;m<nvert;m++)
-		pickedCart[inode[m]]=1;
-	    }
-	  k++;
-	}
-    }
-  //
-  if (ctag_cart!=NULL) TIOGA_FREE(ctag_cart);
-  ctag_cart=(int *)malloc(sizeof(int)*ncells);
-  nreceptorCellsCart=0;
-  for(i=0;i<ncells;i++)
-    if (iflag[i]==-1) ctag_cart[nreceptorCellsCart++]=i+1;
   //
   if (ihigh) 
-    {
+    {     
+      iflag=(int *) malloc(sizeof(int) *ncells);
+      for(i=0;i<ncells;i++) iflag[i]=0;
+
+      k=0;
+      for(n=0;n<ntypes;n++)
+	{
+	  nvert=nv[n];
+	  for(i=0;i<nc[n];i++)
+	    {
+	      fcount=0;
+	      for(m=0;m<nvert;m++)
+		{
+		  inode[m]=vconn[n][nvert*i+m]-BASE;
+		  if (nodeRes[inode[m]]>=BIGVALUE) fcount++;
+		}
+	      if (fcount==nvert && iblank_cell[k]==1) 
+		{
+		  iflag[k]=1;
+		}
+	      k++;
+	    }
+	}
+      //
+      if (ctag_cart!=NULL) TIOGA_FREE(ctag_cart);
+      ctag_cart=(int *)malloc(sizeof(int)*ncells);
+      nreceptorCellsCart=0;
+      for(i=0;i<ncells;i++)
+	if (iflag[i]==-1) ctag_cart[nreceptorCellsCart++]=i+1;
+      
+
       if (pointsPerCell!=NULL) TIOGA_FREE(pointsPerCell);
       pointsPerCell=(int *)malloc(sizeof(int)*nreceptorCellsCart);
       //
@@ -125,14 +121,20 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
 	  get_receptor_nodes(&(ctag_cart[i]),&(pointsPerCell[i]),&(rxyzCart[m]));
 	  m+=(3*pointsPerCell[i]);
 	}
+      TIOGA_FREE(iflag);
     }
   else
     {
+      if (pickedCart !=NULL) TIOGA_FREE(pickedCart);
+      pickedCart=(int *) malloc(sizeof(int)*nnodes);      
+      for(i=0;i<nnodes;i++) pickedCart[i]=0;
+
       ntotalPointsCart=0;      
       for(i=0;i<nnodes;i++) 
 	{
-	  if (pickedCart[i]==1) 
+	  if (nodeRes[i]>=BIGVALUE && iblank[i]==1) 
 	    {
+	      pickedCart[i]=1;
 	      ntotalPointsCart++;
 	    }
 	}
@@ -153,7 +155,7 @@ void MeshBlock::getUnresolvedMandatoryReceptors(void)
 	      rxyzCart[m++]=x[i3+j];
 	  }
     }
- TIOGA_FREE(iflag);
+
 }
 
 void MeshBlock::writeOBB2(OBB * obc, int bid)

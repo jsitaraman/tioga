@@ -174,7 +174,14 @@ void MeshBlock::tagBoundary(void)
   iextmp1=(int *) malloc(sizeof(double)*nnodes);
   // 
   //printf("%p %p\n",userSpecifiedNodeRes,userSpecifiedCellRes);
-  //TRACED( userSpecifiedNodeRes[12]);
+  //if (myid==2) {
+  //  printf("myid,x=%d %d %f %f %f \n",myid,nodeGID[12058],x[12058*3],x[12058*3+1],x[12058*3+2]);
+  //  TRACED( userSpecifiedNodeRes[12058]);
+  //}
+  //if (myid==3) {
+  //  printf("myid,x=%d %d %f %f %f \n",myid,nodeGID[11316],x[11316*3],x[11316*3+1],x[11316*3+2]);
+  //  TRACED(userSpecifiedNodeRes[11316]);
+  //}
   //userSpecifiedNodeRes=NULL;
   //userSpecifiedCellRes=NULL;
   for(i=0;i<nnodes;i++) iflag[i]=0;
@@ -218,12 +225,12 @@ void MeshBlock::tagBoundary(void)
 	      k++;
 	    }
 	}
-      for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
-      int nmandatory=0;
-      int nman_global;
-      for(k=0;k<nnodes;k++) if (nodeRes[k]>=BIGVALUE) nmandatory++;
-      MPI_Reduce(&nmandatory,&nman_global,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
-      if (myid==0) printf("Total mandatory receptors :%d\n",nman_global);
+      for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k],BIGVALUE;
+      //int nmandatory=0;
+      //int nman_global;
+      //for(k=0;k<nnodes;k++) if (nodeRes[k]>=BIGVALUE) nmandatory++;
+      //MPI_Reduce(&nmandatory,&nman_global,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+      //if (myid==0) printf("Total mandatory receptors :%d\n",nman_global);
     }
   
   for(int j=0;j<3;j++)
@@ -1473,18 +1480,19 @@ void MeshBlock::checkOrphans(void)
 {
   int norphan=0;
   char fname[80];
-  sprintf(fname,"nodeRes%d.dat",myid);
-  FILE *fp=fopen(fname,"w");
+  //sprintf(fname,"nodeRes%d.dat",myid);
+  //FILE *fp=fopen(fname,"w");
   for (int i=0;i<nnodes;i++) 
     {
       if (nodeRes[i]>=BIGVALUE) {
 	if (iblank[i]==1) {
 	  norphan++;
         }
+       //if (nodeRes[i] > BIGVALUE) printf("%d %d %e\n",myid,i,nodeRes[i]);
       }
-      fprintf(fp,"%d %e %d %d\n",i,nodeRes[i],iblank[i],nodeRes[i]>=BIGVALUE);
+      //fprintf(fp,"%d %e %d %d\n",i,nodeRes[i],iblank[i],nodeRes[i]>=BIGVALUE);
     }
-  fclose(fp);
+  //fclose(fp);
   if (norphan > 0) {
     char intstring[7];
     char fname[80];

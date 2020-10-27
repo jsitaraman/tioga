@@ -172,7 +172,7 @@ void tioga::performConnectivity(void)
   exchangeDonors();
   this->myTimer("tioga::exchangeDonors",1);
   //this->reduce_fringes();
-  outputStatistics();
+  //outputStatistics();
   MPI_Allreduce(&ihigh,&ihighGlobal,1,MPI_INT,MPI_MAX,scomm);
   //if (ihighGlobal) {
   this->myTimer("tioga::getCellIblanks",0);
@@ -387,7 +387,7 @@ void tioga::dataUpdate_AMR()
   //
   // release all memory
   //
-  // this->writeData(nvar,0);
+  //this->writeData(nvar,0);
   pc_cart->clearPackets2(sndPack,rcvPack);
   TIOGA_FREE(sndPack);
   TIOGA_FREE(rcvPack);

@@ -225,7 +225,7 @@ void MeshBlock::tagBoundary(void)
 	      k++;
 	    }
 	}
-      for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k],BIGVALUE;
+      for(k=0;k<nnodes;k++) nodeRes[k]=userSpecifiedNodeRes[k];
       //int nmandatory=0;
       //int nman_global;
       //for(k=0;k<nnodes;k++) if (nodeRes[k]>=BIGVALUE) nmandatory++;

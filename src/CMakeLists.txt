@@ -52,7 +52,10 @@ if (TIOGA_OUTPUT_STATS)
   target_compile_definitions(tioga PUBLIC TIOGA_OUTPUT_STATS)
 endif()
 
-target_link_libraries(tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+target_link_libraries(tioga INTERFACE ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+if (TIOGA_ENABLE_ARBORX)
+  target_link_libraries(tioga PRIVATE ArborX::ArborX)
+endif()
 
 if(MPI_COMPILE_FLAGS)
   set_target_properties(tioga PROPERTIES

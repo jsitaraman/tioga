@@ -22,6 +22,57 @@
 #include <unordered_map>
 #include <iostream>
 
+#ifdef TIOGA_USE_ARBORX
+#include <ArborX.hpp>
+using DeviceType = Kokkos::Serial::device_type;
+struct ArborXBoxesWrapper {
+    double *data;
+    int n;
+};
+
+namespace ArborX {
+namespace Traits {
+template <>
+struct Access<ArborXBoxesWrapper, PrimitivesTag> {
+    KOKKOS_INLINE_FUNCTION
+    static Box get(ArborXBoxesWrapper const &d, int i) {
+        return {{d.data[6 * i + 0] - TOL, d.data[6 * i + 1] - TOL, d.data[6 * i + 2] - TOL},
+                {d.data[6 * i + 3] + TOL, d.data[6 * i + 4] + TOL, d.data[6 * i + 5] + TOL}};
+    }
+    inline static typename std::size_t size(ArborXBoxesWrapper const &d) {
+        return d.n;
+    }
+    using memory_space = typename DeviceType::memory_space;
+};
+}  // namespace Traits
+}  // namespace ArborX
+
+struct MyCallback {
+    MeshBlock *mb;
+    double *xsearch;
+    int *donorId;
+    int *donorId_helper;
+
+    using tag = ArborX::Details::InlineCallbackTag;
+    template <typename Query, typename Insert>
+    KOKKOS_FUNCTION void operator()(Query const &query, int index,
+                                    Insert const &insert) const {
+        auto const &data = ArborX::getData(query);
+
+        int i = data[0];
+        int *dId0 = donorId;
+        int *dId1 = donorId_helper;
+
+        if (donorId[i] > -1 && donorId_helper[i] == 0) return;
+        int dId[2];
+        mb->checkContainment(dId, index, xsearch + 3 * i);
+        donorId[i] = dId[0];
+        donorId_helper[i] = dId[1];
+    }
+};
+
+#endif
+
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
   void writebbox(OBB *obb,int bid);
@@ -217,20 +268,22 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       //
       k=icell[k];
     }
+
+  ndim = 6;
+
+#ifdef TIOGA_USE_ARBORX
+  ArborX::BVH<DeviceType> bvh{ArborXBoxesWrapper{elementBbox, cell_count}};
+#else
   //
   // build the ADT now
   //
-  if (adt) 
-   {
-    adt->clearData();
-   }
-  else
-   {
-    adt=new ADT[1];
-   }
-  ndim=6;
-  //
-  adt->buildADT(ndim,cell_count,elementBbox);
+  if (adt) {
+      adt->clearData();
+  } else {
+      adt = new ADT[1];
+  }
+  adt->buildADT(ndim, cell_count, elementBbox);
+#endif
   //
   if (donorId) TIOGA_FREE(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
@@ -246,13 +299,69 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 #endif
   //
   donorCount=0;
-  ipoint=0; 
+  ipoint=0;
   dId=(int *) malloc(sizeof(int) *2);
+
+#ifdef TIOGA_USE_ARBORX
+  int *donorId_helper = (int*)malloc(sizeof(int)*nsearch);
+  for (int i = 0; i < nsearch; i++) {
+      donorId[i] = -1;
+      donorId_helper[i] = 0;
+  }
+
+  using QueryType = ArborX::Intersects<ArborX::Point>;
+  using PredicateType =
+      ArborX::PredicateWithAttachment<QueryType, Kokkos::Array<int, 1>>;
+
+  Kokkos::View<PredicateType *, DeviceType> queries_non_compact(
+      Kokkos::ViewAllocateWithoutInitializing("queries"), nsearch);
+
+  int n_queries;
+  using ExecutionSpace = typename DeviceType::execution_space;
+  Kokkos::parallel_scan(
+      "tioga:construct_queries",
+      Kokkos::RangePolicy<ExecutionSpace>(0, nsearch),
+      KOKKOS_LAMBDA(int i, int &update, bool last_pass) {
+          if (xtag[i] == i) {
+              if (last_pass) {
+                  queries_non_compact(update) =
+                      ArborX::attach(QueryType(ArborX::Point{
+                                         xsearch[3 * i], xsearch[3 * i + 1],
+                                         xsearch[3 * i + 2]}),
+                                     Kokkos::Array<int, 1>{i});
+              }
+              ++update;
+          }
+      },
+      n_queries);
+  auto queries =
+      Kokkos::subview(queries_non_compact, Kokkos::make_pair(0, n_queries));
+
+  // printf("#%d: n_queries = %d, n_search = %d\n", myid, n_queries, nsearch);
+
+  Kokkos::View<int *, DeviceType> offset("offset", 0);
+  Kokkos::View<int *, DeviceType> indices("indices", 0);
+  // We really don't need any buffer, but the logic in ArborX right now
+  // dictates that it has to be positive to avoid first pass
+  bvh.query(queries, MyCallback{this, xsearch, donorId, donorId_helper},
+            indices, offset, 1 /*buffer_size*/);
+
+  for (i = 0; i < nsearch; i++) {
+      if (i != xtag[i]) {
+          donorId[i] = donorId[xtag[i]];
+      }
+
+      if (donorId[i] > -1) {
+         donorCount++;
+      }
+  }
+#else
   for(i=0;i<nsearch;i++)
     {
      if (xtag[i]==i) {
 	//adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
 	adt->searchADT(this,dId,&(xsearch[3*i]));
+  // std::cout << "ADT -> (" << dId[0] << "," << dId[1] << ")\n";
         donorId[i]=dId[0];
       }
       else {
@@ -263,9 +372,13 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	}
        ipoint+=3;
      }
+#endif
   TIOGA_FREE(dId);
   TIOGA_FREE(icell);
   TIOGA_FREE(obq);
+#ifdef TIOGA_USE_ARBORX
+  TIOGA_FREE(donorId_helper);
+#endif
 }
 
 void MeshBlock::search_uniform_hex(void)

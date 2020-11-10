@@ -1,0 +1,92 @@
+
+Overall strategy
+-----------------
+
+Use GPU for all searches (i.e. thread safe operations) and the CPU counter-parts 
+of the same variables for communication. 
+
+Do operations that require reduction of any kind that lead to race conditions last.
+
+
+Phase 1
+-----------
+
+1. Make sure minfo->variable->dptr
+   is valid for all integer and double arrays
+   Hopefully these lines accomplish copying all the
+   references and non-pointer data to the device
+
+  if (m_info_device == nullptr) {
+    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::MeshBlockInfo>(
+      sizeof(TIOGA::MeshBlockInfo));
+  }
+  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::MeshBlockInfo));
+
+   Hopefully this is already done, but need to be verified.
+
+  [Ashesh, Shreyas]
+
+2. add {dMeshBlock.h, dMeshBlock.cu} files(s) that implement GPU functionality
+   to start. This is somewhat similar to how I implemented it in the sandbox (PIFUS).
+   MeshBlock can have a handle to dMeshBlock and will get populated 
+   at setData level. This way we can have a cleaner GPU path for GPU specific
+   implementation. This is similar to approach that pifus takes. But perhaps its
+   better to have dMeshBlock with MeshBlock rather than at the TIOGA level.
+   Perhaps a discussion is needed on this, i.e. should we add the GPU methods directly to
+   MeshBlock or have dMeshBlock contain all of them ? I prefer the dMeshBlock, because
+   eventually, we may have full functionality in dMeshBlock and will have no need to use
+   MeshBlock
+   [Jay, Ashesh, Shreyas]
+
+2. Convert MeshBlock::preprocess to GPU
+   (a) make sure iblanks = 1 in both device and host
+       i.e. the equivalent of this on the GPU
+       for(i=0;i<nnodes;i++) iblank[i]=1;
+       The code for this will go into dMeshBlock.cu
+       The other operations in preprocess are reductive, so lets do that on the CPU
+       and just push it to the GPU. 
+       [Ashesh]      
+
+3. Convert mb->search() to GPU. 
+       Within search we perform all the reductive steps and create the ADT on the CPU,
+       then push the ADT and search points to the GPU. Perform the search fully parallel on
+       the GPU and push the results back on to the GPU. i.e. get donorID back on the GPU. We
+       need to push only the search points and ADT to GPU, so its not a large host to device
+       copy. In the future we may build the ADT on the device itself or port the EIM code
+       from PIFUS.
+       [Jay]
+
+
+4. Leave exchangeDonors on CPU. We need to push
+   iblanks and iblank_cell to device. Do this only on a need basis, i.e. gather
+   all the iblanks that may have changed on the CPU and only push them to the GPU.
+   May need to make a copy of iblanks on the CPU. [Ashesh]
+
+5. Leave performConnectivityAMR fully on the CPU for now, except for the mblocks[ib]->search()
+   call which was ported to GPU in step 3. I think cg->search() may be a candidate for 
+   GPU, but lets do it in the next phase. [Jay]
+   
+6. After mb->getCellIblanks() in performConnectivityAMR(), we have to push the iblanks
+   again to device on a need basis. If we are always doing Nalu/AMRwind, we could probably 
+   skip step 4. [Ashesh]
+ 
+
+7. Port dataUpdate_AMR interpolation to GPU. Specific routines to port are
+   MeshBlock::getInterpolatedSolutionAMR and getInterpolated and
+   CartBlock::getInterpolatedData, we have to reimplement these to do a GPU update
+   with methods in dMeshBlock and dCartBlock. 
+
+   (a) Specifically we have to push interpList
+       and interpListCart to device at the end of performConnectivityAMR. So after Step 6
+       above [Ashesh]
+
+   (b) Need to change updateSolnData and update to be a fully parallel update. This
+       will require collecting all the data indices after communication and reorganizing
+       it on a per block basis and then executing a 
+       thread safe update after that. The loop at tioga.C:369-387 should be for CPU and
+       GPU loops will need some book-keeping, push-to-device and update. [Ashesh]
+
+
+I think with these 8 steps we will get to the initial implementation, which puts the most 
+expensive operation (mb->search) and most repetitive operation (dataUpdate_AMR) on the GPU andthen we can accelerate the other parts one by one by growing more capability with dMeshBlock.
+

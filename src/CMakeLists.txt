@@ -79,11 +79,11 @@ if (TIOGA_ENABLE_CUDA)
 endif()
 
 if (TIOGA_ENABLE_HIP)
-  separate_arguments(TIOGA_HIP_FLAGS)
+  separate_arguments(TIOGA_HIP_ARCH_FLAGS)
   target_compile_definitions(tioga PUBLIC
     TIOGA_HAS_GPU TIOGA_HAS_HIP)
   target_compile_options(tioga PRIVATE
-    $<$<COMPILE_LANGUAGE:CXX>:${TIOGA_HIP_FLAGS}>)
+    $<$<COMPILE_LANGUAGE:CXX>:${TIOGA_HIP_ARCH_FLAGS}>)
 endif()
 
 # Enable position independent code

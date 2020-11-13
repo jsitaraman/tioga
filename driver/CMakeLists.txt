@@ -33,6 +33,14 @@ if (TIOGA_ENABLE_CUDA)
   set_source_files_properties(${GPUTEST_CPP_SRC} PROPERTIES LANGUAGE CUDA)
 endif()
 
+if (TIOGA_ENABLE_HIP)
+  separate_arguments(TIOGA_HIP_ARCH_FLAGS)
+  target_compile_options(gpu_test.exe PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:${TIOGA_HIP_ARCH_FLAGS}>)
+  target_compile_options(gpu_test.exe PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:-x hip>)
+endif()
+
 install(TARGETS tiogadriver
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib

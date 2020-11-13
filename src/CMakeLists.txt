@@ -84,6 +84,8 @@ if (TIOGA_ENABLE_HIP)
     TIOGA_HAS_GPU TIOGA_HAS_HIP)
   target_compile_options(tioga PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:${TIOGA_HIP_ARCH_FLAGS}>)
+  target_compile_options(tioga PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:-x hip>)
 endif()
 
 # Enable position independent code

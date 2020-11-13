@@ -33,6 +33,9 @@ inline const char* gpuGetErrorString(gpuError_t err) { return cudaGetErrorString
 #define TIOGA_GPU_CALL(call) cuda ## call
 #define TIOGA_GPU_CALL_CHECK(call) TIOGA_CUDA_CHECK_ERROR(TIOGA_GPU_CALL(call))
 
+#define TIOGA_GPU_LAUNCH_FUNC(func, blocks, threads, sharedmem, stream, ...) \
+    func<<<blocks, threads, sharedmem, stream>>>(__VA_ARGS__);
+
 template <typename T>
 inline T* allocate_on_device(const size_t size)
 {

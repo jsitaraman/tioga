@@ -7,14 +7,13 @@ void print_gpu_info()
 {
     namespace gpu = TIOGA::gpu;
     std::cout << "BEGIN TEST print_gpu_info" << std::endl;
-#ifdef TIOGA_HAS_CUDA
+#ifdef TIOGA_HAS_GPU
 #if defined(CUDA_VERSION)
     std::cout << "CUDA configuration: "
               << "CUDA_VERSION: " << CUDA_VERSION
               << " " << CUDA_VERSION / 1000 << " "
               << (CUDA_VERSION % 1000) / 10 << std::endl;
 #endif
-    gpu::gpuError_t error;
     int ndevices;
     gpu::gpuDeviceProp_t dev;
 
@@ -54,12 +53,7 @@ void test_gpu_send_recv()
         return;
     }
 
-#ifdef TIOGA_HAS_CUDA
-    std::cout << "Calling cuda memset" << std::endl;
-    cudaMemset(dptr, 0, hvec.size() * sizeof(int));
-#else
-    std::memset(dptr, 0, hvec.size() * sizeof(int));
-#endif
+    gpu::memset_on_device(dptr, 0, hvec.size() * sizeof(int));
 
     gpu::pull_from_device(hvec.data(), dptr, hvec.size() * sizeof(int));
 
@@ -79,7 +73,7 @@ void test_gpu_send_recv()
     std::cout << "END TEST gpu_send_recv" << std::endl << std::endl;
 }
 
-#ifdef TIOGA_HAS_CUDA
+#ifdef TIOGA_HAS_GPU
 TIOGA_GPU_GLOBAL void vec_add(double* out, double* a, double* b, int n)
 {
     for (int i=0; i < n; ++i)
@@ -96,7 +90,7 @@ void test_cuda_vec_add()
     double* da = gpu::push_to_device(avec.data(), avec.size() * sizeof(double));
     double* db = gpu::push_to_device(bvec.data(), bvec.size() * sizeof(double));
     double* dc = gpu::push_to_device(cvec.data(), cvec.size() * sizeof(double));
-    vec_add<<< 1, 1 >>>(dc, da, db, N);
+    TIOGA_GPU_LAUNCH_FUNC(vec_add, 1, 1, 0, 0, dc, da, db, N);
 
     gpu::pull_from_device(cvec.data(), dc, cvec.size() * sizeof(double));
 
@@ -119,7 +113,7 @@ int main()
     print_gpu_info();
     test_gpu_send_recv();
 
-#ifdef TIOGA_HAS_CUDA
+#ifdef TIOGA_HAS_GPU
     test_cuda_vec_add();
 #endif
 

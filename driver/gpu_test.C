@@ -5,7 +5,7 @@
 
 void print_gpu_info()
 {
-    using namespace gpu = TIOGA::gpu;
+    namespace gpu = TIOGA::gpu;
     std::cout << "BEGIN TEST print_gpu_info" << std::endl;
 #ifdef TIOGA_HAS_CUDA
 #if defined(CUDA_VERSION)

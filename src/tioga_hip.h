@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <string>
 #include <stdexcept>
-#include <hip/hip_runtime.h>
 
 #define TIOGA_GPU_DEVICE __device__
 #define TIOGA_GPU_GLOBAL __global__

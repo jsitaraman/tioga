@@ -49,7 +49,7 @@ CartGrid::~CartGrid()
     TIOGA_FREE_DEVICE(m_info->xlo.dptr);
     TIOGA_FREE_DEVICE(m_info->dx.dptr);
 
-    TIOGA_FREE(m_info);
+    delete m_info;
   }
 
   if (lcount) TIOGA_FREE(lcount);

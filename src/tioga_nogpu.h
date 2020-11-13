@@ -54,7 +54,7 @@ inline void deallocate_device(T** dptr)
 template <typename T>
 inline void memset_on_device(T* dptr, T val, const size_t sz)
 {
-  TIOGA_CUDA_CHECK_ERROR(std::memset(dptr, val, sz));
+  std::memset(dptr, val, sz);
 }
 
 }

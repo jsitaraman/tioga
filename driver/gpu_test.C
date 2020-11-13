@@ -5,6 +5,7 @@
 
 void print_gpu_info()
 {
+    using namespace gpu = TIOGA::gpu;
     std::cout << "BEGIN TEST print_gpu_info" << std::endl;
 #ifdef TIOGA_HAS_CUDA
 #if defined(CUDA_VERSION)
@@ -13,29 +14,18 @@ void print_gpu_info()
               << " " << CUDA_VERSION / 1000 << " "
               << (CUDA_VERSION % 1000) / 10 << std::endl;
 #endif
-    cudaError_t error;
+    gpu::gpuError_t error;
     int ndevices;
-    cudaDeviceProp dev;
+    gpu::gpuDeviceProp_t dev;
 
-    error = cudaGetDeviceCount(&ndevices);
-    if (error != cudaSuccess) {
-        std::cout << "GPU error: " << cudaGetErrorString(error);
-        return;
-
-    } else {
-        std::cout << "Num. devices = " << ndevices << std::endl;
-    }
+    TIOGA_GPU_CALL_CHECK(GetDeviceCount(&ndevices));
+    std::cout << "Num. devices = " << ndevices << std::endl;
 
     int rankDevice;
-    error = cudaGetDevice(&rankDevice);
-    error = cudaGetDeviceProperties(&dev, rankDevice);
-    if (error != cudaSuccess) {
-        std::cout << cudaGetErrorString(error);
-        return;
-
-    }
+    TIOGA_GPU_CALL_CHECK(GetDevice(&rankDevice));
+    TIOGA_GPU_CALL_CHECK(GetDeviceProperties(&dev, rankDevice));
     char busid[512];
-    cudaDeviceGetPCIBusId(busid, 512, rankDevice);
+    TIOGA_GPU_CALL_CHECK(DeviceGetPCIBusId(busid, 512, rankDevice));
     std::cout << "[" << rankDevice << "] "
               << dev.name << " CC: " << dev.major << "." << dev.minor
               << " ID: " << busid

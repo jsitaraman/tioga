@@ -3,6 +3,8 @@
 
 #if defined(TIOGA_HAS_CUDA)
 #include "tioga_cuda.h"
+#elif defined(TIOGA_HAS_HIP)
+#include "tioga_hip.h"
 #else
 #include "tioga_nogpu.h"
 #endif

@@ -9,9 +9,11 @@ option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
 option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 option(TIOGA_ENABLE_CUDA "Enable CUDA support (default: off)" OFF)
+option(TIOGA_ENABLE_HIP "Enable AMD HIP support (default: off)" OFF)
 
 # CUDA specific options
 set(TIOGA_CUDA_SM "70" CACHE STRING "CUDA arch option")
+set(TIOGA_HIP_ARCH "gfx906,gfx908" CACHE STRING "HIP arch option")
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -31,6 +33,12 @@ if (TIOGA_ENABLE_CUDA)
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
   set(CMAKE_CUDA_EXTENSIONS OFF)
+endif()
+
+if (TIOGA_ENABLE_HIP)
+  find_package(HIP REQUIRED)
+  message(STATUS "HIP: ${HIP_VERSION}, platform = ${HIP_PLATFORM}, compiler=${HIP_COMPILER}")
+  set(TIOGA_HIP_ARCH_FLAGS "-m64 --amdgpu-target=${TIOGA_HIP_ARCH}")
 endif()
 
 # Set some default compilation settings for Fortran compiler

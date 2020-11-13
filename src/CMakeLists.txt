@@ -78,6 +78,17 @@ if (TIOGA_ENABLE_CUDA)
   set_source_files_properties(${TIOGALIB_CPP_SRC} PROPERTIES LANGUAGE CUDA)
 endif()
 
+if (TIOGA_ENABLE_HIP)
+  separate_arguments(TIOGA_HIP_FLAGS)
+  target_compile_definitions(tioga PUBLIC
+    TIOGA_HAS_GPU TIOGA_HAS_HIP)
+  target_compile_options(tioga PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:${TIOGA_HIP_FLAGS}>)
+endif()
+
+# Enable position independent code
+set_target_properties(tioga PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 
 file(GLOB TIOGA_HEADERS *.h)
 install(TARGETS tioga

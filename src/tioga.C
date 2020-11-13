@@ -20,6 +20,8 @@
 #include "codetypes.h"
 #include "tioga.h"
 #include <assert.h>
+#include <vector>
+
 using namespace TIOGA;
 /**
  * set communicator
@@ -766,7 +768,11 @@ void tioga::register_amr_grid(TIOGA::AMRMeshInfo* minfo)
   if (cb) delete [] cb;
 
   cg = new CartGrid[1];
+  cg->myid = myid;
   ncart = minfo->ngrids_local;
+
+  if (ncart < 1) return;
+
   cb = new CartBlock[ncart];
   cg->registerData(minfo);
 
@@ -978,4 +984,102 @@ void tioga::reduce_fringes(void)
   //mb->writeOBB(myid);
   //if (myid==4) mb->writeOutput(myid);
   //if (myid==4) mb->writeOBB(myid);
+}
+
+/** Create valid CartGrid data on all TIOGA MPI processes
+ *
+ *  For patch-based AMR, TIOGA expects a valid CartGrid instance with global
+ *  patch information on all MPI processes visible to TIOGA. However, there are
+ *  situations where it is desirable to restrict the AMR solver to execute on a
+ *  subset of all available MPI processes. To allow for this flexibility, this
+ *  method can be called to ensure that a valid CartGrid instance is available
+ *  on all MPI ranks visible to TIOGA.
+ */
+void tioga::preprocess_amr_data(int root)
+{
+  assert(root < numprocs);
+  assert((root == myid) && (cg != nullptr));
+
+  // Only perform this step if we detect that AMR solver is NOT running on all
+  // MPI ranks. The assumption is that the solver has called
+  // tioga::register_amr_grid on all processes that it is running on and,
+  // therefore, there is a valid CartGrid instance on these MPI ranks.
+  {
+    int ilocal = (cg == nullptr) ? 0 : 1;
+    int iglobal = 0;
+    MPI_Allreduce(&ilocal, &iglobal, 1, MPI_INT, MPI_SUM, scomm);
+
+    // If everyone has a valid CartGrid instance, there is nothing to do so
+    // return.
+    if (iglobal == numprocs) return;
+  }
+
+  // Some MPI ranks do not have information regarding the AMR mesh. We broadcast
+  // the AMR patch information from ranks that have it and then create a valid
+  // CartGrid instance on MPI ranks that do not have it.
+
+  constexpr int nint_per_grid = 10;
+  constexpr int nreal_per_grid = 6;
+
+  // Let all processes know the number of global AMR patches so that they can
+  // create buffers for MPI broadcast.
+  int ngrids_global = (root == myid) ? cg->m_info->ngrids_global : 0;
+  MPI_Bcast(&ngrids_global, 1, MPI_INT, root, scomm);
+
+  // Buffers that will be used to perform MPI communications. The data layout is
+  // similar to what CartGrid uses for the registerData interface. We add an
+  // additional parameter at the end to exchange the number of ghosts per patch.
+  std::vector<int> idata(ngrids_global * nint_per_grid + 1);
+  std::vector<double> rdata(ngrids_global * nreal_per_grid);
+
+  // On root MPI process for the AMR solver, populate the buffer for broadcast
+  // to all processes.
+  if (root == myid) {
+    const auto* ainfo = cg->m_info;
+    for (int pp = 0; pp < ngrids_global; ++pp) {
+      int i3 = pp * 3;
+      int i6 = pp * 6;
+      int iloc = nint_per_grid * pp;
+
+      idata[iloc] = pp;
+      idata[iloc + 1] = ainfo->level.hptr[pp];
+      idata[iloc + 2] = ainfo->mpi_rank.hptr[pp];
+      idata[iloc + 3] = ainfo->local_id.hptr[pp];
+
+      for (int n = 0; n < 3; ++n) {
+        idata[iloc + 4 + n] = ainfo->ilow.hptr[i3 + n];
+        idata[iloc + 7 + n] = ainfo->ihigh.hptr[i3 + n];
+
+        rdata[i6 + n] = ainfo->xlo.hptr[i3 + n];
+        rdata[i6 + n + 3] = ainfo->dx.hptr[i3 + n];
+      }
+    }
+
+    // Add in number of ghost cells surrounding each patch
+    idata.back() = ainfo->num_ghost;
+  }
+
+  // Broadcast from AMR solver root MPI proc to all ranks
+  MPI_Bcast(idata.data(), idata.size(), MPI_INT, root, scomm);
+  MPI_Bcast(rdata.data(), rdata.size(), MPI_DOUBLE, root, scomm);
+
+  // For MPI ranks that already have a valid AMR grid registered, do nothing and
+  // return early.
+  if (cg != nullptr) return;
+
+  // These MPI ranks don't have AMR mesh, but require patch information for
+  // performing searches. So create appropriate data here.
+  {
+    int nghost = idata.back();
+    cg = new CartGrid[1];
+    cg->myid = myid;
+
+    // For these MPI ranks there are no local patches
+    assert(cb == nullptr);
+    ncart = 0;
+
+    // Register data using the buffer interface. AMRMeshInfo object will be
+    // created by CartGrid
+    cg->registerData(nghost, idata.data(), rdata.data(), ngrids_global);
+  }
 }

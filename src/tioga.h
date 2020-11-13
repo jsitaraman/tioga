@@ -137,6 +137,12 @@ class tioga
   void register_amr_grid(TIOGA::AMRMeshInfo* minfo);
   void register_amr_solution();
 
+  /** Synchronize AMR patch information on all processes
+   *
+   *  \param root Root process from which data is broadcast to other processes
+   */
+  void preprocess_amr_data(int root = 0);
+
   void profile(void);
 
   void exchangeBoxes(void);

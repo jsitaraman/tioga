@@ -37,6 +37,7 @@ class CartGrid
   int maxlevel;
 
   bool own_data_ptrs{true};
+  bool own_amr_mesh_info{false};
 
  public :
   TIOGA::AMRMeshInfo* m_info{nullptr};
@@ -65,6 +66,8 @@ class CartGrid
   void search(double *x,int *donorid,int nsearch);
   void setcallback(void (*f1)(int *,double *,int *,double *)) 
   {   donor_frac=f1;  }
+
+  void create_mesh_info();
 };
 
 #endif /* CARTGRID_H */

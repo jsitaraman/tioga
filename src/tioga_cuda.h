@@ -14,6 +14,7 @@
 namespace TIOGA {
 namespace gpu {
 
+using gpuDeviceProp_t = cudaDeviceProp;
 using gpuError_t = cudaError_t;
 constexpr gpuError_t gpuSuccess = cudaSuccess;
 
@@ -28,6 +29,9 @@ inline const char* gpuGetErrorString(gpuError_t err) { return cudaGetErrorString
                                + ": " + TIOGA::gpu::gpuGetErrorString(gpu_ierr)); \
             throw std::runtime_error(err_str);                                    \
         }}
+
+#define TIOGA_GPU_CALL(call) cuda ## call
+#define TIOGA_GPU_CALL_CHECK(call) TIOGA_CUDA_CHECK_ERROR(TIOGA_GPU_CALL(call))
 
 template <typename T>
 inline T* allocate_on_device(const size_t size)
@@ -62,6 +66,12 @@ inline void deallocate_device(T** dptr)
 {
     TIOGA_CUDA_CHECK_ERROR(cudaFree(static_cast<void*>(*dptr)));
     *dptr = nullptr;
+}
+
+template <typename T>
+inline void memset_on_device(T* dptr, T val, const size_t sz)
+{
+  TIOGA_CUDA_CHECK_ERROR(cudaMemset(dptr, val, sz));
 }
 
 } // namespace gpu

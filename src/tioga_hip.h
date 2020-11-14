@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <string>
 #include <stdexcept>
+#include <hip/hip_runtime.h>
 
 #define TIOGA_GPU_DEVICE __device__
 #define TIOGA_GPU_GLOBAL __global__
@@ -13,7 +14,7 @@
 namespace TIOGA {
 namespace gpu {
 
-using gpuDeviceProp_t = hipDeviceProp;
+using gpuDeviceProp_t = hipDeviceProp_t;
 using gpuError_t = hipError_t;
 constexpr gpuError_t gpuSuccess = hipSuccess;
 

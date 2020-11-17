@@ -17,6 +17,7 @@ target_sources(tioga PRIVATE
   CartBlock.C
   CartGrid.C
   MeshBlock.C
+  dMeshBlock.C
   bookKeeping.C
   cartOps.C
   checkContainment.C

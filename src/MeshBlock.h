@@ -27,6 +27,7 @@
 #include "codetypes.h"
 #include "ADT.h"
 #include "TiogaMeshInfo.h"
+#include "dMeshBlock.h"
 
 // forward declare to instantiate one of the methods
 class parallelComm;
@@ -53,6 +54,9 @@ class MeshBlock
    *  This pointer is owned by MeshBlock
    */
   TIOGA::MeshBlockInfo* m_info_device{nullptr};
+  
+  TIOGA::dMeshBlock *dMB; /** device instance of mesh block with device specific methods */
+
 
   int nnodes;  /** < number of grid nodes */
   int ncells;  /** < total number of cells */
@@ -195,6 +199,7 @@ class MeshBlock
     invmap = NULL;
     icft   = NULL;
     mapmask= NULL;
+    dMB = NULL;
   };
 
   /** basic destructor */

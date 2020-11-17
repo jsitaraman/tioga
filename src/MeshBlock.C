@@ -118,6 +118,9 @@ void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
       sizeof(TIOGA::MeshBlockInfo));
   }
   TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::MeshBlockInfo));
+  if (dMB==NULL) dMB=new TIOGA::dMeshBlock[1];
+  dMB->setData(m_info_device);
+
 }
 
 void MeshBlock::preprocess(void)

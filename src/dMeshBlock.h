@@ -24,7 +24,7 @@ public:
 
   dMeshBlock() {}
 
-  ~dMeshBlock();
+  ~dMeshBlock() {};
 
   void setData( TIOGA::MeshBlockInfo* m_info_device);
   void resetIblanks();

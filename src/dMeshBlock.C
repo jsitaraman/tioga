@@ -31,6 +31,7 @@ namespace TIOGA {
 
   void dMeshBlock::resetIblanks() {
     int n_blocks = nnodes/block_size + (nnodes%block_size == 0 ? 0:1);
-    g_reset_iblanks<<<n_blocks,block_size>>>(iblank,nnodes);
+    TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, iblank, nnodes);
+    //g_reset_iblanks<<<n_blocks,block_size>>>(iblank,nnodes);
   }
 } //namespace TIOGA

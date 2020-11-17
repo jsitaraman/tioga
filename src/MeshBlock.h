@@ -54,8 +54,10 @@ class MeshBlock
    *  This pointer is owned by MeshBlock
    */
   TIOGA::MeshBlockInfo* m_info_device{nullptr};
+
+  std::unique_ptr<TIOGA::dMeshBlock> dMB;
   
-  TIOGA::dMeshBlock *dMB; /** device instance of mesh block with device specific methods */
+  //TIOGA::dMeshBlock *dMB; /** device instance of mesh block with device specific methods */
 
 
   int nnodes;  /** < number of grid nodes */
@@ -199,7 +201,6 @@ class MeshBlock
     invmap = NULL;
     icft   = NULL;
     mapmask= NULL;
-    dMB = NULL;
   };
 
   /** basic destructor */

@@ -8,9 +8,9 @@ void g_reset_iblanks(int *iblank, int nnodes)
   if (idx < nnodes) {
 #else
   for(int idx=0;idx<nnodes;idx++) {
+#endif
     iblank[idx]=1;
   }
-#endif
 
 }
 

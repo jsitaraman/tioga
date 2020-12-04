@@ -8,88 +8,11 @@
 // leave this as pifus native for now for 
 // posterity sake, fix later
 // 
-# define DEVICE_MIN(x,y)  (x) < (y) ? (x) : (y)
-# define DEVICE_MAX(x,y)  (x) > (y) ? (x) : (y)
-# define DEVICE_BIGVALUE 1e15
-# define DEVICE_TOL 1e-6
-# define DEVICE_BASE 1
-
-
-TIOGA_GPU_DEVICE
-int d_boxRegionIntersect(double *x0,double *vec,double *bbox)
-{
-  int i,j,k,l,d,m,k1,k2;
-  double xc[3][8],xp[3],xcmin[3],xcmax[3],alpha;
-  double EPS=DEVICE_TOL;
-  int bflag;
-
-  bflag=0;
-  for(i=0;i<3;i++) { xcmin[i]=DEVICE_BIGVALUE; xcmax[i]=-xcmin[i];}
-  m=-1;
-  // check if any corners are within the region
-  for(l=0;l<2;l++)
-    for(k=0;k<2;k++)
-      for(j=0;j<2;j++)
-	{
-	  m++;
-	  xp[0]=bbox[3*j+0]-x0[0];
-	  xp[1]=bbox[3*k+1]-x0[1];
-	  xp[2]=bbox[3*l+2]-x0[2];
-	  for(d=0;d<2;d++)
-	    {
-	      xc[d][m]=xp[0]*vec[3*d]+xp[1]*vec[3*d+1]+xp[2]*vec[3*d+2];
-	      xcmin[d]=(xc[d][m] < xcmin[d])?xc[d][m]:xcmin[d];
-	      xcmax[d]=(xc[d][m] > xcmax[d])?xc[d][m]:xcmax[d];
-	    }
-          //printf("%f %f %f %f\n",xc[0][m],xc[1][m],xc[2][m],EPS);
-          //printf("%d %d %d\n",(xc[0][m] > -EPS),(xc[1][m] > -EPS),(xc[2][m] > -EPS));
-	  if (xc[0][m] >= -EPS && 
-	      xc[1][m] >= -EPS &&
-	      xc[2][m] >= -EPS)
-	    {
-	      bflag=1;
-	      return bflag;
-	    }
-	}
-  
-  if (xcmax[0] < 0.0 || xcmax[1] < 0.0 || xcmax[2] < 0.0) return bflag;
-  
-  for(k=0;k<3;k++)     // for each vector
-    for(j=0;j<3;j++)   // for each direction
-      for(i=0;i<2;i++) // for each vector in this direction
-	{
-	  if (d_fabs(vec[3*k+j]) > DEVICE_TOL)
-	    {
-	      alpha=(bbox[3*i+j]-x0[j])/vec[3*k+j];
-	      xp[0]=x0[0]+alpha*vec[3*k];
-	      xp[1]=x0[1]+alpha*vec[3*k+1];
-	      xp[2]=x0[2]+alpha*vec[3*k+2];
-	      k1=(k+1)%3;
-	      k2=(k1+1)%3;
-	      if ( (xp[k1] - (bbox[k1]+EPS))*(xp[k1]-(bbox[3+k1]-EPS)) <= 0.0 &&
-                   (xp[k2] - (bbox[k2]+EPS))*(xp[k2]-(bbox[3+k2]-EPS)) <= 0.0)
-		{
-		  bflag=1;
-		  return bflag;
-		}
-	    }
-	}
-  return bflag;
-}
-TIOGA_GPU_DEVICE
-double d_boxdist2(double *xp, double *box)
-{
-  int j;
-  double dx[3];
-  double boxDist2;
-  for(j=0;j<3;j++)
-    {
-      dx[j]=DEVICE_MAX(box[j]-xp[j],0.0);
-      dx[j]=DEVICE_MAX(dx[j],xp[j]-box[j+3]);
-    }
-  boxDist2=dx[0]*dx[0]+dx[1]*dx[1]+dx[2]*dx[2];
-  return boxDist2;
-}
+//# define TIOGA_DEVICE_MIN(x,y)  (x) < (y) ? (x) : (y)
+//# define TIOGA_DEVICE_MAX(x,y)  (x) > (y) ? (x) : (y)
+# define TIOGA_DEVICE_BIGVALUE 1e15
+# define TIOGA_DEVICE_TOL 1e-6
+# define TIOGA_DEVICE_BASE 1
 
 
 TIOGA_GPU_DEVICE
@@ -386,7 +309,7 @@ void d_checkContainment(double *x, int **vconn,int *nc, int *nv, int ntypes, int
       nvert=nv[n];
       for(m=0;m<nvert;m++)
 	{
-	  i3=3*(vconn[n][nvert*i+m]-DEVICE_BASE);
+	  i3=3*(vconn[n][nvert*i+m]-TIOGA_DEVICE_BASE);
 	  for(j=0;j<3;j++)
 	    xv[m][j]=x[i3+j];
 	}
@@ -402,13 +325,13 @@ void d_checkContainment(double *x, int **vconn,int *nc, int *nv, int ntypes, int
       //
       for(m=0;m<nvert;m++)
 	{
-	  if ((frac[m]+DEVICE_TOL)*(frac[m]-1.0-DEVICE_TOL) > 0) 
+	  if ((frac[m]+TIOGA_DEVICE_TOL)*(frac[m]-1.0-TIOGA_DEVICE_TOL) > 0) 
 	    {
 	      cellIndex[0]=-1;
 	      return;
 	    }
           // need to find another way to implement this
-          //if (fabs(frac[m]) < TOL && cellRes[icell]==DEVICE_BIGVALUE) cellIndex[1]=1;
+          //if (fabs(frac[m]) < TOL && cellRes[icell]==TIOGA_DEVICE_BIGVALUE) cellIndex[1]=1;
 	}
       
       return;
@@ -452,7 +375,7 @@ void d_searchIntersections_containment(int cellIndex[2],
   int level=0;
 
   nodeStack[0]=node;
-  dmin[0]=dmin[1]=DEVICE_BIGVALUE;
+  dmin[0]=dmin[1]=TIOGA_DEVICE_BIGVALUE;
   cellIndex[0]=cellIndex[1]=-1;
 
   while(nstack > 0) 
@@ -466,9 +389,9 @@ void d_searchIntersections_containment(int cellIndex[2],
 	  //
 	  flag=1;
           for(i=0;i<ndim/2;i++)
-            flag = (flag && (xsearch[i] >=element[i]-DEVICE_TOL));
+            flag = (flag && (xsearch[i] >=element[i]-TIOGA_DEVICE_TOL));
           for(i=ndim/2;i<ndim;i++)
-            flag = (flag && (xsearch[i-ndim/2] <=element[i]+DEVICE_TOL));
+            flag = (flag && (xsearch[i-ndim/2] <=element[i]+TIOGA_DEVICE_TOL));
           if (flag) 
           {
             d_checkContainment(x,vconn,nc,nv,ntypes,elementList,
@@ -491,9 +414,9 @@ void d_searchIntersections_containment(int cellIndex[2],
 		  }
                  flag=1;
                  for(i=0;i<ndim/2;i++)
-                   flag = (flag && (xsearch[i] >=element[i]-DEVICE_TOL));
+                   flag = (flag && (xsearch[i] >=element[i]-TIOGA_DEVICE_TOL));
                  for(i=ndim/2;i<ndim;i++)
-                   flag = (flag && (xsearch[i-ndim/2] <=element[i]+DEVICE_TOL));
+                   flag = (flag && (xsearch[i-ndim/2] <=element[i]+TIOGA_DEVICE_TOL));
 		if (flag)
 		  {
 		     nodeStack[mm+nstack]=nodeChild;

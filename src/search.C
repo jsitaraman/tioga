@@ -245,7 +245,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
 #endif
   //
-#ifdef GPU
+#ifdef TIOGA_HAS_GPU
   dMB->search(adt,elementList,xsearch,donorId,nsearch);
   for(i=0;i<nsearch;i++) donorId[i]=donorId[xtag[i]];
 #else

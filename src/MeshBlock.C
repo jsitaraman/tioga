@@ -118,7 +118,7 @@ void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
       sizeof(TIOGA::MeshBlockInfo));
   }
   TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::MeshBlockInfo));
-#ifdef GPU
+#ifdef TIOGA_HAS_GPU
   if (!dMB) dMB.reset(new TIOGA::dMeshBlock);
   dMB->setData(m_info_device);
 #endif
@@ -132,7 +132,7 @@ void MeshBlock::preprocess(void)
   // set all iblanks = 1
   //
   for(i=0;i<nnodes;i++) iblank[i]=1;
-#ifdef GPU
+#ifdef TIOGA_HAS_GPU
   dMB->resetIblanks();
 #endif
   //

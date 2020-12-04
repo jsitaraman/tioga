@@ -245,6 +245,10 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
 #endif
   //
+#ifdef GPU
+  dMB->search(adt,elementList,xsearch,donorId,nsearch);
+  for(i=0;i<nsearch;i++) donorId[i]=donorId[xtag[i]];
+#else
   donorCount=0;
   ipoint=0; 
   dId=(int *) malloc(sizeof(int) *2);
@@ -264,6 +268,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
        ipoint+=3;
      }
   TIOGA_FREE(dId);
+#endif
   TIOGA_FREE(icell);
   TIOGA_FREE(obq);
 }

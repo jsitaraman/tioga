@@ -10,6 +10,7 @@
 #define TIOGA_GPU_GLOBAL __global__
 #define TIOGA_GPU_HOST __host__
 #define TIOGA_GPU_HOST_DEVICE __host__ __device__
+#define GPU HIP
 
 namespace TIOGA {
 namespace gpu {

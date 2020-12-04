@@ -63,6 +63,13 @@ class ADT
     };      
   void buildADT(int d,int nelements,double *elementBbox);  
   void searchADT(MeshBlock *mb,int *cellindx,double *xsearch);
+  // get methods
+  int get_nelem(void) { return nelem;};
+  int get_ndim(void)  { return ndim;};
+  int *get_Integers(void) {return adtIntegers;};
+  double *get_Reals(void) {return adtReals;};
+  double *get_Extents(void) {return adtExtents;};
+  double *get_coord(void) {return coord;}
 };
 
 

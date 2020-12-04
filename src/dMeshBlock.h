@@ -1,6 +1,7 @@
 #ifndef DMESHBLOCK_H
 #define DMESHBLOCK_H
 #include "TiogaMeshInfo.h"
+#include "ADT.h"
 namespace TIOGA {
 class dMeshBlock
 {
@@ -28,6 +29,7 @@ public:
 
   void setData( TIOGA::MeshBlockInfo* m_info_device);
   void resetIblanks();
+  void search(ADT *adt,int *elementList, double *xsearch, int *donorId, int nsearch);
 
 };
 

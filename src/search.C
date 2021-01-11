@@ -334,7 +334,8 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       Kokkos::subview(queries_non_compact, Kokkos::make_pair(0, n_queries));
 
   // printf("#%d: n_queries = %d, n_search = %d\n", myid, n_queries, nsearch);
-  bvh.query(queries, MyCallback{this, xsearch, donorId, donorId_helper});
+  bvh.query(queries, MyCallback{this, xsearch, donorId, donorId_helper},
+            ArborX::Experimental::TraversalPolicy().setPredicateSorting(false));
 
   for (i = 0; i < nsearch; i++) {
       if (i != xtag[i]) {

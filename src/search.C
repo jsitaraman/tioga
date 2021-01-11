@@ -53,21 +53,18 @@ struct MyCallback {
     int *donorId;
     int *donorId_helper;
 
-    using tag = ArborX::Details::InlineCallbackTag;
-    template <typename Query, typename Insert>
-    KOKKOS_FUNCTION void operator()(Query const &query, int index,
-                                    Insert const &insert) const {
-        auto const &data = ArborX::getData(query);
+    template <typename Query>
+    KOKKOS_FUNCTION auto operator()(Query const &query, int index) const {
+        int i = ArborX::getData(query);
 
-        int i = data[0];
-        int *dId0 = donorId;
-        int *dId1 = donorId_helper;
-
-        if (donorId[i] > -1 && donorId_helper[i] == 0) return;
         int dId[2];
         mb->checkContainment(dId, index, xsearch + 3 * i);
         donorId[i] = dId[0];
         donorId_helper[i] = dId[1];
+
+        if (donorId[i] > -1 && donorId_helper[i] == 0)
+            return ArborX::CallbackTreeTraversalControl::early_exit;
+        return ArborX::CallbackTreeTraversalControl::normal_continuation;
     }
 };
 
@@ -311,7 +308,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 
   using QueryType = ArborX::Intersects<ArborX::Point>;
   using PredicateType =
-      ArborX::PredicateWithAttachment<QueryType, Kokkos::Array<int, 1>>;
+      ArborX::PredicateWithAttachment<QueryType, int>;
 
   Kokkos::View<PredicateType *, DeviceType> queries_non_compact(
       Kokkos::ViewAllocateWithoutInitializing("queries"), nsearch);
@@ -327,8 +324,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
                   queries_non_compact(update) =
                       ArborX::attach(QueryType(ArborX::Point{
                                          xsearch[3 * i], xsearch[3 * i + 1],
-                                         xsearch[3 * i + 2]}),
-                                     Kokkos::Array<int, 1>{i});
+                                         xsearch[3 * i + 2]}), i);
               }
               ++update;
           }
@@ -338,13 +334,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       Kokkos::subview(queries_non_compact, Kokkos::make_pair(0, n_queries));
 
   // printf("#%d: n_queries = %d, n_search = %d\n", myid, n_queries, nsearch);
-
-  Kokkos::View<int *, DeviceType> offset("offset", 0);
-  Kokkos::View<int *, DeviceType> indices("indices", 0);
-  // We really don't need any buffer, but the logic in ArborX right now
-  // dictates that it has to be positive to avoid first pass
-  bvh.query(queries, MyCallback{this, xsearch, donorId, donorId_helper},
-            indices, offset, 1 /*buffer_size*/);
+  bvh.query(queries, MyCallback{this, xsearch, donorId, donorId_helper});
 
   for (i = 0; i < nsearch; i++) {
       if (i != xtag[i]) {

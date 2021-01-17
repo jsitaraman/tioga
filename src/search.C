@@ -25,27 +25,27 @@
 #ifdef TIOGA_USE_ARBORX
 #include <ArborX.hpp>
 using DeviceType = Kokkos::Serial::device_type;
+using ExecutionSpace = typename DeviceType::execution_space;
+using MemorySpace = typename DeviceType::memory_space;
+
 struct ArborXBoxesWrapper {
     double *data;
     int n;
 };
 
-namespace ArborX {
-namespace Traits {
 template <>
-struct Access<ArborXBoxesWrapper, PrimitivesTag> {
-    KOKKOS_INLINE_FUNCTION
-    static Box get(ArborXBoxesWrapper const &d, int i) {
+struct ArborX::AccessTraits<ArborXBoxesWrapper, ArborX::PrimitivesTag> {
+    KOKKOS_FUNCTION
+    static ArborX::Box get(ArborXBoxesWrapper const &d, int i) {
         return {{d.data[6 * i + 0] - TOL, d.data[6 * i + 1] - TOL, d.data[6 * i + 2] - TOL},
                 {d.data[6 * i + 3] + TOL, d.data[6 * i + 4] + TOL, d.data[6 * i + 5] + TOL}};
     }
-    inline static typename std::size_t size(ArborXBoxesWrapper const &d) {
+    KOKKOS_FUNCTION
+    static typename std::size_t size(ArborXBoxesWrapper const &d) {
         return d.n;
     }
     using memory_space = typename DeviceType::memory_space;
 };
-}  // namespace Traits
-}  // namespace ArborX
 
 struct MyCallback {
     MeshBlock *mb;
@@ -64,6 +64,7 @@ struct MyCallback {
 
         if (donorId[i] > -1 && donorId_helper[i] == 0)
             return ArborX::CallbackTreeTraversalControl::early_exit;
+
         return ArborX::CallbackTreeTraversalControl::normal_continuation;
     }
 };
@@ -269,7 +270,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   ndim = 6;
 
 #ifdef TIOGA_USE_ARBORX
-  ArborX::BVH<DeviceType> bvh{ArborXBoxesWrapper{elementBbox, cell_count}};
+  ArborX::BVH<MemorySpace> bvh(ExecutionSpace{}, ArborXBoxesWrapper{elementBbox, cell_count});
 #else
   //
   // build the ADT now
@@ -314,7 +315,6 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       Kokkos::ViewAllocateWithoutInitializing("queries"), nsearch);
 
   int n_queries;
-  using ExecutionSpace = typename DeviceType::execution_space;
   Kokkos::parallel_scan(
       "tioga:construct_queries",
       Kokkos::RangePolicy<ExecutionSpace>(0, nsearch),
@@ -334,7 +334,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
       Kokkos::subview(queries_non_compact, Kokkos::make_pair(0, n_queries));
 
   // printf("#%d: n_queries = %d, n_search = %d\n", myid, n_queries, nsearch);
-  bvh.query(queries, MyCallback{this, xsearch, donorId, donorId_helper},
+  bvh.query(ExecutionSpace{}, queries, MyCallback{this, xsearch, donorId, donorId_helper},
             ArborX::Experimental::TraversalPolicy().setPredicateSorting(false));
 
   for (i = 0; i < nsearch; i++) {

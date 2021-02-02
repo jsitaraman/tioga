@@ -15,7 +15,8 @@ jobs:
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        #os: [ubuntu-latest, macos-latest]
+        os: [ ubuntu-latest ]
         build_type: [Release, Debug]
         include:
           - os: macos-latest
@@ -32,23 +33,23 @@ jobs:
           cmake -Bbuild -DCMAKE_Fortran_COMPILER=$(which mpif90) .
           cmake --build build -- -j $(nproc)
 
-  analyze:
-    name: CodeQL analysis
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+  # analyze:
+  #   name: CodeQL analysis
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
 
-      - name: Install dependencies
-        run: sudo apt-get install mpich libmpich-dev
+  #     - name: Install dependencies
+  #       run: sudo apt-get install mpich libmpich-dev
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v1
-        with:
-          languages: cpp
+  #     - name: Initialize CodeQL
+  #       uses: github/codeql-action/init@v1
+  #       with:
+  #         languages: cpp
 
-      - name: Configure and build
-        uses: github/codeql-action/autobuild@v1
+  #     - name: Configure and build
+  #       uses: github/codeql-action/autobuild@v1
 
-      - name: Analyze
-        uses: github/codeql-action/analyze@v1
+  #     - name: Analyze
+  #       uses: github/codeql-action/analyze@v1

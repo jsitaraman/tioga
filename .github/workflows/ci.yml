@@ -19,7 +19,7 @@ jobs:
         build_type: [Release, Debug]
         include:
           - os: macos-latest
-            build_deps: brew install open-mpi
+            build_deps: brew install gfortran open-mpi
           - os: ubuntu-latest
             build_deps: sudo apt-get install mpich libmpich-dev
     name: ${{matrix.os}} - ${{matrix.build_type}}
@@ -29,7 +29,7 @@ jobs:
         run: ${{matrix.build_deps}}
       - name: Configure and build
         run: |
-          cmake -Bbuild .
+          cmake -Bbuild -DCMAKE_Fortran_COMPILER=$(which mpif90) .
           cmake --build build -- -j $(nproc)
 
   analyze:

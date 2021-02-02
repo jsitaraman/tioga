@@ -19,7 +19,7 @@ jobs:
         build_type: [Release, Debug]
         include:
           - os: macos-latest
-            build_deps: brew install gfortran open-mpi
+            build_deps: brew install open-mpi && brew link gcc
           - os: ubuntu-latest
             build_deps: sudo apt-get install mpich libmpich-dev
     name: ${{matrix.os}} - ${{matrix.build_type}}

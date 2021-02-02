@@ -28,6 +28,7 @@ jobs:
           cmake -Bbuild \
             -DCMAKE_CXX_COMPILER=$(which hipcc) \
             -DCMAKE_C_COMPILER=$(which hipcc) \
+            -DCMAKE_Fortran_COMPILER=$(which mpif90) \
             -DCMAKE_VERBOSE_MAKEFILE=ON \
             -DTIOGA_ENABLE_HIP=ON \
             -DTIOGA_HIP_ARCH="gfx906,gfx908" .

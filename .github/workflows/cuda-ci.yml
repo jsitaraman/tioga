@@ -45,6 +45,7 @@ jobs:
           export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda-${{matrix.cuda_ver}}/lib:${LD_LIBRARY_PATH}
           cmake -Bbuild-${{matrix.cuda_pkg}} \
             -DCMAKE_VERBOSE_MAKEFILE=ON \
+            -DCMAKE_Fortran_COMPILER=$(which mpif90) \
             -DTIOGA_ENABLE_CUDA=ON \
             -DTIOGA_CUDA_SM=70 .
           cmake --build build-${{matrix.cuda_pkg}} -- -j $(nproc)

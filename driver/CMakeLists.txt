@@ -20,7 +20,7 @@ if (TIOGA_ENABLE_ARBORX)
   target_link_libraries(tiogadriver PRIVATE ArborX::ArborX)
 endif()
 
-add_executable(tioga.exe testTioga.f90)
+add_executable(tioga.exe testTioga.F90)
 # Using #ifdef requires preprocessing
 target_compile_options(tioga.exe PRIVATE "-cpp")
 

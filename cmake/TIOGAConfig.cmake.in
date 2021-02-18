@@ -45,6 +45,11 @@ if (NOT TIOGA_FIND_COMPONENTS)
     set(TIOGA_FIND_COMPONENTS "tioga")
 endif ()
 
+set(TIOGA_ENABLE_ARBORX "@TIOGA_ENABLE_ARBORX@")
+if (TIOGA_ENABLE_ARBORX)
+  find_package(ArborX REQUIRED)
+endif()
+
 set(TIOGA_FOUND TRUE)
 set(TIOGA_tioga_FOUND TRUE)
 

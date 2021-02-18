@@ -10,6 +10,7 @@ option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" O
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 option(TIOGA_ENABLE_CUDA "Enable CUDA support (default: off)" OFF)
 option(TIOGA_ENABLE_HIP "Enable AMD HIP support (default: off)" OFF)
+option(TIOGA_ENABLE_ARBORX "Enable ArborX (default: off)" OFF)
 
 # CUDA specific options
 set(TIOGA_CUDA_SM "70" CACHE STRING "CUDA arch option")
@@ -22,6 +23,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(MPI REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
+if (TIOGA_ENABLE_ARBORX)
+  add_definitions(-DTIOGA_USE_ARBORX)
+  find_package(ArborX REQUIRED)
+endif()
+
 if (TIOGA_ENABLE_CUDA)
   enable_language(CUDA)
   if (CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "9.0")
@@ -29,7 +35,7 @@ if (TIOGA_ENABLE_CUDA)
       "Please use CUDA toolkit version 9.0 or newer")
   endif()
   set(TIOGA_CUDA_FLAGS "--Wno-deprecated-gpu-targets -m64")
-  set(TIOGA_CUDA_ARCH_FLAGS "-gencode=arch=compute_${TIOGA_CUDA_SM},code=sm_${TIOGA_CUDA_SM}")
+  set(TIOGA_CUDA_ARCH_FLAGS "-gencode=arch=compute_${TIOGA_CUDA_SM},code=sm_${TIOGA_CUDA_SM} -expt-extended-lambda")
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
   set(CMAKE_CUDA_EXTENSIONS OFF)

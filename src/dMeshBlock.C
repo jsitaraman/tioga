@@ -17,8 +17,8 @@ namespace TIOGA {
     obcnode = m_info->overset_ids.dptr;
     
     ntypes = m_info->num_vert_per_elem.sz;
-    nv = m_info->num_vert_per_elem.dptr;
-    nc = m_info->num_cells_per_elem.dptr;
+    nv = m_info->num_vert_per_elem.hptr;
+    nc = m_info->num_cells_per_elem.hptr;
     
     ncells=0;
     for(int i=0;i<ntypes;i++) ncells+=nc[i];
@@ -33,6 +33,7 @@ namespace TIOGA {
 #ifdef TIOGA_HAS_GPU
     int n_blocks = nnodes/block_size + (nnodes%block_size == 0 ? 0:1);
     TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, iblank, nnodes);
+    TIOGA::gpu::synchronize();
     //g_reset_iblanks<<<n_blocks,block_size>>>(iblank,nnodes);
 #endif
   }
@@ -64,7 +65,7 @@ namespace TIOGA {
    //g_adt_search(double *x, int **vconn,int *nc, int *nv, int ntypes, 
    //             double *coord, double *adtExtents, double *adtIntegers, double *adtReals,
    //             int *elementList, double *donorId, double *xsearch, int ndim, int nelem, int nsearch);
-
+   TIOGA::gpu::synchronize();
    TIOGA::gpu::pull_from_device<int>(donorId_host,donorId,sizeof(int)*nsearch);    
    //
    //release all gpu memory

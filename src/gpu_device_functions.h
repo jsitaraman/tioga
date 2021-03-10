@@ -377,7 +377,6 @@ void d_searchIntersections_containment(int cellIndex[2],
   nodeStack[0]=node;
   dmin[0]=dmin[1]=TIOGA_DEVICE_BIGVALUE;
   cellIndex[0]=cellIndex[1]=-1;
-
   while(nstack > 0) 
     {
       mm=0;
@@ -396,6 +395,7 @@ void d_searchIntersections_containment(int cellIndex[2],
           {
             d_checkContainment(x,vconn,nc,nv,ntypes,elementList,
                                cellIndex,adtIntegers[4*node],xsearch);
+            printf("cellIndex[0]=%d\n",cellIndex[0]);
             if (cellIndex[0] > -1 && cellIndex[1]==0) return;
           }
 	  //

@@ -6,7 +6,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" on)
 option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" on)
 option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" on)
 option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
-option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
+option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" ON)
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 option(TIOGA_ENABLE_CUDA "Enable CUDA support (default: off)" OFF)
 option(TIOGA_ENABLE_HIP "Enable AMD HIP support (default: off)" OFF)
@@ -28,7 +28,7 @@ if (TIOGA_ENABLE_CUDA)
     message(FATAL_ERROR "Your nvcc version is ${CMAKE_CUDA_COMPILER_VERSION}. "
       "Please use CUDA toolkit version 9.0 or newer")
   endif()
-  set(TIOGA_CUDA_FLAGS "--Wno-deprecated-gpu-targets -m64")
+  set(TIOGA_CUDA_FLAGS "-g -rdynamic --Wno-deprecated-gpu-targets -m64")
   set(TIOGA_CUDA_ARCH_FLAGS "-gencode=arch=compute_${TIOGA_CUDA_SM},code=sm_${TIOGA_CUDA_SM}")
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
@@ -52,7 +52,12 @@ endif()
 if (${CMAKE_Fortran_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_Fortran_FLAGS
     "${CMAKE_Fortran_FLAGS} -fbounds-check -fbacktrace -fdefault-real-8 -ffree-line-length-none")
+ set(CMAKE_CXX_FLAGS
+   "${CMAKE_CXX_FLAGS} -g -rdynamic")
+ set(CMAKE_C_FLAGS
+   "${CMAKE_C_FLAGS} -g -rdynamic")
 elseif (${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel")
+ 
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -r8 -double_size 128")
 endif()
 

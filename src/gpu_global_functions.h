@@ -28,6 +28,7 @@ void g_adt_search(double *x, int **vconn,int *nc, int *nv, int ntypes,
 #endif
     int cellIndex[2];
     int nchecks;
+    donorId[idx]=-1;
     d_searchIntersections_containment(cellIndex,
                                      adtIntegers,
                                      adtReals,

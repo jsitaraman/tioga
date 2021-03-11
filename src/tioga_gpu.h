@@ -12,7 +12,7 @@
 namespace TIOGA {
 namespace gpu {
 
-#if defined(TIOGA_HAS_GPU)
+#if defined(TIOGA_HAS_GPU) && !defined(TIOGA_FAKE_GPU)
 #define TIOGA_GPU_CHECK_ERROR(call) {                                             \
         TIOGA::gpu::gpuError_t gpu_ierr = (call);                                 \
         if (TIOGA::gpu::gpuSuccess != gpu_ierr) {                                 \

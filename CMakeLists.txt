@@ -10,6 +10,7 @@ option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" O
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 option(TIOGA_ENABLE_CUDA "Enable CUDA support (default: off)" OFF)
 option(TIOGA_ENABLE_HIP "Enable AMD HIP support (default: off)" OFF)
+option(TIOGA_FAKE_GPU "Fake GPU pathways for testing (default: off)" OFF)
 
 # CUDA specific options
 set(TIOGA_CUDA_SM "70" CACHE STRING "CUDA arch option")

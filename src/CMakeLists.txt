@@ -89,6 +89,11 @@ if (TIOGA_ENABLE_HIP)
     $<$<COMPILE_LANGUAGE:CXX>:-x hip>)
 endif()
 
+if (TIOGA_FAKE_GPU)
+  target_compile_definitions(tioga PUBLIC
+    TIOGA_HAS_GPU TIOGA_FAKE_GPU)
+endif()
+
 # Enable position independent code
 set_target_properties(tioga PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

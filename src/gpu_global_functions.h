@@ -3,7 +3,7 @@
 TIOGA_GPU_GLOBAL
 void g_reset_iblanks(int *iblank, int nnodes)
 {
-#ifdef TIOGA_HAS_GPU
+#if defined(TIOGA_HAS_GPU) && !defined(TIOGA_FAKE_GPU)
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < nnodes) {
 #else
@@ -20,7 +20,7 @@ void g_adt_search(double *x, int **vconn,int *nc, int *nv, int ntypes,
              int *elementList, int *donorId, double *xsearch, 
 	     int ndim, int nelem, int nsearch)
 {
-#ifdef TIOGA_HAS_GPU
+#if defined(TIOGA_HAS_GPU) && !defined(TIOGA_FAKE_GPU)
   int idx = blockIdx.x*blockDim.x + threadIdx.x;
   if (idx < nsearch) {
 #else

@@ -1,11 +1,20 @@
 #include "dMeshBlock.h"
 #include "gpu_global_functions.h"
-
+#include<chrono>
+#include<thread>
+\
 namespace TIOGA {
+
+  void dMeshBlock::setMinfo(TIOGA::MeshBlockInfo *m_info_in)
+  {
+    m_info_device=m_info_in;
+  }
 
   void dMeshBlock::setData(TIOGA::MeshBlockInfo* m_info)
   {
     // Populate legacy data
+#if defined(TIOGA_HAS_GPU) 
+ #if defined(TIOGA_FAKE_GPU)
     meshtag = m_info->meshtag;
     nnodes = m_info->num_nodes;
     x = m_info->xyz.dptr;
@@ -17,22 +26,52 @@ namespace TIOGA {
     obcnode = m_info->overset_ids.dptr;
     
     ntypes = m_info->num_vert_per_elem.sz;
-    nv = m_info->num_vert_per_elem.hptr;
-    nc = m_info->num_cells_per_elem.hptr;
+    nv = m_info->num_vert_per_elem.dptr;
+    nc = m_info->num_cells_per_elem.dptr;
     
     ncells=0;
     for(int i=0;i<ntypes;i++) ncells+=nc[i];
     
-    for (int i=0; i < TIOGA::MeshBlockInfo::max_vertex_types; ++i) {
+    for (int i=0; i < TIOGA::MeshBlockInfo::max_vertex_types; i++) {
       vconn_ptrs[i] = m_info->vertex_conn[i].dptr;
     }
     vconn=&vconn_ptrs[0];
+ #else
+    meshtag = m_info->meshtag;
+    nnodes = m_info->num_nodes;
+    x = m_info->xyz.hptr;
+    iblank = m_info->iblank_node.dptr;
+    iblank_cell = m_info->iblank_cell.dptr;
+    nwbc = m_info->wall_ids.sz;
+    nobc = m_info->overset_ids.sz;
+    wbcnode = m_info->wall_ids.dptr;
+    obcnode = m_info->overset_ids.dptr;
+    
+    ntypes = m_info->num_vert_per_elem.sz;
+    nv = m_info->num_vert_per_elem.dptr;
+    nc = m_info->num_cells_per_elem.dptr;
+//    printf("ntypes=%d\n",ntypes);
+//    for(int i=0;i<ntypes;i++) printf("nv[i],nc[i]=%d %d\n",nv[i],nc[i]);  
+    ncells=0;
+    for(int i=0;i<ntypes;i++) ncells+=m_info->num_cells_per_elem.hptr[i];
+    
+    for (int i=0; i < TIOGA::MeshBlockInfo::max_vertex_types; i++) {
+      vconn_ptrs[i] = m_info->vertex_conn[i].dptr;
+      //if (i==0) ndc4= m_info->vertex_conn[i].hptr;
+      //if (i==1) ndc5= m_info->vertex_conn[i].hptr;
+      //if (i==2) ndc6= m_info->vertex_conn[i].hptr;
+      //if (i==0) ndc8= m_info->vertex_conn[i].hptr;
+    }
+    vconn=&vconn_ptrs[0];
+  #endif
+#endif
   }
 
   void dMeshBlock::resetIblanks() {
 #ifdef TIOGA_HAS_GPU
     int n_blocks = nnodes/block_size + (nnodes%block_size == 0 ? 0:1);
-    TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, iblank, nnodes);
+//    TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, iblank, nnodes);
+    TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, m_info_device);
     TIOGA::gpu::synchronize();
     //g_reset_iblanks<<<n_blocks,block_size>>>(iblank,nnodes);
 #endif
@@ -58,7 +97,7 @@ namespace TIOGA {
    // perform the gpu based adt search now
    //  
    int n_blocks = nsearch/block_size + (nsearch%block_size == 0 ? 0:1);
-   TIOGA_GPU_LAUNCH_FUNC(g_adt_search,n_blocks,block_size,0,0,x,vconn,nc,nv,ntypes,
+   TIOGA_GPU_LAUNCH_FUNC(g_adt_search,n_blocks,block_size,0,0,m_info_device,
                          coord,adtExtents,adtIntegers,adtReals,
                          elementList,donorId,xsearch,ndim,nelem,nsearch);
 

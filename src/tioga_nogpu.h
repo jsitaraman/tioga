@@ -60,6 +60,8 @@ inline void memset_on_device(T* dptr, T val, const size_t sz)
   std::memset(dptr, val, sz);
 }
 
+inline void synchronize(void)
+{}
 }
 }
 

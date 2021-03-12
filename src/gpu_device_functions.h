@@ -14,6 +14,32 @@
 # define TIOGA_DEVICE_TOL 1e-6
 # define TIOGA_DEVICE_BASE 1
 
+TIOGA_GPU_DEVICE
+void invertMat3(double A[3][3],
+                double f[3])
+{
+  int i;
+  double b11,b21,b22,b31,b32,b33,b41,b42,b43,b44;
+  double u12,u13,u23;
+  double d1,d2,d3;
+  double c1,c2,c3;
+  double a1,a2,a3;
+  b11=1./A[0][0];
+  u12=A[0][1]*b11;
+  u13=A[0][2]*b11;
+  b21=A[1][0];
+  b22=1./(A[1][1]-b21*u12);
+  u23=(A[1][2]-b21*u13)*b22;
+  b31=A[2][0];
+  b32=A[2][1]-b31*u12;
+  b33=1./(A[2][2]-b31*u13-b32*u23);
+  d1=f[0]*b11;
+  d2=(f[1]-b21*d1)*b22;
+  d3=(f[2]-b31*d1-b32*d2)*b33;
+  f[2]=d3;
+  f[1]=d2-u23*f[2];
+  f[0]=d1-u12*f[1]-u13*f[2];
+}
 
 TIOGA_GPU_DEVICE
 void d_solvec(double a[NEQNS][NEQNS],double b[NEQNS],int *iflag,int n)
@@ -86,6 +112,7 @@ void d_newtonSolve(double f[7][3],double *u1,double *v1,double *w1)
   double rhs[3];
   //
   itmax=500;
+  //itmax=0; // uncommenting this works, i.e. by pass this routine
   convergenceLimit=1e-14;
   alph=1.0;
   isolflag=1.0;
@@ -114,7 +141,8 @@ void d_newtonSolve(double f[7][3],double *u1,double *v1,double *w1)
 	  lhs[j][2]=f[3][j]+f[6][j]*u+f[5][j]*v+f[7][j]*uv;
 	}      
       
-      d_solvec(lhs,rhs,&isolflag,3);
+      //d_solvec(lhs,rhs,&isolflag,3);
+      invertMat3(lhs,rhs);
       if (isolflag==0) break;
       
       u-=(rhs[0]*alph);
@@ -395,7 +423,6 @@ void d_searchIntersections_containment(int cellIndex[2],
           {
             d_checkContainment(x,vconn,nc,nv,ntypes,elementList,
                                cellIndex,adtIntegers[4*node],xsearch);
-            printf("cellIndex[0]=%d\n",cellIndex[0]);
             if (cellIndex[0] > -1 && cellIndex[1]==0) return;
           }
 	  //

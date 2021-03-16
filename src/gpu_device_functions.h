@@ -11,7 +11,7 @@
 //# define TIOGA_DEVICE_MIN(x,y)  (x) < (y) ? (x) : (y)
 //# define TIOGA_DEVICE_MAX(x,y)  (x) > (y) ? (x) : (y)
 # define TIOGA_DEVICE_BIGVALUE 1e15
-# define TIOGA_DEVICE_TOL 1e-6
+# define TIOGA_DEVICE_TOL 1e-10
 # define TIOGA_DEVICE_BASE 1
 
 TIOGA_GPU_DEVICE

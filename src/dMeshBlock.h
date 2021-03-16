@@ -22,7 +22,7 @@ public:
   int *nv{nullptr};
   int* vconn_ptrs[TIOGA::MeshBlockInfo::max_vertex_types];
   int **vconn;
-  int block_size{512};
+  int block_size{128};
 
   dMeshBlock() {}
 

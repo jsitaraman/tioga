@@ -61,10 +61,10 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 		{
 		  inode=interpList[i].inode[m];
 		  weight=interpList[i].weights[m];
-		  if (weight < -TOL || weight > 1.0+TOL) {
-                    TRACED(weight);
-                    printf("warning: weights are not convex 1\n");
-                   }
+		  //if (weight < -TOL || weight > 1.0+TOL) {
+                  //  TRACED(weight);
+                  //  printf("warning: weights are not convex 1\n");
+                  // }
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[inode*nvar+k]*weight;
 		}

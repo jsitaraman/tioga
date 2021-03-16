@@ -5,8 +5,9 @@
 \
 namespace TIOGA {
 
-  void dMeshBlock::setMinfo(TIOGA::MeshBlockInfo *m_info_in)
+  void dMeshBlock::setMinfo(TIOGA::MeshBlockInfo *m_info_in, int myid_in)
   {
+    myid=myid_in;
     m_info_device=m_info_in;
   }
 
@@ -77,8 +78,9 @@ namespace TIOGA {
 #endif
   }
 
-  void dMeshBlock::search(ADT *adt,int *elementList_host, double *xsearch_host, int *donorId_host, 
-                          int nsearch)
+  void dMeshBlock::search(double *xyz, ADT *adt,int *elementList_host, double *xsearch_host, int *donorId_host, 
+                          int nsearch, int nnodes, int ntypes,int *nc_cpu, 
+                          int *nv_cpu, int **vconn_cpu)
   {
 #ifdef TIOGA_HAS_GPU
    int nelem=adt->get_nelem();
@@ -91,13 +93,22 @@ namespace TIOGA {
    double *adtReals=TIOGA::gpu::push_to_device<double>(adt->get_Reals(),sizeof(double)*nelem*ndim);
    double *coord=TIOGA::gpu::push_to_device<double>(adt->get_coord(),sizeof(double)*nelem*ndim);
    int    *elementList=TIOGA::gpu::push_to_device<int>(elementList_host,sizeof(int)*nelem);
-   int    *donorId=TIOGA::gpu::push_to_device<int>(donorId_host,sizeof(int)*nsearch);
+   //int    *donorId=TIOGA::gpu::push_to_device<int>(donorId_host,sizeof(int)*nsearch);
+   int    *donorId=TIOGA::gpu::allocate_on_device<int>(sizeof(int)*nsearch);
    double *xsearch=TIOGA::gpu::push_to_device<double>(xsearch_host,sizeof(double)*nsearch*3);
+   double *x=TIOGA::gpu::push_to_device<double>(xyz,sizeof(double)*nnodes*3);
+   //int *vconn[4];
+   //for(int i=0;i<ntypes;i++)
+   //  vconn[i]=TIOGA::gpu::push_to_device<int>(vconn_cpu[i],sizeof(int)*nc_cpu[i]*nv_cpu[i]);
+   int *vconn=TIOGA::gpu::push_to_device<int>(vconn_cpu[0],sizeof(int)*nc_cpu[0]*nv_cpu[0]);
+   // 
+   int *nc=TIOGA::gpu::push_to_device<int>(nc_cpu,sizeof(int)*ntypes);
+   int *nv=TIOGA::gpu::push_to_device<int>(nv_cpu,sizeof(int)*ntypes);
    //
    // perform the gpu based adt search now
    //  
    int n_blocks = nsearch/block_size + (nsearch%block_size == 0 ? 0:1);
-   TIOGA_GPU_LAUNCH_FUNC(g_adt_search,n_blocks,block_size,0,0,m_info_device,
+   TIOGA_GPU_LAUNCH_FUNC(g_adt_search,n_blocks,block_size,0,0,x,m_info_device,ntypes,nc,nv,vconn,
                          coord,adtExtents,adtIntegers,adtReals,
                          elementList,donorId,xsearch,ndim,nelem,nsearch);
 
@@ -106,6 +117,7 @@ namespace TIOGA {
    //             int *elementList, double *donorId, double *xsearch, int ndim, int nelem, int nsearch);
    TIOGA::gpu::synchronize();
    TIOGA::gpu::pull_from_device<int>(donorId_host,donorId,sizeof(int)*nsearch);    
+   printf("myid/donorId_host[0]=%d %d\n",myid,donorId_host[0]);
    //
    //release all gpu memory
    // 
@@ -116,6 +128,10 @@ namespace TIOGA {
    TIOGA_FREE_DEVICE(elementList); 
    TIOGA_FREE_DEVICE(donorId);
    TIOGA_FREE_DEVICE(xsearch);
+   TIOGA_FREE_DEVICE(x);
+   TIOGA_FREE_DEVICE(vconn);
+   TIOGA_FREE_DEVICE(nc);
+   TIOGA_FREE_DEVICE(nv);
 #endif
   }
   

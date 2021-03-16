@@ -7,6 +7,7 @@ class dMeshBlock
 {
 public:
   TIOGA::MeshBlockInfo* m_info_device{nullptr};
+  int myid{0};
   int meshtag{0};
   int nnodes{0};
   int nwbc{0};
@@ -28,10 +29,10 @@ public:
 
   ~dMeshBlock() {};
 
-  void setMinfo( TIOGA::MeshBlockInfo* m_info_in);
+  void setMinfo( TIOGA::MeshBlockInfo* m_info_in, int myid);
   void setData( TIOGA::MeshBlockInfo* m_info_device);
   void resetIblanks();
-  void search(ADT *adt,int *elementList, double *xsearch, int *donorId, int nsearch);
+  void search(double *x,ADT *adt,int *elementList, double *xsearch, int *donorId, int nsearch, int nnodes, int ntypes, int *nc,int *nv, int **vconn);
 
 };
 

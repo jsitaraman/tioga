@@ -246,7 +246,7 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 #endif
   //
 #ifdef TIOGA_HAS_GPU
-  dMB->search(adt,elementList,xsearch,donorId,nsearch);
+  dMB->search(x,adt,elementList,xsearch,donorId,nsearch,nnodes,ntypes,nc,nv,vconn);
   for(i=0;i<nsearch;i++) donorId[i]=donorId[xtag[i]];
 #else
   donorCount=0;

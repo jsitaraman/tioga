@@ -103,8 +103,8 @@ void tioga::register_unstructured_grid(TIOGA::MeshBlockInfo *minfo)
   }
 
   auto& mb = mblocks[iblk];
-  mb->setData(minfo);
   mb->myid = myid;
+  mb->setData(minfo);
 }
 
 void tioga::registerSolution(int btag,double *q)

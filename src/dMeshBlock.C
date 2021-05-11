@@ -5,9 +5,10 @@
 \
 namespace TIOGA {
 
-  void dMeshBlock::setMinfo(TIOGA::MeshBlockInfo *m_info_in)
+  void dMeshBlock::setMinfo(TIOGA::MeshBlockInfo *m_info_in, int myid_in)
   {
     m_info_device=m_info_in;
+    myid=myid_in;
   }
 
   void dMeshBlock::setData(TIOGA::MeshBlockInfo* m_info)
@@ -99,7 +100,7 @@ namespace TIOGA {
    int n_blocks = nsearch/block_size + (nsearch%block_size == 0 ? 0:1);
    TIOGA_GPU_LAUNCH_FUNC(g_adt_search,n_blocks,block_size,0,0,m_info_device,
                          coord,adtExtents,adtIntegers,adtReals,
-                         elementList,donorId,xsearch,ndim,nelem,nsearch);
+                         elementList,donorId,xsearch,ndim,nelem,nsearch,myid);
 
    //g_adt_search(double *x, int **vconn,int *nc, int *nv, int ntypes, 
    //             double *coord, double *adtExtents, double *adtIntegers, double *adtReals,

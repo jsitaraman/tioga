@@ -122,7 +122,7 @@ void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
   if (!dMB) dMB.reset(new TIOGA::dMeshBlock);
   //dMB->setData(m_info_device);
   //dMB->setData(m_info);
-  dMB->setMinfo(m_info_device);
+  dMB->setMinfo(m_info_device,myid);
 #endif
 
 }

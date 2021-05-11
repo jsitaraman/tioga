@@ -25,7 +25,7 @@ TIOGA_GPU_GLOBAL
 void g_adt_search(TIOGA::MeshBlockInfo* m_info, 
 		    double *coord, double *adtExtents, int *adtIntegers, double *adtReals,
 		    int *elementList, int *donorId, double *xsearch,
-		    int ndim, int nelem, int nsearch)
+		    int ndim, int nelem, int nsearch, int myid)
 {
   double *x = m_info->xyz.dptr;
   int ntypes=m_info->num_vert_per_elem.sz;
@@ -34,8 +34,18 @@ void g_adt_search(TIOGA::MeshBlockInfo* m_info,
   int **vconn;
   int *vconn_ptrs[4];
   int ncells=0;
+  int maxchecks=0;
+  int imax;
+  /*
+  FILE *fp=fopen("log.dat","w");
   for(int i=0;i<ntypes;i++) ncells+=nc[i];
-
+  fprintf(fp,"%d %d %d %d\n",nc[0],nc[1],nc[2],nc[3]);
+  fprintf(fp,"ncells=%d\n",ncells);
+  fprintf(fp,"ntypes=%d\n",ntypes);
+  fprintf(fp,"nsearch=%d\n",nsearch);
+  fprintf(fp,"%d %d %d %d\n",nv[0],nv[1],nv[2],nv[3]);
+  fclose(fp);
+  */
   for (int i=0; i < TIOGA::MeshBlockInfo::max_vertex_types; i++) {
     vconn_ptrs[i] = m_info->vertex_conn[i].dptr;
   }
@@ -48,9 +58,11 @@ void g_adt_search(TIOGA::MeshBlockInfo* m_info,
   for (int idx =0;idx<nsearch;idx++) {
 #endif
     int cellIndex[2];
-    int nchecks;
+    int nchecks=0;
     donorId[idx]=-1;
-    d_searchIntersections_containment(cellIndex,
+    //printf("%d %d\n",idx,nsearch);
+    d_searchIntersections_containment(idx,
+                                     cellIndex,
                                      adtIntegers,
                                      adtReals,
                                      coord,
@@ -61,6 +73,12 @@ void g_adt_search(TIOGA::MeshBlockInfo* m_info,
                                      nelem,
                                      ndim,
                                      &nchecks);
+    if (maxchecks < nchecks) {
+     imax=idx;
+     maxchecks=nchecks;
+    }
     if (cellIndex[0] > -1 && cellIndex[1]==0) donorId[idx]=cellIndex[0];
   }
+ //printf("maxchecks= %d %d %d %f %f %f\n",myid,imax,maxchecks,
+ //                   xsearch[3*imax],xsearch[3*imax+1],xsearch[3*imax+2]);
 }

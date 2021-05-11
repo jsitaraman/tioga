@@ -23,12 +23,13 @@ public:
   int* vconn_ptrs[TIOGA::MeshBlockInfo::max_vertex_types];
   int **vconn;
   int block_size{128};
+  int myid;
 
   dMeshBlock() {}
 
   ~dMeshBlock() {};
 
-  void setMinfo( TIOGA::MeshBlockInfo* m_info_in);
+  void setMinfo( TIOGA::MeshBlockInfo* m_info_in, int myid_in);
   void setData( TIOGA::MeshBlockInfo* m_info_device);
   void resetIblanks();
   void search(ADT *adt,int *elementList, double *xsearch, int *donorId, int nsearch);

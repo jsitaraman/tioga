@@ -2,7 +2,7 @@
 #include <cmath>
 
 #define NEQNS 3
-#define maxStackSize 256
+#define maxStackSize 2048
 #define d_fabs(a) (a > 0 ? a:-a)
 
 // leave this as pifus native for now for 
@@ -13,6 +13,7 @@
 # define TIOGA_DEVICE_BIGVALUE 1e15
 # define TIOGA_DEVICE_TOL 1e-10
 # define TIOGA_DEVICE_BASE 1
+
 
 TIOGA_GPU_DEVICE
 void invertMat3(double A[3][3],
@@ -370,7 +371,7 @@ void d_checkContainment(double *x, int **vconn,int *nc, int *nv, int ntypes, int
     }
 }
 TIOGA_GPU_DEVICE
-void d_searchIntersections_containment(int cellIndex[2],
+void d_searchIntersections_containment(int idx, int cellIndex[2],
 			               int *adtIntegers,
 				       double *adtReals,
 				       double *coord,
@@ -393,6 +394,7 @@ void d_searchIntersections_containment(int cellIndex[2],
   int mm=0;
   int nstack=1;
   double dmin[2];
+  int bruteSearch=0;
 
   //typedef struct nodestack{
   //  int val;
@@ -405,7 +407,7 @@ void d_searchIntersections_containment(int cellIndex[2],
   nodeStack[0]=node;
   dmin[0]=dmin[1]=TIOGA_DEVICE_BIGVALUE;
   cellIndex[0]=cellIndex[1]=-1;
-  while(nstack > 0) 
+  while(nstack > 0 && !bruteSearch) 
     {
       mm=0;
       for(is=0;is<nstack;is++)
@@ -446,18 +448,47 @@ void d_searchIntersections_containment(int cellIndex[2],
                    flag = (flag && (xsearch[i-ndim/2] <=element[i]+TIOGA_DEVICE_TOL));
 		if (flag)
 		  {
-		     nodeStack[mm+nstack]=nodeChild;
+                     if (mm+nstack > maxStackSize-1)  {
+                      cellIndex[0]=cellIndex[1]=-1;
+                      bruteSearch=1;
+                     }
+                    else {
+   		     nodeStack[mm+nstack]=nodeChild;
+                     (*nchecks)=(mm+nstack > (*nchecks)) ? (mm+nstack):(*nchecks);
 		     mm++;
+                    }
 		  }
 	      }
 	    }
 	}
-      //printf("mm=%d\n",mm);
-      for(int j=0;j<mm;j++)
+      //if (idx==4629) printf("mm=%d\n",mm);
+      if (!bruteSearch) {
+       for(int j=0;j<mm;j++)
          nodeStack[j]=nodeStack[j+nstack];
-      nstack=mm;
-      level++;
+       nstack=mm;
+       level++;
+     }
     }
+  if (bruteSearch) {
+   //printf("Brute force search for point %d \n",idx);
+   for(node=0;node<nelem;node++)
+    {
+      for(i=0;i<ndim;i++)
+	element[i]=coord[ndim*(adtIntegers[4*node])+i];
+      //
+      flag=1;
+      for(i=0;i<ndim/2;i++)
+	flag = (flag && (xsearch[i] >=element[i]-TIOGA_DEVICE_TOL));
+      for(i=ndim/2;i<ndim;i++)
+	flag = (flag && (xsearch[i-ndim/2] <=element[i]+TIOGA_DEVICE_TOL));
+      if (flag) 
+	{
+	  d_checkContainment(x,vconn,nc,nv,ntypes,elementList,
+			     cellIndex,adtIntegers[4*node],xsearch);
+	  if (cellIndex[0] > -1 && cellIndex[1]==0) return;
+	}      
+    }
+  }
   return;
 }
 

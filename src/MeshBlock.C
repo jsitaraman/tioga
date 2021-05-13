@@ -113,16 +113,9 @@ void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
     throw std::runtime_error("#tioga: global IDs for nodes not provided");
 #endif
 
-  if (m_info_device == nullptr) {
-    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::MeshBlockInfo>(
-      sizeof(TIOGA::MeshBlockInfo));
-  }
-  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::MeshBlockInfo));
 #ifdef TIOGA_HAS_GPU
   if (!dMB) dMB.reset(new TIOGA::dMeshBlock);
-  //dMB->setData(m_info_device);
-  //dMB->setData(m_info);
-  dMB->setMinfo(m_info_device,myid);
+  dMB->setMinfo(m_info,myid);
 #endif
 
 }
@@ -1305,8 +1298,6 @@ MeshBlock::~MeshBlock()
   if (mapmask) TIOGA_FREE(mapmask);
   if (uindx) TIOGA_FREE(uindx);
   if (invmap) TIOGA_FREE(invmap);
-
-  if (m_info_device) TIOGA_FREE_DEVICE(m_info_device);
 
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  

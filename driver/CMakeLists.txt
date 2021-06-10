@@ -12,8 +12,16 @@ if (TIOGA_ENABLE_ARBORX)
 endif()
 
 add_library(tiogadriver ${TIOGA_EXE_SOURCES})
-target_compile_options(tiogadriver PUBLIC ${MPI_Fortran_COMPILE_FLAGS})
+
+set(libopts ${MPI_fortran_COMPILE_FLAGS})
+
+if( CMAKE_Fortran_COMPILER_ID STREQUAL "Intel" )
+    list(APPEND libopts "-nofor-main")
+endif()
+
+target_compile_options(tiogadriver PUBLIC ${libopts})
 target_include_directories(tiogadriver PUBLIC ${MPI_Fortran_INCLUDE_PATH})
+
 target_link_libraries(tiogadriver INTERFACE
   tioga ${MPI_Fortran_LIBRARIES} ${CMAKE_DL_LIBS})
 if (TIOGA_ENABLE_ARBORX)

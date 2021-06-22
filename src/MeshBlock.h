@@ -49,12 +49,6 @@ class MeshBlock
    */
   TIOGA::MeshBlockInfo* m_info{nullptr};
 
-  /** Device copy of the mesh block info registered by the application code
-   *
-   *  This pointer is owned by MeshBlock
-   */
-  TIOGA::MeshBlockInfo* m_info_device{nullptr};
-
   std::unique_ptr<TIOGA::dMeshBlock> dMB;
   
   //TIOGA::dMeshBlock *dMB; /** device instance of mesh block with device specific methods */
@@ -385,9 +379,6 @@ class MeshBlock
 
   const TIOGA::MeshBlockInfo* mesh_info() const { return m_info; }
   TIOGA::MeshBlockInfo* mesh_info() { return m_info; }
-
-  const TIOGA::MeshBlockInfo* d_mesh_info() const { return m_info_device; }
-  TIOGA::MeshBlockInfo* d_mesh_info() { return m_info_device; }
 
   void set_interptype(int type) {
     interptype = type;

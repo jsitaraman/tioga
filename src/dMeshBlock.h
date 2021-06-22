@@ -27,10 +27,9 @@ public:
 
   dMeshBlock() {}
 
-  ~dMeshBlock() {};
+  ~dMeshBlock();
 
   void setMinfo( TIOGA::MeshBlockInfo* m_info_in, int myid_in);
-  void setData( TIOGA::MeshBlockInfo* m_info_device);
   void resetIblanks();
   void search(ADT *adt,int *elementList, double *xsearch, int *donorId, int nsearch);
 

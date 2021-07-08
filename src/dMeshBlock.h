@@ -25,6 +25,11 @@ public:
   int block_size{128};
   int myid;
 
+  int ninterp,nweights;
+  int *interpList_wcft{nullptr};
+  int *interpList_inode{nullptr};
+  double *interpList_weights{nullptr};
+	
   dMeshBlock() {}
 
   ~dMeshBlock();
@@ -33,8 +38,17 @@ public:
   void resetIblanks();
   void search(ADT *adt,int *elementList, double *xsearch, int *donorId, int nsearch);
 
+  void pushInterpListsToDevice(int ninterp_in, int nweights_in,
+			       int *interpList_wcft_in,
+			       int *interpList_inode_in,
+			       double *interpList_weights_in);
+
+  void getInterpolatedData(double *realData, int nvar);
+
+
 };
 
+    
 } // namespace TIOGA
 
 #endif 

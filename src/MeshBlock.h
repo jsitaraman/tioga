@@ -50,7 +50,7 @@ class MeshBlock
   TIOGA::MeshBlockInfo* m_info{nullptr};
 
   std::unique_ptr<TIOGA::dMeshBlock> dMB;
-  
+   
   //TIOGA::dMeshBlock *dMB; /** device instance of mesh block with device specific methods */
 
 
@@ -384,6 +384,8 @@ class MeshBlock
     interptype = type;
   }
   void checkOrphans(void);
+
+  void pushInterpListsToDevice(void);
 };
 
 #endif /* MESHBLOCK_H */

@@ -1513,3 +1513,72 @@ void MeshBlock::checkOrphans(void)
     fclose(fp);
   }
 }
+
+void MeshBlock::pushInterpListsToDevice(void)
+{
+#ifdef TIOGA_HAS_GPU
+  int ninterpg=0;
+  int ninterpCartg=0;
+  int nweightsg=0;
+  int nweightsCartg=0;
+
+  for(int i=0;i<ninterp;i++)
+    if (!interpList[i].cancel) {
+      ninterpg++;
+      nweightsg+=interpList[i].nweights;
+    }
+  for(int i=0;i<ninterpCart;i++)
+    if (!interpListCart[i].cancel) {
+      ninterpg++;
+      nweightsg+=interpListCart[i].nweights;
+    }
+  
+  int *interpList_wcft    =new int[ninterpg+1];
+  int *interpList_inode       =new int [nweightsg];
+  double *interpList_weights  =new double [nweightsg];
+  
+  int wptr;
+
+  ninterpg=nweightsg=wptr=0;
+
+  for(int i=0;i<ninterp;i++)
+    if (!interpList[i].cancel) {
+      interpList_wcft[ninterpg]=wptr;
+      wptr+=interpList[i].nweights;
+      ninterpg++;
+      for(int j=0;j<interpList[i].nweights;j++)
+	{
+	  interpList_weights[nweightsg]=interpList[i].weights[j];
+	  interpList_inode[nweightsg]=interpList[i].inode[j];
+	  nweightsg++;
+	}
+    }
+
+  for(int i=0;i<ninterpCart;i++)
+    if (!interpListCart[i].cancel) {
+      interpList_wcft[ninterpg]=wptr;
+      wptr+=interpList[i].nweights;
+      ninterpg++;
+      for(int j=0;j<interpListCart[i].nweights;j++)
+	{
+	  interpList_weights[nweightsg]=interpListCart[i].weights[j];
+	  interpList_inode[nweightsg]=interpListCart[i].inode[j];
+	  nweightsg++;
+	}
+    }
+
+  interpList_wcft[ninterpg]=wptr;
+      
+  dMB->pushInterpListsToDevice(ninterpg,nweightsg,
+			       interpList_wcft,
+			       interpList_inode,
+			       interpList_weights);
+
+
+  delete [] interpList_wcft;
+  delete [] interpList_inode;
+  delete [] interpList_weights;
+			       
+#endif
+}
+  

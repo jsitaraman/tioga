@@ -19,7 +19,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "codetypes.h"
 #include "MeshBlock.h"
-
+#include "tioga_gpu.h"
 #define ROW 0
 #define COLUMN 1
 #define NFRAC 1331
@@ -82,6 +82,15 @@ void MeshBlock::getCellIblanks2(void)
           icell++;
         }
     }
+
+#ifdef TIOGA_HAS_GPU
+  TIOGA::gpu::copy_to_device(
+    m_info->iblank_cell.dptr, m_info->iblank_cell.hptr, sizeof(int)*ncells);
+
+  TIOGA::gpu::copy_to_device(
+    m_info->iblank_node.dptr, m_info->iblank_node.hptr, sizeof(int)*nnodes);
+#endif
+
 }
 
 
@@ -147,6 +156,15 @@ void MeshBlock::getCellIblanks(void)
 	  icell++;
 	}
     }
+
+#ifdef TIOGA_HAS_GPU
+  TIOGA::gpu::copy_to_device(
+    m_info->iblank_cell.dptr, m_info->iblank_cell.hptr, sizeof(int)*ncells);
+
+  TIOGA::gpu::copy_to_device(
+    m_info->iblank_node.dptr, m_info->iblank_node.hptr, sizeof(int)*nnodes);
+#endif
+
 }
 
 void MeshBlock::clearOrphans(HOLEMAP *holemap, int nmesh,int *itmp)

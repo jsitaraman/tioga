@@ -73,5 +73,46 @@ namespace TIOGA {
    TIOGA_FREE_DEVICE(xsearch);
 #endif
   }
-  
+
+  void dMeshBlock::pushInterpListsToDevice(int ninterp_in, int nweights_in,
+					   int *interpList_wcft_in,
+					   int *interpList_inode_in,
+					   double *interpList_weights_in)
+  {
+    
+    if (interpList_wcft) TIOGA_FREE_DEVICE(interpList_wcft);
+    if (interpList_inode) TIOGA_FREE_DEVICE(interpList_inode);
+    if (interpList_weights) TIOGA_FREE_DEVICE(interpList_weights);
+    
+    ninterp=ninterp_in;
+    nweights=nweights_in;
+
+    interpList_wcft=TIOGA::gpu::push_to_device<int>(interpList_wcft_in,
+						    sizeof(int)*(ninterp+1));
+    interpList_weights=TIOGA::gpu::push_to_device<double>(interpList_weights_in,
+							  sizeof(double)*nweights);
+    interpList_inode=TIOGA::gpu::push_to_device<int>(interpList_inode_in,
+						     sizeof(int)*nweights);
+  }
+
+  void dMeshBlock::getInterpolatedData(double *realData,  int nvar)
+  {
+#ifdef TIOGA_HAS_GPU
+    int n_blocks = nvar*ninterp/block_size 
+      + ((nvar*ninterp)%block_size == 0 ? 0:1);
+    double *realData_d=TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp*nvar);
+    TIOGA_GPU_LAUNCH_FUNC(g_interp_data, n_blocks, block_size, 0, 0, 
+                          interpList_wcft,
+                          interpList_weights,
+                          interpList_inode,
+                          ninterp,
+                          nvar,
+                          realData_d,
+                          m_info_device);
+    TIOGA::gpu::synchronize();
+    TIOGA::gpu::pull_from_device<double>(realData,realData_d,sizeof(double)*ninterp*nvar);    
+    TIOGA_FREE_DEVICE(realData_d);
+#endif    
+  }
+
 } //namespace TIOGA

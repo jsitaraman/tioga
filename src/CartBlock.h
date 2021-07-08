@@ -48,8 +48,16 @@ class CartBlock
   double dx[3];
   int ndonors;
   int interpListSize;
+  int ninterp,nweights;
   INTERPLIST2 *interpList,*listptr;
   DONORLIST **donorList;
+  // these are device pointers
+  double *qcell_d,*qnode_d;
+  int block_size{128};
+  int *interpList_wcft;
+  double *interpList_weights;
+  int *interpList_inode;
+
   void (*donor_frac) (int *,double *,int *,double *);
  public:
   CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl_cell=NULL;ibl_node=NULL;qcell=NULL;qnode=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
@@ -83,6 +91,8 @@ class CartBlock
   void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData);
+  void  pushInterpListsToDevice(void);
+  void getInterpolatedDataDevice(double *realData,int nvar_cell,int nvar_node);
   void update(double *qval,int index);
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);

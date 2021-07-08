@@ -82,3 +82,34 @@ void g_adt_search(TIOGA::MeshBlockInfo* m_info,
  //printf("maxchecks= %d %d %d %f %f %f\n",myid,imax,maxchecks,
  //                   xsearch[3*imax],xsearch[3*imax+1],xsearch[3*imax+2]);
 }
+
+TIOGA_GPU_GLOBAL
+void g_interp_data(int *interpList_wcft,
+		   double *interpList_weights,
+		   int *interpList_inode,
+		   int ninterp,
+		   int nvar,
+		   double *realData,
+		   TIOGA::MeshBlockInfo* m_info)
+{
+  double *qnode=m_info->qnode.dptr;
+  int nsend=nvar*ninterp;
+#if defined(TIOGA_HAS_GPU) && !defined(TIOGA_FAKE_GPU)
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < nsend) 
+#else
+  for(int idx=0;idx<nsend;idx++) 
+#endif
+  {
+    int i=idx/nvar;
+    int k=idx-i*nvar;
+    realData[idx]=0;
+    for(int m=interpList_wcft[i];m<interpList_wcft[i+1];m++)
+      {
+	int inode=interpList_inode[m];
+	double weight=interpList_weights[m];
+	realData[idx]+=qnode[inode*nvar+k]*weight;
+      }
+   }
+}
+

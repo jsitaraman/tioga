@@ -257,7 +257,9 @@ void tioga::performConnectivityAMR(void)
    {
     auto &mb = mblocks[ib];
     mb->getCellIblanks();
+    mb->pushInterpListsToDevice();
    }
+  for(i=0;i<ncart;i++) cb[i].pushInterpListsToDevice();
   //  mb->writeCellFile(myid);
   //for(i=0;i<ncart;i++)
 	//cb[i].writeCellFile(i);

@@ -43,7 +43,7 @@ public:
 			       int *interpList_inode_in,
 			       double *interpList_weights_in);
 
-  void getInterpolatedData(double *realData, int nvar);
+  void getInterpolatedData(double *realData, int nvar, TIOGA::MeshBlockInfo* m_info_in);
 
 
 };

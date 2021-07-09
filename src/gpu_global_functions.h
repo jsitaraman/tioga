@@ -108,7 +108,8 @@ void g_interp_data(int *interpList_wcft,
       {
 	int inode=interpList_inode[m];
 	double weight=interpList_weights[m];
-	realData[idx]+=qnode[inode*nvar+k]*weight;
+        double val=qnode[inode*nvar+k]*weight;
+	realData[idx]+=val;
       }
    }
 }

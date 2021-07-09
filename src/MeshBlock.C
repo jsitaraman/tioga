@@ -1557,7 +1557,7 @@ void MeshBlock::pushInterpListsToDevice(void)
   for(int i=0;i<ninterpCart;i++)
     if (!interpListCart[i].cancel) {
       interpList_wcft[ninterpg]=wptr;
-      wptr+=interpList[i].nweights;
+      wptr+=interpListCart[i].nweights;
       ninterpg++;
       for(int j=0;j<interpListCart[i].nweights;j++)
 	{

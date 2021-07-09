@@ -54,9 +54,9 @@ class CartBlock
   // these are device pointers
   double *qcell_d,*qnode_d;
   int block_size{128};
-  int *interpList_wcft;
-  double *interpList_weights;
-  int *interpList_inode;
+  int *interpList_wcft{nullptr};
+  double *interpList_weights{nullptr};
+  int *interpList_inode{nullptr};
 
   void (*donor_frac) (int *,double *,int *,double *);
  public:

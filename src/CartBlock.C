@@ -51,6 +51,8 @@ void CartBlock::registerSolution(int lid, TIOGA::AMRMeshInfo* minfo)
   nvar_node = minfo->nvar_node;
   qcell = minfo->qcell.hptr[lid];
   qnode = minfo->qnode.hptr[lid];
+  qcell_d= minfo->qcell.dptr[lid];
+  qnode_d= minfo->qnode.dptr[lid];
 }
 
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
@@ -633,6 +635,7 @@ void CartBlock::pushInterpListsToDevice()
   while(listptr!=NULL) 
     {
       interpList_h_wcft[interpCount]=wptr;
+      interpCount++;
       for(int i=0;i<2*listptr->nweights;i++)
 	{
 	  int index;
@@ -655,7 +658,7 @@ void CartBlock::pushInterpListsToDevice()
       wptr=weightCount;
       listptr=listptr->next;
     }
-  interpList_h_wcft[interpCount+1];
+  interpList_h_wcft[interpCount]=wptr;
 
   if (interpList_wcft) TIOGA_FREE_DEVICE(interpList_wcft);
   if (interpList_inode) TIOGA_FREE_DEVICE(interpList_inode);
@@ -688,8 +691,8 @@ void CartBlock::getInterpolatedDataDevice(double *realData,int nvar_cell,int nva
                       interpList_weights,
                       interpList_inode,
                       ninterp,
-                      nvar_cell,
-                      nvar_node,
+                      nvar_cell,ncell_nf,
+                      nvar_node,nnode_nf,
                       realData_d,
                       qcell_d,
                       qnode_d);

@@ -95,9 +95,10 @@ namespace TIOGA {
 						     sizeof(int)*nweights);
   }
 
-  void dMeshBlock::getInterpolatedData(double *realData,  int nvar)
+  void dMeshBlock::getInterpolatedData(double *realData,  int nvar, TIOGA::MeshBlockInfo *m_info_in)
   {
 #ifdef TIOGA_HAS_GPU
+    TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
     int n_blocks = nvar*ninterp/block_size 
       + ((nvar*ninterp)%block_size == 0 ? 0:1);
     double *realData_d=TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp*nvar);

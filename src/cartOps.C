@@ -454,7 +454,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 	}
     }
 #ifdef TIOGA_HAS_GPU
-  dMB->getInterpolatedData(&((*realData)[dcount]),nvar);
+  dMB->getInterpolatedData(&((*realData)[dcount]),nvar,m_info);
 #endif  
     
   if (qq) TIOGA_FREE(qq);

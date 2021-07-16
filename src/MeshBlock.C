@@ -128,7 +128,7 @@ void MeshBlock::preprocess(void)
   //
   for(i=0;i<nnodes;i++) iblank[i]=1;
 #ifdef TIOGA_HAS_GPU
-  dMB->resetIblanks();
+  dMB->resetIblanks(nnodes);
 #endif
   //
   // find oriented bounding boxes

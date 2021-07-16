@@ -24,9 +24,9 @@ namespace TIOGA {
     if (m_info_device) TIOGA_FREE_DEVICE(m_info_device);
   };
 
-  void dMeshBlock::resetIblanks() {
+  void dMeshBlock::resetIblanks(const int num_nodes) {
 #ifdef TIOGA_HAS_GPU
-    int n_blocks = nnodes/block_size + (nnodes%block_size == 0 ? 0:1);
+    int n_blocks = num_nodes/block_size + (num_nodes%block_size == 0 ? 0:1);
     TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, m_info_device);
     TIOGA::gpu::synchronize();
 #endif

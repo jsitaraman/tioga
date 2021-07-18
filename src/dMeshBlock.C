@@ -2,7 +2,8 @@
 #include "gpu_global_functions.h"
 #include<chrono>
 #include<thread>
-\
+#include <vector>
+
 namespace TIOGA {
 
   void dMeshBlock::setMinfo(TIOGA::MeshBlockInfo *m_info_in, int myid_in)
@@ -116,4 +117,27 @@ namespace TIOGA {
 #endif    
   }
 
+  void dMeshBlock::updateSolution(std::vector<int>& q_fringe_ind, std::vector<double>& q_fringe)
+  {
+#ifdef TIOGA_HAS_GPU
+    int num_updates = q_fringe_ind.size();
+    int n_blocks = num_updates/block_size + (num_updates%block_size == 0 ? 0:1);
+
+    // create gpu memory
+    int* fringe_ind_d =
+        TIOGA::gpu::push_to_device<int>(q_fringe_ind.data(), sizeof(int)*num_updates);
+    double* fringe_val_d =
+        TIOGA::gpu::push_to_device<double>(q_fringe.data(), sizeof(double)*num_updates);
+
+    TIOGA_GPU_LAUNCH_FUNC(g_update_sol, n_blocks, block_size, 0, 0,
+                          num_updates,
+                          fringe_ind_d,
+                          fringe_val_d,
+                          m_info_device);
+
+    TIOGA::gpu::synchronize();
+    TIOGA_FREE_DEVICE(fringe_ind_d);
+    TIOGA_FREE_DEVICE(fringe_val_d);
+#endif
+  }
 } //namespace TIOGA

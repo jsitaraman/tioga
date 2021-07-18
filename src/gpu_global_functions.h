@@ -114,3 +114,22 @@ void g_interp_data(int *interpList_wcft,
    }
 }
 
+TIOGA_GPU_GLOBAL
+void g_update_sol(
+  int num_updates,
+  int* q_ind,
+  double* q_val,
+  TIOGA::MeshBlockInfo* m_info)
+{
+  double* qnode = m_info->qnode.dptr;
+
+#if defined(TIOGA_HAS_GPU) && !defined(TIOGA_FAKE_GPU)
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < num_updates)
+#else
+  for(int idx=0; idx<num_updates; idx++)
+#endif
+  {
+    qnode[q_ind[idx]] = q_val[idx];
+  }
+}

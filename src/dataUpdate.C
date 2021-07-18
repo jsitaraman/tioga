@@ -101,7 +101,19 @@ void MeshBlock::getInterpolatedSolution(int *nints,int *nreals,int **intData,dou
 
   if (qq) TIOGA_FREE(qq);
 }
-	
+
+void MeshBlock::assembleFringeSolution(int inode, double *qvar)
+{
+#ifdef TIOGA_HAS_GPU
+  if (inode > nnodes) { TRACEI(inode); TRACEI(nnodes);}
+
+  for(int k=0;k<nvar;k++) {
+    q_fringe_ind.push_back(inode*nvar+k);
+    q_fringe.push_back(qvar[k]);
+  }
+#endif
+}
+
 void MeshBlock::updateSolnData(int inode,double *qvar,double *q)
 {
   int k;
@@ -118,6 +130,13 @@ void MeshBlock::updateSolnData(int inode,double *qvar,double *q)
       for(k=0;k<nvar;k++)
 	q[nnodes*k+inode]=qvar[k];
     }
+}
+
+void MeshBlock::updateSolnDataDevice()
+{
+#ifdef TIOGA_HAS_GPU
+  dMB->updateSolution(q_fringe_ind, q_fringe);
+#endif
 }
 
 void MeshBlock::getDonorCount(int *dcount,int *fcount)

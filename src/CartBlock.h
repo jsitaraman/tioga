@@ -23,6 +23,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <vector>
 #include "codetypes.h"
 
 struct INTERPLIST2;
@@ -51,6 +52,9 @@ class CartBlock
   int ninterp,nweights;
   INTERPLIST2 *interpList,*listptr;
   DONORLIST **donorList;
+  std::vector<int> q_fringe_ind_full, q_fringe_ind_cell_nd;
+  std::vector<double> q_fringe;
+
   // these are device pointers
   double *qcell_d,*qnode_d;
   int block_size{128};
@@ -93,7 +97,9 @@ class CartBlock
 			   double **realData);
   void  pushInterpListsToDevice(void);
   void getInterpolatedDataDevice(double *realData,int nvar_cell,int nvar_node);
+  void assembleFringeSolution(double *qval,int index);
   void update(double *qval,int index);
+  void updateDevice();
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
   void processIblank(HOLEMAP *holemap, int nmesh, bool isNodal);

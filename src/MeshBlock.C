@@ -1581,4 +1581,3 @@ void MeshBlock::pushInterpListsToDevice(void)
 			       
 #endif
 }
-  

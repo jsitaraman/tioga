@@ -117,9 +117,14 @@ namespace TIOGA {
 #endif    
   }
 
-  void dMeshBlock::updateSolution(std::vector<int>& q_fringe_ind, std::vector<double>& q_fringe)
+  void dMeshBlock::updateSolution(
+    std::vector<int>& q_fringe_ind,
+    std::vector<double>& q_fringe,
+    TIOGA::MeshBlockInfo* m_info_in)
   {
 #ifdef TIOGA_HAS_GPU
+    TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
+
     int num_updates = q_fringe_ind.size();
     int n_blocks = num_updates/block_size + (num_updates%block_size == 0 ? 0:1);
 

@@ -135,7 +135,7 @@ void MeshBlock::updateSolnData(int inode,double *qvar,double *q)
 void MeshBlock::updateSolnDataDevice()
 {
 #ifdef TIOGA_HAS_GPU
-  dMB->updateSolution(q_fringe_ind, q_fringe);
+  dMB->updateSolution(q_fringe_ind, q_fringe, m_info);
 #endif
 }
 

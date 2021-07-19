@@ -33,7 +33,7 @@ public:
 
   void getInterpolatedData(double *realData, int nvar, TIOGA::MeshBlockInfo* m_info_in);
 
-  void updateSolution(std::vector<int>& q_fringe_ind, std::vector<double>& q_fringe);
+  void updateSolution(std::vector<int>&, std::vector<double>&, TIOGA::MeshBlockInfo*);
 };
 
     

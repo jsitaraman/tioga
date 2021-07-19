@@ -200,9 +200,16 @@ void CartBlock::updateDevice()
                         qcell_d,
                         qnode_d);
 
+  TIOGA::gpu::synchronize();
+
   TIOGA_FREE_DEVICE(fr_ind_full_d);
   TIOGA_FREE_DEVICE(fr_ind_cell_nd_d);
   TIOGA_FREE_DEVICE(fr_val_d);
+
+  // clear fringe solution related vectors
+  q_fringe_ind_full.clear();
+  q_fringe_ind_cell_nd.clear();
+  q_fringe.clear();
 #endif
 }
 

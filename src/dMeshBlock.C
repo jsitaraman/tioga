@@ -141,6 +141,7 @@ namespace TIOGA {
                           m_info_device);
 
     TIOGA::gpu::synchronize();
+
     TIOGA_FREE_DEVICE(fringe_ind_d);
     TIOGA_FREE_DEVICE(fringe_val_d);
 #endif

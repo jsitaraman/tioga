@@ -136,6 +136,10 @@ void MeshBlock::updateSolnDataDevice()
 {
 #ifdef TIOGA_HAS_GPU
   dMB->updateSolution(q_fringe_ind, q_fringe, m_info);
+
+  // clear fringe solution related vectors
+  q_fringe_ind.clear();
+  q_fringe.clear();
 #endif
 }
 

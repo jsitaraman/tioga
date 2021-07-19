@@ -82,14 +82,12 @@ void MeshBlock::search(void)
   int iptr,isum,nvert;
   OBB *obq;
   int *icell;
-  int *itag;
   int cell_count; 
   int cellindex;
   double xd[3];
   double dxc[3];
   double xmin[3];
   double xmax[3];
-  int *dId;
   //
   // form the bounding box of the 
   // query points

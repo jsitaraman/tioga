@@ -43,7 +43,7 @@ class CartBlock
   int dims[3],nf,ncell,ncell_nf,nnode,nnode_nf;
   int nvar_cell,nvar_node;
   int myid;
-  int *ibl_cell, *ibl_node;;
+  int *ibl_cell, *ibl_node;
   double *qcell, *qnode;
   double xlo[3]; 
   double dx[3];

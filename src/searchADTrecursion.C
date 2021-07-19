@@ -53,7 +53,7 @@ void searchIntersections(MeshBlock *mb,int *cellIndex,int *adtIntegers,double *a
 			 double *coord,int level,int node,double *xsearch,int nelem,int ndim)
 {
   int i;
-  int d,nodeChild,dimcut;
+  int d,nodeChild;
   double element[ndim];
   bool flag;
   //

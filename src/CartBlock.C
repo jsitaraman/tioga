@@ -58,14 +58,13 @@ void CartBlock::registerSolution(int lid, TIOGA::AMRMeshInfo* minfo)
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData)
 {
-  int i,n;
+  int i;
   double *qq;
   int *tmpint;
   double *tmpreal;
   int icount,dcount;
   int nintold,nrealold;
   int interpCount=0;
-  double weight;
   listptr=interpList;
   while(listptr!=NULL)
     {
@@ -209,7 +208,6 @@ void CartBlock::updateDevice()
 
 void CartBlock::preprocess(CartGrid *cg)
   {
-    int nfrac;
     for(int n=0;n<3;n++) xlo[n]=cg->xlo[3*global_id+n];
     for(int n=0;n<3;n++) dx[n]=cg->dx[3*global_id+n];
     dims[0]=cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
@@ -244,7 +242,7 @@ void CartBlock::clearLists(void)
 
 void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,double *xtmp)
 {
-  int i,n;
+  int n;
   int ix[3];
   double *rst;
   rst=(double *)malloc(sizeof(double)*3);
@@ -370,22 +368,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 
 void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
 {
-  //FILE*fp;
-  char fname[80];
-  char qstr[2];
-  char intstring[7];
-  int ni,nj,nk,ibcheck;
-  //sprintf(intstring,"%d",100000+myid);
-  //sprintf(fname,"fringes_%s.dat",&(intstring[1]));
-  //if (local_id==0)
-  //  {
-  //    fp=fopen(fname,"w");
-  //  }
-  //else
-  //  {
-  //    fp=fopen(fname,"a");
-  //  }
-
   DONORLIST *temp;
   int* iflag=(int *)malloc(sizeof(int)*nmesh);
   double* xtmp=(double *)malloc(sizeof(double)*3);
@@ -578,14 +560,10 @@ void CartBlock::writeCellFile(int bid)
 {
   int ibmin,ibmax;
   char fname[80];
-  char qstr[2];
   char intstring[7];
-  char hash,c;
-  int i,n,j,k,ibindex;
-  int bodytag;
+  int i,j,k,ibindex;
   FILE *fp;
-  int ba,id;
-  int nvert;
+  int id;
   int nnodes,ncells;
   int dd1,dd2;
   
@@ -678,8 +656,7 @@ void CartBlock::pushInterpListsToDevice()
   int *interpList_h_inode=new int[weightCount];
   listptr=interpList;
 
-  int inodeCount;
-  interpCount=weightCount=inodeCount=0;
+  interpCount=weightCount=0;
   int wptr=0;
 
   while(listptr!=NULL) 

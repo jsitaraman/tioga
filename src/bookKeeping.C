@@ -650,8 +650,8 @@ void MeshBlock::setIblanks(int inode)
 void MeshBlock::reduce_fringes(void)
 {
   int *ibltmp;
-  int m,n,nvert,i,flag,ncount,inode[8];
-  int verbose,iter;
+  int m,n,nvert,i,ncount,inode[8];
+  int iter;
   INTEGERLIST *clist;
   //
   if (iblank_reduced) TIOGA_FREE(iblank_reduced);
@@ -691,7 +691,6 @@ void MeshBlock::reduce_fringes(void)
       nvert=nv[n];
       for(i=0;i<nc[n];i++)
         {
-          verbose=0;
           ncount=0;
           for(m=0;m<nvert;m++)
             {

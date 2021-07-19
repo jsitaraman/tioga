@@ -23,17 +23,15 @@ void g_interp_data_cart(int *interpList_wcft,
     int k=idx-i*(nvar_cell+nvar_node);
     int nweights=(interpList_wcft[i+1]-interpList_wcft[i])/2;
     double *q;
-    int offset,nvar,ndof,koffset;
+    int offset,ndof,koffset;
     if (k < nvar_cell) {
         q=qcell;
         offset=0;
-        nvar=nvar_cell;
         ndof=ncell_nf;
         koffset=0;
     } else {
         q=qnode;
         offset=nweights;
-        nvar=nvar_node;
         ndof=nnode_nf;
         koffset=nvar_cell;
     }

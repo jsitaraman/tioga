@@ -219,7 +219,7 @@ void tioga::performConnectivityHighOrder(void)
 
 void tioga::performConnectivityAMR(void)
 {
-  int i,ierr;
+  int i;
   int iamr;
 
   iamr=(ncart >0)?1:0;

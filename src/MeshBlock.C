@@ -145,16 +145,13 @@ void MeshBlock::preprocess(void)
 
 void MeshBlock::tagBoundary(void)
 {
-  int i,j,k,n,m,ii;
+  int i,j,k,n,m;
   int itag;
   int inode[8];
   double xv[8][3];
   double vol;
   int *iflag;
   int nvert,i3;
-  FILE *fp;
-  char intstring[7];
-  char fname[80];  
   int *iextmp,*iextmp1; 
   int iex;
   //
@@ -175,18 +172,7 @@ void MeshBlock::tagBoundary(void)
   iflag=(int *)malloc(sizeof(int)*nnodes);
   iextmp=(int *) malloc(sizeof(double)*nnodes);
   iextmp1=(int *) malloc(sizeof(double)*nnodes);
-  // 
-  //printf("%p %p\n",userSpecifiedNodeRes,userSpecifiedCellRes);
-  //if (myid==2) {
-  //  printf("myid,x=%d %d %f %f %f \n",myid,nodeGID[12058],x[12058*3],x[12058*3+1],x[12058*3+2]);
-  //  TRACED( userSpecifiedNodeRes[12058]);
-  //}
-  //if (myid==3) {
-  //  printf("myid,x=%d %d %f %f %f \n",myid,nodeGID[11316],x[11316*3],x[11316*3+1],x[11316*3+2]);
-  //  TRACED(userSpecifiedNodeRes[11316]);
-  //}
-  //userSpecifiedNodeRes=NULL;
-  //userSpecifiedCellRes=NULL;
+
   for(i=0;i<nnodes;i++) iflag[i]=0;
   //
   if (userSpecifiedNodeRes ==NULL && userSpecifiedCellRes ==NULL)
@@ -299,7 +285,6 @@ void MeshBlock::tagBoundary(void)
   //TRACEI(nobc);
   for(i=0;i<nobc;i++)
     { 
-      ii=(obcnode[i]-BASE);
       iflag[(obcnode[i]-BASE)]=1;
     }
   //
@@ -314,7 +299,7 @@ void MeshBlock::tagBoundary(void)
       nvert=nv[n];
       for(i=0;i<nc[n];i++)
 	{
-	  double xd[3],xc[3],xmin[3],xmax[3];	    
+	  double xd[3],xmin[3],xmax[3];
 	  int idx[3];
 	  itag=0;
 	  for(int j=0;j<3;j++) { xmin[j]=BIGVALUE;xmax[j]=-BIGVALUE;}
@@ -492,11 +477,8 @@ void MeshBlock::writeGridFile(int bid)
 void MeshBlock::writeCellFile(int bid)
 {
   char fname[80];
-  char qstr[3];
   char intstring[7];
-  char hash,c;
-  int i,n,j;
-  int bodytag;
+  int i,n;
   FILE *fp;
   int ba;
   int nvert;
@@ -580,9 +562,7 @@ void MeshBlock::writeFlowFile(int bid,double *q,int nvar,int type)
   char fname[80];
   char qstr[3];
   char intstring[7];
-  char hash,c;
   int i,n,j;
-  int bodytag;
   FILE *fp;
   int ba;
   int nvert;
@@ -739,30 +719,22 @@ void MeshBlock::markWallBoundary(int *sam,int nx[3],double extents[6])
   int i3,iv;
   int *iflag;
   int *inode;
-  char intstring[7];
-  char fname[80];
   double ds[3];
   double xv;
   int imin[3];
   int imax[3];
-  FILE *fp;
   //
   iflag=(int *)malloc(sizeof(int)*ncells);
   inode=(int *) malloc(sizeof(int)*nnodes);
-  ///
-  //sprintf(intstring,"%d",100000+myid);
-  //sprintf(fname,"wbc%s.dat",&(intstring[1]));
-  //fp=fopen(fname,"w");
+
   for(i=0;i<ncells;i++) iflag[i]=0;
   for(i=0;i<nnodes;i++) inode[i]=0;
   //
   for(i=0;i<nwbc;i++)
    {
     ii=wbcnode[i]-BASE;
-    //fprintf(fp,"%e %e %e\n",x[3*ii],x[3*ii+1],x[3*ii+2]);
     inode[ii]=1;
    }
-  //fclose(fp);
   //
   // mark wall boundary cells
   //
@@ -908,7 +880,7 @@ void MeshBlock::getReducedOBB(OBB *obc,double *realData)
 
 void MeshBlock::getReducedOBB2(OBB *obc,double *realData) 
 {
-  int i,j,k,l,m,n,i3,jmin,kmin,lmin,jmax,kmax,lmax,indx;
+  int j,k,l,n,jmin,kmin,lmin,jmax,kmax,lmax,indx;
   double bbox[6],xd[3];
   double xmin[3],xmax[3],xv[8][3];
   double delta;
@@ -977,7 +949,6 @@ void MeshBlock::getQueryPoints(OBB *obc,
   int i3;
   double xd[3];
   int *inode;
-  int iptr;
   int m;
 
   inode=(int *)malloc(sizeof(int)*nnodes);
@@ -1022,8 +993,8 @@ void MeshBlock::getQueryPoints2(OBB *obc,
 			       int *nints,int **intData,
 			       int *nreals, double **realData)
 {
-  int i,j,k,l,il,ik,ij,n,m,i3,iflag;
-  int indx,iptr;
+  int i,j,k,l,ik,ij,n,m,i3,iflag;
+  int indx;
   int *inode;
   double delta;
   double xv[8][3],mdx[3],xd[3],xc[3];
@@ -1480,9 +1451,7 @@ void MeshBlock::create_hex_cell_map(void)
 void MeshBlock::checkOrphans(void)
 {
   int norphan=0;
-  char fname[80];
-  //sprintf(fname,"nodeRes%d.dat",myid);
-  //FILE *fp=fopen(fname,"w");
+
   for (int i=0;i<nnodes;i++) 
     {
       if (nodeRes[i]>=BIGVALUE) {
@@ -1518,9 +1487,7 @@ void MeshBlock::pushInterpListsToDevice(void)
 {
 #ifdef TIOGA_HAS_GPU
   int ninterpg=0;
-  int ninterpCartg=0;
   int nweightsg=0;
-  int nweightsCartg=0;
 
   for(int i=0;i<ninterp;i++)
     if (!interpList[i].cancel) {

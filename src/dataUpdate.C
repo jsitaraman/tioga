@@ -157,7 +157,6 @@ void MeshBlock::getDonorCount(int *dcount,int *fcount)
 void MeshBlock::getDonorInfo(int *receptors,int *indices,double *frac)
 {
   int i,j,k,m;
-  int dcount=0;
 
   j=0;
   k=0;

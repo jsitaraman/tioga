@@ -282,8 +282,6 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 					   double **realData,double *q,int *sndMap)
 {
   int i;
-  int k,m,inode;
-  double weight;
   double *qq;
   int icount,dcount;
   int nintold,nrealold;

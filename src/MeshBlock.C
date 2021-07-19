@@ -395,9 +395,7 @@ void MeshBlock::writeGridFile(int bid)
 {
   char fname[80];
   char intstring[7];
-  char hash,c;
-  int i,n,j;
-  int bodytag;
+  int i,n;
   FILE *fp;
   int ba;
   int nvert;

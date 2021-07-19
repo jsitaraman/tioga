@@ -1,7 +1,10 @@
 #ifndef DMESHBLOCK_H
 #define DMESHBLOCK_H
+
+#include <vector>
 #include "TiogaMeshInfo.h"
 #include "ADT.h"
+
 namespace TIOGA {
 class dMeshBlock
 {

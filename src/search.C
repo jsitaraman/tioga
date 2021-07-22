@@ -88,6 +88,7 @@ void MeshBlock::search(void)
   double dxc[3];
   double xmin[3];
   double xmax[3];
+  int *dId;
   //
   // form the bounding box of the 
   // query points

@@ -58,13 +58,14 @@ void CartBlock::registerSolution(int lid, TIOGA::AMRMeshInfo* minfo)
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
 				    double **realData)
 {
-  int i;
+  int i,n;
   double *qq;
   int *tmpint;
   double *tmpreal;
   int icount,dcount;
   int nintold,nrealold;
   int interpCount=0;
+  double weight;
   listptr=interpList;
   while(listptr!=NULL)
     {

@@ -23,7 +23,11 @@ public:
   ~dMeshBlock();
 
   void setMinfo( TIOGA::MeshBlockInfo* m_info_in, int myid_in);
+
+  void update_minfo_device(TIOGA::MeshBlockInfo *m_info_in);
+
   void resetIblanks(const int num_nodes);
+
   void search(ADT *adt,int *elementList, double *xsearch, int *donorId, int nsearch);
 
   void pushInterpListsToDevice(int ninterp_in, int nweights_in,

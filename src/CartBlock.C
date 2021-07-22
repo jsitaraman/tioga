@@ -49,10 +49,14 @@ void CartBlock::registerSolution(int lid, TIOGA::AMRMeshInfo* minfo)
 {
   nvar_cell = minfo->nvar_cell;
   nvar_node = minfo->nvar_node;
+
+#ifndef TIOGA_HAS_GPU
   qcell = minfo->qcell.hptr[lid];
   qnode = minfo->qnode.hptr[lid];
-  qcell_d= minfo->qcell.dptr[lid];
-  qnode_d= minfo->qnode.dptr[lid];
+#else
+  qcell = minfo->qcell.dptr[lid];
+  qnode = minfo->qnode.dptr[lid];
+#endif
 }
 
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
@@ -198,8 +202,8 @@ void CartBlock::updateDevice()
                         fr_ind_full_d,
                         fr_ind_cell_nd_d,
                         fr_val_d,
-                        qcell_d,
-                        qnode_d);
+                        qcell,
+                        qnode);
 
   TIOGA::gpu::synchronize();
 
@@ -729,8 +733,8 @@ void CartBlock::getInterpolatedDataDevice(double *realData,int nvar_cell,int nva
                       nvar_cell,ncell_nf,
                       nvar_node,nnode_nf,
                       realData_d,
-                      qcell_d,
-                      qnode_d);
+                      qcell,
+                      qnode);
  TIOGA::gpu::synchronize();
  TIOGA::gpu::pull_from_device<double>(realData,realData_d,
 				      sizeof(double)*ninterp*(nvar_cell+nvar_node));

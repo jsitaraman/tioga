@@ -25,6 +25,12 @@ namespace TIOGA {
     if (m_info_device) TIOGA_FREE_DEVICE(m_info_device);
   };
 
+  void dMeshBlock::update_minfo_device(TIOGA::MeshBlockInfo *m_info_in) {
+#ifdef TIOGA_HAS_GPU
+    TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
+#endif TIOGA_HAS_GPU
+  }
+
   void dMeshBlock::resetIblanks(const int num_nodes) {
 #ifdef TIOGA_HAS_GPU
     int n_blocks = num_nodes/block_size + (num_nodes%block_size == 0 ? 0:1);
@@ -99,7 +105,6 @@ namespace TIOGA {
   void dMeshBlock::getInterpolatedData(double *realData,  int nvar, TIOGA::MeshBlockInfo *m_info_in)
   {
 #ifdef TIOGA_HAS_GPU
-    TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
     int n_blocks = nvar*ninterp/block_size 
       + ((nvar*ninterp)%block_size == 0 ? 0:1);
     double *realData_d=TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp*nvar);
@@ -123,8 +128,6 @@ namespace TIOGA {
     TIOGA::MeshBlockInfo* m_info_in)
   {
 #ifdef TIOGA_HAS_GPU
-    TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
-
     int num_updates = q_fringe_ind.size();
     int n_blocks = num_updates/block_size + (num_updates%block_size == 0 ? 0:1);
 

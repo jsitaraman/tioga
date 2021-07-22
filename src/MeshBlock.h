@@ -393,6 +393,10 @@ class MeshBlock
   void checkOrphans(void);
 
   void pushInterpListsToDevice(void);
+
+  void set_sol_on_device() {
+    dMB->update_minfo_device(m_info);
+  }
 };
 
 #endif /* MESHBLOCK_H */

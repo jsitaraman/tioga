@@ -56,7 +56,6 @@ class CartBlock
   std::vector<double> q_fringe;
 
   // these are device pointers
-  double *qcell_d,*qnode_d;
   int block_size{128};
   int *interpList_wcft{nullptr};
   double *interpList_weights{nullptr};

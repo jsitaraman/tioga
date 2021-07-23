@@ -129,6 +129,9 @@ void tioga::register_unstructured_solution()
     const auto* minfo = mblocks[iblk]->mesh_info();
     qblock[iblk] = minfo->qnode.hptr;
     mblocks[iblk]->num_var() = minfo->num_vars;
+#ifdef TIOGA_HAS_GPU
+    mblocks[iblk]->set_sol_on_device();
+#endif
   }
 }
 
@@ -219,7 +222,7 @@ void tioga::performConnectivityHighOrder(void)
 
 void tioga::performConnectivityAMR(void)
 {
-  int i,ierr;
+  int i;
   int iamr;
 
   iamr=(ncart >0)?1:0;
@@ -368,26 +371,46 @@ void tioga::dataUpdate_AMR()
   //
   pc_cart->sendRecvPacketsAll(sndPack,rcvPack);
   //
-  // decode the packets and update the data
+  // decode the packets and arrange by block
   //
+  // FIXME: arrange packets block-wise
   for(k=0;k<nrecv;k++)
+  {
+    m=0;
+    for(i=0;i<rcvPack[k].nints/2;i++)
     {
-      m=0;
-      for(i=0;i<rcvPack[k].nints/2;i++)
-	{
-	  bid=rcvPack[k].intData[2*i];
-	  if (bid < 0) 
-	    {
-              int inode=rcvPack[k].intData[2*i+1];
-	      mblocks[-(bid+1)]->updateSolnData(inode,&rcvPack[k].realData[m],qblock[-(bid+1)]);
-	    }
-	  else
-	    {
-	      cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1]);
-	    }
-	  m+=nvar;
-	}
+      bid=rcvPack[k].intData[2*i];
+      if (bid < 0)
+      {
+        int inode=rcvPack[k].intData[2*i+1];
+#ifdef TIOGA_HAS_GPU
+        mblocks[-(bid+1)]->assembleFringeSolution(inode,&rcvPack[k].realData[m]);
+#else
+        mblocks[-(bid+1)]->updateSolnData(inode,&rcvPack[k].realData[m],qblock[-(bid+1)]);
+#endif
+      }
+      else
+      {
+#ifdef TIOGA_HAS_GPU
+        cb[bid-1].assembleFringeSolution(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1]);
+#else
+        cb[bid-1].update(&rcvPack[k].realData[m],rcvPack[k].intData[2*i+1]);
+#endif
+      }
+      m+=nvar;
     }
+  }
+  //
+  // update the data on device
+  //
+#ifdef TIOGA_HAS_GPU
+  for(int ib=0;ib<nblocks;ib++) {
+   auto & mb = mblocks[ib];
+   mb->updateSolnDataDevice();
+  }
+  for(i=0;i<ncart;i++)
+    cb[i].updateDevice();
+#endif
   //
   // release all memory
   //

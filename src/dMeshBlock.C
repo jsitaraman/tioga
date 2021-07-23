@@ -2,7 +2,8 @@
 #include "gpu_global_functions.h"
 #include<chrono>
 #include<thread>
-\
+#include <vector>
+
 namespace TIOGA {
 
   void dMeshBlock::setMinfo(TIOGA::MeshBlockInfo *m_info_in, int myid_in)
@@ -24,9 +25,15 @@ namespace TIOGA {
     if (m_info_device) TIOGA_FREE_DEVICE(m_info_device);
   };
 
-  void dMeshBlock::resetIblanks() {
+  void dMeshBlock::update_minfo_device(TIOGA::MeshBlockInfo *m_info_in) {
 #ifdef TIOGA_HAS_GPU
-    int n_blocks = nnodes/block_size + (nnodes%block_size == 0 ? 0:1);
+    TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
+#endif TIOGA_HAS_GPU
+  }
+
+  void dMeshBlock::resetIblanks(const int num_nodes) {
+#ifdef TIOGA_HAS_GPU
+    int n_blocks = num_nodes/block_size + (num_nodes%block_size == 0 ? 0:1);
     TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, m_info_device);
     TIOGA::gpu::synchronize();
 #endif
@@ -98,7 +105,6 @@ namespace TIOGA {
   void dMeshBlock::getInterpolatedData(double *realData,  int nvar, TIOGA::MeshBlockInfo *m_info_in)
   {
 #ifdef TIOGA_HAS_GPU
-    TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
     int n_blocks = nvar*ninterp/block_size 
       + ((nvar*ninterp)%block_size == 0 ? 0:1);
     double *realData_d=TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp*nvar);
@@ -116,4 +122,31 @@ namespace TIOGA {
 #endif    
   }
 
+  void dMeshBlock::updateSolution(
+    std::vector<int>& q_fringe_ind,
+    std::vector<double>& q_fringe,
+    TIOGA::MeshBlockInfo* m_info_in)
+  {
+#ifdef TIOGA_HAS_GPU
+    int num_updates = q_fringe_ind.size();
+    int n_blocks = num_updates/block_size + (num_updates%block_size == 0 ? 0:1);
+
+    // create gpu memory
+    int* fringe_ind_d =
+        TIOGA::gpu::push_to_device<int>(q_fringe_ind.data(), sizeof(int)*num_updates);
+    double* fringe_val_d =
+        TIOGA::gpu::push_to_device<double>(q_fringe.data(), sizeof(double)*num_updates);
+
+    TIOGA_GPU_LAUNCH_FUNC(g_update_sol, n_blocks, block_size, 0, 0,
+                          num_updates,
+                          fringe_ind_d,
+                          fringe_val_d,
+                          m_info_device);
+
+    TIOGA::gpu::synchronize();
+
+    TIOGA_FREE_DEVICE(fringe_ind_d);
+    TIOGA_FREE_DEVICE(fringe_val_d);
+#endif
+  }
 } //namespace TIOGA

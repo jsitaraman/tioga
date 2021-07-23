@@ -33,9 +33,6 @@ void g_adt_search(TIOGA::MeshBlockInfo* m_info,
   int* nc= m_info->num_cells_per_elem.dptr;
   int **vconn;
   int *vconn_ptrs[4];
-  int ncells=0;
-  int maxchecks=0;
-  int imax;
   /*
   FILE *fp=fopen("log.dat","w");
   for(int i=0;i<ntypes;i++) ncells+=nc[i];
@@ -73,14 +70,9 @@ void g_adt_search(TIOGA::MeshBlockInfo* m_info,
                                      nelem,
                                      ndim,
                                      &nchecks);
-    if (maxchecks < nchecks) {
-     imax=idx;
-     maxchecks=nchecks;
-    }
+
     if (cellIndex[0] > -1 && cellIndex[1]==0) donorId[idx]=cellIndex[0];
   }
- //printf("maxchecks= %d %d %d %f %f %f\n",myid,imax,maxchecks,
- //                   xsearch[3*imax],xsearch[3*imax+1],xsearch[3*imax+2]);
 }
 
 TIOGA_GPU_GLOBAL
@@ -114,3 +106,22 @@ void g_interp_data(int *interpList_wcft,
    }
 }
 
+TIOGA_GPU_GLOBAL
+void g_update_sol(
+  int num_updates,
+  int* q_ind,
+  double* q_val,
+  TIOGA::MeshBlockInfo* m_info)
+{
+  double* qnode = m_info->qnode.dptr;
+
+#if defined(TIOGA_HAS_GPU) && !defined(TIOGA_FAKE_GPU)
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < num_updates)
+#else
+  for(int idx=0; idx<num_updates; idx++)
+#endif
+  {
+    qnode[q_ind[idx]] = q_val[idx];
+  }
+}

@@ -225,7 +225,7 @@ void MeshBlock::clearOrphans(HOLEMAP *holemap, int nmesh,int *itmp)
 
 void MeshBlock::getInternalNodes(void)
 {
-  int i,m,j,icell,indx,isum,i3,n,nvert;
+  int i,m,j,i3;
   //
   nreceptorCells=0;
   //
@@ -295,7 +295,6 @@ void MeshBlock::getExtraQueryPoints(OBB *obc,
   int i3;
   double xd[3];
   int *inode;
-  int iptr;
   int m;
 
   inode=(int *)malloc(sizeof(int)*ntotalPoints);
@@ -343,7 +342,6 @@ void MeshBlock::processPointDonors(void)
   double *frac;
   int icell;
   int ndim;
-  int ierr;
   double xv[8][3];
   double xp[3];
   double frac2[8];

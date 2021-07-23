@@ -50,7 +50,7 @@ class MeshBlock
   TIOGA::MeshBlockInfo* m_info{nullptr};
 
   std::unique_ptr<TIOGA::dMeshBlock> dMB;
-  
+   
   //TIOGA::dMeshBlock *dMB; /** device instance of mesh block with device specific methods */
 
 
@@ -163,6 +163,9 @@ class MeshBlock
 
   int* vconn_ptrs[TIOGA::MeshBlockInfo::max_vertex_types];
 
+  std::vector<int> q_fringe_ind; /** < index of fringe point q in full solution array*/
+  std::vector<double> q_fringe; /** < solution for this block's fringe points */
+
   //
   // call back functions to use p4est to search
   // its own internal data
@@ -224,7 +227,11 @@ class MeshBlock
 
   void writeOBB2(OBB *obc,int bid);
 
+  void assembleFringeSolution(int inode, double *qvar);
+
   void updateSolnData(int inode,double *qvar,double *q);
+
+  void updateSolnDataDevice();
 
   int getNinterp(void) {return ninterp;};
 
@@ -384,6 +391,12 @@ class MeshBlock
     interptype = type;
   }
   void checkOrphans(void);
+
+  void pushInterpListsToDevice(void);
+
+  void set_sol_on_device() {
+    dMB->update_minfo_device(m_info);
+  }
 };
 
 #endif /* MESHBLOCK_H */

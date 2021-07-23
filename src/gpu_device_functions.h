@@ -19,12 +19,10 @@ TIOGA_GPU_DEVICE
 void invertMat3(double A[3][3],
                 double f[3])
 {
-  int i;
-  double b11,b21,b22,b31,b32,b33,b41,b42,b43,b44;
+  double b11,b21,b22,b31,b32,b33;
   double u12,u13,u23;
   double d1,d2,d3;
-  double c1,c2,c3;
-  double a1,a2,a3;
+
   b11=1./A[0][0];
   u12=A[0][1]*b11;
   u13=A[0][2]*b11;
@@ -104,7 +102,7 @@ void d_solvec(double a[NEQNS][NEQNS],double b[NEQNS],int *iflag,int n)
 TIOGA_GPU_DEVICE
 void d_newtonSolve(double f[7][3],double *u1,double *v1,double *w1)
 {
-  int i,j,k;
+  int j;
   int iter,itmax,isolflag;
   double u,v,w;
   double uv,wu,vw,uvw,norm,convergenceLimit;
@@ -164,7 +162,7 @@ void d_newtonSolve(double f[7][3],double *u1,double *v1,double *w1)
 TIOGA_GPU_DEVICE
 void d_computeNodalWeights(double xv[8][3],double *xp,double frac[8],int nvert)
 {
-  int i,j,k,isolflag;
+  int j,k,isolflag;
   double f[8][3];
   double u,v,w;
   double oneminusU,oneminusV,oneminusW,oneminusUV;
@@ -306,10 +304,9 @@ TIOGA_GPU_DEVICE
 void d_checkContainment(double *x, int **vconn,int *nc, int *nv, int ntypes, int *elementList,
                       int cellIndex[2], int adtElement, double *xsearch)
 {
-  int i,j,k,m,n,i3;
+  int i,j,m,n,i3;
   int nvert;
-  int icell,icell1;
-  int passFlag;
+  int icell;
   int isum;
   double xv[8][3];
   double frac[8];
@@ -385,15 +382,12 @@ void d_searchIntersections_containment(int idx, int cellIndex[2],
 {
   
 
-  int i,k,is;
+  int i,is;
   int d,nodeChild,flag;
   double element[6];
-  double dv[3];
-  double dtest,bdist;
   int nodeStack[maxStackSize];
   int mm=0;
   int nstack=1;
-  double dmin[2];
   int bruteSearch=0;
 
   //typedef struct nodestack{
@@ -405,7 +399,6 @@ void d_searchIntersections_containment(int idx, int cellIndex[2],
   int level=0;
 
   nodeStack[0]=node;
-  dmin[0]=dmin[1]=TIOGA_DEVICE_BIGVALUE;
   cellIndex[0]=cellIndex[1]=-1;
   while(nstack > 0 && !bruteSearch) 
     {

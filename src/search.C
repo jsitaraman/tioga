@@ -82,7 +82,6 @@ void MeshBlock::search(void)
   int iptr,isum,nvert;
   OBB *obq;
   int *icell;
-  int *itag;
   int cell_count; 
   int cellindex;
   double xd[3];

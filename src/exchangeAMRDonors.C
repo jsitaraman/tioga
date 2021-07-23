@@ -23,7 +23,7 @@
 using namespace TIOGA;
 void tioga::exchangeAMRDonors(void)
 {
-  int i,j,k,l,m,n,i3;
+  int i,j,m,n;
   int nsend_sav,nrecv_sav,nsend,nrecv;
   PACKET *sndPack,*rcvPack;
   int *sndMap,*rcvMap,*sndMapAll,*rcvMapAll;

@@ -26,7 +26,7 @@ extern "C"{
 			   
 void MeshBlock::checkContainment(int *cellIndex, int adtElement, double *xsearch)
 {
-  int i,j,k,m,n,i3;
+  int i,j,m,n,i3;
   int nvert;
   int icell,icell1;
   int passFlag;

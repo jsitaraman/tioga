@@ -220,7 +220,6 @@ extern "C" {
 
   void tioga_dataupdate_(double *q,int *nvar,char *itype)
   {
-    int interptype;
     int bid=0;
     tg->registerSolution(bid,q);
     tioga_dataupdate_mb_(nvar,itype);

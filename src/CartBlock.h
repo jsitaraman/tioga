@@ -23,6 +23,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <vector>
 #include "codetypes.h"
 
 struct INTERPLIST2;
@@ -42,14 +43,24 @@ class CartBlock
   int dims[3],nf,ncell,ncell_nf,nnode,nnode_nf;
   int nvar_cell,nvar_node;
   int myid;
-  int *ibl_cell, *ibl_node;;
+  int *ibl_cell, *ibl_node;
   double *qcell, *qnode;
   double xlo[3]; 
   double dx[3];
   int ndonors;
   int interpListSize;
+  int ninterp,nweights;
   INTERPLIST2 *interpList,*listptr;
   DONORLIST **donorList;
+  std::vector<int> q_fringe_ind_full, q_fringe_ind_cell_nd;
+  std::vector<double> q_fringe;
+
+  // these are device pointers
+  int block_size{128};
+  int *interpList_wcft{nullptr};
+  double *interpList_weights{nullptr};
+  int *interpList_inode{nullptr};
+
   void (*donor_frac) (int *,double *,int *,double *);
  public:
   CartBlock() { global_id=0;dims[0]=dims[1]=dims[2]=0;ibl_cell=NULL;ibl_node=NULL;qcell=NULL;qnode=NULL;interpListSize=0;donorList=NULL;interpList=NULL;
@@ -83,7 +94,11 @@ class CartBlock
   void preprocess(CartGrid *cg);
   void getInterpolatedData(int *nints,int *nreals,int **intData,
 			   double **realData);
+  void  pushInterpListsToDevice(void);
+  void getInterpolatedDataDevice(double *realData,int nvar_cell,int nvar_node);
+  void assembleFringeSolution(double *qval,int index);
   void update(double *qval,int index);
+  void updateDevice();
   void getCancellationData(int *cancelledData, int *ncancel);
   void processDonors(HOLEMAP *holemap, int nmesh);
   void processIblank(HOLEMAP *holemap, int nmesh, bool isNodal);

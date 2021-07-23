@@ -24,6 +24,7 @@
 #include "CartGrid.h"
 #include "cartUtils.h"
 #include "linCartInterp.h"
+#include "gpu_global_functions_cart.h"
 
 extern "C" {
   void deallocateLinkList(DONORLIST *temp);
@@ -48,8 +49,14 @@ void CartBlock::registerSolution(int lid, TIOGA::AMRMeshInfo* minfo)
 {
   nvar_cell = minfo->nvar_cell;
   nvar_node = minfo->nvar_node;
+
+#ifndef TIOGA_HAS_GPU
   qcell = minfo->qcell.hptr[lid];
   qnode = minfo->qnode.hptr[lid];
+#else
+  qcell = minfo->qcell.dptr[lid];
+  qnode = minfo->qnode.dptr[lid];
+#endif
 }
 
 void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
@@ -103,6 +110,7 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
         (*intData)[icount++]=-1-listptr->receptorInfo[2];
         (*intData)[icount++]=listptr->receptorInfo[1];
 
+#ifndef TIOGA_HAS_GPU
         for(n=0;n<(nvar_cell+nvar_node);n++) qq[n]=0; // zero out solution
 
         for(i=0;i<listptr->nweights;i++)
@@ -126,13 +134,38 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
         }
 
         for(n=0;n<(nvar_cell+nvar_node);n++) (*realData)[dcount++]=qq[n]; // update solution
+#endif
 
         listptr=listptr->next;
       }
+#ifdef TIOGA_HAS_GPU
+      getInterpolatedDataDevice(&((*realData)[dcount]),nvar_cell,nvar_node);
+#endif
       TIOGA_FREE(qq);
     }
 }
 
+void CartBlock::assembleFringeSolution(double *qval,int index)
+{
+#ifdef TIOGA_HAS_GPU
+  if(index >= ncell_nf) {
+    if(nvar_node == 0) return;
+    for(int i=0;i<nvar_node;i++) {
+      q_fringe_ind_full.push_back(index);
+      q_fringe_ind_cell_nd.push_back(index-ncell_nf+nnode_nf*i);
+      q_fringe.push_back(qval[nvar_cell+i]);
+    }
+  }
+  else {
+    if(nvar_cell == 0) return;
+    for(int i=0;i<nvar_cell;i++) {
+      q_fringe_ind_full.push_back(index);
+      q_fringe_ind_cell_nd.push_back(index+ncell_nf*i);
+      q_fringe.push_back(qval[i]);
+    }
+  }
+#endif
+}
 
 void CartBlock::update(double *qval,int index)
 {
@@ -148,10 +181,45 @@ void CartBlock::update(double *qval,int index)
   }
 }
 
-  
+void CartBlock::updateDevice()
+{
+#ifdef TIOGA_HAS_GPU
+
+  int num_updates = q_fringe_ind_full.size();
+  int n_blocks = num_updates/block_size + (num_updates%block_size == 0 ? 0:1);
+
+  // create gpu memory
+  int* fr_ind_full_d =
+    TIOGA::gpu::push_to_device<int>(q_fringe_ind_full.data(), sizeof(int)*num_updates);
+  int* fr_ind_cell_nd_d =
+    TIOGA::gpu::push_to_device<int>(q_fringe_ind_cell_nd.data(), sizeof(int)*num_updates);
+  double* fr_val_d =
+    TIOGA::gpu::push_to_device<double>(q_fringe.data(), sizeof(double)*num_updates);
+
+  TIOGA_GPU_LAUNCH_FUNC(g_update_sol_cart,n_blocks,block_size,0,0,
+                        ncell_nf,
+                        num_updates,
+                        fr_ind_full_d,
+                        fr_ind_cell_nd_d,
+                        fr_val_d,
+                        qcell,
+                        qnode);
+
+  TIOGA::gpu::synchronize();
+
+  TIOGA_FREE_DEVICE(fr_ind_full_d);
+  TIOGA_FREE_DEVICE(fr_ind_cell_nd_d);
+  TIOGA_FREE_DEVICE(fr_val_d);
+
+  // clear fringe solution related vectors
+  q_fringe_ind_full.clear();
+  q_fringe_ind_cell_nd.clear();
+  q_fringe.clear();
+#endif
+}
+
 void CartBlock::preprocess(CartGrid *cg)
   {
-    int nfrac;
     for(int n=0;n<3;n++) xlo[n]=cg->xlo[3*global_id+n];
     for(int n=0;n<3;n++) dx[n]=cg->dx[3*global_id+n];
     dims[0]=cg->ihi[3*global_id]  -cg->ilo[3*global_id  ]+1;
@@ -186,7 +254,7 @@ void CartBlock::clearLists(void)
 
 void CartBlock::insertInInterpList(int procid,int remoteid,int remoteblockid,double *xtmp)
 {
-  int i,n;
+  int n;
   int ix[3];
   double *rst;
   rst=(double *)malloc(sizeof(double)*3);
@@ -312,22 +380,6 @@ void CartBlock::processDonors(HOLEMAP *holemap, int nmesh)
 
 void CartBlock::processIblank(HOLEMAP *holemap, int nmesh, bool isNodal)
 {
-  //FILE*fp;
-  char fname[80];
-  char qstr[2];
-  char intstring[7];
-  int ni,nj,nk,ibcheck;
-  //sprintf(intstring,"%d",100000+myid);
-  //sprintf(fname,"fringes_%s.dat",&(intstring[1]));
-  //if (local_id==0)
-  //  {
-  //    fp=fopen(fname,"w");
-  //  }
-  //else
-  //  {
-  //    fp=fopen(fname,"a");
-  //  }
-
   DONORLIST *temp;
   int* iflag=(int *)malloc(sizeof(int)*nmesh);
   double* xtmp=(double *)malloc(sizeof(double)*3);
@@ -520,14 +572,10 @@ void CartBlock::writeCellFile(int bid)
 {
   int ibmin,ibmax;
   char fname[80];
-  char qstr[2];
   char intstring[7];
-  char hash,c;
-  int i,n,j,k,ibindex;
-  int bodytag;
+  int i,j,k,ibindex;
   FILE *fp;
-  int ba,id;
-  int nvert;
+  int id;
   int nnodes,ncells;
   int dd1,dd2;
   
@@ -600,4 +648,96 @@ void CartBlock::writeCellFile(int bid)
                                                
   fclose(fp);
   return;
+}
+
+
+void CartBlock::pushInterpListsToDevice()
+{  
+  //#ifdef TIOGA_HAS_GPU
+  listptr=interpList;
+  int interpCount=0;
+  int weightCount=0;
+  while(listptr!=NULL)
+    {
+      interpCount++;
+      weightCount+=(listptr->nweights)*2;      
+      listptr=listptr->next;
+    } 
+  int *interpList_h_wcft=new int[interpCount+1];
+  double *interpList_h_weights=new double[weightCount];
+  int *interpList_h_inode=new int[weightCount];
+  listptr=interpList;
+
+  interpCount=weightCount=0;
+  int wptr=0;
+
+  while(listptr!=NULL) 
+    {
+      interpList_h_wcft[interpCount]=wptr;
+      interpCount++;
+      for(int i=0;i<2*listptr->nweights;i++)
+	{
+	  int index;
+	  if (i< listptr->nweights) {
+	    index = cart_utils::get_cell_index(dims[0],dims[1],nf,
+					       listptr->inode[3*i],
+					       listptr->inode[3*i+1],
+					       listptr->inode[3*i+2]);
+	  }
+	  else {
+	    index = cart_utils::get_node_index(dims[0],dims[1],nf,
+					       listptr->inode[3*i],
+					       listptr->inode[3*i+1],
+					       listptr->inode[3*i+2]);
+	  }
+	  interpList_h_weights[weightCount]=listptr->weights[i];
+	  interpList_h_inode[weightCount]=index;
+	  weightCount++;
+	}
+      wptr=weightCount;
+      listptr=listptr->next;
+    }
+  interpList_h_wcft[interpCount]=wptr;
+
+  if (interpList_wcft) TIOGA_FREE_DEVICE(interpList_wcft);
+  if (interpList_inode) TIOGA_FREE_DEVICE(interpList_inode);
+  if (interpList_weights) TIOGA_FREE_DEVICE(interpList_weights);
+  
+  ninterp=interpCount;
+  nweights=weightCount;
+
+  interpList_wcft=TIOGA::gpu::push_to_device<int>(interpList_h_wcft,
+    sizeof(int)*(ninterp+1));
+  interpList_weights=TIOGA::gpu::push_to_device<double>(interpList_h_weights,
+    sizeof(double)*nweights);
+  interpList_inode=TIOGA::gpu::push_to_device<int>(interpList_h_inode,
+    sizeof(int)*nweights);
+
+  delete [] interpList_h_wcft;
+  delete [] interpList_h_inode;
+  delete [] interpList_h_weights;
+
+}
+
+void CartBlock::getInterpolatedDataDevice(double *realData,int nvar_cell,int nvar_node)
+{
+#ifdef TIOGA_HAS_GPU
+  int n_blocks=(nvar_cell+nvar_node)*ninterp/block_size
+    + (((nvar_cell+nvar_node)*ninterp)%block_size == 0 ? 0:1);
+ double *realData_d=TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp*(nvar_cell+nvar_node));
+ TIOGA_GPU_LAUNCH_FUNC(g_interp_data_cart,n_blocks,block_size,0,0,
+                      interpList_wcft,
+                      interpList_weights,
+                      interpList_inode,
+                      ninterp,
+                      nvar_cell,ncell_nf,
+                      nvar_node,nnode_nf,
+                      realData_d,
+                      qcell,
+                      qnode);
+ TIOGA::gpu::synchronize();
+ TIOGA::gpu::pull_from_device<double>(realData,realData_d,
+				      sizeof(double)*ninterp*(nvar_cell+nvar_node));
+ TIOGA_FREE_DEVICE(realData_d);
+#endif
 }

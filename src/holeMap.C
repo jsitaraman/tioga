@@ -39,11 +39,8 @@ extern "C"
  */
 void tioga::getHoleMap(void)
 {
-  int i,j,k,m;
-  int ii,jj,kk;
-  // double wbox[6];
+  int i,j;
   std::vector<std::array<double,6>> wbox(nblocks);
-  //int existWall;
   std::vector<int> existWall(nblocks);
   int meshtag,maxtag, mtagtmp;
   int *existHoleLocal;
@@ -52,9 +49,6 @@ void tioga::getHoleMap(void)
   double *bboxGlobal;
   double ds[3],dsmax,dsbox;
   int bufferSize;
-  FILE *fp;
-  char fname[80];
-  char intstring[7];
  //
  // get the local bounding box
  //

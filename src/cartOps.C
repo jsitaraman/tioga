@@ -278,7 +278,8 @@ void MeshBlock::findInterpListCart(void)
 }    
 
 
-void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,int *sndMap)
+void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
+					   double **realData,double *q,int *sndMap)
 {
   int i;
   int k,m,inode;
@@ -346,6 +347,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 	{
 	  if (!interpList[i].cancel)
 	    {
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++) qq[k]=0;
 	      for(m=0;m<interpList[i].nweights;m++)
 		{
@@ -358,17 +360,21 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[inode*nvar+k]*weight;
 		}
+#endif
 	      (*intData)[icount++]=sndMap[interpList[i].receptorInfo[0]];
 	      (*intData)[icount++]=-1-interpList[i].receptorInfo[2];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
+#endif
 	    }
 	}
       for(i=0;i<ninterpCart;i++)
 	{
 	  if (!interpListCart[i].cancel)
 	    {
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++) qq[k]=0;
 	      for(m=0;m<interpListCart[i].nweights;m++)
 		{
@@ -386,12 +392,15 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		     // }
 		    }
 		}
+#endif
 	      //writeqnode_(&myid,qq,&nvar);
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[0];
 	      (*intData)[icount++]=1+interpListCart[i].receptorInfo[2];
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[1];
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
+#endif
 	    }
 	}
     }
@@ -401,6 +410,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 	{
 	  if (!interpList[i].cancel)
 	    {
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++) qq[k]=0;
 	      for(m=0;m<interpList[i].nweights;m++)
 		{
@@ -409,17 +419,21 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[k*nnodes+inode]*weight;
 		}
+#endif
 	      (*intData)[icount++]=sndMap[interpList[i].receptorInfo[0]];
 	      (*intData)[icount++]=-1-interpList[i].receptorInfo[2];
 	      (*intData)[icount++]=interpList[i].receptorInfo[1];
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
+#endif
 	    }
 	}
       for(i=0;i<ninterpCart;i++)
 	{
 	  if (!interpListCart[i].cancel)
 	    {
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++) qq[k]=0;
 	      for(m=0;m<interpListCart[i].nweights;m++)
 		{
@@ -428,13 +442,20 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 		  for(k=0;k<nvar;k++)
 		    qq[k]+=q[k*nnodes+inode]*weight;
 		}
+#endif
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[0];
 	      (*intData)[icount++]=1+interpListCart[i].receptorInfo[2];
 	      (*intData)[icount++]=interpListCart[i].receptorInfo[1];
+#ifndef TIOGA_HAS_GPU
 	      for(k=0;k<nvar;k++)
 		(*realData)[dcount++]=qq[k];
+#endif
 	    }
 	}
     }
+#ifdef TIOGA_HAS_GPU
+  dMB->getInterpolatedData(&((*realData)[dcount]),nvar,m_info);
+#endif  
+    
   if (qq) TIOGA_FREE(qq);
 }

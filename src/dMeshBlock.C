@@ -28,7 +28,7 @@ namespace TIOGA {
   void dMeshBlock::update_minfo_device(TIOGA::MeshBlockInfo *m_info_in) {
 #ifdef TIOGA_HAS_GPU
     TIOGA::gpu::copy_to_device(m_info_device, m_info_in, sizeof(TIOGA::MeshBlockInfo));
-#endif TIOGA_HAS_GPU
+#endif
   }
 
   void dMeshBlock::resetIblanks(const int num_nodes) {

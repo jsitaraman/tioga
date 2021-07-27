@@ -250,10 +250,10 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
    //
    // create gpu memory
    //
-   double *adtExtents = TIOGA::gpu::push_to_device<double>(adt->get_Extents(),sizeof(double)*ndim);
-   int    *adtIntegers = TIOGA::gpu::push_to_device<int>(adt->get_Integers(),sizeof(int)*cell_count*4);
-   double *adtReals = TIOGA::gpu::push_to_device<double>(adt->get_Reals(),sizeof(double)*cell_count*ndim);
-   double *coord = TIOGA::gpu::push_to_device<double>(elementBbox,sizeof(double)*cell_count*ndim);
+   double *adtExtents_d = TIOGA::gpu::push_to_device<double>(adt->get_Extents(),sizeof(double)*ndim);
+   int    *adtIntegers_d = TIOGA::gpu::push_to_device<int>(adt->get_Integers(),sizeof(int)*cell_count*4);
+   double *adtReals_d = TIOGA::gpu::push_to_device<double>(adt->get_Reals(),sizeof(double)*cell_count*ndim);
+   double *coords_d = TIOGA::gpu::push_to_device<double>(elementBbox,sizeof(double)*cell_count*ndim);
    int    *elementList_d = TIOGA::gpu::push_to_device<int>(elementList,sizeof(int)*cell_count);
    int    *donorId_d = TIOGA::gpu::push_to_device<int>(donorId,sizeof(int)*nsearch);
    double *xsearch_d = TIOGA::gpu::push_to_device<double>(xsearch,sizeof(double)*nsearch*3);
@@ -264,21 +264,21 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
    int n_blocks = nsearch/block_size + (nsearch%block_size == 0 ? 0:1);
 
    TIOGA_GPU_LAUNCH_FUNC(g_adt_search,n_blocks,block_size,0,0,m_info_device,
-                         coord,adtExtents,adtIntegers,adtReals,
-                         elementList,donorId,xsearch,ndim,cell_count,nsearch,myid);
+                         coords_d,adtExtents_d,adtIntegers_d,adtReals_d,
+                         elementList_d,donorId_d,xsearch_d,ndim,cell_count,nsearch,myid);
    TIOGA::gpu::synchronize();
 
    TIOGA::gpu::pull_from_device<int>(donorId,donorId_d,sizeof(int)*nsearch);
    //
    //release all gpu memory
    //
-   TIOGA_FREE_DEVICE(adtExtents);
-   TIOGA_FREE_DEVICE(adtIntegers);
-   TIOGA_FREE_DEVICE(adtReals);
-   TIOGA_FREE_DEVICE(coord);
-   TIOGA_FREE_DEVICE(elementList);
-   TIOGA_FREE_DEVICE(donorId);
-   TIOGA_FREE_DEVICE(xsearch);
+   TIOGA_FREE_DEVICE(adtExtents_d);
+   TIOGA_FREE_DEVICE(adtIntegers_d);
+   TIOGA_FREE_DEVICE(adtReals_d);
+   TIOGA_FREE_DEVICE(coords_d);
+   TIOGA_FREE_DEVICE(elementList_d);
+   TIOGA_FREE_DEVICE(donorId_d);
+   TIOGA_FREE_DEVICE(xsearch_d);
 
   for(i=0;i<nsearch;i++) donorId[i]=donorId[xtag[i]];
 #else

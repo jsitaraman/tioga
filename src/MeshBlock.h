@@ -78,7 +78,7 @@ class MeshBlock
   //
   DONORLIST **donorList;      /**< list of donors for the nodes of this mesh */
   //
-  int ninterp;              /**< number of interpolations to be performed */
+  int ninterp;       /**< number of interpolations to be performed */
   int interpListSize;
   int interptype;
   INTERPLIST *interpList;   /**< list of donor nodes in my grid, with fractions and information of
@@ -166,6 +166,7 @@ class MeshBlock
    *  This pointer is owned by MeshBlock
    */
   TIOGA::MeshBlockInfo* m_info_device{nullptr};
+  int ninterp_total_g;
   int *interpList_wcft_d{nullptr};
   int *interpList_inode_d{nullptr};
   double *interpList_weights_d{nullptr};

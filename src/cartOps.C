@@ -459,21 +459,21 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 
 #ifdef TIOGA_HAS_GPU
   int block_size = 128;
-  int n_blocks = nvar*ninterp/block_size + ((nvar*ninterp)%block_size == 0 ? 0:1);
+  int n_blocks = nvar*ninterp/block_size + ((nvar*ninterp_total_g)%block_size == 0 ? 0:1);
 
-  double *realData_d = TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp*nvar);
+  double *realData_d = TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp_total_g*nvar);
 
   TIOGA_GPU_LAUNCH_FUNC(g_interp_data, n_blocks, block_size, 0, 0,
                         interpList_wcft_d,
                         interpList_weights_d,
                         interpList_inode_d,
-                        ninterp,
+                        ninterp_total_g,
                         nvar,
                         realData_d,
                         m_info_device);
   TIOGA::gpu::synchronize();
 
-  TIOGA::gpu::pull_from_device<double>(&((*realData)[dcount]),realData_d,sizeof(double)*ninterp*nvar);
+  TIOGA::gpu::pull_from_device<double>(&((*realData)[dcount]),realData_d,sizeof(double)*ninterp_total_g*nvar);
 
   TIOGA_FREE_DEVICE(realData_d);
 #endif

@@ -1500,33 +1500,33 @@ void MeshBlock::checkOrphans(void)
 void MeshBlock::pushInterpListsToDevice(void)
 {
 #ifdef TIOGA_HAS_GPU
-  int ninterpg=0;
+  ninterp_total_g=0;
   int nweightsg=0;
 
   for(int i=0;i<ninterp;i++)
     if (!interpList[i].cancel) {
-      ninterpg++;
+      ninterp_total_g++;
       nweightsg+=interpList[i].nweights;
     }
   for(int i=0;i<ninterpCart;i++)
     if (!interpListCart[i].cancel) {
-      ninterpg++;
+      ninterp_total_g++;
       nweightsg+=interpListCart[i].nweights;
     }
   
-  int *interpList_wcft    =new int[ninterpg+1];
+  int *interpList_wcft    =new int[ninterp_total_g+1];
   int *interpList_inode       =new int [nweightsg];
   double *interpList_weights  =new double [nweightsg];
   
   int wptr;
 
-  ninterpg=nweightsg=wptr=0;
+  ninterp_total_g=nweightsg=wptr=0;
 
   for(int i=0;i<ninterp;i++)
     if (!interpList[i].cancel) {
-      interpList_wcft[ninterpg]=wptr;
+      interpList_wcft[ninterp_total_g]=wptr;
       wptr+=interpList[i].nweights;
-      ninterpg++;
+      ninterp_total_g++;
       for(int j=0;j<interpList[i].nweights;j++)
 	{
 	  interpList_weights[nweightsg]=interpList[i].weights[j];
@@ -1537,9 +1537,9 @@ void MeshBlock::pushInterpListsToDevice(void)
 
   for(int i=0;i<ninterpCart;i++)
     if (!interpListCart[i].cancel) {
-      interpList_wcft[ninterpg]=wptr;
+      interpList_wcft[ninterp_total_g]=wptr;
       wptr+=interpListCart[i].nweights;
-      ninterpg++;
+      ninterp_total_g++;
       for(int j=0;j<interpListCart[i].nweights;j++)
 	{
 	  interpList_weights[nweightsg]=interpListCart[i].weights[j];
@@ -1548,14 +1548,14 @@ void MeshBlock::pushInterpListsToDevice(void)
 	}
     }
 
-  interpList_wcft[ninterpg]=wptr;
+  interpList_wcft[ninterp_total_g]=wptr;
 
   if (interpList_wcft_d) TIOGA_FREE_DEVICE(interpList_wcft_d);
   if (interpList_inode_d) TIOGA_FREE_DEVICE(interpList_inode_d);
   if (interpList_weights_d) TIOGA_FREE_DEVICE(interpList_weights_d);
 
   interpList_wcft_d = TIOGA::gpu::push_to_device<int>(interpList_wcft,
-    sizeof(int)*(ninterpg+1));
+    sizeof(int)*(ninterp_total_g+1));
   interpList_inode_d = TIOGA::gpu::push_to_device<int>(interpList_inode,
     sizeof(int)*nweightsg);
   interpList_weights_d = TIOGA::gpu::push_to_device<double>(interpList_weights,

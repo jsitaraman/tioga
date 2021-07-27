@@ -22,7 +22,7 @@
 
 #include "codetypes.h"
 #include "MeshBlock.h"
-#include "tioga_gpu.h"
+#include "gpu_global_functions_mb.h"
 
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
@@ -114,10 +114,18 @@ void MeshBlock::setData(TIOGA::MeshBlockInfo* minfo)
 #endif
 
 #ifdef TIOGA_HAS_GPU
-  if (!dMB) dMB.reset(new TIOGA::dMeshBlock);
-  dMB->setMinfo(m_info,myid);
+  if (m_info_device == nullptr) {
+    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::MeshBlockInfo>(
+      sizeof(TIOGA::MeshBlockInfo));
+  }
+  update_minfo_device();
 #endif
+}
 
+void MeshBlock::update_minfo_device() {
+#ifdef TIOGA_HAS_GPU
+  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::MeshBlockInfo));
+#endif
 }
 
 void MeshBlock::preprocess(void)
@@ -126,9 +134,17 @@ void MeshBlock::preprocess(void)
   //
   // set all iblanks = 1
   //
-  for(i=0;i<nnodes;i++) iblank[i]=1;
 #ifdef TIOGA_HAS_GPU
-  dMB->resetIblanks(nnodes);
+  int block_size = 128;
+  int n_blocks = nnodes/block_size + (nnodes%block_size == 0 ? 0:1);
+
+  TIOGA_GPU_LAUNCH_FUNC(g_reset_iblanks, n_blocks, block_size, 0, 0, m_info_device);
+  TIOGA::gpu::synchronize();
+
+  TIOGA::gpu::pull_from_device(
+    m_info->iblank_node.hptr, m_info->iblank_node.dptr, sizeof(int)*nnodes);
+#else
+  for(i=0;i<nnodes;i++) iblank[i]=1;
 #endif
   //
   // find oriented bounding boxes
@@ -1533,13 +1549,19 @@ void MeshBlock::pushInterpListsToDevice(void)
     }
 
   interpList_wcft[ninterpg]=wptr;
-      
-  dMB->pushInterpListsToDevice(ninterpg,nweightsg,
-			       interpList_wcft,
-			       interpList_inode,
-			       interpList_weights);
 
+  if (interpList_wcft_d) TIOGA_FREE_DEVICE(interpList_wcft_d);
+  if (interpList_inode_d) TIOGA_FREE_DEVICE(interpList_inode_d);
+  if (interpList_weights_d) TIOGA_FREE_DEVICE(interpList_weights_d);
 
+  interpList_wcft_d = TIOGA::gpu::push_to_device<int>(interpList_wcft,
+    sizeof(int)*(ninterpg+1));
+  interpList_inode_d = TIOGA::gpu::push_to_device<int>(interpList_inode,
+    sizeof(int)*nweightsg);
+  interpList_weights_d = TIOGA::gpu::push_to_device<double>(interpList_weights,
+    sizeof(double)*nweightsg);
+
+  // delete host memory
   delete [] interpList_wcft;
   delete [] interpList_inode;
   delete [] interpList_weights;

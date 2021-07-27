@@ -19,6 +19,8 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "codetypes.h"
 #include "MeshBlock.h"
+#include "gpu_global_functions_mb.h"
+
 #include <string.h>
 
 #define ROW 0
@@ -135,7 +137,27 @@ void MeshBlock::updateSolnData(int inode,double *qvar,double *q)
 void MeshBlock::updateSolnDataDevice()
 {
 #ifdef TIOGA_HAS_GPU
-  dMB->updateSolution(q_fringe_ind, q_fringe, m_info);
+  int num_updates = q_fringe_ind.size();
+  int block_size = 128;
+  int n_blocks = num_updates/block_size + (num_updates%block_size == 0 ? 0:1);
+
+  // create gpu memory
+  int* fringe_ind_d =
+      TIOGA::gpu::push_to_device<int>(q_fringe_ind.data(), sizeof(int)*num_updates);
+  double* fringe_val_d =
+      TIOGA::gpu::push_to_device<double>(q_fringe.data(), sizeof(double)*num_updates);
+
+  TIOGA_GPU_LAUNCH_FUNC(g_update_sol, n_blocks, block_size, 0, 0,
+                        num_updates,
+                        fringe_ind_d,
+                        fringe_val_d,
+                        m_info_device);
+
+  TIOGA::gpu::synchronize();
+
+  // clear GPU memory
+  TIOGA_FREE_DEVICE(fringe_ind_d);
+  TIOGA_FREE_DEVICE(fringe_val_d);
 
   // clear fringe solution related vectors
   q_fringe_ind.clear();

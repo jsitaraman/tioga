@@ -54,8 +54,6 @@ CartGrid::~CartGrid()
 
   if (lcount) TIOGA_FREE(lcount);
   if (dxlvl) TIOGA_FREE(dxlvl);
-
-  if (m_info_device != nullptr) TIOGA_FREE_DEVICE(m_info_device);
 };
 
 void CartGrid::registerData(TIOGA::AMRMeshInfo* minfo)
@@ -74,12 +72,6 @@ void CartGrid::registerData(TIOGA::AMRMeshInfo* minfo)
   xlo = minfo->xlo.hptr;
   dx = minfo->dx.hptr;
   nf = minfo->num_ghost;
-
-  if (m_info_device == nullptr) {
-    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::AMRMeshInfo>(
-      sizeof(TIOGA::AMRMeshInfo));
-  }
-  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::AMRMeshInfo));
 }
 
 void CartGrid::registerData(int nfin,int *idata,double *rdata,int ngridsin)
@@ -251,12 +243,6 @@ void CartGrid::create_mesh_info()
     [iproc](int x, int y) -> int { return x + ((iproc == y) ? 1 : 0); });
 
   m_info->ngrids_local = nplocal;
-
-  if (m_info_device == nullptr) {
-    m_info_device = TIOGA::gpu::allocate_on_device<TIOGA::AMRMeshInfo>(
-      sizeof(TIOGA::AMRMeshInfo));
-  }
-  TIOGA::gpu::copy_to_device(m_info_device, m_info, sizeof(TIOGA::AMRMeshInfo));
 
   own_data_ptrs = true;
   own_amr_mesh_info = true;

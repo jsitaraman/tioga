@@ -41,7 +41,6 @@ class CartGrid
 
  public :
   TIOGA::AMRMeshInfo* m_info{nullptr};
-  TIOGA::AMRMeshInfo* m_info_device{nullptr};
 
   int *global_id{nullptr};
   int *level_num{nullptr};

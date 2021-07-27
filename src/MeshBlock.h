@@ -27,7 +27,6 @@
 #include "codetypes.h"
 #include "ADT.h"
 #include "TiogaMeshInfo.h"
-#include "dMeshBlock.h"
 
 // forward declare to instantiate one of the methods
 class parallelComm;
@@ -48,11 +47,6 @@ class MeshBlock
    *  application.
    */
   TIOGA::MeshBlockInfo* m_info{nullptr};
-
-  std::unique_ptr<TIOGA::dMeshBlock> dMB;
-   
-  //TIOGA::dMeshBlock *dMB; /** device instance of mesh block with device specific methods */
-
 
   int nnodes;  /** < number of grid nodes */
   int ncells;  /** < total number of cells */
@@ -165,6 +159,16 @@ class MeshBlock
 
   std::vector<int> q_fringe_ind; /** < index of fringe point q in full solution array*/
   std::vector<double> q_fringe; /** < solution for this block's fringe points */
+
+  // device member variables
+  /** Device copy of the mesh block info registered by the application code
+   *
+   *  This pointer is owned by MeshBlock
+   */
+  TIOGA::MeshBlockInfo* m_info_device{nullptr};
+  int *interpList_wcft_d{nullptr};
+  int *interpList_inode_d{nullptr};
+  double *interpList_weights_d{nullptr};
 
   //
   // call back functions to use p4est to search
@@ -394,9 +398,7 @@ class MeshBlock
 
   void pushInterpListsToDevice(void);
 
-  void set_sol_on_device() {
-    dMB->update_minfo_device(m_info);
-  }
+  void update_minfo_device();
 };
 
 #endif /* MESHBLOCK_H */

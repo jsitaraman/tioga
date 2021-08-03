@@ -130,7 +130,7 @@ void tioga::register_unstructured_solution()
     qblock[iblk] = minfo->qnode.hptr;
     mblocks[iblk]->num_var() = minfo->num_vars;
 #ifdef TIOGA_HAS_GPU
-    mblocks[iblk]->set_sol_on_device();
+    mblocks[iblk]->update_minfo_device();
 #endif
   }
 }

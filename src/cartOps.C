@@ -19,7 +19,10 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "codetypes.h"
 #include "MeshBlock.h"
+#include "gpu_global_functions_mb.h"
+
 #include <assert.h>
+
 #define ROW 0
 #define COLUMN 1
 
@@ -453,9 +456,27 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 	    }
 	}
     }
+
 #ifdef TIOGA_HAS_GPU
-  dMB->getInterpolatedData(&((*realData)[dcount]),nvar,m_info);
-#endif  
+  int block_size = 128;
+  int n_blocks = nvar*ninterp/block_size + ((nvar*ninterp_total_g)%block_size == 0 ? 0:1);
+
+  double *realData_d = TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp_total_g*nvar);
+
+  TIOGA_GPU_LAUNCH_FUNC(g_interp_data, n_blocks, block_size, 0, 0,
+                        interpList_wcft_d,
+                        interpList_weights_d,
+                        interpList_inode_d,
+                        ninterp_total_g,
+                        nvar,
+                        realData_d,
+                        m_info_device);
+  TIOGA::gpu::synchronize();
+
+  TIOGA::gpu::pull_from_device<double>(&((*realData)[dcount]),realData_d,sizeof(double)*ninterp_total_g*nvar);
+
+  TIOGA_FREE_DEVICE(realData_d);
+#endif
     
   if (qq) TIOGA_FREE(qq);
 }

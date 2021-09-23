@@ -702,16 +702,15 @@ void MeshBlock::getWallBounds(int *mtag,int *existWall, double wbox[6])
   int inode;
 
   *mtag=meshtag+(1-BASE); 
+  wbox[0]=wbox[1]=wbox[2]=BIGVALUE;
+  wbox[3]=wbox[4]=wbox[5]=-BIGVALUE;
+
   if (nwbc <=0) {
     *existWall=0;
-    for(i=0;i<6;i++) wbox[i]=0;
     return;
   }
 
   *existWall=1;
-  wbox[0]=wbox[1]=wbox[2]=BIGVALUE;
-  wbox[3]=wbox[4]=wbox[5]=-BIGVALUE;
-
   for(i=0;i<nwbc;i++)
     {
       inode=wbcnode[i]-BASE;

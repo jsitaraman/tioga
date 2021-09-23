@@ -459,7 +459,7 @@ void MeshBlock::getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,
 
 #ifdef TIOGA_HAS_GPU
   int block_size = 128;
-  int n_blocks = nvar*ninterp/block_size + ((nvar*ninterp_total_g)%block_size == 0 ? 0:1);
+  int n_blocks = nvar*ninterp_total_g/block_size + ((nvar*ninterp_total_g)%block_size == 0 ? 0:1);
 
   double *realData_d = TIOGA::gpu::allocate_on_device<double>(sizeof(double)*ninterp_total_g*nvar);
 

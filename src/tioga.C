@@ -998,9 +998,7 @@ void tioga::reduce_fringes(void)
 void tioga::preprocess_amr_data(int root)
 {
   assert(root < numprocs);
-  if (root == myid) {
-      assert(cg != nullptr);
-  }
+  assert(root != myid || cg != nullptr);
 
   // Only perform this step if we detect that AMR solver is NOT running on all
   // MPI ranks. The assumption is that the solver has called

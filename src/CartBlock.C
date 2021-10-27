@@ -59,13 +59,12 @@ void CartBlock::registerSolution(int lid, TIOGA::AMRMeshInfo* minfo)
 #endif
 }
 
-void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
-				    double **realData)
+void CartBlock::getInterpolatedData(
+  int *nints,int *nreals,
+  std::vector<int>& intData, std::vector<double>& realData)
 {
   int i,n;
   double *qq;
-  int *tmpint;
-  double *tmpreal;
   int icount,dcount;
   int nintold,nrealold;
   int interpCount=0;
@@ -80,35 +79,22 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
     {
       nintold=(*nints);
       nrealold=(*nreals);
-      if (nintold > 0) {
-       tmpint=(int *)malloc(sizeof(int)*3*(*nints));
-       tmpreal=(double *)malloc(sizeof(double)*(*nreals));
-       for(i=0;i<(*nints)*3;i++) tmpint[i]=(*intData)[i];
-       for(i=0;i<(*nreals);i++) tmpreal[i]=(*realData)[i];
-       //
-       TIOGA_FREE((*intData));
-       TIOGA_FREE((*realData)); // didnt free this before ??
-       //  
-      }
+
+      // resize interpolation data vectors
       (*nints)+=interpCount;
       (*nreals)+=(interpCount*(nvar_cell+nvar_node));
-      (*intData)=(int *)malloc(sizeof(int)*3*(*nints));
-      (*realData)=(double *)malloc(sizeof(double)*(*nreals));
-      if (nintold > 0) {
-       for(i=0;i<nintold*3;i++) (*intData)[i]=tmpint[i];
-       for(i=0;i<nrealold;i++) (*realData)[i]=tmpreal[i];      
-       TIOGA_FREE(tmpint);
-       TIOGA_FREE(tmpreal);
-      }
+      intData.resize(3*(*nints));
+      realData.resize(*nreals);
+
       listptr=interpList;
-      icount=3*nintold;
+      icount=3*nintold; icount=3*nintold;
       dcount=nrealold;
       qq=(double *)malloc(sizeof(double)*(nvar_cell+nvar_node));
       while(listptr!=NULL)
       {
-        (*intData)[icount++]=listptr->receptorInfo[0];
-        (*intData)[icount++]=-1-listptr->receptorInfo[2];
-        (*intData)[icount++]=listptr->receptorInfo[1];
+        intData[icount++]=listptr->receptorInfo[0];
+        intData[icount++]=-1-listptr->receptorInfo[2];
+        intData[icount++]=listptr->receptorInfo[1];
 
 #ifndef TIOGA_HAS_GPU
         for(n=0;n<(nvar_cell+nvar_node);n++) qq[n]=0; // zero out solution
@@ -133,15 +119,17 @@ void CartBlock::getInterpolatedData(int *nints,int *nreals,int **intData,
           }
         }
 
-        for(n=0;n<(nvar_cell+nvar_node);n++) (*realData)[dcount++]=qq[n]; // update solution
+        for(n=0;n<(nvar_cell+nvar_node);n++) realData[dcount++]=qq[n]; // update solution
 #endif
 
         listptr=listptr->next;
       }
+
 #ifdef TIOGA_HAS_GPU
-      getInterpolatedDataDevice(&((*realData)[dcount]),nvar_cell,nvar_node);
+      getInterpolatedDataDevice(&((realData.data())[dcount]),nvar_cell,nvar_node);
 #endif
-      TIOGA_FREE(qq);
+
+      if (qq) TIOGA_FREE(qq);
     }
 }
 

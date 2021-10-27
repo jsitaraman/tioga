@@ -243,7 +243,10 @@ class MeshBlock
   void getInterpolatedSolution(int *nints,int *nreals,int **intData,double **realData,double *q,
 			       int nvar, int interptype);
 
-  void getInterpolatedSolutionAMR(int *nints,int *nreals,int **intData,double **realData,double *q,int *);
+  void getInterpolatedSolutionAMR(
+    int *nints,int *nreals,
+    std::vector<int>&, std::vector<double>&,
+    double *q,int *);
   
   void checkContainment(int *cellIndex,int adtElement,double *xsearch);
 

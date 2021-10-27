@@ -92,8 +92,9 @@ class CartBlock
   int num_cell_var() const { return nvar_cell; }
   int num_node_var() const { return nvar_node; }
   void preprocess(CartGrid *cg);
-  void getInterpolatedData(int *nints,int *nreals,int **intData,
-			   double **realData);
+  void getInterpolatedData(
+    int *nints,int *nreals,
+    std::vector<int>&, std::vector<double>&);
   void  pushInterpListsToDevice(void);
   void getInterpolatedDataDevice(double *realData,int nvar_cell,int nvar_node);
   void assembleFringeSolution(double *qval,int index);

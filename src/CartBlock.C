@@ -87,7 +87,7 @@ void CartBlock::getInterpolatedData(
       realData.resize(*nreals);
 
       listptr=interpList;
-      icount=3*nintold; icount=3*nintold;
+      icount=3*nintold;
       dcount=nrealold;
       qq=(double *)malloc(sizeof(double)*(nvar_cell+nvar_node));
       while(listptr!=NULL)

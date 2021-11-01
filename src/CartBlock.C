@@ -126,7 +126,7 @@ void CartBlock::getInterpolatedData(
       }
 
 #ifdef TIOGA_HAS_GPU
-      getInterpolatedDataDevice(&((realData.data())[dcount]),nvar_cell,nvar_node);
+      getInterpolatedDataDevice(realData.data() + dcount,nvar_cell,nvar_node);
 #endif
 
       if (qq) TIOGA_FREE(qq);

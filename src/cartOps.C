@@ -458,7 +458,7 @@ void MeshBlock::getInterpolatedSolutionAMR(
                         m_info_device);
   TIOGA::gpu::synchronize();
 
-  TIOGA::gpu::pull_from_device<double>(&((realData.data())[dcount]),realData_d,sizeof(double)*ninterp_total_g*nvar);
+  TIOGA::gpu::pull_from_device<double>(realData.data() + dcount, realData_d, sizeof(double)*ninterp_total_g*nvar);
 
   TIOGA_FREE_DEVICE(realData_d);
 #endif

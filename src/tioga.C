@@ -21,6 +21,7 @@
 #include "tioga.h"
 #include <assert.h>
 #include <vector>
+#include <iostream>
 
 using namespace TIOGA;
 /**
@@ -283,8 +284,6 @@ void tioga::dataUpdate_AMR()
   int i,j,k,m;
   int nints;
   int nreals;
-  int *integerRecords;
-  double *realRecords;
   int nsend,nrecv;
   int *sndMap,*rcvMap;
   int *sndMapNB,*rcvMapNB;
@@ -292,6 +291,8 @@ void tioga::dataUpdate_AMR()
   PACKET *sndPack,*rcvPack;
   int *icount,*dcount;
   int bid;
+  std::vector <int> integerRecords;
+  std::vector <double> realRecords;
   //
   // initialize send and recv packets
   //
@@ -301,8 +302,6 @@ void tioga::dataUpdate_AMR()
      return;
     }   
   icount=dcount=NULL;
-  integerRecords=NULL;
-  realRecords=NULL;
   //
   pc_cart->getMap(&nsend,&nrecv,&sndMap,&rcvMap);
   if (nsend==0) return;
@@ -315,8 +314,6 @@ void tioga::dataUpdate_AMR()
   //
   // get the interpolated solution now
   //
-  integerRecords=NULL;
-  realRecords=NULL;
   //
   // TODO : verify for nblocks > 1
   //
@@ -327,10 +324,11 @@ void tioga::dataUpdate_AMR()
   nints=nreals=0;
   for(int ib=0;ib<nblocks;ib++) {
    auto & mb = mblocks[ib];
-   mb->getInterpolatedSolutionAMR(&nints,&nreals,&integerRecords,&realRecords,qblock[ib],sndMapNB);
+   mb->getInterpolatedSolutionAMR(&nints,&nreals,integerRecords,realRecords,qblock[ib],sndMapNB);
   }
   for(i=0;i<ncart;i++)
-    cb[i].getInterpolatedData(&nints,&nreals,&integerRecords,&realRecords);
+    cb[i].getInterpolatedData(&nints,&nreals,integerRecords,realRecords);
+
   //
   // populate the packets
   //
@@ -361,8 +359,9 @@ void tioga::dataUpdate_AMR()
       k=integerRecords[3*i];
       sndPack[k].intData[icount[k]++]=integerRecords[3*i+1];
       sndPack[k].intData[icount[k]++]=integerRecords[3*i+2];
-      for(j=0;j<nvar;j++)
-	sndPack[k].realData[dcount[k]++]=realRecords[m++];
+      for(j=0;j<nvar;j++){
+        sndPack[k].realData[dcount[k]++]=realRecords[m++];
+      }
     }
   //
   // communicate the data across
@@ -418,8 +417,6 @@ void tioga::dataUpdate_AMR()
   pc_cart->clearPackets2(sndPack,rcvPack);
   TIOGA_FREE(sndPack);
   TIOGA_FREE(rcvPack);
-  if (integerRecords) TIOGA_FREE(integerRecords);
-  if (realRecords) TIOGA_FREE(realRecords);
   if (icount) TIOGA_FREE(icount);
   if (dcount) TIOGA_FREE(dcount);
 }

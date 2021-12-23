@@ -31,6 +31,24 @@ void buildADTrecursion(double *coord,double *adtReals,double *adtWork,int *adtIn
 
 extern void median_(int *,double *,int *,double *);
 
+void traverse(int *adtIntegers,int nodeid)
+ {
+   int d,nodeChild;
+   //ndescent[nodeid]=1;
+   adtIntegers[4*nodeid+3]=1;
+   for(d=1;d<3;d++)
+     {
+       if (adtIntegers[4*nodeid+d] > -1) {
+	 //nodeChild=adtIntegers[4*adtIntegers[4*nodeid+d]+3];
+	 nodeChild=adtIntegers[4*nodeid+d];
+	 traverse(adtIntegers,nodeChild);
+	 adtIntegers[4*nodeid+3]+=adtIntegers[4*nodeChild+3];
+	 //ndescent[nodeid]+=ndescent[nodeChild];
+       }
+     }
+}
+
+
 void ADT::buildADT(int d, int nelements,double *elementBbox)
 {
   int i,i2,j6,j,i4;
@@ -122,6 +140,15 @@ void ADT::buildADT(int d, int nelements,double *elementBbox)
       i4=4*adtIntegers[4*i];
       adtIntegers[i4+3]=i;
     }
+
+  for(i=0;i<nelem;i++) 
+    for(j=1;j<3;j++) {
+      if (adtIntegers[4*i+j] > -1) 
+	adtIntegers[4*i+j]=adtIntegers[4*adtIntegers[4*i+j]+3];
+    }
+  
+  traverse(adtIntegers,0);
+
   //for(i=0;i<nelem;i++)
   // {
   //   fprintf(fp,"%.8e %.8e %.8e %.8e %.8e %.8e\n",adtReals[6*i],adtReals[6*i+1],adtReals[6*i+2],adtReals[6*i+3],

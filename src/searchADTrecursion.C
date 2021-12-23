@@ -79,7 +79,7 @@ void searchIntersections(MeshBlock *mb,int *cellIndex,int *adtIntegers,double *a
     {
       nodeChild=adtIntegers[4*node+d];
       if (nodeChild > -1) {
-        nodeChild=adtIntegers[4*nodeChild+3];
+        //nodeChild=adtIntegers[4*nodeChild+3];
 	for(i=0;i<ndim;i++)
          {
 	  element[i]=adtReals[ndim*nodeChild+i];

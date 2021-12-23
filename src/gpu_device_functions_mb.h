@@ -6,7 +6,7 @@
 #include <cmath>
 
 #define NEQNS 3
-#define maxStackSize 2048
+#define maxStackSize 128
 #define d_fabs(a) (a > 0 ? a:-a)
 
 // leave this as pifus native for now for 
@@ -421,7 +421,7 @@ void d_searchIntersections_containment(int idx, int cellIndex[2],
       {
         nodeChild=adtIntegers[4*node+d];
         if (nodeChild > -1) {
-          nodeChild=adtIntegers[4*nodeChild+3];
+          //nodeChild=adtIntegers[4*nodeChild+3];
           for(i=0;i<ndim;i++)
           {
             element[i]=adtReals[ndim*nodeChild+i];
@@ -454,24 +454,44 @@ void d_searchIntersections_containment(int idx, int cellIndex[2],
     }
   }
   if (bruteSearch) {
-    for(node=0;node<nelem;node++)
-    {
+    node=0;
+    while(node < nelem ) {
       for(i=0;i<ndim;i++)
         element[i]=coord[ndim*(adtIntegers[4*node])+i];
-      //
       flag=1;
       for(i=0;i<ndim/2;i++)
         flag = (flag && (xsearch[i] >=element[i]-TIOGA_DEVICE_TOL));
       for(i=ndim/2;i<ndim;i++)
         flag = (flag && (xsearch[i-ndim/2] <=element[i]+TIOGA_DEVICE_TOL));
-      if (flag)
-      {
+      if (flag) {
         d_checkContainment(x,vconn,nc,nv,ntypes,elementList,
           cellIndex,adtIntegers[4*node],xsearch);
         if (cellIndex[0] > -1 && cellIndex[1]==0) return;
+	node=node+1;
+      }
+      else {
+	node=node+adtIntegers[4*node+3];
       }
     }
   }
+  /* for(node=0;node<nelem;node++) */
+  /*   { */
+  /*     for(i=0;i<ndim;i++) */
+  /*       element[i]=coord[ndim*(adtIntegers[4*node])+i]; */
+  /*     // */
+  /*     flag=1; */
+  /*     for(i=0;i<ndim/2;i++) */
+  /*       flag = (flag && (xsearch[i] >=element[i]-TIOGA_DEVICE_TOL)); */
+  /*     for(i=ndim/2;i<ndim;i++) */
+  /*       flag = (flag && (xsearch[i-ndim/2] <=element[i]+TIOGA_DEVICE_TOL)); */
+  /*     if (flag) */
+  /*     { */
+  /*       d_checkContainment(x,vconn,nc,nv,ntypes,elementList, */
+  /*         cellIndex,adtIntegers[4*node],xsearch); */
+  /*       if (cellIndex[0] > -1 && cellIndex[1]==0) return; */
+  /*     } */
+  /*   } */
+  /* } */
   return;
 }
 

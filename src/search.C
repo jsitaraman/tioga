@@ -240,10 +240,12 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   // create a unique hash
   //
+#ifdef TIOGA_ENABLE_UNIQUEID
 #ifdef TIOGA_HAS_NODEGID
   uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
 #else
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
+#endif
 #endif
   //
 #ifdef TIOGA_HAS_GPU
@@ -280,13 +282,22 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
    TIOGA_FREE_DEVICE(donorId_d);
    TIOGA_FREE_DEVICE(xsearch_d);
 
-  for(i=0;i<nsearch;i++) donorId[i]=donorId[xtag[i]];
+  for(i=0;i<nsearch;i++) {
+#ifndef TIOGA_ENABLE_UNIQUEID
+      xtag[i]=i;
+#endif
+      donorId[i]=donorId[xtag[i]];
+  }
+  }
 #else
   donorCount=0;
   ipoint=0; 
   dId=(int *) malloc(sizeof(int) *2);
   for(i=0;i<nsearch;i++)
     {
+#ifndef TIOGA_ENABLE_UNIQUEID
+      xtag[i]=i;
+#endif
      if (xtag[i]==i) {
 	//adt->searchADT(this,&(donorId[i]),&(xsearch[3*i]));
 	adt->searchADT(this,dId,&(xsearch[3*i]));

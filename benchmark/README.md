@@ -68,9 +68,13 @@ face shared by two cells is legitimately ambiguous and is counted as benign.
 GH200 120GB (sm_90) / 72-core Grace, CUDA 12.9, nvhpc 25.7, `-O3`, single
 rank, best of 3 reps. All times in milliseconds.
 
-**Real mismatches across the entire sweep: 0.** (One benign mismatch out of
-50,000 appeared in the mixed hex/prism mesh — a point on a shared face where
-both answers are valid donors.)
+**The GPU never returned a wrong donor.** Two differences turned up across
+~100 configurations:
+
+- 1 in 50,000 (mixed hex/prism): both donors valid, point on a shared face.
+- 1 in 4,000,000 (13,824-cell hex, `results/shmoo.csv`): the *CPU* returned -1
+  where the GPU returned a cell the independent check confirms contains the
+  point. A miss in `search()`, not in the port. Flagged, not investigated.
 
 ### Growing block, fixed 100k query points
 

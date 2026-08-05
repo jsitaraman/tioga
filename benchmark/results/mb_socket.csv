@@ -1,0 +1,4 @@
+nblocks,nx,nq,ranks,cpu_1core_Mqps,cpu_socket_Mqps,cpu_efficiency,gpu_Mqps,gpu_cached_Mqps,gpu_vs_socket,gpu_cached_vs_socket
+64,16,2000,72,0.5391,37.5581,0.968,2.3126,5.5629,0.06,0.15
+256,16,2000,72,0.5381,37.5294,0.969,2.2710,5.4899,0.06,0.15
+1024,16,2000,72,0.5392,37.1360,0.957,2.2129,5.4003,0.06,0.15

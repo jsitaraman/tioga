@@ -1,0 +1,3 @@
+mode,ranks,nblocks,nx,nq,cpu_Mqps,gpu_rebuild_Mqps,gpu_cached_Mqps,gpu_rebuild_vs_cpu,gpu_cached_vs_cpu
+with-dedup,72,64,16,2000,37.39,23.12,212.25,0.62,5.68
+--skip-dedup,72,64,16,2000,37.82,24.18,382.28,0.64,10.11

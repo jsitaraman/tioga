@@ -5,3 +5,11 @@ target_link_libraries(bench_search.exe tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 
 install(TARGETS bench_search.exe
   RUNTIME DESTINATION bin)
+
+add_executable(bench_multiblock.exe bench_multiblock.C)
+target_include_directories(bench_multiblock.exe PRIVATE
+  ${CMAKE_SOURCE_DIR}/src ${MPI_CXX_INCLUDE_DIRS})
+target_link_libraries(bench_multiblock.exe tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+
+install(TARGETS bench_multiblock.exe
+  RUNTIME DESTINATION bin)

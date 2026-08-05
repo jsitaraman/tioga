@@ -320,13 +320,71 @@ re-uploaded, 67× if the mesh stays resident on the device.** Two caveats:
 - One CUDA context per rank is the wrong architecture anyway. One rank owning the
   GPU with many blocks in a single context is right, and I have **not** measured it.
 
+### Many blocks per rank, one CUDA context per GPU (the production shape)
+
+Everything above measures one large block. A real run gives each rank many
+small blocks -- **16^3 active cells is typical** -- and calls `search()` on each
+once per connectivity update. `benchmark/bench_multiblock.C` runs N blocks in a
+single process, so there is exactly one CUDA context, each block keeping its own
+device state and stream.
+
+Per-block cost, cached path, 16^3 blocks with 2,000 receptor points each:
+
+| blocks/rank | cached us/block | of which traversal | fixed overhead | traversal share |
+|---|---|---|---|---|
+| 1 | 58.0 | 32.0 | 26.0 | 55 % |
+| 64 | 66.7 | 33.8 | 32.9 | 51 % |
+| 1024 | 73.1 | 34.0 | 39.1 | 46 % |
+
+Scaling in block count is linear -- 1024 blocks in one context show no
+degradation -- but **the per-block cost is essentially all latency**. 2,000
+query points is under a microsecond of actual traversal at the ~2 G/s the
+kernel reaches when saturated; the 34 us attributed to traversal is kernel
+launch plus stream synchronise, and the other ~33 us is the query upload,
+result download and two more syncs. Against the rate a single saturated launch
+achieves (285 M q/s), the measured per-block loop leaves roughly **10x on the
+table** at every block count.
+
+#### Does the GPU help a fully loaded socket?
+
+A GH200 superchip has 72 Grace cores *and* one Hopper GPU, so the question is
+not "1 core + GPU vs 72 cores" -- it is whether adding the GPU to a socket that
+is already busy helps. 72 ranks, 64 blocks of 16^3 each, all sharing the one GPU
+through CUDA MPS:
+
+| | CPU only | GPU, rebuilt each call | GPU, BVH cached |
+|---|---|---|---|
+| with host dedup | 37.4 M q/s | 23.1 (**0.62x**) | 212 (5.7x) |
+| dedup excluded | 37.8 M q/s | 24.2 (**0.64x**) | 382 (10.1x) |
+
+Two results worth stating plainly:
+
+- **On a moving mesh at 16^3 blocks the naive port is a regression.** Rebuilding
+  4,608 tiny BVHs per round (64 blocks x 72 ranks) costs more than the host
+  search it replaces. This is the pessimistic form of "moving" -- it re-uploads
+  connectivity and rebuilds from scratch, where a real deforming mesh would
+  re-upload coordinates only and refit. But a per-block BVH over 4,096
+  primitives is latency-bound no matter what, so aggregation across blocks
+  matters more here than refit.
+- **On a static mesh the GPU is worth 5.7x**, or 10.1x once the host dedup is
+  out of the way.
+
+Block size dominates this. The same MPS experiment on one 1.4M-cell block per
+rank gave 6.5x rebuilt / 67x cached; at 16^3 blocks it is 0.62x / 5.7x. The
+earlier single-block numbers in this document should not be read as predictions
+for the production configuration.
+
 ---
 
 ## Conclusions
 
-1. **The search itself is comprehensively GPU-friendly.** Traversal plus exact
-   containment reaches ~2.1 G point-locations/s, against ~0.36 M/s per core and
-   ~21 M/s for a full 72-core socket. Correctness is exact.
+1. **The search itself is comprehensively GPU-friendly** *when the GPU is given
+   enough work per launch*. Traversal plus exact containment reaches ~2.1 G
+   point-locations/s, against ~0.36 M/s per core. Correctness is exact.
+   But at the production block size (16^3) the per-block launch and
+   synchronisation latency dominates, and one CUDA context per GPU with a
+   per-block loop delivers 0.62x-5.7x against a fully loaded 72-core socket --
+   not the 6.5x-67x the single-block measurements suggest.
 2. **Caching the acceleration structure is worth more than the traversal speedup**
    for a static or slowly-deforming mesh: 6.5× → 67× at socket scale. Rebuilding
    an ADT every call is the single largest structural cost in the host version.
@@ -347,8 +405,12 @@ re-uploaded, 67× if the mesh stays resident on the device.** Two caveats:
    is Amdahl-limited until this is done.
 2. Keep the mesh device-resident across timesteps and use `cuBQL::cuda::refit`
    for deformation instead of re-uploading and rebuilding.
-3. One BVH per rank aggregating many mesh blocks, one CUDA context per GPU. This
-   is the configuration a production run would actually use and it is unmeasured.
+3. **Batch across blocks.** Measured: the per-block loop is ~10x off the rate a
+   saturated launch achieves, at every block count from 1 to 1024. One BVH per
+   rank over all its blocks, one query upload, one kernel, one sync, one
+   download -- instead of the current per-block round trip. This is the single
+   largest remaining item for the production shape, and it is what turns the
+   moving-mesh case from a regression into a win.
 4. Temporal coherence: test the previous donor and its neighbours before falling
    back to the BVH. For moving overset meshes this can make most searches O(1).
 

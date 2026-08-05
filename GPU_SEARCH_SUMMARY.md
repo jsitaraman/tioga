@@ -203,6 +203,25 @@ slowly than the host. Both GPU columns rise steeply with query count at small
 `nq`, where fixed per-call overhead dominates and the GPU is starved.
 
 
+#### Scaling the CPU column to a socket
+
+The table is one core. Parallel efficiency across 72 cores is **not** constant --
+measured with N pinned concurrent processes, `--skip-dedup`:
+
+| block | 1 core | 72 cores | speedup | efficiency |
+|---|---|---|---|---|
+| 4,096 cells / 1M queries | 1.35 M q/s | 90.8 M q/s | 67.2x | 93 % |
+| 262,144 cells / 500k queries | 0.36 | 21.0 | 58.2x | 81 % |
+| 1,404,928 cells / 1M queries | 0.28 | 12.3 | 44.0x | 61 % |
+
+Small blocks fit in cache and scale nearly perfectly; a 1.4M-cell block is
+memory-bound and loses a third of its scaling. This measures 72 *copies* of the
+same mesh, so footprint scales with rank count -- the pessimistic end. A real
+MPI run partitions the mesh, so each of 72 ranks holds ~1/72 the cells, which is
+the high-efficiency regime, and the ADT build shrinks superlinearly with
+per-rank cell count. Use ~90 % for small per-rank blocks, ~60 % for million-cell
+blocks.
+
 ### Where the time goes
 
 Two representative cases, single core / single GPU:

@@ -129,6 +129,20 @@ typedef struct INTEGERLIST
   struct INTEGERLIST *next;
 } INTEGERLIST;
 
+/* Phase-by-phase breakdown of one MeshBlock::search()/search_gpu() call.
+   All times are wall-clock seconds; fields that do not apply to a given
+   backend are left at zero. */
+typedef struct SEARCHTIMERS
+{
+  double total;        /* whole call                                        */
+  double filter;       /* CPU: query OBB + all-cell overlap scan + cand bbox */
+  double build;        /* CPU: buildADT.  GPU: cell AABB kernel + cuBQL build*/
+  double dedup;        /* duplicate query point detection (host, both)       */
+  double query;        /* CPU: searchADT loop.  GPU: traversal kernel        */
+  double transfer;     /* GPU only: H2D mesh/query upload + D2H donorId      */
+  int    candidates;   /* number of cells the acceleration structure holds   */
+} SEARCHTIMERS;
+
 typedef struct INTEGERLIST2
 {
   int intDataSize,realDataSize;

@@ -13,6 +13,9 @@
 // forward declare to instantiate one of the methods
 class parallelComm;
 class CartGrid;
+/* opaque handle for the persistent device-side state used by
+   MeshBlock::search_gpu(); defined in searchGPU.cu */
+struct TiogaGpuSearchData;
 
 /**
  * MeshBlock class - container and functions for generic unstructured grid partition in 3D
@@ -117,6 +120,27 @@ class MeshBlock
   std::vector<uint64_t> gid_search; /**< Global node ID for the query points */
   int donorCount;
   int myid;
+  //
+  // per-call phase breakdown, filled by both search() and search_gpu()
+  //
+  SEARCHTIMERS searchTimers;
+  //
+  // state/knobs for the cuBQL based GPU search
+  //
+  TiogaGpuSearchData *gpuData; /** < persistent device state (opaque)        */
+  int gpuMeshDirty;            /** < 1 => re-upload mesh and rebuild the BVH */
+  int gpuLeafSize;             /** < cuBQL makeLeafThreshold (0 = default)   */
+  int gpuBuilderType;          /** < 0=gpuBuilder(spatial median) 1=radix
+                                     2=rebinRadix 3=SAH                      */
+  int gpuEarlyExit;            /** < 1 => stop at first accepted donor (as
+                                     the ADT does), 0 => scan all candidates
+                                     and keep the lowest cell id             */
+  int gpuSkipDedup;            /** < 1 => skip the host duplicate-query-point
+                                     pass. The GPU searches every point
+                                     regardless, so donorId is unaffected,
+                                     but xtag/res_search are then NOT set up
+                                     for the downstream donor exchange. For
+                                     measuring the search itself.            */
   double *cellRes;  /** < resolution for each cell */
   int ntotalPoints;        /**  total number of extra points to interpolate */
   int ihigh;
@@ -160,6 +184,14 @@ class MeshBlock
     invmap = NULL;
     icft   = NULL;
     mapmask= NULL;
+
+    gpuData=NULL;
+    gpuMeshDirty=1;
+    gpuLeafSize=0;
+    gpuBuilderType=0;
+    gpuEarlyExit=1;
+    gpuSkipDedup=0;
+    searchTimers=SEARCHTIMERS();
   };
 
   /** basic destructor */
@@ -183,6 +215,22 @@ class MeshBlock
 	       
   void search();
   void search_uniform_hex();
+
+  /** GPU (cuBQL BVH) alternative to search()
+   *
+   *  Produces the same donorId[]/donorCount/xtag[] outputs as search().
+   *  Returns 0 on success, non-zero if the library was built without CUDA
+   *  support, in which case nothing is written.
+   *
+   *  Unlike search(), this does not pre-filter cells against the query-cloud
+   *  OBB; it builds a BVH over all cells of the block. Set gpuMeshDirty=1
+   *  whenever x[] or the connectivity changes so the device copy and BVH are
+   *  rebuilt (it is set for you by setData()).
+   */
+  int search_gpu();
+
+  /** release device memory held for search_gpu() */
+  void freeGpuSearchData();
   void writeOBB(int bid);
 
   void writeOBB2(OBB *obc,int bid);

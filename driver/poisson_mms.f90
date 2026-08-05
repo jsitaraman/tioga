@@ -20,6 +20,7 @@ program poissonMMS
   type(grid), target :: gr(mgrids)
   type(grid), pointer :: g
   !
+  integer, external :: iargc
   integer :: myid,numprocs,ierr
   integer :: ib,iter,ngrids,irefine,nref,ndof,ntypes,nv2,i,jmax,jmax2
   integer :: mexclude,nfringe

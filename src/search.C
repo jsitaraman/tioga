@@ -6,6 +6,15 @@
 #include "MeshBlock.h"
 #include <unordered_map>
 #include <iostream>
+#include <time.h>
+
+/* monotonic wall clock, used for the per-phase search breakdown */
+static inline double search_wtime(void)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC,&ts);
+  return (double)ts.tv_sec + 1.0e-9*(double)ts.tv_nsec;
+}
 
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
@@ -75,22 +84,27 @@ void MeshBlock::search(void)
   double xmin[3];
   double xmax[3];
   int *dId;
+  double t0,t1;
   //
-  // form the bounding box of the 
+  searchTimers=SEARCHTIMERS();
+  t0=search_wtime();
+  //
+  // form the bounding box of the
   // query points
   //
   if (nsearch == 0) {
     donorCount=0;
     return;
   }
- 
+
   if (uniform_hex) {
     search_uniform_hex();
+    searchTimers.total=search_wtime()-t0;
     return;
   }
 
   obq=(OBB *) malloc(sizeof(OBB));
-  
+
 findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 
 
@@ -205,7 +219,11 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   // build the ADT now
   //
-  if (adt) 
+  t1=search_wtime();
+  searchTimers.filter=t1-t0;
+  searchTimers.candidates=cell_count;
+  //
+  if (adt)
    {
     adt->clearData();
    }
@@ -216,6 +234,9 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   ndim=6;
   //
   adt->buildADT(ndim,cell_count,elementBbox);
+  //
+  searchTimers.build=search_wtime()-t1;
+  t1=search_wtime();
   //
   if (donorId) TIOGA_FREE(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
@@ -230,8 +251,11 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
 #endif
   //
+  searchTimers.dedup=search_wtime()-t1;
+  t1=search_wtime();
+  //
   donorCount=0;
-  ipoint=0; 
+  ipoint=0;
   dId=(int *) malloc(sizeof(int) *2);
   for(i=0;i<nsearch;i++)
     {
@@ -248,9 +272,11 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	}
        ipoint+=3;
      }
+  searchTimers.query=search_wtime()-t1;
   TIOGA_FREE(dId);
   TIOGA_FREE(icell);
   TIOGA_FREE(obq);
+  searchTimers.total=search_wtime()-t0;
 }
 
 void MeshBlock::search_uniform_hex(void)

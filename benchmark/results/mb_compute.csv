@@ -21,3 +21,13 @@ gpu_compute_static_cached,0.0052,1757.4,3011,42.8
 gpu_compute_plus_hostwork_moving,0.0400,230.2,394,5.6
 gpu_compute_plus_hostwork_static,0.0359,256.6,440,6.2
 gpu_end_to_end_moving_incl_transfer,0.1009,91.3,156,2.2
+# Duplicate-rate sensitivity of the compute comparison (bench_search, 32^3,
+# 400k points). The CPU query loop skips duplicates via xtag; the GPU searches
+# every point. CPU compute breakdown under 72-way load: filter 5.8%, ADT build
+# 51.8% (no discount), walk 42.4% (scales as 1-d).
+# dup_fraction,cpu_query_ms,gpu_query_ms,walk_ratio,gpu_advantage_vs_socket
+# 0.0,420.7,0.200,2103,24.5
+# 0.1,368.6,0.203,1816,23.5
+# 0.2,,,,22.4
+# 0.3,291.9,0.207,1410,21.4
+# 0.5,208.9,0.206,1014,19.3

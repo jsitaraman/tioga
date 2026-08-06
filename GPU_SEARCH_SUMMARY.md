@@ -135,6 +135,15 @@ traversal kernel.
 | **GPU compute, moving mesh** | 0.0092 | **1007** | **1725×** | **24.5×** |
 | GPU compute, static mesh | 0.0052 | 1757 | 3011× | 42.8× |
 
+Neither column contains dedup: `cpu_compute` is `filter + build + query`, and
+`dedup` is timed separately on both sides. One asymmetry does remain, though —
+the CPU's *query* loop uses `xtag` to skip duplicate points, while the GPU
+searches every point. The benchmark generates no duplicates, so as measured both
+backends locate the same 9.216M points. At a real duplicate rate `d` the CPU's
+walk shrinks as `(1-d)` while its ADT build (52 % of CPU compute) does not, so
+the advantage moves only slowly: 24.5× at `d=0`, 22.4× at `d=0.2`, 19.3× at
+`d=0.5`.
+
 **No host round-trip inside TIOGA's compute chain** — cell-AABB kernel → refit →
 traversal is one dependent chain on one stream. cuBQL's *builders* do round-trip
 (`sm_builder` and `radixBuilder` D2H the build state and event-sync before every
@@ -236,6 +245,8 @@ sort-by-key with no tolerance matching.
 - The moving-mesh timings re-send coordinates and refit, but those coordinates
   are unchanged, so BVH quality decay under sustained motion is **not**
   captured. Refit correctness under displacement *is* tested (`--move`).
+- The compute comparison is at 0 % duplicate receptor points. A real duplicate
+  rate discounts the CPU walk but not the ADT build; see §4.
 - CPU parallel efficiency is not constant: 93 % for a 4k-cell block, 61 % for a
   1.4M-cell block. The 72-core baseline here replicates the mesh per rank, the
   pessimistic end; a partitioned run puts each rank in the high-efficiency

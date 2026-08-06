@@ -95,6 +95,12 @@ static void usage(const char *p)
     "  --builder N     0=spatial median 1=radix 2=rebin 3=SAH      [1]\n"
     "  --skip-dedup    GPU skips the host duplicate-point pass\n"
     "  --batch         one BVH per rank over all blocks, one launch\n"
+    "  --moving        emulate a moving mesh: coordinates re-sent and the\n"
+    "                  BVH refit each call, connectivity left resident\n"
+    "  --no-refit      on --moving, rebuild the BVH instead of refitting\n"
+    "  --move F        displace every node by F cell-widths once, before the\n"
+    "                  timed phases, so refit runs on coordinates the tree\n"
+    "                  was not built for (correctness check)          [0]\n"
     "  --cpu-only      skip the GPU run\n"
     "  --gpu-only      skip the CPU run (no donor cross-check)\n"
     "  --barrier DIR   shared dir for the cross-rank barrier\n"
@@ -111,13 +117,19 @@ static const char *CSV_HEADER =
   "donors_cpu,donors_gpu,mismatch,mismatch_real,"
   "speedup_total,speedup_cached,"
   "cpu_Mqps,gpu_Mqps,gpu_cached_Mqps,us_per_block_cached,"
-  "reps,cpu_window,gpu_window,gpu_cached_window";
+  "reps,cpu_window,gpu_window,gpu_cached_window,"
+  "cpu_compute,gpu_compute,gpu_compute_cached,"
+  "cpu_compute_Mqps,gpu_compute_Mqps,gpu_compute_cached_Mqps,"
+  "speedup_compute,speedup_compute_cached,"
+  "gpu_hostwork,gpu_compute_plus_hostwork,gpu_compute_plus_hostwork_cached,"
+  "speedup_compute_plus_hostwork";
 
 int main(int argc, char **argv)
 {
   int nblocks = 64, nx = 16, nq = 2000, reps = 3, builder = 1;
-  int cpuOnly = 0, gpuOnly = 0, verbose = 0, eltype = EL_HEX, skipDedup = 0, batch = 0;
-  double qfrac = 1.0, perturb = 0.15, overlap = 0.0;
+  int cpuOnly = 0, gpuOnly = 0, verbose = 0, moving = 0, refit = 1;
+  int eltype = EL_HEX, skipDedup = 0, batch = 0;
+  double qfrac = 1.0, perturb = 0.15, overlap = 0.0, moveBy = 0.0;
   uint64_t seed = 12345;
 
   for (int a = 1; a < argc; a++) {
@@ -140,6 +152,9 @@ int main(int argc, char **argv)
     }
     else if (!strcmp(argv[a],"--skip-dedup")) skipDedup = 1;
     else if (!strcmp(argv[a],"--batch"))      batch = 1;
+    else if (!strcmp(argv[a],"--moving"))    moving = 1;
+    else if (!strcmp(argv[a],"--no-refit"))  refit = 0;
+    else if (!strcmp(argv[a],"--move") && a+1 < argc) moveBy = atof(argv[++a]);
     else if (!strcmp(argv[a],"--cpu-only"))   cpuOnly = 1;
     else if (!strcmp(argv[a],"--gpu-only"))   gpuOnly = 1;
     else if (!strcmp(argv[a],"--barrier") && a+1 < argc) g_barrierDir = argv[++a];
@@ -170,8 +185,23 @@ int main(int argc, char **argv)
     blk[b].mb->preprocess();
     blk[b].mb->gpuBuilderType = builder;
     blk[b].mb->gpuSkipDedup   = skipDedup;
+    blk[b].mb->gpuRefit       = refit;
   }
   double tsetup = wtime() - tb;
+
+  /* Displace the mesh once, before anything is searched, so that the CPU
+     reference and the GPU both see the moved configuration -- but the GPU's
+     BVH gets built on it and then refit against it, which is what a real
+     moving-mesh step does. */
+  if (moveBy != 0.0) {
+    const double d = moveBy / nx;
+    for (int b = 0; b < nblocks; b++)
+      for (int i = 0; i < blk[b].mesh.nnodes; i++) {
+        blk[b].mesh.x[3*i+0] += d;
+        blk[b].mesh.x[3*i+1] += 0.5*d;
+        blk[b].mesh.x[3*i+2] -= 0.25*d;
+      }
+  }
 
   std::vector<MeshBlock *> mbs(nblocks);
   for (int b = 0; b < nblocks; b++) mbs[b] = blk[b].mb;
@@ -216,6 +246,7 @@ int main(int argc, char **argv)
   double gpuBestTotal = 1e300, gpuBestCached = 1e300;
   int gpuOk = 0, donorsGpu = -1, mismatch = 0, bad = 0;
   double gpuWindow = 0.0, gpuCachedWindow = 0.0;
+  SEARCHTIMERS gpuCached; memset(&gpuCached, 0, sizeof(gpuCached));
 
   if (!cpuOnly) {
     /* warm-up: creates device state, uploads, builds */
@@ -241,7 +272,8 @@ int main(int argc, char **argv)
         double t0 = wtime();
         for (int b = 0; b < nblocks; b++) {
           attachQueries(*blk[b].mb, blk[b].xs, nq);
-          blk[b].mb->gpuMeshDirty = 1;
+          if (moving) blk[b].mb->gpuCoordsDirty = 1;
+          else        blk[b].mb->gpuMeshDirty   = 1;
         }
         if (batch) {
           MeshBlock::search_gpu_batch(mbs.data(), nblocks, &acc);
@@ -251,6 +283,7 @@ int main(int argc, char **argv)
             const SEARCHTIMERS &t = blk[b].mb->searchTimers;
             acc.transfer += t.transfer; acc.build += t.build;
             acc.dedup    += t.dedup;    acc.query += t.query;
+            acc.hostwork += t.hostwork;
           }
         }
         acc.total = wtime() - t0;
@@ -264,11 +297,22 @@ int main(int argc, char **argv)
     if (gpuOk) {
       /* (b) static mesh: everything resident from the previous call */
       for (int r = 0; r < reps; r++) {
+        SEARCHTIMERS cacc; memset(&cacc, 0, sizeof(cacc));
         double t0 = wtime();
         for (int b = 0; b < nblocks; b++) attachQueries(*blk[b].mb, blk[b].xs, nq);
-        if (batch) MeshBlock::search_gpu_batch(mbs.data(), nblocks, NULL);
-        else for (int b = 0; b < nblocks; b++) blk[b].mb->search_gpu();
-        gpuBestCached = std::min(gpuBestCached, wtime() - t0);
+        if (batch) {
+          MeshBlock::search_gpu_batch(mbs.data(), nblocks, &cacc);
+        } else {
+          for (int b = 0; b < nblocks; b++) {
+            blk[b].mb->search_gpu();
+            const SEARCHTIMERS &t = blk[b].mb->searchTimers;
+            cacc.transfer += t.transfer; cacc.build += t.build;
+            cacc.dedup    += t.dedup;    cacc.query += t.query;
+            cacc.hostwork += t.hostwork;
+          }
+        }
+        double el = wtime() - t0;
+        if (el < gpuBestCached) { gpuBestCached = el; gpuCached = cacc; }
       }
     }
     gpuCachedWindow = wtime() - gpucW0;
@@ -294,6 +338,23 @@ int main(int argc, char **argv)
   const double gpuCacMq = gpuOk ? nqTot / gpuBestCached / 1e6 : 0.0;
   const double usBlk    = gpuOk ? gpuBestCached*1e6/nblocks : 0.0;
 
+  /* Compute-only comparison: the arithmetic each backend performs, with host
+     <-> device transfers and the shared host duplicate-point pass excluded on
+     both sides.
+       CPU : query-OBB filter + ADT build + tree walk + containment
+       GPU : cell-AABB kernel + BVH build/refit + traversal kernel
+     The GPU figures are wall time around the kernels including launch and
+     stream synchronise, which at these sizes is under 1 % of the total. */
+  const double cpuCompute    = cpuBest.filter + cpuBest.build + cpuBest.query;
+  const double gpuCompute    = gpuOk ? gpuBest.build   + gpuBest.query   : 0.0;
+  const double gpuComputeCac = gpuOk ? gpuCached.build + gpuCached.query : 0.0;
+  /* compute plus the host packing/unpacking that sits between the kernels */
+  const double gpuComputeHW  = gpuCompute    + (gpuOk ? gpuBest.hostwork   : 0.0);
+  const double gpuCompCacHW  = gpuComputeCac + (gpuOk ? gpuCached.hostwork : 0.0);
+  const double cpuComputeMq  = cpuCompute    > 0 ? nqTot/cpuCompute/1e6    : 0.0;
+  const double gpuComputeMq  = gpuCompute    > 0 ? nqTot/gpuCompute/1e6    : 0.0;
+  const double gpuCompCacMq  = gpuComputeCac > 0 ? nqTot/gpuComputeCac/1e6 : 0.0;
+
   if (verbose) {
     if (!gpuOnly) printf("# CPU  %8.4f s  (filter %6.4f  ADT %6.4f  dedup %6.4f  walk %6.4f)"
            "  donors %d  %.3f M q/s\n",
@@ -304,6 +365,20 @@ int main(int argc, char **argv)
              "  donors %d  %.3f M q/s\n",
              gpuBestTotal, gpuBest.transfer, gpuBest.build, gpuBest.dedup,
              gpuBest.query, donorsGpu, gpuMq);
+      printf("# + host pack/unpack between kernels: %8.4f s  =>  compute+host "
+             "%8.4f s (%.1f M q/s), cached %8.4f s (%.1f M q/s)\n",
+             gpuBest.hostwork, gpuComputeHW,
+             gpuComputeHW > 0 ? nqTot/gpuComputeHW/1e6 : 0.0,
+             gpuCompCacHW, gpuCompCacHW > 0 ? nqTot/gpuCompCacHW/1e6 : 0.0);
+      printf("# COMPUTE ONLY (no H2D/D2H, no dedup):  CPU %8.4f s (%.1f M q/s)  "
+             "GPU %8.4f s (%.1f M q/s) = %.1fx   |   GPU cached %8.4f s "
+             "(%.1f M q/s) = %.1fx\n",
+             cpuCompute, cpuComputeMq, gpuCompute, gpuComputeMq,
+             gpuCompute > 0 ? cpuCompute/gpuCompute : 0.0,
+             gpuComputeCac, gpuCompCacMq,
+             gpuComputeCac > 0 ? cpuCompute/gpuComputeCac : 0.0,
+         gpuOk ? gpuBest.hostwork : 0.0, gpuComputeHW, gpuCompCacHW,
+         gpuComputeHW > 0 ? cpuCompute/gpuComputeHW : 0.0);
       printf("# GPU cached %8.4f s  %.3f M q/s  %.1f us/block  |  "
              "speedup %.2fx / %.2fx cached  |  mismatches %d (%d real)\n",
              gpuBestCached, gpuCacMq, usBlk,
@@ -319,7 +394,11 @@ int main(int argc, char **argv)
          "%d,%d,%d,%d,"
          "%.3f,%.3f,"
          "%.4f,%.4f,%.4f,%.2f,"
-         "%d,%.6f,%.6f,%.6f\n",
+         "%d,%.6f,%.6f,%.6f,"
+         "%.6f,%.6f,%.6f,"
+         "%.4f,%.4f,%.4f,"
+         "%.3f,%.3f,"
+         "%.6f,%.6f,%.6f,%.3f\n",
          nblocks, nx, elTypeName(eltype), cellsPer, cellsTot, nq, nqTot, builder, batch,
          cpuBestTotal, cpuBest.filter, cpuBest.build, cpuBest.dedup, cpuBest.query,
          gpuOk ? gpuBestTotal : 0.0, gpuOk ? gpuBest.transfer : 0.0,
@@ -329,7 +408,13 @@ int main(int argc, char **argv)
          (gpuOk && cpuBestTotal > 0) ? cpuBestTotal/gpuBestTotal  : 0.0,
          (gpuOk && cpuBestTotal > 0) ? cpuBestTotal/gpuBestCached : 0.0,
          cpuMq, gpuMq, gpuCacMq, usBlk,
-         reps, cpuWindow, gpuWindow, gpuCachedWindow);
+         reps, cpuWindow, gpuWindow, gpuCachedWindow,
+         cpuCompute, gpuCompute, gpuComputeCac,
+         cpuComputeMq, gpuComputeMq, gpuCompCacMq,
+         gpuCompute    > 0 ? cpuCompute/gpuCompute    : 0.0,
+         gpuComputeCac > 0 ? cpuCompute/gpuComputeCac : 0.0,
+         gpuOk ? gpuBest.hostwork : 0.0, gpuComputeHW, gpuCompCacHW,
+         gpuComputeHW > 0 ? cpuCompute/gpuComputeHW : 0.0);
   fflush(stdout);
 
   MeshBlock::freeGpuBatchData();

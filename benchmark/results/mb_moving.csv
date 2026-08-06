@@ -1,0 +1,8 @@
+# Moving-mesh path: what re-uploading coordinates + refit costs versus a full
+# topology re-upload + rebuild. 4608 blocks x 16^3, one rank, batched,
+# --skip-dedup. Times in seconds.
+mode,xfer,bvh,walk,compute,total,Mqps
+full_rebuild_topology_resent,0.3486,0.0084,0.0052,0.0136,0.3855,23.9
+moving_coords_only_rebuild,0.0692,0.0084,0.0052,0.0136,0.1057,87.2
+moving_coords_only_refit,0.0689,0.0039,0.0052,0.0091,0.1008,91.4
+static_cached,0.0000,0.0000,0.0052,0.0052,0.0611,150.9

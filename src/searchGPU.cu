@@ -821,7 +821,7 @@ int MeshBlock::search_gpu_batch(MeshBlock **blocks, int nblocks,
     }
   }
 
-  int dirty = 0;
+  int dirty = 0, coordsDirty = 0;
   if (!g_batch) {
     g_batch = new TiogaGpuBatchData();
     memset(g_batch, 0, sizeof(TiogaGpuBatchData));
@@ -832,7 +832,11 @@ int MeshBlock::search_gpu_batch(MeshBlock **blocks, int nblocks,
   cudaStream_t s = g->stream;
 
   if (g->nblocks != nblocks) dirty = 1;
-  for (int b = 0; b < nblocks; b++) if (blocks[b]->gpuMeshDirty) dirty = 1;
+  for (int b = 0; b < nblocks; b++) {
+    if (blocks[b]->gpuMeshDirty)   dirty = 1;
+    if (blocks[b]->gpuCoordsDirty) coordsDirty = 1;
+  }
+  if (dirty) coordsDirty = 0;   /* a full rebuild subsumes a coordinate update */
 
   /* ---------------- build the concatenated mesh (cached) ---------------- */
   t1 = gpu_wtime();
@@ -910,12 +914,37 @@ int MeshBlock::search_gpu_batch(MeshBlock **blocks, int nblocks,
     TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
 
     free(h_x); free(h_verts); free(h_nvert); free(h_block); free(h_local); free(h_res);
+  } else if (coordsDirty) {
+    /* Moving mesh: the connectivity is unchanged, so only x[] is re-sent.
+       Each block's coordinates go straight from its own array into its slice
+       of the concatenated buffer -- no host staging, no re-walking the
+       connectivity, which is what makes a full rebuild expensive. */
+    long nodeOfs = 0;
+    for (int b = 0; b < nblocks; b++) {
+      MeshBlock *mb = blocks[b];
+      TIOGA_CUDA_CALL(cudaMemcpyAsync(g->d_x + 3*nodeOfs, mb->x,
+                                      sizeof(double)*3*mb->nnodes,
+                                      cudaMemcpyHostToDevice, s));
+      nodeOfs += mb->nnodes;
+      mb->gpuCoordsDirty = 0;
+    }
+    TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
   }
   tm.transfer = gpu_wtime() - t1;
 
   /* ---------------- one BVH over every cell (cached) ---------------- */
   t1 = gpu_wtime();
-  if (dirty || !g->bvhValid) {
+  if (coordsDirty && g->bvhValid && blocks[0]->gpuRefit) {
+    /* recompute the cell AABBs for the new coordinates and refit the existing
+       tree; leaf membership is kept, only the bounds move */
+    int nb = (g->totalCells + 255)/256;
+    k_cellBoxesBatch<<<nb,256,0,s>>>(g->d_cellBox, g->d_x, g->d_cellVerts,
+                                     g->d_cellNvert, g->totalCells);
+    TIOGA_CUDA_CALL(cudaGetLastError());
+    cuBQL::cuda::refit(g->bvh, g->d_cellBox, s);
+    TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
+  } else if (dirty || coordsDirty || !g->bvhValid) {
+    if (g->bvhValid) { cuBQL::cuda::free(g->bvh, s); g->bvhValid = 0; }
     int nb = (g->totalCells + 255)/256;
     k_cellBoxesBatch<<<nb,256,0,s>>>(g->d_cellBox, g->d_x, g->d_cellVerts,
                                      g->d_cellNvert, g->totalCells);
@@ -993,10 +1022,13 @@ int MeshBlock::search_gpu_batch(MeshBlock **blocks, int nblocks,
     for (int i = 0; i < mb->nsearch; i++) h_qb[qofs+i] = b;
     qofs += mb->nsearch;
   }
+  tm.hostwork += gpu_wtime() - t1;
+  t1 = gpu_wtime();
   TIOGA_CUDA_CALL(cudaMemcpyAsync(g->d_xsearch, h_q, sizeof(double)*3*totalQ,
                                   cudaMemcpyHostToDevice, s));
   TIOGA_CUDA_CALL(cudaMemcpyAsync(g->d_qBlock, h_qb, sizeof(int)*totalQ,
                                   cudaMemcpyHostToDevice, s));
+  TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
   tm.transfer += gpu_wtime() - t1;
 
   t1 = gpu_wtime();
@@ -1016,6 +1048,8 @@ int MeshBlock::search_gpu_batch(MeshBlock **blocks, int nblocks,
   TIOGA_CUDA_CALL(cudaMemcpyAsync(h_donor, g->d_donorId, sizeof(int)*totalQ,
                                   cudaMemcpyDeviceToHost, s));
   TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
+  tm.transfer += gpu_wtime() - t1;
+  t1 = gpu_wtime();
   qofs = 0;
   for (int b = 0; b < nblocks; b++) {
     MeshBlock *mb = blocks[b];
@@ -1028,7 +1062,7 @@ int MeshBlock::search_gpu_batch(MeshBlock **blocks, int nblocks,
     qofs += mb->nsearch;
   }
   free(h_donor); free(h_q); free(h_qb);
-  tm.transfer += gpu_wtime() - t1;
+  tm.hostwork += gpu_wtime() - t1;
 
   tm.total = gpu_wtime() - t0;
   if (timers) *timers = tm;

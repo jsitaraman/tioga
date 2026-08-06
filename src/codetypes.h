@@ -139,7 +139,13 @@ typedef struct SEARCHTIMERS
   double build;        /* CPU: buildADT.  GPU: cell AABB kernel + cuBQL build*/
   double dedup;        /* duplicate query point detection (host, both)       */
   double query;        /* CPU: searchADT loop.  GPU: traversal kernel        */
-  double transfer;     /* GPU only: H2D mesh/query upload + D2H donorId      */
+  double transfer;     /* GPU only: actual H2D/D2H memcpy time                */
+  double hostwork;     /* GPU only: host-side packing/unpacking that sits on
+                          the critical path between kernels -- gathering the
+                          per-block query arrays into one buffer, scattering
+                          donorId back per block. Not a memcpy, not dedup.
+                          Real work today; would disappear if the receptor
+                          points were already device-resident.                */
   int    candidates;   /* number of cells the acceleration structure holds   */
 } SEARCHTIMERS;
 

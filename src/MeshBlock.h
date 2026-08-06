@@ -128,7 +128,19 @@ class MeshBlock
   // state/knobs for the cuBQL based GPU search
   //
   TiogaGpuSearchData *gpuData; /** < persistent device state (opaque)        */
-  int gpuMeshDirty;            /** < 1 => re-upload mesh and rebuild the BVH */
+  int gpuMeshDirty;            /** < 1 => re-upload mesh and rebuild the BVH.
+                                     Set this when the connectivity changes.  */
+  int gpuCoordsDirty;          /** < 1 => x[] moved but the connectivity did
+                                     not. Only the coordinates are re-sent,
+                                     the cell AABBs are recomputed and the BVH
+                                     is refit (or rebuilt, see gpuRefit). This
+                                     is the moving-mesh path.                 */
+  int gpuRefit;                /** < on a coordinate update: 1 = refit the
+                                     existing BVH (cheap, tree topology kept),
+                                     0 = rebuild it from scratch. Refit is
+                                     always correct; only query performance
+                                     degrades as the mesh drifts from the
+                                     configuration the tree was built for.    */
   int gpuLeafSize;             /** < cuBQL makeLeafThreshold (0 = default)   */
   int gpuBuilderType;          /** < 0=gpuBuilder(spatial median) 1=radix
                                      2=rebinRadix 3=SAH                      */
@@ -187,6 +199,8 @@ class MeshBlock
 
     gpuData=NULL;
     gpuMeshDirty=1;
+    gpuCoordsDirty=0;
+    gpuRefit=1;
     gpuLeafSize=0;
     gpuBuilderType=0;
     gpuEarlyExit=1;

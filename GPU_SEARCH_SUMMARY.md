@@ -367,6 +367,58 @@ At 64 blocks the BVH build drops from 25.1 ms to 0.6 ms (42x) and traversal from
 2.1 ms to 0.1 ms (21x). It holds up at scale: one rank owning 4,608 blocks
 (18.9M cells, 9.2M receptor points) sustains 152.6 M q/s.
 
+#### Moving mesh: coordinates only, and refit
+
+For a fluid solver where solid meshes move through an AMR background every
+timestep, the acceleration structure has to be updated every call. Two things
+make that much cheaper than a full rebuild:
+
+- **Connectivity does not move.** `gpuCoordsDirty` re-sends only `x[]`, straight
+  from each block's own array into its slice of the concatenated buffer -- no
+  host staging and no re-walking the connectivity, which is what made a full
+  rebuild expensive.
+- **`cuBQL::cuda::refit`** updates the existing tree's bounds instead of
+  rebuilding it (`gpuRefit`, default on). It is always correct -- only query
+  performance degrades as the mesh drifts from the configuration the tree was
+  built for. It also has *no* host round-trips, where the builders do.
+
+4,608 blocks of 16^3, one rank, seconds:
+
+| | xfer | BVH | walk | compute | total | M q/s |
+|---|---|---|---|---|---|---|
+| full rebuild, topology re-sent | 0.349 | 0.0084 | 0.0052 | 0.0136 | 0.386 | 23.9 |
+| moving: coords only, rebuild | 0.069 | 0.0084 | 0.0052 | 0.0136 | 0.106 | 87.2 |
+| **moving: coords only, refit** | 0.069 | 0.0039 | 0.0052 | 0.0091 | **0.101** | **91.4** |
+| static, fully cached | -- | -- | 0.0052 | 0.0052 | 0.061 | 150.9 |
+
+#### Compute versus compute
+
+Excluding host/device transfer and the shared host dedup on both sides:
+
+| | seconds | M q/s | vs 1 core | vs 72-core socket |
+|---|---|---|---|---|
+| CPU compute (filter + ADT build + walk), 1 core | 15.787 | 0.58 | 1.0x | -- |
+| CPU compute, 72-core aggregate | 0.224 | 41.1 | 70x | 1.0x |
+| **GPU compute, moving (boxes + refit + traverse)** | 0.0092 | **1007** | **1725x** | **24.5x** |
+| GPU compute, static (traverse only) | 0.0052 | 1757 | 3011x | 42.8x |
+
+**Is there any host round-trip inside the GPU compute chain?** Not in TIOGA's
+code: cell-AABB kernel -> BVH refit -> traversal kernel is a single dependent
+chain on one stream with no host work between the stages. But cuBQL's *builders*
+do round-trip -- `sm_builder` D2H-copies its node count and synchronises on an
+event before every level's split kernel, and `radixBuilder` does the same per
+level. Those are inside the `build` figures above. `cuBQL::cuda::refit` has
+none, which is part of why refit beats rebuild.
+
+There is also host work in the current implementation that sits *between* the
+kernels and is on the critical path: gathering the per-block query arrays into
+one buffer before the launch, and scattering `donorId` back per block after it
+(`SEARCHTIMERS::hostwork`). It is 30.9 ms for 9.2M points -- 3.4 ns/point,
+memory bandwidth on one core, against 1712 ns/point for the CPU search. Counting
+it, the moving case is 40.0 ms / 230 M q/s, still **5.6x a full 72-core socket**;
+it exists only because TIOGA hands receptor points over as per-block host arrays
+and would disappear once they are device-resident.
+
 #### The production comparison
 
 Same total work -- 4,608 blocks of 16^3, 18,874,368 cells, 9,216,000 receptor

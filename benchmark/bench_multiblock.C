@@ -24,6 +24,37 @@
  * Output is one CSV row per configuration; see --header.
  */
 #include "meshgen.h"
+#include <dirent.h>
+#include <unistd.h>
+
+/* Filesystem barrier across independently launched ranks.
+   Without this, ranks reach their GPU section at different times, each finds
+   an idle GPU, and "total queries / max wall time" measures N x the
+   uncontended single-rank rate rather than a sustained throughput. */
+static const char *g_barrierDir = NULL;
+static int g_nranks = 0, g_rank = 0;
+
+static void barrier(const char *tag)
+{
+  if (!g_barrierDir || g_nranks <= 1) return;
+  char f[1024];
+  snprintf(f, sizeof(f), "%s/%s.%d", g_barrierDir, tag, g_rank);
+  FILE *fp = fopen(f, "w");
+  if (fp) { fputc('x', fp); fclose(fp); }
+  const size_t tl = strlen(tag);
+  for (;;) {
+    int c = 0;
+    DIR *d = opendir(g_barrierDir);
+    if (d) {
+      struct dirent *e;
+      while ((e = readdir(d)))
+        if (!strncmp(e->d_name, tag, tl) && e->d_name[tl] == '.') c++;
+      closedir(d);
+    }
+    if (c >= g_nranks) break;
+    usleep(500);
+  }
+}
 
 struct Block
 {
@@ -56,28 +87,37 @@ static void usage(const char *p)
     "  --nq N          query points per block                      [2000]\n"
     "  --eltype T      hex | prism | tet | mixed                   [hex]\n"
     "  --qfrac F       query cloud edge as fraction of a block     [1.0]\n"
+    "  --overlap F     block lattice pitch = 1-F, so neighbouring blocks\n"
+    "                  overlap in space (exercises the per-block donor\n"
+    "                  restriction in --batch)                        [0]\n"
     "  --reps N        timed repetitions (best is reported)        [3]\n"
     "  --seed N        RNG seed                                    [12345]\n"
     "  --builder N     0=spatial median 1=radix 2=rebin 3=SAH      [1]\n"
     "  --skip-dedup    GPU skips the host duplicate-point pass\n"
+    "  --batch         one BVH per rank over all blocks, one launch\n"
     "  --cpu-only      skip the GPU run\n"
+    "  --gpu-only      skip the CPU run (no donor cross-check)\n"
+    "  --barrier DIR   shared dir for the cross-rank barrier\n"
+    "  --nranks N      number of ranks participating in the barrier\n"
+    "  --rank N        this process's rank id\n"
     "  --header        print the CSV header and exit\n"
     "  --verbose       print a human readable breakdown too\n", p);
 }
 
 static const char *CSV_HEADER =
-  "nblocks,nx,eltype,cells_per_block,cells_total,nq_per_block,nq_total,builder,"
+  "nblocks,nx,eltype,cells_per_block,cells_total,nq_per_block,nq_total,builder,batch,"
   "cpu_total,cpu_filter,cpu_build,cpu_dedup,cpu_query,"
   "gpu_total,gpu_xfer,gpu_build,gpu_dedup,gpu_query,gpu_total_cached,"
   "donors_cpu,donors_gpu,mismatch,mismatch_real,"
   "speedup_total,speedup_cached,"
-  "cpu_Mqps,gpu_Mqps,gpu_cached_Mqps,us_per_block_cached";
+  "cpu_Mqps,gpu_Mqps,gpu_cached_Mqps,us_per_block_cached,"
+  "reps,cpu_window,gpu_window,gpu_cached_window";
 
 int main(int argc, char **argv)
 {
   int nblocks = 64, nx = 16, nq = 2000, reps = 3, builder = 1;
-  int cpuOnly = 0, verbose = 0, eltype = EL_HEX, skipDedup = 0;
-  double qfrac = 1.0, perturb = 0.15;
+  int cpuOnly = 0, gpuOnly = 0, verbose = 0, eltype = EL_HEX, skipDedup = 0, batch = 0;
+  double qfrac = 1.0, perturb = 0.15, overlap = 0.0;
   uint64_t seed = 12345;
 
   for (int a = 1; a < argc; a++) {
@@ -85,6 +125,7 @@ int main(int argc, char **argv)
     else if (!strcmp(argv[a],"--nx")      && a+1 < argc) nx = atoi(argv[++a]);
     else if (!strcmp(argv[a],"--nq")      && a+1 < argc) nq = atoi(argv[++a]);
     else if (!strcmp(argv[a],"--qfrac")   && a+1 < argc) qfrac = atof(argv[++a]);
+    else if (!strcmp(argv[a],"--overlap") && a+1 < argc) overlap = atof(argv[++a]);
     else if (!strcmp(argv[a],"--perturb") && a+1 < argc) perturb = atof(argv[++a]);
     else if (!strcmp(argv[a],"--reps")    && a+1 < argc) reps = atoi(argv[++a]);
     else if (!strcmp(argv[a],"--seed")    && a+1 < argc) seed = strtoull(argv[++a],NULL,10);
@@ -98,7 +139,12 @@ int main(int argc, char **argv)
       else { fprintf(stderr,"unknown --eltype %s\n",e); return 1; }
     }
     else if (!strcmp(argv[a],"--skip-dedup")) skipDedup = 1;
+    else if (!strcmp(argv[a],"--batch"))      batch = 1;
     else if (!strcmp(argv[a],"--cpu-only"))   cpuOnly = 1;
+    else if (!strcmp(argv[a],"--gpu-only"))   gpuOnly = 1;
+    else if (!strcmp(argv[a],"--barrier") && a+1 < argc) g_barrierDir = argv[++a];
+    else if (!strcmp(argv[a],"--nranks")  && a+1 < argc) g_nranks = atoi(argv[++a]);
+    else if (!strcmp(argv[a],"--rank")    && a+1 < argc) g_rank = atoi(argv[++a]);
     else if (!strcmp(argv[a],"--verbose"))    verbose = 1;
     else if (!strcmp(argv[a],"--header")) { printf("%s\n",CSV_HEADER); return 0; }
     else { usage(argv[0]); return 1; }
@@ -110,9 +156,10 @@ int main(int argc, char **argv)
   int side = 1;
   while (side*side*side < nblocks) side++;      /* lay blocks out in a lattice */
   for (int b = 0; b < nblocks; b++) {
-    double org[3] = { (double)(b % side),
-                      (double)((b / side) % side),
-                      (double)(b / (side*side)) };
+    const double pitch = 1.0 - overlap;
+    double org[3] = { pitch*(b % side),
+                      pitch*((b / side) % side),
+                      pitch*(b / (side*side)) };
     buildMesh(blk[b].mesh, nx, nx, nx, perturb, eltype, org);
     buildQueries(blk[b].mesh, nq, qfrac, 0.0, seed + 7919ull*b, blk[b].xs);
     blk[b].mb = new MeshBlock();
@@ -126,6 +173,9 @@ int main(int argc, char **argv)
   }
   double tsetup = wtime() - tb;
 
+  std::vector<MeshBlock *> mbs(nblocks);
+  for (int b = 0; b < nblocks; b++) mbs[b] = blk[b].mb;
+
   const long cellsPer  = blk[0].mesh.ncells;
   const long cellsTot  = cellsPer * nblocks;
   const long nqTot     = (long)nq * nblocks;
@@ -137,9 +187,10 @@ int main(int argc, char **argv)
 
   /* ---------------- CPU: loop over all blocks ---------------- */
   SEARCHTIMERS cpuBest; memset(&cpuBest, 0, sizeof(cpuBest));
-  double cpuBestTotal = 1e300;
+  double cpuBestTotal = 1e300, cpuWindow = 0.0, cpuW0 = 0.0;
   int donorsCpu = 0;
-  for (int r = 0; r < reps + 1; r++) {                 /* r==0 warm-up */
+  for (int r = 0; r < (gpuOnly ? 0 : reps + 1); r++) {   /* r==0 warm-up */
+    if (r == 1) { barrier("cpu"); cpuW0 = wtime(); }
     SEARCHTIMERS acc; memset(&acc, 0, sizeof(acc));
     int donors = 0;
     double t0 = wtime();
@@ -157,21 +208,32 @@ int main(int argc, char **argv)
     if (r == 0) { donorsCpu = donors; continue; }
     if (acc.total < cpuBestTotal) { cpuBestTotal = acc.total; cpuBest = acc; }
   }
+  if (gpuOnly) { cpuBestTotal = 0.0; cpuWindow = 0.0; }
+  else cpuWindow = wtime() - cpuW0;
 
   /* ---------------- GPU: loop over all blocks, one context ---------------- */
   SEARCHTIMERS gpuBest; memset(&gpuBest, 0, sizeof(gpuBest));
   double gpuBestTotal = 1e300, gpuBestCached = 1e300;
   int gpuOk = 0, donorsGpu = -1, mismatch = 0, bad = 0;
+  double gpuWindow = 0.0, gpuCachedWindow = 0.0;
 
   if (!cpuOnly) {
-    /* warm-up: creates every block's context state, uploads, builds */
+    /* warm-up: creates device state, uploads, builds */
     int rc = 0;
-    for (int b = 0; b < nblocks; b++) {
-      attachQueries(*blk[b].mb, blk[b].xs, nq);
-      rc |= blk[b].mb->search_gpu();
-    }
+    for (int b = 0; b < nblocks; b++) attachQueries(*blk[b].mb, blk[b].xs, nq);
+    if (batch) rc = MeshBlock::search_gpu_batch(mbs.data(), nblocks, NULL);
+    else for (int b = 0; b < nblocks; b++) rc |= blk[b].mb->search_gpu();
     gpuOk = (rc == 0);
 
+    (void)0;
+  }
+
+  /* The barriers below are entered unconditionally -- including by ranks whose
+     GPU path failed or which are running --cpu-only -- so that one rank
+     bailing out cannot strand the others. */
+  {
+    barrier("gpu");
+    double gpuW0 = wtime();
     if (gpuOk) {
       /* (a) moving mesh: re-upload + rebuild every block, every call */
       for (int r = 0; r < reps; r++) {
@@ -180,27 +242,42 @@ int main(int argc, char **argv)
         for (int b = 0; b < nblocks; b++) {
           attachQueries(*blk[b].mb, blk[b].xs, nq);
           blk[b].mb->gpuMeshDirty = 1;
-          blk[b].mb->search_gpu();
-          const SEARCHTIMERS &t = blk[b].mb->searchTimers;
-          acc.transfer += t.transfer; acc.build += t.build;
-          acc.dedup    += t.dedup;    acc.query += t.query;
+        }
+        if (batch) {
+          MeshBlock::search_gpu_batch(mbs.data(), nblocks, &acc);
+        } else {
+          for (int b = 0; b < nblocks; b++) {
+            blk[b].mb->search_gpu();
+            const SEARCHTIMERS &t = blk[b].mb->searchTimers;
+            acc.transfer += t.transfer; acc.build += t.build;
+            acc.dedup    += t.dedup;    acc.query += t.query;
+          }
         }
         acc.total = wtime() - t0;
         if (acc.total < gpuBestTotal) { gpuBestTotal = acc.total; gpuBest = acc; }
       }
+    }
+    gpuWindow = wtime() - gpuW0;
+
+    barrier("gpuc");
+    double gpucW0 = wtime();
+    if (gpuOk) {
       /* (b) static mesh: everything resident from the previous call */
       for (int r = 0; r < reps; r++) {
         double t0 = wtime();
-        for (int b = 0; b < nblocks; b++) {
-          attachQueries(*blk[b].mb, blk[b].xs, nq);
-          blk[b].mb->search_gpu();
-        }
+        for (int b = 0; b < nblocks; b++) attachQueries(*blk[b].mb, blk[b].xs, nq);
+        if (batch) MeshBlock::search_gpu_batch(mbs.data(), nblocks, NULL);
+        else for (int b = 0; b < nblocks; b++) blk[b].mb->search_gpu();
         gpuBestCached = std::min(gpuBestCached, wtime() - t0);
       }
+    }
+    gpuCachedWindow = wtime() - gpucW0;
 
+    if (gpuOk) {
       donorsGpu = 0;
       for (int b = 0; b < nblocks; b++) {
         donorsGpu += blk[b].mb->donorCount;
+        if (gpuOnly) continue;
         for (int i = 0; i < nq; i++) {
           int c = blk[b].donorCpu[i], g = blk[b].mb->donorId[i];
           if (c == g) continue;
@@ -212,13 +289,13 @@ int main(int argc, char **argv)
     }
   }
 
-  const double cpuMq    = nqTot / cpuBestTotal / 1e6;
+  const double cpuMq    = cpuBestTotal > 0 ? nqTot / cpuBestTotal / 1e6 : 0.0;
   const double gpuMq    = gpuOk ? nqTot / gpuBestTotal  / 1e6 : 0.0;
   const double gpuCacMq = gpuOk ? nqTot / gpuBestCached / 1e6 : 0.0;
   const double usBlk    = gpuOk ? gpuBestCached*1e6/nblocks : 0.0;
 
   if (verbose) {
-    printf("# CPU  %8.4f s  (filter %6.4f  ADT %6.4f  dedup %6.4f  walk %6.4f)"
+    if (!gpuOnly) printf("# CPU  %8.4f s  (filter %6.4f  ADT %6.4f  dedup %6.4f  walk %6.4f)"
            "  donors %d  %.3f M q/s\n",
            cpuBestTotal, cpuBest.filter, cpuBest.build, cpuBest.dedup,
            cpuBest.query, donorsCpu, cpuMq);
@@ -230,28 +307,32 @@ int main(int argc, char **argv)
       printf("# GPU cached %8.4f s  %.3f M q/s  %.1f us/block  |  "
              "speedup %.2fx / %.2fx cached  |  mismatches %d (%d real)\n",
              gpuBestCached, gpuCacMq, usBlk,
-             cpuBestTotal/gpuBestTotal, cpuBestTotal/gpuBestCached,
+             cpuBestTotal > 0 ? cpuBestTotal/gpuBestTotal  : 0.0,
+             cpuBestTotal > 0 ? cpuBestTotal/gpuBestCached : 0.0,
              mismatch, bad);
     }
   }
 
-  printf("%d,%d,%s,%ld,%ld,%d,%ld,%d,"
+  printf("%d,%d,%s,%ld,%ld,%d,%ld,%d,%d,"
          "%.6f,%.6f,%.6f,%.6f,%.6f,"
          "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,"
          "%d,%d,%d,%d,"
          "%.3f,%.3f,"
-         "%.4f,%.4f,%.4f,%.2f\n",
-         nblocks, nx, elTypeName(eltype), cellsPer, cellsTot, nq, nqTot, builder,
+         "%.4f,%.4f,%.4f,%.2f,"
+         "%d,%.6f,%.6f,%.6f\n",
+         nblocks, nx, elTypeName(eltype), cellsPer, cellsTot, nq, nqTot, builder, batch,
          cpuBestTotal, cpuBest.filter, cpuBest.build, cpuBest.dedup, cpuBest.query,
          gpuOk ? gpuBestTotal : 0.0, gpuOk ? gpuBest.transfer : 0.0,
          gpuOk ? gpuBest.build : 0.0, gpuOk ? gpuBest.dedup : 0.0,
          gpuOk ? gpuBest.query : 0.0, gpuOk ? gpuBestCached : 0.0,
          donorsCpu, donorsGpu, gpuOk ? mismatch : -1, gpuOk ? bad : -1,
-         gpuOk ? cpuBestTotal/gpuBestTotal  : 0.0,
-         gpuOk ? cpuBestTotal/gpuBestCached : 0.0,
-         cpuMq, gpuMq, gpuCacMq, usBlk);
+         (gpuOk && cpuBestTotal > 0) ? cpuBestTotal/gpuBestTotal  : 0.0,
+         (gpuOk && cpuBestTotal > 0) ? cpuBestTotal/gpuBestCached : 0.0,
+         cpuMq, gpuMq, gpuCacMq, usBlk,
+         reps, cpuWindow, gpuWindow, gpuCachedWindow);
   fflush(stdout);
 
+  MeshBlock::freeGpuBatchData();
   for (int b = 0; b < nblocks; b++) { delete blk[b].mb; freeMesh(blk[b].mesh); }
   return 0;
 }

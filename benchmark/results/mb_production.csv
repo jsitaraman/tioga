@@ -1,0 +1,12 @@
+# Production configuration: same total work (4608 blocks of 16^3 = 18,874,368
+# cells, 9,216,000 receptor points) decomposed two ways.
+#   GPU: 1 rank owning all 4608 blocks, one CUDA context, one BVH (--batch)
+#   CPU: 72 ranks x 64 blocks, barrier-synchronised, sustained over 10 reps
+# Throughput in millions of query points located per second.
+config,path,dedup,Mqps,vs_cpu_socket
+cpu_socket_72core,host_adt,included,37.43,1.00
+cpu_socket_72core,host_adt,excluded,40.67,1.00
+gpu_1rank_1context,batched_cached,excluded,152.63,3.75
+gpu_1rank_1context,batched_rebuilt,excluded,23.84,0.59
+gpu_1rank_1context,batched_cached,included,6.47,0.17
+gpu_1rank_1context,batched_rebuilt,included,5.25,0.14

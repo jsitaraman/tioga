@@ -345,34 +345,62 @@ result download and two more syncs. Against the rate a single saturated launch
 achieves (285 M q/s), the measured per-block loop leaves roughly **10x on the
 table** at every block count.
 
-#### Does the GPU help a fully loaded socket?
+#### One BVH per rank
 
-A GH200 superchip has 72 Grace cores *and* one Hopper GPU, so the question is
-not "1 core + GPU vs 72 cores" -- it is whether adding the GPU to a socket that
-is already busy helps. 72 ranks, 64 blocks of 16^3 each, all sharing the one GPU
-through CUDA MPS:
+The per-block loop above builds one BVH per block and launches one kernel per
+block. `MeshBlock::search_gpu_batch()` instead concatenates the cells of every
+block the rank owns into a single BVH and locates every block's points in one
+launch. Donor semantics are preserved: each cell carries the block it came from
+and each query the block it belongs to, and the traversal visitor rejects any
+candidate from a different block, so overlapping blocks -- the normal case in
+overset -- cannot steal each other's receptors.
 
-| | CPU only | GPU, rebuilt each call | GPU, BVH cached |
-|---|---|---|---|
-| with host dedup | 37.4 M q/s | 23.1 (**0.62x**) | 212 (5.7x) |
-| dedup excluded | 37.8 M q/s | 24.2 (**0.64x**) | 382 (10.1x) |
+16^3 blocks, 2,000 receptor points each, one rank, BVH cached, dedup excluded:
 
-Two results worth stating plainly:
+| blocks | per-block | batched | gain | per-block us/blk | batched us/blk |
+|---|---|---|---|---|---|
+| 64 | 32.5 M q/s | 239.2 | 7.4x | 61.5 | 8.4 |
+| 256 | 30.8 | 192.0 | 6.2x | 64.9 | 10.4 |
+| 1024 | 28.6 | 157.5 | 5.5x | 70.1 | 12.7 |
 
-- **On a moving mesh at 16^3 blocks the naive port is a regression.** Rebuilding
-  4,608 tiny BVHs per round (64 blocks x 72 ranks) costs more than the host
-  search it replaces. This is the pessimistic form of "moving" -- it re-uploads
-  connectivity and rebuilds from scratch, where a real deforming mesh would
-  re-upload coordinates only and refit. But a per-block BVH over 4,096
-  primitives is latency-bound no matter what, so aggregation across blocks
-  matters more here than refit.
-- **On a static mesh the GPU is worth 5.7x**, or 10.1x once the host dedup is
-  out of the way.
+At 64 blocks the BVH build drops from 25.1 ms to 0.6 ms (42x) and traversal from
+2.1 ms to 0.1 ms (21x). It holds up at scale: one rank owning 4,608 blocks
+(18.9M cells, 9.2M receptor points) sustains 152.6 M q/s.
 
-Block size dominates this. The same MPS experiment on one 1.4M-cell block per
-rank gave 6.5x rebuilt / 67x cached; at 16^3 blocks it is 0.62x / 5.7x. The
-earlier single-block numbers in this document should not be read as predictions
-for the production configuration.
+#### The production comparison
+
+Same total work -- 4,608 blocks of 16^3, 18,874,368 cells, 9,216,000 receptor
+points -- decomposed two ways. GPU: one rank owning all blocks, one CUDA
+context, one BVH. CPU: 72 ranks x 64 blocks, barrier-synchronised, sustained.
+
+| | throughput | vs 72-core socket |
+|---|---|---|
+| CPU socket, host ADT | 40.7 M q/s | 1.00x |
+| GPU batched, BVH cached, dedup excluded | 152.6 | **3.75x** |
+| GPU batched, rebuilt each call, dedup excluded | 23.8 | **0.59x** |
+| GPU batched, BVH cached, **including host dedup** | 6.5 | **0.17x** |
+
+The batched search itself beats the whole socket by 3.75x. But with one rank
+owning the GPU, `uniquenodes_octree` runs on that rank's single core for all
+9.2M points -- 1.37 s against 60 ms of GPU work, 23x more -- and the
+configuration loses to CPU-only by 6x. **At the production block size the host
+dedup is not a bottleneck to tidy up later; it is the difference between a 3.75x
+win and a 6x loss.** Rebuilding every call also loses, even batched.
+
+#### A measurement that was wrong
+
+An earlier version of this section reported socket numbers from 72 ranks sharing
+the GPU through MPS: 0.62x rebuilt / 5.7x cached at 16^3, and 6.5x / 67x on a
+1.4M-cell block. **Those numbers were invalid and too favourable to the GPU.**
+Throughput was computed as total queries over the slowest rank's wall time, but
+ranks spend most of their runtime in the CPU phase, so each reached its GPU
+section on a largely idle GPU -- measuring N x the uncontended single-rank rate
+rather than a sustained one. The tell was a reported aggregate of 13,572 M q/s
+against a kernel ceiling of ~2,100 M q/s; it came out at 79 % of the
+no-contention value, the signature of staggered ranks rather than contention.
+They have been withdrawn and replaced by the barrier-synchronised comparison
+above. (MPS also caps at 48 clients on this GPU, so 72 ranks could not all have
+connected in any case.)
 
 ---
 
@@ -380,15 +408,17 @@ for the production configuration.
 
 1. **The search itself is comprehensively GPU-friendly** *when the GPU is given
    enough work per launch*. Traversal plus exact containment reaches ~2.1 G
-   point-locations/s, against ~0.36 M/s per core. Correctness is exact.
-   But at the production block size (16^3) the per-block launch and
-   synchronisation latency dominates, and one CUDA context per GPU with a
-   per-block loop delivers 0.62x-5.7x against a fully loaded 72-core socket --
-   not the 6.5x-67x the single-block measurements suggest.
+   point-locations/s against ~0.36 M/s per core, and correctness is exact.
+   At the production block size (16^3) that requires batching across blocks:
+   one BVH per rank is 5.5-7.4x faster than one BVH per block, and beats a
+   fully loaded 72-core socket by 3.75x on the search itself.
 2. **Caching the acceleration structure is worth more than the traversal speedup**
    for a static or slowly-deforming mesh: 6.5× → 67× at socket scale. Rebuilding
    an ADT every call is the single largest structural cost in the host version.
-3. **`uniquenodes_octree` is now the bottleneck**, at up to 99 % of GPU total. It
+3. **`uniquenodes_octree` is the bottleneck, and at the production block size it
+   decides the outcome** -- 3.75x win with it excluded, 0.17x loss with it
+   included, because one rank owning the GPU runs it serially on one core for
+   every point. It reaches up to 99 % of GPU total. It
    is host code shared by both backends and untouched here. The GPU search does
    not need it — it searches every point regardless; it exists only to produce
    `xtag`/`res_search` for the downstream donor exchange (`bookKeeping.C`).
@@ -405,12 +435,12 @@ for the production configuration.
    is Amdahl-limited until this is done.
 2. Keep the mesh device-resident across timesteps and use `cuBQL::cuda::refit`
    for deformation instead of re-uploading and rebuilding.
-3. **Batch across blocks.** Measured: the per-block loop is ~10x off the rate a
-   saturated launch achieves, at every block count from 1 to 1024. One BVH per
-   rank over all its blocks, one query upload, one kernel, one sync, one
-   download -- instead of the current per-block round trip. This is the single
-   largest remaining item for the production shape, and it is what turns the
-   moving-mesh case from a regression into a win.
+3. **Done: batch across blocks** (`MeshBlock::search_gpu_batch`). One BVH per
+   rank, one upload, one kernel, one download. 5.5-7.4x over the per-block loop,
+   holding 152.6 M q/s at 4,608 blocks.
+4. **Still open: the moving-mesh case.** Even batched, rebuilding every call is
+   0.59x against the socket. Refit (`cuBQL::cuda::refit`) rather than rebuild,
+   and keep connectivity resident so only coordinates move.
 4. Temporal coherence: test the previous donor and its neighbours before falling
    back to the BVH. For moving overset meshes this can make most searches O(1).
 

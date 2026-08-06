@@ -231,6 +231,33 @@ class MeshBlock
 
   /** release device memory held for search_gpu() */
   void freeGpuSearchData();
+
+  /** GPU donor search for many blocks at once, one BVH per rank
+   *
+   *  Equivalent to calling search_gpu() on each block in turn, but builds a
+   *  single BVH over the cells of every block and locates every block's query
+   *  points in one kernel launch. At production block sizes (16^3) the
+   *  per-block launch and synchronisation latency dominates the per-block
+   *  path, so this is the form that matters.
+   *
+   *  Donor semantics are unchanged: a query point belonging to block b can
+   *  only be given a donor from block b, so overlapping blocks (which is the
+   *  normal case in overset) do not steal each other's receptors. donorId[]
+   *  is written per block in that block's own cell numbering.
+   *
+   *  Rebuilds the shared BVH if the block set changed or any block has
+   *  gpuMeshDirty set. Returns 0 on success, non-zero if unsupported or if
+   *  the library was built without CUDA.
+   *
+   *  \param[in] blocks   array of nblocks MeshBlock pointers
+   *  \param[in] nblocks  how many
+   *  \param[out] timers  optional aggregate phase breakdown
+   */
+  static int search_gpu_batch(MeshBlock **blocks, int nblocks,
+                              SEARCHTIMERS *timers = NULL);
+
+  /** release the shared device state held for search_gpu_batch() */
+  static void freeGpuBatchData();
   void writeOBB(int bid);
 
   void writeOBB2(OBB *obc,int bid);

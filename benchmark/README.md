@@ -214,9 +214,10 @@ to produce `xtag`/`res_search` for the downstream donor exchange
   Direct logical indexing already beats any tree; a BVH would be a regression.
 - `ihigh != 0` (high-order) returns `-2`: containment goes through host
   callbacks (`donor_inclusion_test`) that cannot run on the device.
-- Multi-block / multi-rank. One BVH per `MeshBlock` per rank; aggregating
-  several small blocks into one BVH is the obvious next step for strong
-  scaling, and matters most where blocks are small.
+- Multi-block: see `bench_multiblock.C` and `MeshBlock::search_gpu_batch()`,
+  which builds one BVH per rank over all its blocks. At the production block
+  size (16^3) that is 5.5-7.4x faster than one BVH per block. Results in
+  `results/mb_*.csv`, discussion in `GPU_SEARCH_SUMMARY.md`.
 - Temporal coherence (test the previous donor, then its neighbours, before
   falling back to the BVH). For moving overset meshes this can turn most
   searches into O(1) and would sit on top of this.

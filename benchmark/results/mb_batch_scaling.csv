@@ -1,0 +1,8 @@
+# One rank, one CUDA context, 16^3 blocks with 2000 receptor points each,
+# --batch --skip-dedup. cells_total, nq_total, gpu_rebuilt_s, gpu_cached_s,
+# gpu_cached_Mqps, us_per_block_cached
+nblocks,cells_total,nq_total,gpu_rebuilt_s,gpu_cached_s,gpu_cached_Mqps,us_per_block
+512,2097152,1024000,0.043843,0.005227,195.91,10.21
+1024,4194304,2048000,0.087562,0.012878,159.03,12.58
+2304,9437184,4608000,0.192200,0.029881,154.21,12.97
+4608,18874368,9216000,0.386659,0.060381,152.63,13.10

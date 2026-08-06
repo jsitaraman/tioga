@@ -23,3 +23,16 @@ int MeshBlock::search_gpu(void)
 void MeshBlock::freeGpuSearchData(void)
 {
 }
+
+int MeshBlock::search_gpu_batch(MeshBlock ** /*blocks*/, int /*nblocks*/,
+                                SEARCHTIMERS * /*timers*/)
+{
+  fprintf(stderr,
+          "#tioga: search_gpu_batch() unavailable, "
+          "rebuild with -DTIOGA_ENABLE_CUDA=ON\n");
+  return -1;
+}
+
+void MeshBlock::freeGpuBatchData(void)
+{
+}

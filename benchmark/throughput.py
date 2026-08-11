@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 """Turn results/shmoo_search.csv into plot-ready throughput tables.
 
 Writes results/shmoo_throughput.csv (tidy/long form, one row per

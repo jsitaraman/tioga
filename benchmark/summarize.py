@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 """Render the sweep CSVs written by sweep.sh as readable tables.
 
     usage: ./summarize.py [results_dir]

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 # 2-D shmoo over (mesh size x query count), for plotting throughput curves.
 #
 # Runs the grid twice:

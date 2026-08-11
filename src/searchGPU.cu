@@ -1,6 +1,8 @@
 // Copyright TIOGA Developers. See COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD 3-Clause)
+// Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause
 
 /*
  * GPU donor search for MeshBlock, built on cuBQL (https://github.com/NVIDIA/cuBQL).

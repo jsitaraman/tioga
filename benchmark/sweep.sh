@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 # Sweep MeshBlock::search (host ADT) against MeshBlock::search_gpu (cuBQL BVH)
 # across problem sizes. Writes one CSV per study into the output directory.
 #

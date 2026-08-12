@@ -11,6 +11,10 @@ option(TIOGA_ENABLE_UNIQUEID
 option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 option(TIOGA_ENABLE_CUDA "Build the cuBQL based GPU donor search (default: off)" OFF)
+set(TIOGA_SEARCH_BACKEND "cpu" CACHE STRING
+  "Donor search backend: cpu, adt_gpu, cubql or cubql_batch")
+set_property(CACHE TIOGA_SEARCH_BACKEND PROPERTY STRINGS
+  cpu adt_gpu cubql cubql_batch)
 set(TIOGA_CUBQL_DIR "/scratch/software/cuBQL" CACHE PATH
   "Root of the cuBQL source tree (the directory containing cuBQL/bvh.h)")
 
@@ -78,6 +82,42 @@ if (TIOGA_ENABLE_CUDA)
   message(STATUS "#tioga: CUDA search enabled, arch=${CMAKE_CUDA_ARCHITECTURES}, "
                  "cuBQL=${TIOGA_CUBQL_DIR}")
 endif()
+
+# Which donor search MeshBlock::search() runs. Compile time rather than run
+# time so that a build contains exactly one backend and the comparison between
+# them cannot be skewed by dispatch left in the measured path.
+string(TOLOWER "${TIOGA_SEARCH_BACKEND}" TIOGA_SEARCH_BACKEND_LC)
+if (TIOGA_SEARCH_BACKEND_LC STREQUAL "cpu")
+  add_definitions(-DTIOGA_SEARCH_BACKEND_CPU)
+elseif (TIOGA_SEARCH_BACKEND_LC STREQUAL "adt_gpu")
+  add_definitions(-DTIOGA_SEARCH_BACKEND_ADT_GPU)
+elseif (TIOGA_SEARCH_BACKEND_LC STREQUAL "cubql")
+  add_definitions(-DTIOGA_SEARCH_BACKEND_CUBQL)
+elseif (TIOGA_SEARCH_BACKEND_LC STREQUAL "cubql_batch")
+  add_definitions(-DTIOGA_SEARCH_BACKEND_CUBQL_BATCH)
+else()
+  message(FATAL_ERROR
+    "TIOGA_SEARCH_BACKEND must be one of cpu, adt_gpu, cubql, cubql_batch "
+    "(got '${TIOGA_SEARCH_BACKEND}')")
+endif()
+
+if (NOT TIOGA_SEARCH_BACKEND_LC STREQUAL "cpu")
+  if (NOT TIOGA_ENABLE_CUDA)
+    message(FATAL_ERROR
+      "TIOGA_SEARCH_BACKEND=${TIOGA_SEARCH_BACKEND} needs -DTIOGA_ENABLE_CUDA=ON")
+  endif()
+  # The GPU backends search every query point, so they only pay off once the
+  # host de-duplication pass is compiled out. With it on they stand down and
+  # search() runs its own loop.
+  if (TIOGA_ENABLE_UNIQUEID)
+    message(WARNING
+      "#tioga: TIOGA_SEARCH_BACKEND=${TIOGA_SEARCH_BACKEND} is inactive while "
+      "TIOGA_ENABLE_UNIQUEID is on; the host search will be used. "
+      "Configure with -DTIOGA_ENABLE_UNIQUEID=off to enable it.")
+  endif()
+endif()
+message(STATUS "#tioga: search backend=${TIOGA_SEARCH_BACKEND_LC}, "
+               "uniqueid=${TIOGA_ENABLE_UNIQUEID}")
 
 # Always build libtioga
 add_subdirectory(src)

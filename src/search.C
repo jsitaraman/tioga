@@ -71,8 +71,25 @@ void uniquenode_map(uint64_t* node_ids, double* node_res, int* itag, int nnodes)
 }
 
 
+/* A GPU backend is compiled in only when the host de-duplication pass is
+   compiled out; see TIOGA_SEARCH_BACKEND in the top level CMakeLists.txt.
+   Every backend can decline at run time (an unsupported element order, no
+   device, no ADT), in which case the host search below runs instead. */
+#if defined(TIOGA_SEARCH_BACKEND_ADT_GPU) && !defined(TIOGA_ENABLE_UNIQUEID)
+#define TIOGA_SEARCH_USE_ADT_GPU 1
+#endif
+#if defined(TIOGA_SEARCH_BACKEND_CUBQL) && !defined(TIOGA_ENABLE_UNIQUEID)
+#define TIOGA_SEARCH_USE_CUBQL 1
+#endif
+
 void MeshBlock::search(void)
 {
+#ifdef TIOGA_SEARCH_USE_CUBQL
+  /* the cuBQL backend replaces the whole search: it does its own broad phase
+     and builds its own tree over every cell of the block */
+  if (search_cubql() == 0) return;
+#endif
+
   int i,j,k,l,m,n,p,i3;
   int ndim;
   int iptr,isum,nvert;
@@ -261,6 +278,17 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   searchTimers.dedup=search_wtime()-t1;
   t1=search_wtime();
+  //
+#ifdef TIOGA_SEARCH_USE_ADT_GPU
+  /* same tree, same candidate cells, walked on the device instead */
+  if (search_adt_gpu() == 0) {
+    TIOGA_FREE(icell);
+    TIOGA_FREE(obq);
+    searchTimers.total=search_wtime()-t0;
+    return;
+  }
+  t1=search_wtime();
+#endif
   //
   donorCount=0;
   ipoint=0;

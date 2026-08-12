@@ -112,8 +112,20 @@ void tioga::performConnectivity(void)
    auto& mb = mblocks[ib];
    mb->ihigh=0;
    mb->resetInterpData();
-   mb->search();
   }
+#if defined(TIOGA_SEARCH_BACKEND_CUBQL_BATCH) && !defined(TIOGA_ENABLE_UNIQUEID)
+  /* One tree per rank covering every block, so that a rank holding many small
+     blocks pays one launch instead of one per block. Falls back to the
+     per-block path if the batch backend declines. */
+  {
+   std::vector<MeshBlock *> raw(nblocks);
+   for(int ib=0;ib < nblocks;ib++) raw[ib]=mblocks[ib].get();
+   if (nblocks==0 || MeshBlock::search_cubql_batch(raw.data(),nblocks) != 0)
+     for(int ib=0;ib < nblocks;ib++) mblocks[ib]->search();
+  }
+#else
+  for(int ib=0;ib < nblocks;ib++) mblocks[ib]->search();
+#endif
   this->myTimer("tioga::search",1);
   this->myTimer("tioga::exchangeDonors",0);
   exchangeDonors();

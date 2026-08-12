@@ -87,3 +87,62 @@ CC=mpicc CXX=mpicxx FC=mpif90 cmake \
 # Compile library and install at user-defined location
 make && make install
 ```
+
+## GPU donor search
+
+The donor search in `MeshBlock::search()` has four interchangeable
+implementations, selected at configure time with `TIOGA_SEARCH_BACKEND`:
+
+| Backend       | What runs on the device                                     |
+|---------------|-------------------------------------------------------------|
+| `cpu`         | nothing; the host search (default)                          |
+| `adt_gpu`     | the ADT query loop, over the host-built tree                |
+| `cubql`       | a cuBQL BVH over all cells of a block, built and queried    |
+| `cubql_batch` | as `cubql`, but one BVH per rank across all of its blocks   |
+
+All three GPU backends need `-DTIOGA_ENABLE_CUDA=ON` and a
+[cuBQL](https://github.com/NVIDIA/cuBQL) checkout, which is header only here:
+
+```
+cmake \
+  -DTIOGA_ENABLE_CUDA=ON \
+  -DCMAKE_CUDA_ARCHITECTURES=90 \
+  -DTIOGA_CUBQL_DIR=/path/to/cuBQL \
+  -DTIOGA_SEARCH_BACKEND=cubql \
+  -DTIOGA_ENABLE_UNIQUEID=off \
+  ../
+```
+
+A backend may decline at run time, for instance for high order elements whose
+containment test goes through host callbacks. The host search runs instead, so
+the result is always correct whatever the configuration.
+
+### De-duplication of query points
+
+`TIOGA_ENABLE_UNIQUEID` (on by default) controls whether repeated query points
+are detected on the host so that only the first occurrence is searched. The GPU
+backends search every point regardless, so they only pay off once that pass is
+compiled out, and they stand down entirely while it is on. Configuring a GPU
+backend with `TIOGA_ENABLE_UNIQUEID=on` warns and leaves the host search in
+place.
+
+### Comparing the backends
+
+Because the backend is a configure time choice, backends cannot be compared
+within a single run. `scripts/compare_search_backends.sh` builds one tree per
+backend, runs `case/` through each, checks that they all find the same donors
+as the host search, and prints the cost of each search phase:
+
+```
+scripts/compare_search_backends.sh -n 8 -c /path/to/cuBQL
+```
+
+Use `-u` to repeat the comparison with de-duplication left on, which checks
+that the host path is unaffected and that the GPU backends stand down.
+
+The same instrumentation is available directly, in any build:
+
+| Variable               | Effect                                            |
+|------------------------|---------------------------------------------------|
+| `TIOGA_DONOR_DUMP=dir` | write the donor found for every query point       |
+| `TIOGA_SEARCH_TIMERS=1`| print the per-phase search cost, reduced over ranks|

@@ -149,12 +149,6 @@ class MeshBlock
   int gpuEarlyExit;            /** < 1 => stop at first accepted donor (as
                                      the ADT does), 0 => scan all candidates
                                      and keep the lowest cell id             */
-  int gpuSkipDedup;            /** < 1 => skip the host duplicate-query-point
-                                     pass. The GPU searches every point
-                                     regardless, so donorId is unaffected,
-                                     but xtag/res_search are then NOT set up
-                                     for the downstream donor exchange. For
-                                     measuring the search itself.            */
   double *cellRes;  /** < resolution for each cell */
   int ntotalPoints;        /**  total number of extra points to interpolate */
   int ihigh;
@@ -206,7 +200,6 @@ class MeshBlock
     gpuLeafSize=0;
     gpuBuilderType=0;
     gpuEarlyExit=1;
-    gpuSkipDedup=0;
     searchTimers=SEARCHTIMERS();
   };
 

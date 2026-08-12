@@ -603,15 +603,15 @@ int MeshBlock::search_gpu(void)
   donorId = (int *)malloc(sizeof(int)*nsearch);
   if (xtag) TIOGA_FREE(xtag);
   xtag = (int *)malloc(sizeof(int)*nsearch);
-  if (gpuSkipDedup) {
-    for (int i = 0; i < nsearch; i++) xtag[i] = i;
-  } else {
+#ifdef TIOGA_ENABLE_UNIQUEID
 #ifdef TIOGA_HAS_NODEGID
-    gpu_uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
+  gpu_uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
 #else
-    uniquenodes_octree(xsearch, tagsearch, res_search, xtag, &nsearch);
+  uniquenodes_octree(xsearch, tagsearch, res_search, xtag, &nsearch);
 #endif
-  }
+#else
+  for (int i = 0; i < nsearch; i++) xtag[i] = i;
+#endif
   searchTimers.dedup = gpu_wtime() - t1;
 
   /* ---------------- traversal + exact containment ---------------- */
@@ -982,16 +982,16 @@ int MeshBlock::search_gpu_batch(MeshBlock **blocks, int nblocks,
     mb->donorId = (int *)malloc(sizeof(int)*mb->nsearch);
     if (mb->xtag) TIOGA_FREE(mb->xtag);
     mb->xtag = (int *)malloc(sizeof(int)*mb->nsearch);
-    if (mb->gpuSkipDedup) {
-      for (int i = 0; i < mb->nsearch; i++) mb->xtag[i] = i;
-    } else {
+#ifdef TIOGA_ENABLE_UNIQUEID
 #ifdef TIOGA_HAS_NODEGID
-      gpu_uniquenode_map(mb->gid_search.data(), mb->res_search, mb->xtag, mb->nsearch);
+    gpu_uniquenode_map(mb->gid_search.data(), mb->res_search, mb->xtag, mb->nsearch);
 #else
-      uniquenodes_octree(mb->xsearch, mb->tagsearch, mb->res_search,
-                         mb->xtag, &mb->nsearch);
+    uniquenodes_octree(mb->xsearch, mb->tagsearch, mb->res_search,
+                       mb->xtag, &mb->nsearch);
 #endif
-    }
+#else
+    for (int i = 0; i < mb->nsearch; i++) mb->xtag[i] = i;
+#endif
   }
   tm.dedup = gpu_wtime() - t1;
 

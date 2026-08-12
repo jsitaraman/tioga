@@ -6,6 +6,8 @@ option(BUILD_SHARED_LIBS "Build shared libraries (default: off)" on)
 option(BUILD_TIOGA_EXE "Build tioga driver code (default: off)" on)
 option(BUILD_GRIDGEN_EXE "Build grid generator code (default: off)" on)
 option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
+option(TIOGA_ENABLE_UNIQUEID
+  "De-duplicate repeated donor search query points on the host (default: on)" on)
 option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 option(TIOGA_ENABLE_CUDA "Build the cuBQL based GPU donor search (default: off)" OFF)
@@ -42,6 +44,10 @@ endif()
 
 if (TIOGA_HAS_NODEGID)
   add_definitions(-DTIOGA_HAS_NODEGID)
+endif()
+
+if (TIOGA_ENABLE_UNIQUEID)
+  add_definitions(-DTIOGA_ENABLE_UNIQUEID)
 endif()
 
 if (TIOGA_ENABLE_TIMERS)

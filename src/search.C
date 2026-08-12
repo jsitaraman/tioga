@@ -245,12 +245,18 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   if (xtag) TIOGA_FREE(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
-  // create a unique hash
+  // create a unique hash, so that a query point that repeats within nsearch
+  // is searched once and the rest copy its donor. With TIOGA_ENABLE_UNIQUEID
+  // off the hash is the identity and every point is searched on its own.
   //
+#ifdef TIOGA_ENABLE_UNIQUEID
 #ifdef TIOGA_HAS_NODEGID
   uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
 #else
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
+#endif
+#else
+  for(i=0;i<nsearch;i++) xtag[i]=i;
 #endif
   //
   searchTimers.dedup=search_wtime()-t1;
@@ -288,10 +294,14 @@ void MeshBlock::search_uniform_hex(void)
   if (xtag) free(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
+#ifdef TIOGA_ENABLE_UNIQUEID
 #ifdef TIOGA_HAS_NODEGID
   uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
 #else
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
+#endif
+#else
+  for(int i=0;i<nsearch;i++) xtag[i]=i;
 #endif
   //
   int donorCount=0;

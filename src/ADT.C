@@ -16,6 +16,29 @@ void buildADTrecursion(double *coord,double *adtReals,double *adtWork,int *adtIn
 
 extern void median_(int *,double *,int *,double *);
 
+/*
+ * Replace the inverse map in adtIntegers[4*node+3] with the number of nodes in
+ * the subtree rooted at node. Because buildADTrecursion numbers nodes in
+ * pre-order, that count is exactly the offset from a node to its next sibling,
+ * i.e. the skip pointer a stackless depth first traversal needs. Only useful
+ * once the children in slots 1 and 2 hold node indices rather than element
+ * indices, since this overwrites the map used to convert between the two.
+ */
+static void traverse(int *adtIntegers,int nodeid)
+{
+  int d,nodeChild;
+  adtIntegers[4*nodeid+3]=1;
+  for(d=1;d<3;d++)
+    {
+      nodeChild=adtIntegers[4*nodeid+d];
+      if (nodeChild > -1)
+        {
+          traverse(adtIntegers,nodeChild);
+          adtIntegers[4*nodeid+3]+=adtIntegers[4*nodeChild+3];
+        }
+    }
+}
+
 void ADT::buildADT(int d, int nelements,double *elementBbox)
 {
   int i,i2,j6,j,i4;
@@ -107,6 +130,20 @@ void ADT::buildADT(int d, int nelements,double *elementBbox)
       i4=4*adtIntegers[4*i];
       adtIntegers[i4+3]=i;
     }
+  //
+  // buildADTrecursion records children as element indices. Convert them to
+  // node indices once here, using the inverse map just built, rather than on
+  // every visit during every search. Slot 3 is then free to hold the subtree
+  // size, which the device traversal uses to skip subtrees without a stack.
+  //
+  for(i=0;i<nelem;i++)
+    for(j=1;j<3;j++)
+      {
+        if (adtIntegers[4*i+j] > -1)
+          adtIntegers[4*i+j]=adtIntegers[4*adtIntegers[4*i+j]+3];
+      }
+  //
+  if (nelem > 0) traverse(adtIntegers,0);
   //for(i=0;i<nelem;i++)
   // {
   //   fprintf(fp,"%.8e %.8e %.8e %.8e %.8e %.8e\n",adtReals[6*i],adtReals[6*i+1],adtReals[6*i+2],adtReals[6*i+3],

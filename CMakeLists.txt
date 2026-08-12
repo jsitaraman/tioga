@@ -9,7 +9,6 @@ option(TIOGA_HAS_NODEGID "Support node global IDs (default: on)" on)
 option(TIOGA_ENABLE_TIMERS "Track timing information for TIOGA (default: off)" OFF)
 option(TIOGA_OUTPUT_STATS "Output statistics for TIOGA holecutting (default: off)" OFF)
 option(TIOGA_ENABLE_CUDA "Build the cuBQL based GPU donor search (default: off)" OFF)
-option(BUILD_BENCHMARK_EXE "Build the MeshBlock::search benchmark (default: off)" ON)
 set(TIOGA_CUBQL_DIR "/scratch/software/cuBQL" CACHE PATH
   "Root of the cuBQL source tree (the directory containing cuBQL/bvh.h)")
 
@@ -76,10 +75,6 @@ endif()
 
 # Always build libtioga
 add_subdirectory(src)
-
-if (BUILD_BENCHMARK_EXE)
-  add_subdirectory(benchmark)
-endif()
 
 # Optionally build driver exe and gridGen if the user requests it
 if (BUILD_TIOGA_EXE)

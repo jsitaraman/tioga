@@ -230,11 +230,9 @@ sort-by-key with no tolerance matching.
 - **Element type barely matters.** A tet mesh with 6× the cells costs 42 % more
   GPU traversal; mixed hex/prism costs 30 % more than pure hex at 1.5× the
   cells. Not enough to justify bucketing candidates by element type.
-- **Single-block shmoo** (8 mesh sizes × 4 query counts) is in
-  `results/shmoo_throughput.csv`, tidy long form for plotting. At 4M queries,
-  M pts/s: CPU search falls 1.36 → 0.29 across the grid because the ADT is
-  rebuilt every call, while GPU cached stays flat at 285–329 over a 340× range
-  of mesh sizes — with the tree resident, cost depends only on query count.
+- **Single-block scaling:** with a cached BVH, GPU cost tracks query count,
+  not mesh size — the host ADT is rebuilt every call, so CPU cost grows with
+  both. See `benchmark/results/` from `sweep.sh` / `bench_search`.
 
 ---
 

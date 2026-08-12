@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 # Many blocks per rank, one CUDA context per GPU -- the production shape.
 # 16^3 active cells per block is typical for the target application.
 #

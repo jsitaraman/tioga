@@ -1,4 +1,5 @@
-
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
 set(TIOGA_SOURCES
   # Fortran sources

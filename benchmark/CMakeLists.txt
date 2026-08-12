@@ -1,3 +1,5 @@
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 add_executable(bench_search.exe bench_search.C)
 target_include_directories(bench_search.exe PRIVATE
   ${CMAKE_SOURCE_DIR}/src ${MPI_CXX_INCLUDE_DIRS})

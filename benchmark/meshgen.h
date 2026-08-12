@@ -1,6 +1,8 @@
 // Copyright TIOGA Developers. See COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD 3-Clause)
+// Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause
 
 /* Synthetic overset mesh block + query cloud generation, shared by the
    single-block (bench_search.C) and many-blocks-per-rank

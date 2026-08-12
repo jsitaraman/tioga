@@ -335,3 +335,21 @@ int MeshBlock::search_adt_gpu(void)
 
   return 0;
 }
+
+/*
+ * Create the CUDA context up front.
+ *
+ * The first device call in a process pays for context creation, which is
+ * order a second per rank and has nothing to do with searching. Applications
+ * call performConnectivity() once per mesh motion, so that cost is amortised
+ * away in production but would otherwise land entirely inside the first (and
+ * in the test drivers, only) measured search. Doing it here keeps the search
+ * timings comparable between backends.
+ */
+extern "C" void tioga_gpu_context_init(void)
+{
+  static int done = 0;
+  if (done) return;
+  done = 1;
+  cudaFree(0);
+}

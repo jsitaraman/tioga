@@ -50,3 +50,7 @@ int MeshBlock::search_cubql_batch(MeshBlock ** /*blocks*/, int /*nblocks*/,
 void MeshBlock::freeCubqlBatchData(void)
 {
 }
+
+extern "C" void tioga_gpu_context_init(void)
+{
+}

@@ -1404,3 +1404,31 @@ void MeshBlock::create_hex_cell_map(void)
        uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]]=i;
     }
 }
+
+/*
+ * Dump the donor found for every query point, for cross checking one search
+ * backend against another. Since the backend is chosen at configure time, two
+ * backends cannot be compared inside one run; each writes its donors and the
+ * files are diffed afterwards (see scripts/compare_search_backends.sh).
+ *
+ * The query points themselves come from exchangeSearchData() and do not depend
+ * on the backend, so at a fixed rank count file i of one run lines up with
+ * file i of another, line for line.
+ */
+void MeshBlock::writeDonorDump(const char *dir,int blockid)
+{
+  char fname[1024];
+  snprintf(fname,sizeof(fname),"%s/donors.%s.r%04d.b%02d.txt",
+           dir,TIOGA_SEARCH_BACKEND_NAME,myid,blockid);
+  FILE *fp=fopen(fname,"w");
+  if (!fp) {
+    fprintf(stderr,"#tioga: cannot write donor dump %s\n",fname);
+    return;
+  }
+  fprintf(fp,"# backend %s meshtag %d nsearch %d donorCount %d\n",
+          TIOGA_SEARCH_BACKEND_NAME,meshtag,nsearch,donorCount);
+  for(int i=0;i<nsearch;i++)
+    fprintf(fp,"%d %d %.17e %.17e %.17e\n",i,donorId[i],
+            xsearch[3*i],xsearch[3*i+1],xsearch[3*i+2]);
+  fclose(fp);
+}

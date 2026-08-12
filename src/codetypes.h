@@ -151,6 +151,17 @@ typedef struct SEARCHTIMERS
   int    candidates;   /* number of cells the acceleration structure holds   */
 } SEARCHTIMERS;
 
+/* name of the backend this build was configured with, for reporting */
+#if defined(TIOGA_SEARCH_BACKEND_ADT_GPU)
+#define TIOGA_SEARCH_BACKEND_NAME "adt_gpu"
+#elif defined(TIOGA_SEARCH_BACKEND_CUBQL_BATCH)
+#define TIOGA_SEARCH_BACKEND_NAME "cubql_batch"
+#elif defined(TIOGA_SEARCH_BACKEND_CUBQL)
+#define TIOGA_SEARCH_BACKEND_NAME "cubql"
+#else
+#define TIOGA_SEARCH_BACKEND_NAME "cpu"
+#endif
+
 typedef struct INTEGERLIST2
 {
   int intDataSize,realDataSize;

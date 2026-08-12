@@ -280,6 +280,9 @@ class MeshBlock
 
   /** release the shared device state held for search_cubql_batch() */
   static void freeCubqlBatchData();
+  /** write donorId[] for every query point, for cross backend verification */
+  void writeDonorDump(const char *dir,int blockid);
+
   void writeOBB(int bid);
 
   void writeOBB2(OBB *obc,int bid);

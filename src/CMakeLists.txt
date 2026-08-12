@@ -39,7 +39,7 @@ set(TIOGA_SOURCES
   )
 
 if (TIOGA_ENABLE_CUDA)
-  list(APPEND TIOGA_SOURCES searchGPU.cu)
+  list(APPEND TIOGA_SOURCES searchGPU.cu searchGPU_adt.cu)
 else()
   list(APPEND TIOGA_SOURCES searchGPU_stub.C)
 endif()
@@ -54,7 +54,8 @@ if (TIOGA_ENABLE_CUDA)
   # CUBQL_GPU_BUILDER_IMPLEMENTATION and instantiates the float3 builders
   # it needs, so no cuBQL library has to be built or linked.
   target_include_directories(tioga PUBLIC ${TIOGA_CUBQL_DIR})
-  set_source_files_properties(searchGPU.cu PROPERTIES LANGUAGE CUDA)
+  set_source_files_properties(searchGPU.cu searchGPU_adt.cu
+    PROPERTIES LANGUAGE CUDA)
   set_target_properties(tioga PROPERTIES
     CUDA_STANDARD 17
     CUDA_STANDARD_REQUIRED ON

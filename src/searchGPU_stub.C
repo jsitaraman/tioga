@@ -10,31 +10,43 @@
 #include "codetypes.h"
 #include "MeshBlock.h"
 
-int MeshBlock::search_gpu(void)
+int MeshBlock::search_cubql(void)
 {
   static int warned = 0;
   if (!warned) {
     fprintf(stderr,
-            "#tioga: search_gpu() unavailable, "
+            "#tioga: search_cubql() unavailable, "
             "rebuild with -DTIOGA_ENABLE_CUDA=ON\n");
     warned = 1;
   }
   return -1;
 }
 
-void MeshBlock::freeGpuSearchData(void)
+void MeshBlock::freeCubqlSearchData(void)
 {
 }
 
-int MeshBlock::search_gpu_batch(MeshBlock ** /*blocks*/, int /*nblocks*/,
+int MeshBlock::search_adt_gpu(void)
+{
+  static int warned = 0;
+  if (!warned) {
+    fprintf(stderr,
+            "#tioga: search_adt_gpu() unavailable, "
+            "rebuild with -DTIOGA_ENABLE_CUDA=ON\n");
+    warned = 1;
+  }
+  return -1;
+}
+
+int MeshBlock::search_cubql_batch(MeshBlock ** /*blocks*/, int /*nblocks*/,
                                 SEARCHTIMERS * /*timers*/)
 {
   fprintf(stderr,
-          "#tioga: search_gpu_batch() unavailable, "
+          "#tioga: search_cubql_batch() unavailable, "
           "rebuild with -DTIOGA_ENABLE_CUDA=ON\n");
   return -1;
 }
 
-void MeshBlock::freeGpuBatchData(void)
+void MeshBlock::freeCubqlBatchData(void)
 {
 }

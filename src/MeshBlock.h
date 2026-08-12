@@ -16,7 +16,7 @@
 class parallelComm;
 class CartGrid;
 /* opaque handle for the persistent device-side state used by
-   MeshBlock::search_gpu(); defined in searchGPU.cu */
+   MeshBlock::search_cubql(); defined in searchGPU.cu */
 struct TiogaGpuSearchData;
 
 /**
@@ -123,7 +123,7 @@ class MeshBlock
   int donorCount;
   int myid;
   //
-  // per-call phase breakdown, filled by both search() and search_gpu()
+  // per-call phase breakdown, filled by both search() and search_cubql()
   //
   SEARCHTIMERS searchTimers;
   //
@@ -236,14 +236,27 @@ class MeshBlock
    *  whenever x[] or the connectivity changes so the device copy and BVH are
    *  rebuilt (it is set for you by setData()).
    */
-  int search_gpu();
+  int search_cubql();
 
-  /** release device memory held for search_gpu() */
-  void freeGpuSearchData();
+  /** release device memory held for search_cubql() */
+  void freeCubqlSearchData();
+
+  /** GPU query pass over the host built ADT
+   *
+   *  Called by search() in place of its own query loop, after the OBB
+   *  pre-filter and buildADT have run on the host. Fills donorId[] for every
+   *  query point and updates donorCount/ipoint. Device memory is allocated
+   *  and released within the call.
+   *
+   *  Returns 0 on success, non-zero if unsupported (ihigh!=0, no ADT) or if
+   *  the library was built without CUDA, in which case donorId is untouched
+   *  and the caller should run the host loop instead.
+   */
+  int search_adt_gpu();
 
   /** GPU donor search for many blocks at once, one BVH per rank
    *
-   *  Equivalent to calling search_gpu() on each block in turn, but builds a
+   *  Equivalent to calling search_cubql() on each block in turn, but builds a
    *  single BVH over the cells of every block and locates every block's query
    *  points in one kernel launch. At production block sizes (16^3) the
    *  per-block launch and synchronisation latency dominates the per-block
@@ -262,11 +275,11 @@ class MeshBlock
    *  \param[in] nblocks  how many
    *  \param[out] timers  optional aggregate phase breakdown
    */
-  static int search_gpu_batch(MeshBlock **blocks, int nblocks,
+  static int search_cubql_batch(MeshBlock **blocks, int nblocks,
                               SEARCHTIMERS *timers = NULL);
 
-  /** release the shared device state held for search_gpu_batch() */
-  static void freeGpuBatchData();
+  /** release the shared device state held for search_cubql_batch() */
+  static void freeCubqlBatchData();
   void writeOBB(int bid);
 
   void writeOBB2(OBB *obc,int bid);

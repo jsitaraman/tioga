@@ -131,7 +131,7 @@ typedef struct INTEGERLIST
   struct INTEGERLIST *next;
 } INTEGERLIST;
 
-/* Phase-by-phase breakdown of one MeshBlock::search()/search_gpu() call.
+/* Phase-by-phase breakdown of one MeshBlock::search()/search_cubql() call.
    All times are wall-clock seconds; fields that do not apply to a given
    backend are left at zero. */
 typedef struct SEARCHTIMERS

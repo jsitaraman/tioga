@@ -52,7 +52,7 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   ncells=0;
   for(i=0;i<ntypes;i++) ncells+=nc[i];
   //
-  // any device-side copy of the mesh held for search_gpu() is now stale
+  // any device-side copy of the mesh held for search_cubql() is now stale
   //
   gpuMeshDirty=1;
 
@@ -1226,7 +1226,7 @@ MeshBlock::~MeshBlock()
   if (mapmask) TIOGA_FREE(mapmask);
   if (uindx) TIOGA_FREE(uindx);
   if (invmap) TIOGA_FREE(invmap);
-  freeGpuSearchData();
+  freeCubqlSearchData();
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };

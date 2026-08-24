@@ -146,3 +146,9 @@ The same instrumentation is available directly, in any build:
 |------------------------|---------------------------------------------------|
 | `TIOGA_DONOR_DUMP=dir` | write the donor found for every query point       |
 | `TIOGA_SEARCH_TIMERS=1`| print the per-phase search cost, reduced over ranks|
+| `TIOGA_SEARCH_REPEAT=n` | repeat the search `n` times and time the last pass |
+
+`TIOGA_SEARCH_REPEAT` exists because the drivers call `performConnectivity()`
+once, which measures the cuBQL backends on a cold tree. Passes after the first
+mark the coordinates dirty, exactly as a moving mesh does, so the BVH is refit
+rather than rebuilt and the steady state cost is what gets reported.

@@ -18,7 +18,7 @@
 #
 # Usage: scripts/compare_search_backends.sh [-n ranks] [-o outdir]
 #                                           [-c cubql_dir] [-a cuda_arch]
-#                                           [-u] [-b backends]
+#                                           [-u] [-b backends] [-r repeats]
 #
 #   -n  MPI ranks for the solve (default 8). The grid generator runs on 2n.
 #   -o  where builds, dumps and logs go (default build-compare)
@@ -27,6 +27,10 @@
 #   -u  leave host de-duplication on. The GPU backends stand down in that
 #       configuration, so this checks that the host path is untouched.
 #   -b  space separated backend list (default "cpu adt_gpu cubql cubql_batch")
+#   -r  repeat the search this many times and time the last pass (default 1).
+#       Passes after the first mark the coordinates dirty, which is what a
+#       moving mesh does, so the cuBQL backends refit rather than rebuild.
+#       Use this for a steady state number; repeat=1 is the first call only.
 
 set -u
 
@@ -36,16 +40,18 @@ cubql=/scratch/software/cuBQL
 arch=90
 uniqueid=off
 backends="cpu adt_gpu cubql cubql_batch"
+repeat=1
 
-while getopts "n:o:c:a:b:uh" opt; do
+while getopts "n:o:c:a:b:r:uh" opt; do
   case $opt in
     n) ranks=$OPTARG ;;
     o) outdir=$OPTARG ;;
     c) cubql=$OPTARG ;;
     a) arch=$OPTARG ;;
     b) backends=$OPTARG ;;
+    r) repeat=$OPTARG ;;
     u) uniqueid=on ;;
-    h) sed -n '10,30p' "$0"; exit 0 ;;
+    h) sed -n '9,33p' "$0"; exit 0 ;;
     *) echo "try -h" >&2; exit 2 ;;
   esac
 done
@@ -66,6 +72,7 @@ echo "== configuration"
 echo "   ranks            $ranks"
 echo "   uniqueid (dedup) $uniqueid"
 echo "   backends         $backends"
+echo "   search repeats   $repeat"
 echo "   cuBQL            $cubql"
 echo "   output           $outdir"
 
@@ -105,6 +112,7 @@ for be in $backends; do
   echo "== running $be on $ranks ranks"
   rm -f "$dumps"/donors.$be.*.txt
   ( cd "$case_dir" && TIOGA_DONOR_DUMP="$dumps" TIOGA_SEARCH_TIMERS=1 \
+      TIOGA_SEARCH_REPEAT="$repeat" \
       mpirun -np "$ranks" --oversubscribe \
       "$outdir/build-$be/driver/tioga.exe" ) > "$logs/run-$be.log" 2>&1 \
     || { echo "   run failed, see $logs/run-$be.log" >&2; exit 1; }

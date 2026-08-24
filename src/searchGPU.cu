@@ -307,6 +307,14 @@ int MeshBlock::search_cubql(void)
 
     free(h_conn); free(h_connOffset); free(h_cellStart);
   }
+  else if (gpuCoordsDirty) {
+    /* Moving mesh: the connectivity is unchanged, so only x[] is re-sent. No
+       host staging and no re-walking of the connectivity, which is most of
+       what makes a full rebuild expensive. */
+    TIOGA_CUDA_CALL(cudaMemcpyAsync(g->d_x, x, sizeof(double)*3*nnodes,
+                                    cudaMemcpyHostToDevice, s));
+    TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
+  }
 
   /* query points */
   if (g->qCapacity < nsearch) {
@@ -323,7 +331,18 @@ int MeshBlock::search_cubql(void)
 
   /* ---------------- cell AABBs + BVH build (cached) ---------------- */
   t1 = gpu_wtime();
-  if (gpuMeshDirty || !g->bvhValid) {
+  if (gpuCoordsDirty && g->bvhValid && !gpuMeshDirty && gpuRefit) {
+    /* recompute the cell AABBs for the moved coordinates and refit the tree:
+       leaf membership is kept, only the bounds move */
+    int nb = (ncells + 255)/256;
+    k_cellBoxes<<<nb,256,0,s>>>(g->d_cellBox, g->d_x, g->d_conn, g->d_connOffset,
+                                g->d_cellStart, g->d_nvert, ntypes, ncells);
+    TIOGA_CUDA_CALL(cudaGetLastError());
+    cuBQL::cuda::refit(g->bvh, g->d_cellBox, s);
+    TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
+    gpuCoordsDirty = 0;
+  }
+  else if (gpuMeshDirty || gpuCoordsDirty || !g->bvhValid) {
     int nb = (ncells + 255)/256;
     k_cellBoxes<<<nb,256,0,s>>>(g->d_cellBox, g->d_x, g->d_conn, g->d_connOffset,
                                 g->d_cellStart, g->d_nvert, ntypes, ncells);
@@ -347,6 +366,7 @@ int MeshBlock::search_cubql(void)
     TIOGA_CUDA_CALL(cudaStreamSynchronize(s));
     g->bvhValid = 1;
     gpuMeshDirty = 0;
+    gpuCoordsDirty = 0;
   }
   searchTimers.build = gpu_wtime() - t1;
   searchTimers.candidates = ncells;

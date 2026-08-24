@@ -165,6 +165,27 @@ void tioga::performConnectivity(void)
    mb->resetInterpData();
   }
   SEARCHTIMERS searchAgg=SEARCHTIMERS();
+  //
+  // TIOGA_SEARCH_REPEAT repeats the search to get a steady state cost. The
+  // drivers call performConnectivity() once, so without this the GPU backends
+  // are always measured on their very first call, where the BVH is built from
+  // scratch. A moving mesh application re-registers the same connectivity with
+  // moved nodes every step, which only refits, so the first call is the least
+  // representative one there is. Each extra pass marks the coordinates dirty
+  // to model exactly that, and only the last pass is timed.
+  //
+  int nrepeat=1;
+  { const char *r=getenv("TIOGA_SEARCH_REPEAT"); if (r) nrepeat=atoi(r); }
+  if (nrepeat < 1) nrepeat=1;
+  for(int irep=0;irep<nrepeat;irep++)
+  {
+   if (irep > 0)
+     for(int ib=0;ib < nblocks;ib++)
+     {
+      mblocks[ib]->gpuCoordsDirty=1;
+      mblocks[ib]->resetInterpData();
+     }
+   searchAgg=SEARCHTIMERS();
 #if defined(TIOGA_SEARCH_BACKEND_CUBQL_BATCH) && !defined(TIOGA_ENABLE_UNIQUEID)
   /* One tree per rank covering every block, so that a rank holding many small
      blocks pays one launch instead of one per block. Falls back to the
@@ -183,6 +204,7 @@ void tioga::performConnectivity(void)
   for(int ib=0;ib < nblocks;ib++) mblocks[ib]->search();
   for(int ib=0;ib < nblocks;ib++) accumulateSearchTimers(&searchAgg,mblocks[ib]->searchTimers);
 #endif
+  }
   this->myTimer("tioga::search",1);
   //
   // optional instrumentation, for comparing search backends across runs

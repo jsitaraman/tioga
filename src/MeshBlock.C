@@ -30,6 +30,26 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   //
   // set internal pointers
   //
+  //
+  // Decide, before anything is overwritten, whether this is the same mesh with
+  // moved nodes or a genuinely different one. A moving mesh re-registers the
+  // same connectivity arrays every step and changes only the contents of xyz,
+  // and that case only needs the device coordinates re-sent and the BVH refit
+  // rather than a full rebuild.
+  //
+  // The test is deliberately conservative: anything it cannot prove unchanged
+  // forces a rebuild. It compares the connectivity by pointer, so an
+  // application that edits vconn in place through the same pointers must set
+  // gpuMeshDirty=1 itself.
+  //
+  int sameTopology = (x != NULL && nnodes == nnodesi && ntypes == ntypesi &&
+                      nv == nvi && nc == nci && vconn == vconni &&
+                      cellGID == cell_gid && nodeGID == node_gid);
+  if (sameTopology) {
+    for(i=0;i<ntypesi;i++)
+      if (nvi[i] != nv[i] || nci[i] != nc[i]) { sameTopology=0; break; }
+  }
+  //
   meshtag=btag;
   nnodes=nnodesi;
   x=xyzi;
@@ -52,9 +72,13 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   ncells=0;
   for(i=0;i<ntypes;i++) ncells+=nc[i];
   //
-  // any device-side copy of the mesh held for search_cubql() is now stale
+  // mark what the device side copy held for the cuBQL search has to redo
   //
-  gpuMeshDirty=1;
+  if (sameTopology) {
+    gpuCoordsDirty=1;
+  } else {
+    gpuMeshDirty=1;
+  }
 
 #ifdef TIOGA_HAS_NODEGID
   if (nodeGID == NULL)

@@ -1,11 +1,22 @@
 // Copyright TIOGA Developers. See COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD 3-Clause)
+// Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include "codetypes.h"
 #include "MeshBlock.h"
 #include <unordered_map>
 #include <iostream>
+#include <time.h>
+
+/* monotonic wall clock, used for the per-phase search breakdown */
+static inline double search_wtime(void)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC,&ts);
+  return (double)ts.tv_sec + 1.0e-9*(double)ts.tv_nsec;
+}
 
 extern "C" {
   void findOBB(double *x,double xc[3],double dxc[3],double vec[3][3],int nnodes);
@@ -60,8 +71,25 @@ void uniquenode_map(uint64_t* node_ids, double* node_res, int* itag, int nnodes)
 }
 
 
+/* A GPU backend is compiled in only when the host de-duplication pass is
+   compiled out; see TIOGA_SEARCH_BACKEND in the top level CMakeLists.txt.
+   Every backend can decline at run time (an unsupported element order, no
+   device, no ADT), in which case the host search below runs instead. */
+#if defined(TIOGA_SEARCH_BACKEND_ADT_GPU) && !defined(TIOGA_ENABLE_UNIQUEID)
+#define TIOGA_SEARCH_USE_ADT_GPU 1
+#endif
+#if defined(TIOGA_SEARCH_BACKEND_CUBQL) && !defined(TIOGA_ENABLE_UNIQUEID)
+#define TIOGA_SEARCH_USE_CUBQL 1
+#endif
+
 void MeshBlock::search(void)
 {
+#ifdef TIOGA_SEARCH_USE_CUBQL
+  /* the cuBQL backend replaces the whole search: it does its own broad phase
+     and builds its own tree over every cell of the block */
+  if (search_cubql() == 0) return;
+#endif
+
   int i,j,k,l,m,n,p,i3;
   int ndim;
   int iptr,isum,nvert;
@@ -75,22 +103,27 @@ void MeshBlock::search(void)
   double xmin[3];
   double xmax[3];
   int *dId;
+  double t0,t1;
   //
-  // form the bounding box of the 
+  searchTimers=SEARCHTIMERS();
+  t0=search_wtime();
+  //
+  // form the bounding box of the
   // query points
   //
   if (nsearch == 0) {
     donorCount=0;
     return;
   }
- 
+
   if (uniform_hex) {
     search_uniform_hex();
+    searchTimers.total=search_wtime()-t0;
     return;
   }
 
   obq=(OBB *) malloc(sizeof(OBB));
-  
+
 findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 
 
@@ -205,7 +238,11 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   // build the ADT now
   //
-  if (adt) 
+  t1=search_wtime();
+  searchTimers.filter=t1-t0;
+  searchTimers.candidates=cell_count;
+  //
+  if (adt)
    {
     adt->clearData();
    }
@@ -217,21 +254,44 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
   //
   adt->buildADT(ndim,cell_count,elementBbox);
   //
+  searchTimers.build=search_wtime()-t1;
+  t1=search_wtime();
+  //
   if (donorId) TIOGA_FREE(donorId);
   donorId=(int*)malloc(sizeof(int)*nsearch);
   if (xtag) TIOGA_FREE(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
-  // create a unique hash
+  // create a unique hash, so that a query point that repeats within nsearch
+  // is searched once and the rest copy its donor. With TIOGA_ENABLE_UNIQUEID
+  // off the hash is the identity and every point is searched on its own.
   //
+#ifdef TIOGA_ENABLE_UNIQUEID
 #ifdef TIOGA_HAS_NODEGID
   uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
 #else
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
 #endif
+#else
+  for(i=0;i<nsearch;i++) xtag[i]=i;
+#endif
+  //
+  searchTimers.dedup=search_wtime()-t1;
+  t1=search_wtime();
+  //
+#ifdef TIOGA_SEARCH_USE_ADT_GPU
+  /* same tree, same candidate cells, walked on the device instead */
+  if (search_adt_gpu() == 0) {
+    TIOGA_FREE(icell);
+    TIOGA_FREE(obq);
+    searchTimers.total=search_wtime()-t0;
+    return;
+  }
+  t1=search_wtime();
+#endif
   //
   donorCount=0;
-  ipoint=0; 
+  ipoint=0;
   dId=(int *) malloc(sizeof(int) *2);
   for(i=0;i<nsearch;i++)
     {
@@ -248,9 +308,11 @@ findOBB(xsearch,obq->xc,obq->dxc,obq->vec,nsearch);
 	}
        ipoint+=3;
      }
+  searchTimers.query=search_wtime()-t1;
   TIOGA_FREE(dId);
   TIOGA_FREE(icell);
   TIOGA_FREE(obq);
+  searchTimers.total=search_wtime()-t0;
 }
 
 void MeshBlock::search_uniform_hex(void)
@@ -260,10 +322,14 @@ void MeshBlock::search_uniform_hex(void)
   if (xtag) free(xtag);
   xtag=(int *)malloc(sizeof(int)*nsearch);
   //
+#ifdef TIOGA_ENABLE_UNIQUEID
 #ifdef TIOGA_HAS_NODEGID
   uniquenode_map(gid_search.data(), res_search, xtag, nsearch);
 #else
   uniquenodes_octree(xsearch,tagsearch,res_search,xtag,&nsearch);
+#endif
+#else
+  for(int i=0;i<nsearch;i++) xtag[i]=i;
 #endif
   //
   int donorCount=0;

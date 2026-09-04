@@ -2,6 +2,9 @@
 ! Tioga is a library for overset grid assembly on parallel distributed systems
 ! Copyright (C) 2015 Jay Sitaraman
 !
+! Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+! SPDX-License-Identifier: BSD-3-Clause
+!
 !> Poisson MMS test code  for Topology Independent Overset Grid Assembler (TIOGA)
 !> 
 !> Jay Sitaraman
@@ -20,6 +23,7 @@ program poissonMMS
   type(grid), target :: gr(mgrids)
   type(grid), pointer :: g
   !
+  integer, external :: iargc
   integer :: myid,numprocs,ierr
   integer :: ib,iter,ngrids,irefine,nref,ndof,ntypes,nv2,i,jmax,jmax2
   integer :: mexclude,nfringe

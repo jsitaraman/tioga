@@ -1,4 +1,5 @@
-
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
 set(TIOGA_SOURCES
   # Fortran sources
@@ -37,10 +38,36 @@ set(TIOGA_SOURCES
   tiogaInterface.C
   )
 
+if (TIOGA_ENABLE_CUDA)
+  list(APPEND TIOGA_SOURCES searchGPU.cu searchGPU_adt.cu)
+else()
+  list(APPEND TIOGA_SOURCES searchGPU_stub.C)
+endif()
+
 file(GLOB TIOGA_HEADERS *.h)
 
 add_library(tioga ${TIOGA_SOURCES})
 target_link_libraries(tioga ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+
+if (TIOGA_ENABLE_CUDA)
+  # cuBQL is header-only here: searchGPU.cu defines
+  # CUBQL_GPU_BUILDER_IMPLEMENTATION and instantiates the float3 builders
+  # it needs, so no cuBQL library has to be built or linked.
+  target_include_directories(tioga PUBLIC ${TIOGA_CUBQL_DIR})
+  set_source_files_properties(searchGPU.cu searchGPU_adt.cu
+    PROPERTIES LANGUAGE CUDA)
+  set_target_properties(tioga PROPERTIES
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON
+    CUDA_SEPARABLE_COMPILATION OFF
+    POSITION_INDEPENDENT_CODE ON)
+  target_compile_options(tioga PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
+    $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+    $<$<COMPILE_LANGUAGE:CUDA>:-O3>)
+  # nvcc needs the MPI headers for codetypes.h
+  target_include_directories(tioga PRIVATE ${MPI_CXX_INCLUDE_DIRS})
+endif()
 
 if(MPI_COMPILE_FLAGS)
   set_target_properties(tioga PROPERTIES

@@ -6,6 +6,56 @@
 #include "tioga.h"
 #include <assert.h>
 using namespace TIOGA;
+
+/* creates the CUDA context outside the measured search; a no-op without CUDA */
+extern "C" void tioga_gpu_context_init(void);
+
+namespace {
+
+void accumulateSearchTimers(SEARCHTIMERS *agg,const SEARCHTIMERS &t)
+{
+  agg->total     += t.total;
+  agg->filter    += t.filter;
+  agg->build     += t.build;
+  agg->dedup     += t.dedup;
+  agg->query     += t.query;
+  agg->transfer  += t.transfer;
+  agg->hostwork  += t.hostwork;
+  agg->candidates+= t.candidates;
+}
+
+/*
+ * Report the per-phase cost of the donor search, summed over the blocks of a
+ * rank and then reduced over ranks. Both the sum and the slowest rank are
+ * printed: the sum is what a backend costs in total, while the slowest rank is
+ * what the next collective actually waits for.
+ */
+void reportSearchTimers(const SEARCHTIMERS &local,MPI_Comm comm)
+{
+  const char *names[7]={"total","filter","build","dedup","query",
+                        "transfer","hostwork"};
+  double mine[7]={local.total,local.filter,local.build,local.dedup,
+                  local.query,local.transfer,local.hostwork};
+  double sum[7],max[7];
+  int myid,nprocs;
+  long cand=(long)local.candidates,candsum;
+
+  MPI_Comm_rank(comm,&myid);
+  MPI_Comm_size(comm,&nprocs);
+  MPI_Reduce(mine,sum,7,MPI_DOUBLE,MPI_SUM,0,comm);
+  MPI_Reduce(mine,max,7,MPI_DOUBLE,MPI_MAX,0,comm);
+  MPI_Reduce(&cand,&candsum,1,MPI_LONG,MPI_SUM,0,comm);
+
+  if (myid!=0) return;
+  printf("#tioga search: backend=%s ranks=%d candidates=%ld\n",
+         TIOGA_SEARCH_BACKEND_NAME,nprocs,candsum);
+  printf("#tioga search: %-10s %14s %14s\n","phase","sum(s)","slowest(s)");
+  for(int i=0;i<7;i++)
+    printf("#tioga search: %-10s %14.6f %14.6f\n",names[i],sum[i],max[i]);
+  fflush(stdout);
+}
+
+}
 /**
  * set communicator
  * and initialize a few variables
@@ -106,15 +156,65 @@ void tioga::performConnectivity(void)
   this->myTimer("tioga::exchangeSearchData",0);
   exchangeSearchData();
   this->myTimer("tioga::exchangeSearchData",1);
+  tioga_gpu_context_init();
   this->myTimer("tioga::search",0);
   for(int ib=0;ib < nblocks;ib++)
   {
    auto& mb = mblocks[ib];
    mb->ihigh=0;
    mb->resetInterpData();
-   mb->search();
+  }
+  SEARCHTIMERS searchAgg=SEARCHTIMERS();
+  //
+  // TIOGA_SEARCH_REPEAT repeats the search to get a steady state cost. The
+  // drivers call performConnectivity() once, so without this the GPU backends
+  // are always measured on their very first call, where the BVH is built from
+  // scratch. A moving mesh application re-registers the same connectivity with
+  // moved nodes every step, which only refits, so the first call is the least
+  // representative one there is. Each extra pass marks the coordinates dirty
+  // to model exactly that, and only the last pass is timed.
+  //
+  int nrepeat=1;
+  { const char *r=getenv("TIOGA_SEARCH_REPEAT"); if (r) nrepeat=atoi(r); }
+  if (nrepeat < 1) nrepeat=1;
+  for(int irep=0;irep<nrepeat;irep++)
+  {
+   if (irep > 0)
+     for(int ib=0;ib < nblocks;ib++)
+     {
+      mblocks[ib]->gpuCoordsDirty=1;
+      mblocks[ib]->resetInterpData();
+     }
+   searchAgg=SEARCHTIMERS();
+#if defined(TIOGA_SEARCH_BACKEND_CUBQL_BATCH) && !defined(TIOGA_ENABLE_UNIQUEID)
+  /* One tree per rank covering every block, so that a rank holding many small
+     blocks pays one launch instead of one per block. Falls back to the
+     per-block path if the batch backend declines. */
+  {
+   std::vector<MeshBlock *> raw(nblocks);
+   for(int ib=0;ib < nblocks;ib++) raw[ib]=mblocks[ib].get();
+   if (nblocks==0 || MeshBlock::search_cubql_batch(raw.data(),nblocks,&searchAgg) != 0)
+    {
+     for(int ib=0;ib < nblocks;ib++) mblocks[ib]->search();
+     searchAgg=SEARCHTIMERS();
+     for(int ib=0;ib < nblocks;ib++) accumulateSearchTimers(&searchAgg,mblocks[ib]->searchTimers);
+    }
+  }
+#else
+  for(int ib=0;ib < nblocks;ib++) mblocks[ib]->search();
+  for(int ib=0;ib < nblocks;ib++) accumulateSearchTimers(&searchAgg,mblocks[ib]->searchTimers);
+#endif
   }
   this->myTimer("tioga::search",1);
+  //
+  // optional instrumentation, for comparing search backends across runs
+  //
+  {
+   const char *dumpdir=getenv("TIOGA_DONOR_DUMP");
+   if (dumpdir)
+     for(int ib=0;ib < nblocks;ib++) mblocks[ib]->writeDonorDump(dumpdir,ib);
+   if (getenv("TIOGA_SEARCH_TIMERS")) reportSearchTimers(searchAgg,scomm);
+  }
   this->myTimer("tioga::exchangeDonors",0);
   exchangeDonors();
   this->myTimer("tioga::exchangeDonors",1);

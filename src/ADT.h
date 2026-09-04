@@ -45,8 +45,16 @@ class ADT
       adtReals=NULL;
       adtExtents=NULL;
     };      
-  void buildADT(int d,int nelements,double *elementBbox);  
+  void buildADT(int d,int nelements,double *elementBbox);
   void searchADT(MeshBlock *mb,int *cellindx,double *xsearch);
+  //
+  // accessors, so that a device side traversal can be handed the flat arrays
+  //
+  int *get_Integers(void) {return adtIntegers;};
+  double *get_Reals(void) {return adtReals;};
+  double *get_Extents(void) {return adtExtents;};
+  int get_nelem(void) {return nelem;};
+  int get_ndim(void) {return ndim;};
 };
 
 

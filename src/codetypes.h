@@ -1,6 +1,8 @@
 // Copyright TIOGA Developers. See COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD 3-Clause)
+// Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause
 
 #ifndef CODETYPES_H
 #define CODETYPES_H
@@ -128,6 +130,37 @@ typedef struct INTEGERLIST
   int inode;
   struct INTEGERLIST *next;
 } INTEGERLIST;
+
+/* Phase-by-phase breakdown of one MeshBlock::search()/search_cubql() call.
+   All times are wall-clock seconds; fields that do not apply to a given
+   backend are left at zero. */
+typedef struct SEARCHTIMERS
+{
+  double total;        /* whole call                                        */
+  double filter;       /* CPU: query OBB + all-cell overlap scan + cand bbox */
+  double build;        /* CPU: buildADT.  GPU: cell AABB kernel + cuBQL build*/
+  double dedup;        /* duplicate query point detection (host, both)       */
+  double query;        /* CPU: searchADT loop.  GPU: traversal kernel        */
+  double transfer;     /* GPU only: actual H2D/D2H memcpy time                */
+  double hostwork;     /* GPU only: host-side packing/unpacking that sits on
+                          the critical path between kernels -- gathering the
+                          per-block query arrays into one buffer, scattering
+                          donorId back per block. Not a memcpy, not dedup.
+                          Real work today; would disappear if the receptor
+                          points were already device-resident.                */
+  int    candidates;   /* number of cells the acceleration structure holds   */
+} SEARCHTIMERS;
+
+/* name of the backend this build was configured with, for reporting */
+#if defined(TIOGA_SEARCH_BACKEND_ADT_GPU)
+#define TIOGA_SEARCH_BACKEND_NAME "adt_gpu"
+#elif defined(TIOGA_SEARCH_BACKEND_CUBQL_BATCH)
+#define TIOGA_SEARCH_BACKEND_NAME "cubql_batch"
+#elif defined(TIOGA_SEARCH_BACKEND_CUBQL)
+#define TIOGA_SEARCH_BACKEND_NAME "cubql"
+#else
+#define TIOGA_SEARCH_BACKEND_NAME "cpu"
+#endif
 
 typedef struct INTEGERLIST2
 {

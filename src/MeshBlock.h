@@ -1,6 +1,8 @@
 // Copyright TIOGA Developers. See COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD 3-Clause)
+// Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause
 
 #ifndef MESHBLOCK_H
 #define MESHBLOCK_H
@@ -13,6 +15,9 @@
 // forward declare to instantiate one of the methods
 class parallelComm;
 class CartGrid;
+/* opaque handle for the persistent device-side state used by
+   MeshBlock::search_cubql(); defined in searchGPU.cu */
+struct TiogaGpuSearchData;
 
 /**
  * MeshBlock class - container and functions for generic unstructured grid partition in 3D
@@ -117,6 +122,33 @@ class MeshBlock
   std::vector<uint64_t> gid_search; /**< Global node ID for the query points */
   int donorCount;
   int myid;
+  //
+  // per-call phase breakdown, filled by both search() and search_cubql()
+  //
+  SEARCHTIMERS searchTimers;
+  //
+  // state/knobs for the cuBQL based GPU search
+  //
+  TiogaGpuSearchData *gpuData; /** < persistent device state (opaque)        */
+  int gpuMeshDirty;            /** < 1 => re-upload mesh and rebuild the BVH.
+                                     Set this when the connectivity changes.  */
+  int gpuCoordsDirty;          /** < 1 => x[] moved but the connectivity did
+                                     not. Only the coordinates are re-sent,
+                                     the cell AABBs are recomputed and the BVH
+                                     is refit (or rebuilt, see gpuRefit). This
+                                     is the moving-mesh path.                 */
+  int gpuRefit;                /** < on a coordinate update: 1 = refit the
+                                     existing BVH (cheap, tree topology kept),
+                                     0 = rebuild it from scratch. Refit is
+                                     always correct; only query performance
+                                     degrades as the mesh drifts from the
+                                     configuration the tree was built for.    */
+  int gpuLeafSize;             /** < cuBQL makeLeafThreshold (0 = default)   */
+  int gpuBuilderType;          /** < 0=gpuBuilder(spatial median) 1=radix
+                                     2=rebinRadix 3=SAH                      */
+  int gpuEarlyExit;            /** < 1 => stop at first accepted donor (as
+                                     the ADT does), 0 => scan all candidates
+                                     and keep the lowest cell id             */
   double *cellRes;  /** < resolution for each cell */
   int ntotalPoints;        /**  total number of extra points to interpolate */
   int ihigh;
@@ -160,6 +192,15 @@ class MeshBlock
     invmap = NULL;
     icft   = NULL;
     mapmask= NULL;
+
+    gpuData=NULL;
+    gpuMeshDirty=1;
+    gpuCoordsDirty=0;
+    gpuRefit=1;
+    gpuLeafSize=0;
+    gpuBuilderType=0;
+    gpuEarlyExit=1;
+    searchTimers=SEARCHTIMERS();
   };
 
   /** basic destructor */
@@ -183,6 +224,65 @@ class MeshBlock
 	       
   void search();
   void search_uniform_hex();
+
+  /** GPU (cuBQL BVH) alternative to search()
+   *
+   *  Produces the same donorId[]/donorCount/xtag[] outputs as search().
+   *  Returns 0 on success, non-zero if the library was built without CUDA
+   *  support, in which case nothing is written.
+   *
+   *  Unlike search(), this does not pre-filter cells against the query-cloud
+   *  OBB; it builds a BVH over all cells of the block. Set gpuMeshDirty=1
+   *  whenever x[] or the connectivity changes so the device copy and BVH are
+   *  rebuilt (it is set for you by setData()).
+   */
+  int search_cubql();
+
+  /** release device memory held for search_cubql() */
+  void freeCubqlSearchData();
+
+  /** GPU query pass over the host built ADT
+   *
+   *  Called by search() in place of its own query loop, after the OBB
+   *  pre-filter and buildADT have run on the host. Fills donorId[] for every
+   *  query point and updates donorCount/ipoint. Device memory is allocated
+   *  and released within the call.
+   *
+   *  Returns 0 on success, non-zero if unsupported (ihigh!=0, no ADT) or if
+   *  the library was built without CUDA, in which case donorId is untouched
+   *  and the caller should run the host loop instead.
+   */
+  int search_adt_gpu();
+
+  /** GPU donor search for many blocks at once, one BVH per rank
+   *
+   *  Equivalent to calling search_cubql() on each block in turn, but builds a
+   *  single BVH over the cells of every block and locates every block's query
+   *  points in one kernel launch. At production block sizes (16^3) the
+   *  per-block launch and synchronisation latency dominates the per-block
+   *  path, so this is the form that matters.
+   *
+   *  Donor semantics are unchanged: a query point belonging to block b can
+   *  only be given a donor from block b, so overlapping blocks (which is the
+   *  normal case in overset) do not steal each other's receptors. donorId[]
+   *  is written per block in that block's own cell numbering.
+   *
+   *  Rebuilds the shared BVH if the block set changed or any block has
+   *  gpuMeshDirty set. Returns 0 on success, non-zero if unsupported or if
+   *  the library was built without CUDA.
+   *
+   *  \param[in] blocks   array of nblocks MeshBlock pointers
+   *  \param[in] nblocks  how many
+   *  \param[out] timers  optional aggregate phase breakdown
+   */
+  static int search_cubql_batch(MeshBlock **blocks, int nblocks,
+                              SEARCHTIMERS *timers = NULL);
+
+  /** release the shared device state held for search_cubql_batch() */
+  static void freeCubqlBatchData();
+  /** write donorId[] for every query point, for cross backend verification */
+  void writeDonorDump(const char *dir,int blockid);
+
   void writeOBB(int bid);
 
   void writeOBB2(OBB *obc,int bid);

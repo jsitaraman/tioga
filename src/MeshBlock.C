@@ -1,6 +1,8 @@
 // Copyright TIOGA Developers. See COPYRIGHT file for details.
 //
 // SPDX-License-Identifier: (BSD 3-Clause)
+// Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause
 
 #include "codetypes.h"
 #include "MeshBlock.h"
@@ -28,6 +30,26 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   //
   // set internal pointers
   //
+  //
+  // Decide, before anything is overwritten, whether this is the same mesh with
+  // moved nodes or a genuinely different one. A moving mesh re-registers the
+  // same connectivity arrays every step and changes only the contents of xyz,
+  // and that case only needs the device coordinates re-sent and the BVH refit
+  // rather than a full rebuild.
+  //
+  // The test is deliberately conservative: anything it cannot prove unchanged
+  // forces a rebuild. It compares the connectivity by pointer, so an
+  // application that edits vconn in place through the same pointers must set
+  // gpuMeshDirty=1 itself.
+  //
+  int sameTopology = (x != NULL && nnodes == nnodesi && ntypes == ntypesi &&
+                      nv == nvi && nc == nci && vconn == vconni &&
+                      cellGID == cell_gid && nodeGID == node_gid);
+  if (sameTopology) {
+    for(i=0;i<ntypesi;i++)
+      if (nvi[i] != nv[i] || nci[i] != nc[i]) { sameTopology=0; break; }
+  }
+  //
   meshtag=btag;
   nnodes=nnodesi;
   x=xyzi;
@@ -49,6 +71,14 @@ void MeshBlock::setData(int btag,int nnodesi,double *xyzi, int *ibli,int nwbci, 
   //for(i=0;i<ntypes;i++) TRACEI(nc[i]);
   ncells=0;
   for(i=0;i<ntypes;i++) ncells+=nc[i];
+  //
+  // mark what the device side copy held for the cuBQL search has to redo
+  //
+  if (sameTopology) {
+    gpuCoordsDirty=1;
+  } else {
+    gpuMeshDirty=1;
+  }
 
 #ifdef TIOGA_HAS_NODEGID
   if (nodeGID == NULL)
@@ -1220,6 +1250,7 @@ MeshBlock::~MeshBlock()
   if (mapmask) TIOGA_FREE(mapmask);
   if (uindx) TIOGA_FREE(uindx);
   if (invmap) TIOGA_FREE(invmap);
+  freeCubqlSearchData();
   // need to add code here for other objects as and
   // when they become part of MeshBlock object  
 };
@@ -1396,4 +1427,32 @@ void MeshBlock::create_hex_cell_map(void)
 	}
        uindx[idx[2]*idims[1]*idims[0]+idx[1]*idims[0]+idx[0]]=i;
     }
+}
+
+/*
+ * Dump the donor found for every query point, for cross checking one search
+ * backend against another. Since the backend is chosen at configure time, two
+ * backends cannot be compared inside one run; each writes its donors and the
+ * files are diffed afterwards (see scripts/compare_search_backends.sh).
+ *
+ * The query points themselves come from exchangeSearchData() and do not depend
+ * on the backend, so at a fixed rank count file i of one run lines up with
+ * file i of another, line for line.
+ */
+void MeshBlock::writeDonorDump(const char *dir,int blockid)
+{
+  char fname[1024];
+  snprintf(fname,sizeof(fname),"%s/donors.%s.r%04d.b%02d.txt",
+           dir,TIOGA_SEARCH_BACKEND_NAME,myid,blockid);
+  FILE *fp=fopen(fname,"w");
+  if (!fp) {
+    fprintf(stderr,"#tioga: cannot write donor dump %s\n",fname);
+    return;
+  }
+  fprintf(fp,"# backend %s meshtag %d nsearch %d donorCount %d\n",
+          TIOGA_SEARCH_BACKEND_NAME,meshtag,nsearch,donorCount);
+  for(int i=0;i<nsearch;i++)
+    fprintf(fp,"%d %d %.17e %.17e %.17e\n",i,donorId[i],
+            xsearch[3*i],xsearch[3*i+1],xsearch[3*i+2]);
+  fclose(fp);
 }
